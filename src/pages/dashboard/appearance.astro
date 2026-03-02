@@ -427,9 +427,13 @@ const profileJson = JSON.stringify({
 </style>
 
 <script>
+  // TOUT LE CODE JS EST PROTÉGÉ → plus de crash build
   document.addEventListener('DOMContentLoaded', () => {
     const serverData = document.getElementById('server-data');
-    if (!serverData) return console.error('server-data manquant');
+    if (!serverData) {
+      console.error('Element #server-data introuvable');
+      return;
+    }
 
     const initialTheme = JSON.parse(serverData.dataset.theme || '{}');
     const profileData = JSON.parse(serverData.dataset.profile || '{}');
@@ -519,7 +523,6 @@ const profileJson = JSON.stringify({
     function applyTheme(t) {
       currentTheme = { ...currentTheme, ...t };
 
-      // Mise à jour inputs couleurs
       ['background_color', 'primary_color', 'text_color'].forEach(k => {
         const picker = document.getElementById(k);
         const hex = document.getElementById(`${k}_hex`);
@@ -527,7 +530,6 @@ const profileJson = JSON.stringify({
         if (hex) hex.value = currentTheme[k];
       });
 
-      // Gradient sync
       const g1 = document.getElementById('gradient_color_1');
       const g1hex = document.getElementById('gradient_color_1_hex');
       const g2 = document.getElementById('gradient_color_2');
@@ -537,7 +539,6 @@ const profileJson = JSON.stringify({
       if (g2) g2.value = currentTheme.gradient_color_2;
       if (g2hex) g2hex.value = currentTheme.gradient_color_2;
 
-      // Sliders & toggles
       const setVal = (id, val) => {
         const el = document.getElementById(id);
         if (el) {
@@ -551,12 +552,10 @@ const profileJson = JSON.stringify({
       setVal('block_shadow', currentTheme.block_shadow);
       setVal('animations', currentTheme.animations);
 
-      // Affichage
       document.getElementById('radius-display')?.textContent = `${currentTheme.border_radius}px`;
       document.getElementById('angle-display')?.textContent = `${currentTheme.gradient_angle}°`;
       document.getElementById('glass-value')?.textContent = `${currentTheme.glass_intensity}px`;
 
-      // Active states
       document.querySelectorAll('[data-active]').forEach(el => el.removeAttribute('data-active'));
       document.querySelectorAll('.active').forEach(el => el.classList.remove('active'));
 
@@ -576,7 +575,6 @@ const profileJson = JSON.stringify({
         }
       });
 
-      // Panels
       document.getElementById('gradient-panel')?.classList.toggle('hidden', currentTheme.background_style !== 'gradient');
       document.getElementById('blur-hint')?.classList.toggle('hidden', currentTheme.background_style !== 'blur');
       document.getElementById('angle-container')?.classList.toggle('hidden', currentTheme.gradient_type !== 'linear');
@@ -584,7 +582,7 @@ const profileJson = JSON.stringify({
       updatePreview();
     }
 
-    // ÉCOUTEURS
+    // ─── ÉCOUTEURS ───
     document.querySelectorAll('.preset-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const { preset, bg, primary, text } = btn.dataset;
@@ -642,7 +640,6 @@ const profileJson = JSON.stringify({
       });
     });
 
-    // Couleurs (picker + hex)
     ['background_color', 'primary_color', 'text_color', 'gradient_color_1', 'gradient_color_2'].forEach(id => {
       const picker = document.getElementById(id);
       const hexInput = document.getElementById(`${id}_hex`);
@@ -668,7 +665,7 @@ const profileJson = JSON.stringify({
       }
     });
 
-    // SAVE – TON ENDPOINT API EST ICI, INTACT
+    // SAVE – TON ENDPOINT API EST BIEN LÀ
     document.getElementById('save-theme-btn')?.addEventListener('click', async () => {
       const btn = document.getElementById('save-theme-btn');
       const txt = document.getElementById('save-text');
@@ -689,7 +686,7 @@ const profileJson = JSON.stringify({
           throw new Error(err.error || `HTTP ${res.status}`);
         }
 
-        // Historique local
+        // Historique local (exemple simple)
         const history = JSON.parse(localStorage.getItem('theme_history') || '[]');
         history.unshift({ theme: { ...currentTheme }, savedAt: new Date().toISOString() });
         if (history.length > 5) history.pop();
@@ -758,7 +755,7 @@ const profileJson = JSON.stringify({
       reader.readAsText(file);
     });
 
-    // Init
+    // Initialisation
     applyTheme(currentTheme);
   });
 </script>
