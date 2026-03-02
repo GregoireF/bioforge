@@ -138,14 +138,14 @@ const profileJson = JSON.stringify({
   ></div>
 
   <!-- ===== MAIN GRID ===== -->
-  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8">
+  <div class="grid lg:grid-cols-3 gap-6 lg:gap-8 items-start">
 
     <!-- ========== LEFT: SETTINGS ========== -->
-    <div class="lg:col-span-8 space-y-6 xl:space-y-8">
+    <div class="lg:col-span-2 space-y-5">
 
       <!-- QUICK PRESETS -->
       <Card title="Presets" description="Choose a starting point">
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div class="grid grid-cols-3 sm:grid-cols-6 gap-3">
           {[
             { id: 'dark',    label: 'Dark',    bg: '#0a0a0a', primary: '#00ff9d', text: '#ffffff', thumb: 'from-gray-900 to-black',          border: 'border-emerald-400/40' },
             { id: 'light',   label: 'Light',   bg: '#f8f8f8', primary: '#0066ff', text: '#0a0a0a', thumb: 'from-white to-gray-200',           border: 'border-blue-400/40'    },
@@ -155,7 +155,7 @@ const profileJson = JSON.stringify({
             { id: 'forest',  label: 'Forest',  bg: '#0d1f0d', primary: '#00cc66', text: '#ffffff', thumb: 'from-green-900 to-emerald-900',    border: 'border-green-400/40'   },
           ].map(p => (
             <button
-              class="preset-btn group relative aspect-[4/3] rounded-2xl overflow-hidden border-2 border-white/10 hover:border-emerald-400/50 hover:scale-105 active:scale-95 transition-all duration-200 shadow-sm hover:shadow-lg"
+              class="preset-btn group relative p-0 rounded-xl border-2 border-white/10 overflow-hidden hover:scale-[1.03] active:scale-[0.97] transition-all duration-200"
               data-preset={p.id}
               data-bg={p.bg}
               data-primary={p.primary}
