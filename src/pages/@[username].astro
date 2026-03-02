@@ -1,12 +1,10 @@
 ---
-// src/pages/[username].astro
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { getProfileByUsername, getActiveBlocks, incrementProfileView } from '@/lib/supabase/queries';
 import QRCode from 'qrcode';
+import { Image } from 'astro:assets'
 
-// Lucide Icons
-import { SiX, SiInstagram, SiFacebook, SiYoutube, SiGithub, SiTiktok, SiTwitch, SiKick, SiDiscord } from '@icons-pack/react-simple-icons';
-
+// ==================== GET USERNAME ====================
 const { username } = Astro.params;
 if (!username) return Astro.redirect('/404');
 
@@ -62,19 +60,6 @@ try {
 } catch (err) {
   console.error('Failed to generate QR code:', err);
 }
-
-// ==================== SOCIAL ICONS MAP ====================
-const socialIconsMap: Record<string, any> = {
-  twitter: SiX,
-  instagram: SiInstagram,
-  facebook: SiFacebook,
-  youtube: SiYoutube,
-  github: SiGithub,
-  tiktok: SiTiktok,
-  twitch: SiTwitch,
-  kick: SiKick,
-  discord: SiDiscord,
-};
 ---
 
 <BaseLayout title={profile.display_name || profile.username}>
@@ -84,74 +69,96 @@ const socialIconsMap: Record<string, any> = {
 
       <!-- PROFILE HEADER -->
       <div class="text-center mb-10 animate-fade-in-up">
-        {profile.avatar_url 
-          ? `<img src="${profile.avatar_url}" alt="${profile.display_name || profile.username}"
+        {profile.avatar_url ? (
+          <Image src={profile.avatar_url} alt={profile.display_name || profile.username}
                class="w-28 h-28 rounded-full mx-auto mb-6 object-cover avatar-glow"
-               style="border: 4px solid ${theme.primary_color}; box-shadow: 0 0 40px ${theme.primary_color}60;" />`
-          : `<div class="w-28 h-28 rounded-full mx-auto mb-6 flex items-center justify-center text-4xl font-bold avatar-glow"
-                 style="background: linear-gradient(135deg, ${theme.primary_color}, ${theme.primary_color}80); color: ${theme.background_color}; box-shadow: 0 0 40px ${theme.primary_color}60;">
-                 ${(profile.display_name || profile.username).charAt(0).toUpperCase()}
-             </div>`
-        }
+               style={`border: 4px solid ${theme.primary_color}; box-shadow: 0 0 40px ${theme.primary_color}60;`} />
+        ) : (
+          <div class="w-28 h-28 rounded-full mx-auto mb-6 flex items-center justify-center text-4xl font-bold avatar-glow"
+               style={`background: linear-gradient(135deg, ${theme.primary_color}, ${theme.primary_color}80); color: ${theme.background_color}; box-shadow: 0 0 40px ${theme.primary_color}60;`}>
+            {(profile.display_name || profile.username).charAt(0).toUpperCase()}
+          </div>
+        )}
 
         <h1 class="text-3xl lg:text-4xl font-bold mb-3 animate-scale-in"
             style={`color: ${theme.text_color}`}>{profile.display_name || profile.username}</h1>
 
-        {profile.bio 
-          ? `<p class="text-base lg:text-lg mb-6 max-w-lg mx-auto leading-relaxed animate-fade-in-up stagger-1"
-               style="color: ${theme.text_color}; opacity: 0.85;">
-               ${profile.bio}
-             </p>` 
-          : ''
-        }
+        {profile.bio && (
+          <p class="text-base lg:text-lg mb-6 max-w-lg mx-auto leading-relaxed animate-fade-in-up stagger-1"
+             style={`color: ${theme.text_color}; opacity: 0.85;`}>
+            {profile.bio}
+          </p>
+        )}
       </div>
 
       <!-- BLOCKS -->
-      {blocks.length === 0 
-        ? `<div class="text-center py-16 animate-fade-in-up stagger-2" style="color: ${theme.text_color}; opacity: 0.5;">
-             <p class="text-lg">No links yet</p>
-           </div>` 
-        : blocks.map((block, index) => {
+      {blocks.length === 0 ? (
+        <div class="text-center py-16 animate-fade-in-up stagger-2"
+             style={`color: ${theme.text_color}; opacity: 0.5;`}>
+          <p class="text-lg">No links yet</p>
+        </div>
+      ) : (
+        <div class="space-y-4 mb-12">
+          {blocks.map((block, index) => {
             const blockId = block.id;
             const staggerClass = `stagger-${Math.min(index + 2, 6)}`;
 
+            // ========== HEADING ==========
             if (block.type === 'heading') {
-              return `<div class="text-xl lg:text-2xl font-bold text-center py-3 animate-fade-in-up ${staggerClass}" style="color: ${theme.text_color}">${block.title || 'Heading'}</div>`;
+              return (
+                <div class={`text-xl lg:text-2xl font-bold text-center py-3 animate-fade-in-up ${staggerClass}`}
+                     style={`color: ${theme.text_color}`}>
+                  {block.title || 'Heading'}
+                </div>
+              );
             }
 
-            if (block.type === 'spacer') return `<div class="h-8"></div>`;
+            // ========== SPACER ==========
+            if (block.type === 'spacer') return <div class="h-8"></div>;
 
+            // ========== LINK ==========
             if (block.type === 'link') {
               const url = block.config?.url || '#';
-              return `<a href="${url}" target="_blank" rel="noopener noreferrer"
-                         class="block-link block w-full py-4 px-6 font-semibold text-center transition-all animate-fade-in-up ${staggerClass}"
-                         data-block-id="${blockId}"
-                         style="
-                           background-color: ${theme.button_style === 'outline' ? 'transparent' : theme.primary_color};
-                           color: ${theme.button_style === 'outline' ? theme.primary_color : theme.background_color};
-                           border: ${theme.button_style === 'outline' ? `2px solid ${theme.primary_color}` : 'none'};
-                           border-radius: ${theme.border_radius}px;
-                           ${theme.block_shadow && theme.button_style !== 'outline' ? `box-shadow: 0 8px 24px ${theme.primary_color}40;` : ''}
-                           ${theme.button_style === 'shadow' ? `box-shadow: 0 8px 32px ${theme.primary_color}60;` : ''}
-                         ">
-                        ${block.title || 'Link'}
-                     </a>`;
+              return (
+                <a href={url} target="_blank" rel="noopener noreferrer"
+                   class={`block-link block w-full py-4 px-6 font-semibold text-center transition-all animate-fade-in-up ${staggerClass}`}
+                   data-block-id={blockId}
+                   style={`
+                     background-color: ${theme.button_style === 'outline' ? 'transparent' : theme.primary_color};
+                     color: ${theme.button_style === 'outline' ? theme.primary_color : theme.background_color};
+                     border: ${theme.button_style === 'outline' ? `2px solid ${theme.primary_color}` : 'none'};
+                     border-radius: ${theme.border_radius}px;
+                     ${theme.block_shadow && theme.button_style !== 'outline' ? `box-shadow: 0 8px 24px ${theme.primary_color}40;` : ''}
+                     ${theme.button_style === 'shadow' ? `box-shadow: 0 8px 32px ${theme.primary_color}60;` : ''}
+                   `}>
+                  {block.title || 'Link'}
+                </a>
+              );
             }
 
+            // ========== IMAGE ==========
             if (block.type === 'image') {
               const imageUrl = block.config?.url;
               const imageLink = block.config?.link;
-              if (!imageUrl) return '';
+              if (!imageUrl) return null;
 
-              const imgEl = `<img src="${imageUrl}" alt="${block.title || 'Image'}"
-                                class="w-full rounded-lg transition-all hover:scale-105 animate-fade-in-up ${staggerClass}"
-                                style="border-radius: ${theme.border_radius}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''}" />`;
-              return imageLink ? `<a href="${imageLink}" target="_blank" rel="noopener noreferrer">${imgEl}</a>` : `<div>${imgEl}</div>`;
+              const imageElement = (
+                <Image src={imageUrl} alt={block.title || 'Image'}
+                     class={`w-full rounded-lg transition-all hover:scale-105 animate-fade-in-up ${staggerClass}`}
+                     style={`border-radius: ${theme.border_radius}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''}`} />
+              );
+
+              if (imageLink) {
+                return <a href={imageLink} target="_blank" rel="noopener noreferrer">{imageElement}</a>;
+              }
+
+              return <div>{imageElement}</div>;
             }
 
+            // ========== VIDEO ==========
             if (block.type === 'video') {
               const videoUrl = block.config?.url;
-              if (!videoUrl) return '';
+              if (!videoUrl) return null;
 
               let embedUrl = videoUrl;
               if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
@@ -165,59 +172,90 @@ const socialIconsMap: Record<string, any> = {
                 if (videoId) embedUrl = `https://www.tiktok.com/embed/v2/${videoId}`;
               }
 
-              return `<div class="relative w-full overflow-hidden animate-fade-in-up ${staggerClass}" style="padding-bottom: 56.25%; border-radius: ${theme.border_radius}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''}">
-                        <iframe src="${embedUrl}" class="absolute top-0 left-0 w-full h-full"
-                                frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                allowfullscreen style="border-radius: ${theme.border_radius}px;"></iframe>
-                      </div>`;
+              return (
+                <div class={`relative w-full overflow-hidden animate-fade-in-up ${staggerClass}`}
+                     style={`padding-bottom: 56.25%; border-radius: ${theme.border_radius}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''}`}>
+                  <iframe src={embedUrl} class="absolute top-0 left-0 w-full h-full"
+                          frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowfullscreen style={`border-radius: ${theme.border_radius}px;`}></iframe>
+                </div>
+              );
             }
 
+            // ========== SOCIAL ==========
             if (block.type === 'social') {
               const links = block.config?.links || [];
-              if (!Array.isArray(links) || links.length === 0) return '';
+              if (!Array.isArray(links) || links.length === 0) return null;
 
-              return `<div class="flex items-center justify-center flex-wrap gap-4 animate-fade-in-up ${staggerClass}">
-                        ${links.map(link => {
-                          const url = typeof link === 'string' ? link : link.url;
-                          if (!url) return '';
+              const socialIcons = {
+                twitter: 'M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z',
+                instagram: 'M7 1C3.1 1 1 3.1 1 7v10c0 3.9 2.1 6 6 6h10c3.9 0 6-2.1 6-6V7c0-3.9-2.1-6-6-6H7zm8 3a1 1 0 110 2 1 1 0 010-2zm-3 3a5 5 0 110 10 5 5 0 010-10zm0 2a3 3 0 100 6 3 3 0 000-6z',
+                facebook: 'M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z',
+                youtube: 'M22.54 6.42a2.78 2.78 0 00-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 00-1.94 2A29 29 0 001 11.75a29 29 0 00.46 5.33A2.78 2.78 0 003.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 001.94-2 29 29 0 00.46-5.25 29 29 0 00-.46-5.33z M9.75 15.02l0-6.89 5.75 3.44z',
+                linkedin: 'M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z M4 6a2 2 0 100-4 2 2 0 000 4z',
+                github: 'M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22',
+                tiktok: 'M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5'
+              };
 
-                          const Icon = Object.entries(socialIconsMap).find(([key]) => url.toLowerCase().includes(key))?.[1];
-                          if (!Icon) return '';
+              function getSocialIcon(url: string) {
+                if (url.includes('twitter.com') || url.includes('x.com')) return socialIcons.twitter;
+                if (url.includes('instagram.com')) return socialIcons.instagram;
+                if (url.includes('facebook.com')) return socialIcons.facebook;
+                if (url.includes('youtube.com')) return socialIcons.youtube;
+                if (url.includes('linkedin.com')) return socialIcons.linkedin;
+                if (url.includes('github.com')) return socialIcons.github;
+                if (url.includes('tiktok.com')) return socialIcons.tiktok;
+                return 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71';
+              }
 
-                          return `<a href="${url}" target="_blank" rel="noopener noreferrer"
-                                    class="w-14 h-14 flex items-center justify-center rounded-full transition-all hover:scale-110"
-                                    data-block-id="${blockId}"
-                                    style="background-color: ${theme.primary_color}; color: ${theme.background_color}; ${theme.block_shadow ? `box-shadow: 0 4px 16px ${theme.primary_color}60;` : ''}">
-                                   <Icon class="w-6 h-6" />
-                                 </a>`;
-                        }).join('')}
-                      </div>`;
+              return (
+                <div class={`flex items-center justify-center flex-wrap gap-4 animate-fade-in-up ${staggerClass}`}>
+                  {links.map(link => {
+                    const url = typeof link === 'string' ? link : link.url;
+                    if (!url) return null;
+                    return (
+                      <a href={url} target="_blank" rel="noopener noreferrer"
+                         class="w-14 h-14 flex items-center justify-center rounded-full transition-all hover:scale-110"
+                         data-block-id={blockId}
+                         style={`background-color: ${theme.primary_color}; color: ${theme.background_color}; ${theme.block_shadow ? `box-shadow: 0 4px 16px ${theme.primary_color}60;` : ''}`}>
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2"
+                             stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                          <path d={getSocialIcon(url)} />
+                        </svg>
+                      </a>
+                    );
+                  })}
+                </div>
+              );
             }
 
-            return '';
-          }).join('')
-      }
+            return null;
+          })}
+        </div>
+      )}
 
       <!-- FOOTER -->
       <div class="text-center py-8 animate-fade-in-up stagger-6">
-        <p class="text-sm mb-3" style={`color: ${theme.text_color}; opacity: 0.5;`}>Powered by BioForge</p>
-        <a href="/" class="text-sm hover:underline transition-all" style={`color: ${theme.primary_color}`}>Create your own page →</a>
+        <p class="text-sm mb-3" style={`color: ${theme.text_color}; opacity: 0.5;`}>
+          Powered by BioForge
+        </p>
+        <a href="/" class="text-sm hover:underline transition-all" style={`color: ${theme.primary_color}`}>
+          Create your own page →
+        </a>
       </div>
     </div>
   </div>
 
-  <!-- QR CODE -->
-  {qrDataUrl 
-    ? `<div id="qr-container" class="fixed bottom-6 right-6 z-50 opacity-100 translate-y-0 transition-all duration-500 hover:scale-105">
-         <div class="p-4 rounded-2xl backdrop-blur-xl shadow-2xl border"
-              style="background-color: ${theme.background_color}CC; border-color: ${theme.primary_color}40;">
-           <img src="${qrDataUrl}" alt="QR code" class="w-28 h-28 rounded-2xl"/>
-         </div>
-       </div>`
-    : ''
-  }
+  <!-- QR CODE CÔTÉ SERVEUR -->
+  <div id="qr-container"
+       class="fixed bottom-6 right-6 z-50 opacity-100 translate-y-0 transition-all duration-500 hover:scale-105">
+    <div class="p-4 rounded-2xl backdrop-blur-xl shadow-2xl border"
+         style={`background-color: ${theme.background_color}CC; border-color: ${theme.primary_color}40;`}>
+      <img src={qrDataUrl} alt="QR code" class="w-28 h-28 rounded-2xl"/>
+    </div>
+  </div>
 
-  <!-- CLICK TRACKING -->
+  <!-- SCRIPT CLIC CORRIGÉ -->
   <script define:vars={{ profileId: profile.id }}>
     let isClicking = false;
     document.querySelectorAll('[data-block-id]').forEach(element => {
