@@ -34,16 +34,4 @@ export default defineConfig({
   server: { 
     host: 'bioforge-three.vercel.app'
   },
-
-  integrations: [sitemap(), purgecss({
-    content: [
-      './src/**/*.{astro,js,jsx,ts,tsx,vue,svelte}'
-    ]
-  }), playformInline(), min(), compress({
-    css: true,
-    html: true,
-    img: true,
-    js: true,
-    svg: true,
-  }), compressor()]
 });
