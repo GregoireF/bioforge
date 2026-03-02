@@ -19,63 +19,80 @@ import Footer from '@/components/layout/Footer.astro';
 
     <HowItWorks />
 
-    <Testimonials client:visible />
+    <Testimonials client:load />
     
-    <CreatorsSection client:visible />
+    <CreatorsSection client:load />
 
-    <FAQ client:visible />
+    <FAQ client:load />
 
-    <CTA client:visible />
+    <CTA client:load />
 
-    <FloatingCTA client:idle />
+    <FloatingCTA client:load />
   </main>
 
   <Footer />
 </BaseLayout>
 
-<script defer>
+<script type="module">
   import { CountUp } from 'countup.js';
-
-  // Exécute sur chaque navigation (View Transitions friendly)
-  document.addEventListener('astro:after-swap', () => {
-    initCountUps();
-  });
-
-  // Aussi au load initial
-  document.addEventListener('DOMContentLoaded', () => {
-    initCountUps();
-  });
 
   function initCountUps() {
     const counters = document.querySelectorAll('.count-up:not(.count-up-initialized)');
-    
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
+    if (!counters.length) return;
+
+    // Fallback si IntersectionObserver n'existe pas
+    if (!('IntersectionObserver' in window)) {
+      counters.forEach((el) => startCount(el));
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+
           const el = entry.target;
-          const count = parseFloat(el.dataset.count || '0');
-          const suffix = el.dataset.suffix || '';
-
-          const countUp = new CountUp(el, count, {
-            duration: 2,
-            useEasing: true,
-            suffix,
-          });
-
-          if (!countUp.error) {
-            countUp.start();
-            el.classList.add('count-up-initialized'); // évite de recommencer
-          } else {
-            el.textContent = count + suffix; // fallback
-          }
-
+          startCount(el);
           observer.unobserve(el);
-        }
-      });
-    }, { threshold: 0.4, rootMargin: '0px 0px 100px 0px' });
+        });
+      },
+      { threshold: 0.4, rootMargin: '0px 0px 100px 0px' }
+    );
 
-    counters.forEach(c => observer.observe(c));
+    counters.forEach((c) => observer.observe(c));
   }
+
+  function startCount(el) {
+    if (el.classList.contains('count-up-initialized')) return;
+
+    const count = parseFloat(el.dataset.count ?? '0');
+    const suffix = el.dataset.suffix ?? '';
+
+    try {
+      const countUp = new CountUp(el, count, {
+        duration: 2,
+        useEasing: true,
+        suffix,
+      });
+
+      if (!countUp.error) {
+        countUp.start();
+      } else {
+        el.textContent = count + suffix;
+      }
+    } catch (err) {
+      console.error('CountUp error:', err);
+      el.textContent = count + suffix;
+    }
+
+    el.classList.add('count-up-initialized');
+  }
+
+  // Load initial
+  window.addEventListener('load', initCountUps);
+
+  // Astro View Transitions support
+  document.addEventListener('astro:after-swap', initCountUps);
 </script>
 
 <style>
