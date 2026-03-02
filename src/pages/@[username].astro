@@ -1,25 +1,48 @@
 ---
+// src/pages/[username].astro - Public Profile Page with Result<T>
+
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { getProfileByUsername, getActiveBlocks, incrementProfileView } from '@/lib/supabase/queries';
-import QRCode from 'qrcode';
+import QRCode from "qrcode";
 
 // ==================== GET USERNAME ====================
+
 const { username } = Astro.params;
-if (!username) return Astro.redirect('/404');
+
+if (!username) {
+  return Astro.redirect('/404');
+}
 
 // ==================== GET PROFILE ====================
+
 const profileResult = await getProfileByUsername(username);
-if (!profileResult.success) return Astro.redirect('/404');
+
+if (!profileResult.success) {
+  console.error('Profile not found:', profileResult.error.message);
+  return Astro.redirect('/404');
+}
+
 const profile = profileResult.data;
 
 // ==================== GET BLOCKS ====================
+
 const blocksResult = await getActiveBlocks(profile.id);
-const blocks = blocksResult.success ? blocksResult.data : [];
+
+let blocks = [];
+if (blocksResult.success) {
+  blocks = blocksResult.data;
+} else {
+  console.error('Failed to load blocks:', blocksResult.error.message);
+}
 
 // ==================== INCREMENT VIEW ====================
-incrementProfileView(username).catch(console.error);
+
+incrementProfileView(username).catch(err => {
+  console.error('Failed to track view:', err);
+});
 
 // ==================== PARSE THEME ====================
+
 let theme = {
   preset: 'dark',
   background_color: '#0a0a0a',
@@ -35,12 +58,15 @@ let theme = {
 
 if (profile.theme) {
   try {
-    const parsedTheme = typeof profile.theme === 'string' ? JSON.parse(profile.theme) : profile.theme;
+    const parsedTheme = typeof profile.theme === 'string' 
+      ? JSON.parse(profile.theme) 
+      : profile.theme;
     theme = { ...theme, ...parsedTheme };
-  } catch (e) { console.error('Failed to parse theme:', e); }
+  } catch (error) {
+    console.error('Failed to parse theme:', error);
+  }
 }
 
-// ==================== BACKGROUND STYLE ====================
 let bgStyle = `background-color: ${theme.background_color};`;
 if (theme.background_style === 'gradient') {
   bgStyle = `background: linear-gradient(135deg, ${theme.background_color} 0%, ${theme.primary_color}20 100%);`;
@@ -49,51 +75,70 @@ if (theme.background_style === 'gradient') {
 }
 
 // ==================== GENERATE QR CODE ====================
-let qrDataUrl = '';
-try {
-  qrDataUrl = await QRCode.toDataURL(`https://bioforge.click/@${profile.username}`, {
-    width: 256,
-    margin: 1,
-    color: { dark: theme.primary_color, light: '#00000000' }
-  });
-} catch (err) {
-  console.error('Failed to generate QR code:', err);
-}
+
+const profileUrl = `${Astro.site}/${username}`;
+const qrDataUrl = await QRCode.toDataURL(profileUrl, {
+  width: 256,
+  margin: 1,
+  color: {
+    dark: theme.primary_color,
+    light: "#00000000"
+  }
+});
 ---
 
 <BaseLayout title={profile.display_name || profile.username}>
-  <div class="min-h-screen flex items-center justify-center p-4 py-12"
-       style={`${bgStyle}; font-family: ${theme.font_family}, system-ui, sans-serif;`}>
+  <div 
+    class="min-h-screen flex items-center justify-center p-4 py-12"
+    style={`${bgStyle}; font-family: ${theme.font_family}, system-ui, sans-serif;`}
+  >
     <div class="w-full max-w-2xl">
+      <div data-profile-id="{profile.id}" class="hidden"></div>
 
-      <!-- PROFILE HEADER -->
+      <!-- Profile Header -->
       <div class="text-center mb-10 animate-fade-in-up">
+        <!-- Avatar -->
         {profile.avatar_url ? (
-          <img src={profile.avatar_url} alt={profile.display_name || profile.username}
-               class="w-28 h-28 rounded-full mx-auto mb-6 object-cover avatar-glow"
-               style={`border: 4px solid ${theme.primary_color}; box-shadow: 0 0 40px ${theme.primary_color}60;`} />
+          <img 
+            src={profile.avatar_url} 
+            alt={profile.display_name || profile.username}
+            class="w-28 h-28 rounded-full mx-auto mb-6 object-cover avatar-glow"
+            style={`border: 4px solid ${theme.primary_color}; box-shadow: 0 0 40px ${theme.primary_color}60;`}
+          />
         ) : (
-          <div class="w-28 h-28 rounded-full mx-auto mb-6 flex items-center justify-center text-4xl font-bold avatar-glow"
-               style={`background: linear-gradient(135deg, ${theme.primary_color}, ${theme.primary_color}80); color: ${theme.background_color}; box-shadow: 0 0 40px ${theme.primary_color}60;`}>
+          <div 
+            class="w-28 h-28 rounded-full mx-auto mb-6 flex items-center justify-center text-4xl font-bold avatar-glow"
+            style={`background: linear-gradient(135deg, ${theme.primary_color}, ${theme.primary_color}80); color: ${theme.background_color}; box-shadow: 0 0 40px ${theme.primary_color}60;`}
+          >
             {(profile.display_name || profile.username).charAt(0).toUpperCase()}
           </div>
         )}
 
-        <h1 class="text-3xl lg:text-4xl font-bold mb-3 animate-scale-in"
-            style={`color: ${theme.text_color}`}>{profile.display_name || profile.username}</h1>
+        <!-- Name -->
+        <h1 
+          class="text-3xl lg:text-4xl font-bold mb-3 animate-scale-in"
+          style={`color: ${theme.text_color}`}
+        >
+          {profile.display_name || profile.username}
+        </h1>
 
+        <!-- Bio -->
         {profile.bio && (
-          <p class="text-base lg:text-lg mb-6 max-w-lg mx-auto leading-relaxed animate-fade-in-up stagger-1"
-             style={`color: ${theme.text_color}; opacity: 0.85;`}>
+          <p 
+            class="text-base lg:text-lg mb-6 max-w-lg mx-auto leading-relaxed animate-fade-in-up stagger-1"
+            style={`color: ${theme.text_color}; opacity: 0.85;`}
+          >
             {profile.bio}
           </p>
         )}
       </div>
 
-      <!-- BLOCKS -->
+      <!-- Blocks -->
       {blocks.length === 0 ? (
-        <div class="text-center py-16 animate-fade-in-up stagger-2"
-             style={`color: ${theme.text_color}; opacity: 0.5;`}>
+        <div 
+          class="text-center py-16 animate-fade-in-up stagger-2"
+          style={`color: ${theme.text_color}; opacity: 0.5;`}
+        >
           <p class="text-lg">No links yet</p>
         </div>
       ) : (
@@ -101,65 +146,87 @@ try {
           {blocks.map((block, index) => {
             const blockId = block.id;
             const staggerClass = `stagger-${Math.min(index + 2, 6)}`;
-
-            // ========== HEADING ==========
+            
             if (block.type === 'heading') {
               return (
-                <div class={`text-xl lg:text-2xl font-bold text-center py-3 animate-fade-in-up ${staggerClass}`}
-                     style={`color: ${theme.text_color}`}>
+                <div 
+                  class={`text-xl lg:text-2xl font-bold text-center py-3 animate-fade-in-up ${staggerClass}`}
+                  style={`color: ${theme.text_color}`}
+                >
                   {block.title || 'Heading'}
                 </div>
               );
             }
 
-            // ========== SPACER ==========
-            if (block.type === 'spacer') return <div class="h-8"></div>;
+            if (block.type === 'spacer') {
+              return <div class="h-8"></div>;
+            }
 
-            // ========== LINK ==========
             if (block.type === 'link') {
               const url = block.config?.url || '#';
+              
               return (
-                <a href={url} target="_blank" rel="noopener noreferrer"
-                   class={`block-link block w-full py-4 px-6 font-semibold text-center transition-all animate-fade-in-up ${staggerClass}`}
-                   data-block-id={blockId}
-                   style={`
-                     background-color: ${theme.button_style === 'outline' ? 'transparent' : theme.primary_color};
-                     color: ${theme.button_style === 'outline' ? theme.primary_color : theme.background_color};
-                     border: ${theme.button_style === 'outline' ? `2px solid ${theme.primary_color}` : 'none'};
-                     border-radius: ${theme.border_radius}px;
-                     ${theme.block_shadow && theme.button_style !== 'outline' ? `box-shadow: 0 8px 24px ${theme.primary_color}40;` : ''}
-                     ${theme.button_style === 'shadow' ? `box-shadow: 0 8px 32px ${theme.primary_color}60;` : ''}
-                   `}>
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class={`block-link block w-full py-4 px-6 font-semibold text-center transition-all animate-fade-in-up ${staggerClass}`}
+                  data-block-id={blockId}
+                  style={`
+                    background-color: ${theme.button_style === 'outline' ? 'transparent' : theme.primary_color};
+                    color: ${theme.button_style === 'outline' ? theme.primary_color : theme.background_color};
+                    border: ${theme.button_style === 'outline' ? `2px solid ${theme.primary_color}` : 'none'};
+                    border-radius: ${theme.border_radius}px;
+                    ${theme.block_shadow && theme.button_style !== 'outline' ? `box-shadow: 0 8px 24px ${theme.primary_color}40;` : ''}
+                    ${theme.button_style === 'shadow' ? `box-shadow: 0 8px 32px ${theme.primary_color}60;` : ''}
+                  `}
+                >
                   {block.title || 'Link'}
                 </a>
               );
             }
 
-            // ========== IMAGE ==========
             if (block.type === 'image') {
               const imageUrl = block.config?.url;
               const imageLink = block.config?.link;
+              
               if (!imageUrl) return null;
 
               const imageElement = (
-                <img src={imageUrl} alt={block.title || 'Image'}
-                     class={`w-full rounded-lg transition-all hover:scale-105 animate-fade-in-up ${staggerClass}`}
-                     style={`border-radius: ${theme.border_radius}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''}`} />
+                <img 
+                  src={imageUrl}
+                  alt={block.title || 'Image'}
+                  class={`w-full rounded-lg transition-all hover:scale-105 animate-fade-in-up ${staggerClass}`}
+                  style={`
+                    border-radius: ${theme.border_radius}px;
+                    ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''}
+                  `}
+                />
               );
 
               if (imageLink) {
-                return <a href={imageLink} target="_blank" rel="noopener noreferrer">{imageElement}</a>;
+                return (
+                  <a 
+                    href={imageLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="block hover:opacity-90 transition-opacity"
+                    data-block-id={blockId}
+                  >
+                    {imageElement}
+                  </a>
+                );
               }
 
               return <div>{imageElement}</div>;
             }
 
-            // ========== VIDEO ==========
             if (block.type === 'video') {
               const videoUrl = block.config?.url;
               if (!videoUrl) return null;
 
               let embedUrl = videoUrl;
+              
               if (videoUrl.includes('youtube.com') || videoUrl.includes('youtu.be')) {
                 const videoId = videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\s]+)/)?.[1];
                 if (videoId) embedUrl = `https://www.youtube.com/embed/${videoId}`;
@@ -172,16 +239,26 @@ try {
               }
 
               return (
-                <div class={`relative w-full overflow-hidden animate-fade-in-up ${staggerClass}`}
-                     style={`padding-bottom: 56.25%; border-radius: ${theme.border_radius}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''}`}>
-                  <iframe src={embedUrl} class="absolute top-0 left-0 w-full h-full"
-                          frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowfullscreen style={`border-radius: ${theme.border_radius}px;`}></iframe>
+                <div 
+                  class={`relative w-full overflow-hidden animate-fade-in-up ${staggerClass}`}
+                  style={`
+                    padding-bottom: 56.25%;
+                    border-radius: ${theme.border_radius}px;
+                    ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''}
+                  `}
+                >
+                  <iframe
+                    src={embedUrl}
+                    class="absolute top-0 left-0 w-full h-full"
+                    frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowfullscreen
+                    style={`border-radius: ${theme.border_radius}px;`}
+                  ></iframe>
                 </div>
               );
             }
 
-            // ========== SOCIAL ==========
             if (block.type === 'social') {
               const links = block.config?.links || [];
               if (!Array.isArray(links) || links.length === 0) return null;
@@ -196,7 +273,7 @@ try {
                 tiktok: 'M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5'
               };
 
-              function getSocialIcon(url: string) {
+              function getSocialIcon(url: string): string {
                 if (url.includes('twitter.com') || url.includes('x.com')) return socialIcons.twitter;
                 if (url.includes('instagram.com')) return socialIcons.instagram;
                 if (url.includes('facebook.com')) return socialIcons.facebook;
@@ -204,21 +281,29 @@ try {
                 if (url.includes('linkedin.com')) return socialIcons.linkedin;
                 if (url.includes('github.com')) return socialIcons.github;
                 if (url.includes('tiktok.com')) return socialIcons.tiktok;
-                return 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71';
+                return 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71'; // Default link icon
               }
 
               return (
                 <div class={`flex items-center justify-center flex-wrap gap-4 animate-fade-in-up ${staggerClass}`}>
-                  {links.map(link => {
+                  {links.map((link: any) => {
                     const url = typeof link === 'string' ? link : link.url;
                     if (!url) return null;
+
                     return (
-                      <a href={url} target="_blank" rel="noopener noreferrer"
-                         class="w-14 h-14 flex items-center justify-center rounded-full transition-all hover:scale-110"
-                         data-block-id={blockId}
-                         style={`background-color: ${theme.primary_color}; color: ${theme.background_color}; ${theme.block_shadow ? `box-shadow: 0 4px 16px ${theme.primary_color}60;` : ''}`}>
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2"
-                             stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="w-14 h-14 flex items-center justify-center rounded-full transition-all hover:scale-110"
+                        data-block-id={blockId}
+                        style={`
+                          background-color: ${theme.primary_color};
+                          color: ${theme.background_color};
+                          ${theme.block_shadow ? `box-shadow: 0 4px 16px ${theme.primary_color}60;` : ''}
+                        `}
+                      >
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                           <path d={getSocialIcon(url)} />
                         </svg>
                       </a>
@@ -233,24 +318,44 @@ try {
         </div>
       )}
 
-      <!-- FOOTER -->
+      <!-- Footer -->
       <div class="text-center py-8 animate-fade-in-up stagger-6">
-        <p class="text-sm mb-3" style={`color: ${theme.text_color}; opacity: 0.5;`}>
+        <p 
+          class="text-sm mb-3"
+          style={`color: ${theme.text_color}; opacity: 0.5;`}
+        >
           Powered by BioForge
         </p>
-        <a href="/" class="text-sm hover:underline transition-all" style={`color: ${theme.primary_color}`}>
+        <a 
+          href="/"
+          class="text-sm hover:underline transition-all"
+          style={`color: ${theme.primary_color}`}
+        >
           Create your own page →
         </a>
       </div>
     </div>
   </div>
 
-  <!-- QR CODE CÔTÉ SERVEUR -->
-  <div id="qr-container"
-       class="fixed bottom-6 right-6 z-50 opacity-100 translate-y-0 transition-all duration-500 hover:scale-105">
-    <div class="p-4 rounded-2xl backdrop-blur-xl shadow-2xl border"
-         style={`background-color: ${theme.background_color}CC; border-color: ${theme.primary_color}40;`}>
-      <img src={qrDataUrl} alt="QR code" class="w-28 h-28 rounded-2xl"/>
+  <!-- QR + Share Modal -->
+  <div
+    id="share-modal"
+    class="fixed bottom-6 right-6 z-50 w-32 p-4 rounded-2xl backdrop-blur-xl shadow-2xl border flex flex-col items-center gap-4 transition-all opacity-100 hover:scale-105"
+    style={`
+      background-color: ${theme.background_color}CC;
+      border-color: ${theme.primary_color}40;
+    `}
+  >
+    <img src={qrDataUrl} alt="QR Code" class="w-28 h-28" />
+    <button
+      class="mt-2 px-3 py-1 text-sm rounded-lg font-semibold transition-all hover:bg-white hover:text-black"
+      onClick={() => navigator.clipboard.writeText(profileUrl)}
+    >
+      Copy Link
+    </button>
+    <div class="flex gap-2">
+      <a href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(profileUrl)}`} target="_blank" class="text-blue-500 font-bold text-sm">Twitter</a>
+      <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(profileUrl)}`} target="_blank" class="text-blue-800 font-bold text-sm">FB</a>
     </div>
   </div>
 
@@ -267,14 +372,16 @@ try {
         if (!blockId) return;
 
         try {
-          const res = await fetch('/api/analytics/click', {
+          await fetch('/api/analytics/click', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-csrf-token': 'dev-bypass' },
             body: JSON.stringify({ block_id: blockId, profile_id: profileId })
           });
-          if (!res.ok) console.error('Click tracking failed', await res.text());
-        } catch (err) { console.error(err); }
+        } catch (err) {
+          console.error('[FRONT] Erreur fetch :', err);
+        }
       });
     });
   </script>
+
 </BaseLayout>
