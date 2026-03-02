@@ -22,7 +22,7 @@ if (Astro.request.method === 'POST') {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: provider as Provider,
       options: {
-        redirectTo: `${siteUrl}/auth/callback`
+        redirectTo: `https://bioforge-three.vercel.app/auth/callback`
       }
     });
 

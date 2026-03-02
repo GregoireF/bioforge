@@ -6,6 +6,8 @@ const supabase = createSupabaseServer({
   cookies: Astro.cookies,
 });
 
+const siteUrl = import.meta.env.PUBLIC_SITE_URL;
+
 const error = Astro.url.searchParams.get('error');
 const code = Astro.url.searchParams.get('code');
 
@@ -14,7 +16,6 @@ if (error) {
 }
 
 if (code) {
-  // juste le code, PAS siteUrl
   const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
   if (exchangeError) {
@@ -35,6 +36,5 @@ if (!user.email_confirmed_at) {
   return Astro.redirect('/signin?error=email_not_verified');
 }
 
-// tout est ok → redirection finale
 return Astro.redirect('/dashboard');
 ---
