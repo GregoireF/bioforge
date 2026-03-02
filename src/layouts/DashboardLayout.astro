@@ -5,6 +5,7 @@ import CommandPalette from '@/components/features/CommandPalette.astro';
 import OnboardingTour from '@/components/features/OnboardingTour.astro';
 import UpgradeModal from '@/components/features/UpgradeModal.astro';
 import '@/styles/global.css';
+import { Image } from 'astro:assets';
 
 interface Props {
   title: string;
@@ -20,7 +21,7 @@ const currentPath = Astro.url.pathname;
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{title} - BioForge Dashboard</title>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
 </head>
 <body class="bg-dark-900 text-white min-h-screen">
   <div class="flex min-h-screen">
@@ -29,10 +30,8 @@ const currentPath = Astro.url.pathname;
       <div class="flex flex-col w-full">
         <!-- Logo -->
         <div class="flex items-center justify-between h-16 px-6 border-b border-white/10">
-          <a href="https://bioforge-three.vercel.app/" class="flex items-center space-x-2">
-            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-neon-green to-neon-blue flex items-center justify-center">
-              <span class="text-white font-bold text-lg">B</span>
-            </div>
+          <a href="https://bioforge.click/" class="flex items-center space-x-2">
+            <Image src="/logo.webp" alt="BioForge Logo" width="40" height="40" />
             <span class="text-white font-bold text-lg">BioForge</span>
           </a>
         </div>
