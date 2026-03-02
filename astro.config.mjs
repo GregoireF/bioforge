@@ -24,7 +24,7 @@ export default defineConfig({
 
   vite: {
     server: {
-      host: 'https://bioforge.click'
+      host: 'bioforge.click'
     },
     plugins: [
       tailwindcss(),
@@ -38,6 +38,6 @@ export default defineConfig({
   },
 
   server: { 
-    host: 'https://bioforge.click'
+    host: 'bioforge.click'
   },
 });
