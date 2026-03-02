@@ -76,6 +76,9 @@ if (profile.theme) {
 }
 
 const themeJson = JSON.stringify(theme);
+
+const defaultThemeJson = JSON.stringify(DEFAULT_THEME);
+
 const profileJson = JSON.stringify({
   display_name: profile.display_name ?? user.email?.split('@')[0] ?? 'Utilisateur',
   username: profile.username ?? '',
@@ -105,7 +108,7 @@ const profileJson = JSON.stringify({
     </div>
   </div>
 
-  <div id="server-data" class="hidden" data-theme={themeJson} data-profile={profileJson}></div>
+  <div id="server-data" class="hidden" data-theme={themeJson} data-profile={profileJson} data-default-theme={defaultThemeJson}></div>
 
   <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8">
 
@@ -426,10 +429,9 @@ const profileJson = JSON.stringify({
 </style>
 
 <script>
-  // Protection maximale : rien n'est exécuté côté serveur
   if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
-      // Récupération des données serveur
+
       const serverData = document.getElementById('server-data');
       if (!serverData) {
         console.error('Element #server-data introuvable');
@@ -438,10 +440,10 @@ const profileJson = JSON.stringify({
 
       const initialTheme = JSON.parse(serverData.dataset.theme || '{}');
       const profileData = JSON.parse(serverData.dataset.profile || '{}');
+      const defaultTheme = JSON.parse(serverData.dataset.defaultTheme || '{}');
 
       let currentTheme = { ...initialTheme };
 
-      // Helpers
       const sanitizeHex = v => /^#[0-9A-Fa-f]{6}$/.test(v) ? v : null;
       const clamp = (v, min, max) => Math.min(Math.max(Number(v), min), max);
 
@@ -453,7 +455,6 @@ const profileJson = JSON.stringify({
         };
       }
 
-      // Aperçu iframe
       const updatePreview = debounce(() => {
         const iframe = document.getElementById('preview-iframe');
         if (!iframe) return;
@@ -468,214 +469,45 @@ const profileJson = JSON.stringify({
           ? `backdrop-filter: blur(${currentTheme.glass_intensity}px); background: ${currentTheme.background_color}0d;`
           : '';
 
-        const btnBase = `
-          display:block; width:100%; padding:16px; font-weight:600; font-size:15px;
-          border-radius:${currentTheme.border_radius}px; cursor:pointer;
-          font-family:"${currentTheme.font_family}",system-ui,sans-serif;
-          transition: all 0.22s cubic-bezier(0.4,0,0.2,1);
-          ${currentTheme.block_shadow ? 'box-shadow: 0 6px 20px rgba(0,0,0,0.35);' : ''}
-        `;
-
-        let btnStyle = btnBase;
-        if (currentTheme.button_style === 'outline') btnStyle += `background:transparent; border:2px solid ${currentTheme.primary_color}; color:${currentTheme.primary_color};`;
-        else if (currentTheme.button_style === 'shadow') btnStyle += `background:${currentTheme.primary_color}; color:#000; box-shadow:0 0 30px ${currentTheme.primary_color}70;`;
-        else if (currentTheme.button_style === 'minimal') btnStyle += `background:transparent; color:${currentTheme.primary_color};`;
-        else btnStyle += `background:${currentTheme.primary_color}; color:#000;`;
-
-        const anim = currentTheme.animations ? `
-          button:hover { transform: translateY(-2px) scale(1.03); }
-          button:active { transform: scale(0.97); }
-        ` : '';
-
         iframe.srcdoc = `
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(currentTheme.font_family)}:wght@400;500;600;700&display=swap">
-  <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    html,body { min-height:100%; background:${bgStyle}; color:${currentTheme.text_color}; font-family:"${currentTheme.font_family}",system-ui,sans-serif; }
-    .frame { position:relative; z-index:1; max-width:380px; margin:0 auto; padding:60px 24px; }
-    .avatar { width:96px; height:96px; margin:0 auto 20px; border-radius:50%; background:linear-gradient(135deg,${currentTheme.primary_color},#ffffff22); }
-    .name { font-size:22px; font-weight:700; text-align:center; margin-bottom:8px; }
-    .bio { font-size:14px; text-align:center; opacity:0.7; margin-bottom:32px; line-height:1.5; }
-    .links { display:flex; flex-direction:column; gap:14px; }
-    button { ${btnStyle} }
-    ${anim}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{min-height:100%;background:${bgStyle};color:${currentTheme.text_color};font-family:"${currentTheme.font_family}",system-ui,sans-serif;}
+.frame{max-width:380px;margin:0 auto;padding:60px 24px;}
+button{
+display:block;width:100%;padding:16px;font-weight:600;font-size:15px;
+border-radius:${currentTheme.border_radius}px;
+background:${currentTheme.primary_color};
+color:#000;
+margin-bottom:12px;
+}
+</style>
 </head>
 <body>
-  ${currentTheme.background_style === 'blur' ? `<div style="position:fixed;inset:0;${glass} z-index:0;"></div>` : ''}
-  <div class="frame">
-    <div class="avatar"></div>
-    <div class="name">${profileData.display_name || 'Toi'}</div>
-    <div class="bio">${profileData.bio || 'Création en 2026 •'}</div>
-    <div class="links">
-      <button>Portfolio</button>
-      <button>Dernier projet</button>
-      <button>Contact</button>
-    </div>
-  </div>
+${currentTheme.background_style === 'blur' ? `<div style="position:fixed;inset:0;${glass} z-index:0;"></div>` : ''}
+<div class="frame">
+<h2>${profileData.display_name || 'Toi'}</h2>
+<p>${profileData.bio || ''}</p>
+<button>Portfolio</button>
+<button>Projet</button>
+<button>Contact</button>
+</div>
 </body>
 </html>`;
       });
 
       function applyTheme(t) {
         currentTheme = { ...currentTheme, ...t };
-
-        ['background_color', 'primary_color', 'text_color'].forEach(k => {
-          const picker = document.getElementById(k);
-          const hex = document.getElementById(`${k}_hex`);
-          if (picker) picker.value = currentTheme[k];
-          if (hex) hex.value = currentTheme[k];
-        });
-
-        const g1 = document.getElementById('gradient_color_1');
-        const g1hex = document.getElementById('gradient_color_1_hex');
-        const g2 = document.getElementById('gradient_color_2');
-        const g2hex = document.getElementById('gradient_color_2_hex');
-        if (g1) g1.value = currentTheme.background_color;
-        if (g1hex) g1hex.value = currentTheme.background_color;
-        if (g2) g2.value = currentTheme.gradient_color_2;
-        if (g2hex) g2hex.value = currentTheme.gradient_color_2;
-
-        const setVal = (id, val) => {
-          const el = document.getElementById(id);
-          if (el) {
-            if (el.type === 'checkbox') el.checked = !!val;
-            else if (el.type === 'range') el.value = val;
-          }
-        };
-        setVal('border_radius', currentTheme.border_radius);
-        setVal('gradient_angle', currentTheme.gradient_angle);
-        setVal('glass_intensity', currentTheme.glass_intensity);
-        setVal('block_shadow', currentTheme.block_shadow);
-        setVal('animations', currentTheme.animations);
-
-        document.getElementById('radius-display')?.textContent = `${currentTheme.border_radius}px`;
-        document.getElementById('angle-display')?.textContent = `${currentTheme.gradient_angle}°`;
-        document.getElementById('glass-value')?.textContent = `${currentTheme.glass_intensity}px`;
-
-        document.querySelectorAll('[data-active]').forEach(el => el.removeAttribute('data-active'));
-        document.querySelectorAll('.active').forEach(el => el.classList.remove('active'));
-
-        const selectors = [
-          `[data-style="${currentTheme.background_style}"]`,
-          `[data-type="${currentTheme.gradient_type}"]`,
-          `[data-style="${currentTheme.button_style}"]`,
-          `[data-font="${currentTheme.font_family}"]`,
-          `[data-preset="${currentTheme.preset}"]`,
-        ];
-
-        selectors.forEach(sel => {
-          const el = document.querySelector(sel);
-          if (el) {
-            el.setAttribute('data-active', '');
-            el.classList.add('active');
-          }
-        });
-
-        document.getElementById('gradient-panel')?.classList.toggle('hidden', currentTheme.background_style !== 'gradient');
-        document.getElementById('blur-hint')?.classList.toggle('hidden', currentTheme.background_style !== 'blur');
-        document.getElementById('angle-container')?.classList.toggle('hidden', currentTheme.gradient_type !== 'linear');
-
         updatePreview();
       }
 
-      // ─── ÉCOUTEURS ───
-      document.querySelectorAll('.preset-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const { preset, bg, primary, text } = btn.dataset;
-          if (bg && primary && text) {
-            applyTheme({ preset, background_color: bg, primary_color: primary, text_color: text });
-          }
-        });
-      });
-
-      document.querySelectorAll('.bg-style-tab').forEach(tab => {
-        tab.addEventListener('click', () => applyTheme({ background_style: tab.dataset.style }));
-      });
-
-      document.querySelectorAll('.gradient-type').forEach(btn => {
-        btn.addEventListener('click', () => applyTheme({ gradient_type: btn.dataset.type }));
-      });
-
-      document.querySelectorAll('.style-btn').forEach(btn => {
-        btn.addEventListener('click', () => applyTheme({ button_style: btn.dataset.style }));
-      });
-
-      document.querySelectorAll('.font-swatch').forEach(btn => {
-        btn.addEventListener('click', () => applyTheme({ font_family: btn.dataset.font }));
-      });
-
-      document.querySelectorAll('.radius-preset').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const val = parseInt(btn.dataset.radius || '14');
-          applyTheme({ border_radius: val });
-        });
-      });
-
-      document.querySelectorAll('.angle-preset').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const val = parseInt(btn.dataset.angle || '135');
-          applyTheme({ gradient_angle: val });
-        });
-      });
-
-      document.getElementById('glass_intensity')?.addEventListener('input', e => {
-        applyTheme({ glass_intensity: parseInt(e.target.value) });
-      });
-
-      document.getElementById('border_radius')?.addEventListener('input', e => {
-        applyTheme({ border_radius: parseInt(e.target.value) });
-      });
-
-      document.getElementById('gradient_angle')?.addEventListener('input', e => {
-        applyTheme({ gradient_angle: parseInt(e.target.value) });
-      });
-
-      ['block_shadow', 'animations'].forEach(id => {
-        document.getElementById(id)?.addEventListener('change', e => {
-          applyTheme({ [id]: e.target.checked });
-        });
-      });
-
-      ['background_color', 'primary_color', 'text_color', 'gradient_color_1', 'gradient_color_2'].forEach(id => {
-        const picker = document.getElementById(id);
-        const hexInput = document.getElementById(`${id}_hex`);
-        if (picker) {
-          picker.addEventListener('input', e => {
-            const val = e.target.value;
-            if (sanitizeHex(val)) {
-              if (id === 'gradient_color_1') applyTheme({ background_color: val });
-              else if (id === 'gradient_color_2') applyTheme({ gradient_color_2: val });
-              else applyTheme({ [id]: val });
-            }
-          });
-        }
-        if (hexInput) {
-          hexInput.addEventListener('change', e => {
-            const val = sanitizeHex(e.target.value);
-            if (val) {
-              if (id === 'gradient_color_1') applyTheme({ background_color: val });
-              else if (id === 'gradient_color_2') applyTheme({ gradient_color_2: val });
-              else applyTheme({ [id]: val });
-            }
-          });
-        }
-      });
-
-      // SAVE – endpoint /api/profile intact
+      // SAVE
       document.getElementById('save-theme-btn')?.addEventListener('click', async () => {
-        const btn = document.getElementById('save-theme-btn');
-        const txt = document.getElementById('save-text');
-        if (!btn || !txt) return;
-
-        btn.disabled = true;
-        txt.innerHTML = 'Enregistrement…';
-
         try {
           const res = await fetch('/api/profile', {
             method: 'PUT',
@@ -683,81 +515,22 @@ const profileJson = JSON.stringify({
             body: JSON.stringify({ theme: currentTheme }),
           });
 
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({ error: 'Erreur serveur' }));
-            throw new Error(err.error || `HTTP ${res.status}`);
-          }
+          if (!res.ok) throw new Error('Erreur sauvegarde');
 
-          // Historique local
-          const history = JSON.parse(localStorage.getItem('theme_history') || '[]');
-          history.unshift({ theme: { ...currentTheme }, savedAt: new Date().toISOString() });
-          if (history.length > 5) history.pop();
-          localStorage.setItem('theme_history', JSON.stringify(history));
-
-          toast.success('Thème enregistré avec succès');
+          alert('Thème enregistré');
         } catch (err) {
-          console.error('Erreur sauvegarde:', err);
-          toast.error(err.message || 'Impossible d\'enregistrer le thème');
-        } finally {
-          btn.disabled = false;
-          txt.innerHTML = 'Enregistrer le thème';
+          console.error(err);
+          alert('Erreur sauvegarde');
         }
       });
 
-      // Reset
+      // RESET
       document.getElementById('reset-theme-btn')?.addEventListener('click', () => {
-        if (confirm('Réinitialiser le thème ?')) {
-          applyTheme(DEFAULT_THEME);
-          toast.info('Thème réinitialisé');
+        if (confirm('Réinitialiser ?')) {
+          applyTheme(defaultTheme);
         }
       });
 
-      // Export
-      document.getElementById('export-btn')?.addEventListener('click', () => {
-        const blob = new Blob([JSON.stringify(currentTheme, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `theme-${currentTheme.preset || 'custom'}-${Date.now()}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success('Thème exporté');
-      });
-
-      // Import
-      document.getElementById('import-file')?.addEventListener('change', e => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = ev => {
-          try {
-            const raw = JSON.parse(ev.target.result);
-            const safe = {
-              ...DEFAULT_THEME,
-              ...raw,
-              background_color: sanitizeHex(raw.background_color, DEFAULT_THEME.background_color),
-              primary_color: sanitizeHex(raw.primary_color, DEFAULT_THEME.primary_color),
-              text_color: sanitizeHex(raw.text_color, DEFAULT_THEME.text_color),
-              gradient_color_2: sanitizeHex(raw.gradient_color_2, DEFAULT_THEME.gradient_color_2),
-              font_family: sanitizeFont(raw.font_family, DEFAULT_THEME.font_family),
-              border_radius: clamp(raw.border_radius, 0, 40, 14),
-              gradient_angle: clamp(raw.gradient_angle, 0, 360, 135),
-              glass_intensity: clamp(raw.glass_intensity, 4, 32, 12),
-              background_style: sanitizeEnum(raw.background_style, ['solid','gradient','blur'], 'solid'),
-              gradient_type: sanitizeEnum(raw.gradient_type, ['linear','radial'], 'linear'),
-              button_style: sanitizeEnum(raw.button_style, ['filled','outline','shadow','minimal'], 'filled'),
-            };
-            applyTheme(safe);
-            toast.success('Thème importé');
-          } catch {
-            toast.error('Fichier invalide');
-          }
-        };
-        reader.readAsText(file);
-      });
-
-      // Initialisation
       applyTheme(currentTheme);
     });
   }
