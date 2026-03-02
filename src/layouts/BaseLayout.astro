@@ -1,6 +1,6 @@
 ---
 import { AstroFont } from 'astro-font';
-import { ViewTransition } from 'astro:transitions';
+//import { ViewTransition } from 'astro:transitions';
 import GlobalScripts from '@/components/ui/Global.astro';
 import "../styles/global.css";
 
@@ -144,9 +144,7 @@ const finalJsonLd = pageJsonLd || defaultJsonLd;
   </head>
   <body class="min-h-screen bg-dark-900 text-white font-sans antialiased smooth-font">
     <!-- Smooth scroll container -->
-    <div data-scroll-container>
-      <slot />
-    </div>
+    <slot />
 
     <!-- Global Scripts (cursor trail, particles, etc.) -->
     <GlobalScripts />
