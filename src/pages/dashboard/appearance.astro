@@ -1,249 +1,255 @@
 ---
+// src/pages/dashboard/appearance.astro — Appearance/Theme Page v2
+// Réécriture complète : UX 2026, perf, sécurité, nouvelles features
+
 import DashboardLayout from '@/layouts/DashboardLayout.astro';
 import Button from '@/components/ui/Button.astro';
 import Card from '@/components/ui/Card.astro';
 import { withAuth } from '@/lib/auth/auth';
 
-const authResult = await withAuth({ cookies: Astro.cookies, request: Astro.request });
+// ==================== AUTH CHECK ====================
+
+const authResult = await withAuth({
+  cookies: Astro.cookies,
+  request: Astro.request,
+});
+
 if (!authResult.success || !authResult.data) {
   return Astro.redirect(authResult.redirect || '/signin?error=auth_failed');
 }
 
 const { user, profile } = authResult.data;
 
+// ==================== THEME DEFAULTS & PARSE ====================
+
 const DEFAULT_THEME = {
-  preset: 'dark' as const,
-  background_style: 'solid' as const,
+  preset: 'dark',
   background_color: '#0a0a0a',
-  gradient_color_2: '#1a1a2e',
-  gradient_type: 'linear' as const,
-  gradient_angle: 135,
   primary_color: '#00ff9d',
   text_color: '#ffffff',
-  button_style: 'filled' as const,
-  border_radius: 14,
-  font_family: 'Geist' as const,
+  button_style: 'filled',
+  border_radius: 12,
+  font_family: 'Inter',
+  background_style: 'solid',
+  gradient_color_2: '#1a1a2e',
+  gradient_angle: 135,
+  gradient_type: 'linear',
   block_shadow: true,
   animations: true,
-  glass_intensity: 12,
-} satisfies Record<string, any>;
+};
 
-type Theme = typeof DEFAULT_THEME;
-
-function sanitizeHex(value: unknown, fallback: string): string {
-  return typeof value === 'string' && /^#[0-9A-Fa-f]{6}$/.test(value) ? value : fallback;
+// Sanitize hex color server-side
+function sanitizeHex(value: string, fallback: string): string {
+  return /^#[0-9A-Fa-f]{6}$/.test(value) ? value : fallback;
 }
 
-const ALLOWED_FONTS = ['Geist', 'Inter', 'Poppins', 'Roboto', 'Space Grotesk', 'Figtree', 'DM Sans'] as const;
-type AllowedFont = typeof ALLOWED_FONTS[number];
-
-function sanitizeFont(value: unknown, fallback: AllowedFont): AllowedFont {
-  return ALLOWED_FONTS.includes(value as any) ? value as AllowedFont : fallback;
+// Sanitize font name server-side (allowlist)
+const ALLOWED_FONTS = ['Inter', 'Poppins', 'Roboto', 'Montserrat', 'Open Sans', 'Lato', 'Space Grotesk', 'DM Sans', 'Geist', 'Figtree'];
+function sanitizeFont(value: string, fallback: string): string {
+  return ALLOWED_FONTS.includes(value) ? value : fallback;
 }
 
-function sanitizeEnum<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
-  return allowed.includes(value as any) ? value as T : fallback;
-}
-
-function clamp(n: unknown, min: number, max: number, fallback: number): number {
-  const v = Number(n);
-  return Number.isFinite(v) ? Math.min(Math.max(v, min), max) : fallback;
-}
-
-let theme: Theme = { ...DEFAULT_THEME };
+let theme = { ...DEFAULT_THEME };
 
 if (profile.theme) {
   try {
     const raw = typeof profile.theme === 'string' ? JSON.parse(profile.theme) : profile.theme;
-    if (raw && typeof raw === 'object') {
-      theme = {
-        ...DEFAULT_THEME,
-        ...raw,
-        background_color: sanitizeHex(raw.background_color, DEFAULT_THEME.background_color),
-        primary_color: sanitizeHex(raw.primary_color, DEFAULT_THEME.primary_color),
-        text_color: sanitizeHex(raw.text_color, DEFAULT_THEME.text_color),
-        gradient_color_2: sanitizeHex(raw.gradient_color_2, DEFAULT_THEME.gradient_color_2),
-        font_family: sanitizeFont(raw.font_family, DEFAULT_THEME.font_family),
-        border_radius: clamp(raw.border_radius, 0, 40, 14),
-        gradient_angle: clamp(raw.gradient_angle, 0, 360, 135),
-        glass_intensity: clamp(raw.glass_intensity, 4, 32, 12),
-        background_style: sanitizeEnum(raw.background_style, ['solid','gradient','blur'] as const, 'solid'),
-        gradient_type: sanitizeEnum(raw.gradient_type, ['linear','radial'] as const, 'linear'),
-        button_style: sanitizeEnum(raw.button_style, ['filled','outline','shadow','minimal'] as const, 'filled'),
-      };
-    }
-  } catch {}
+    theme = {
+      ...DEFAULT_THEME,
+      ...raw,
+      background_color: sanitizeHex(raw.background_color, DEFAULT_THEME.background_color),
+      primary_color: sanitizeHex(raw.primary_color, DEFAULT_THEME.primary_color),
+      text_color: sanitizeHex(raw.text_color, DEFAULT_THEME.text_color),
+      gradient_color_2: sanitizeHex(raw.gradient_color_2, DEFAULT_THEME.gradient_color_2),
+      font_family: sanitizeFont(raw.font_family, DEFAULT_THEME.font_family),
+      border_radius: Math.min(Math.max(parseInt(raw.border_radius) || 12, 0), 32),
+      gradient_angle: Math.min(Math.max(parseInt(raw.gradient_angle) || 135, 0), 360),
+    };
+  } catch {
+    // keep defaults
+  }
 }
 
 const themeJson = JSON.stringify(theme);
-
-const defaultThemeJson = JSON.stringify(DEFAULT_THEME);
-
 const profileJson = JSON.stringify({
-  display_name: profile.display_name ?? user.email?.split('@')[0] ?? 'Utilisateur',
+  display_name: profile.display_name ?? '',
   username: profile.username ?? '',
   bio: profile.bio ?? '',
 });
 ---
 
-<DashboardLayout title="Apparence • 2026">
+<DashboardLayout title="Appearance">
 
-  <div class="mb-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+  <!-- ===== HEADER ===== -->
+  <div class="mb-8 flex items-center justify-between">
     <div>
-      <h1 class="text-2xl font-bold tracking-tight bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">Apparence</h1>
-      <p class="text-sm text-gray-400 mt-1.5">Personnalise ton profil — glass, couleurs, mouvements</p>
+      <h2 class="text-xl font-semibold text-white mb-1 tracking-tight">Appearance</h2>
+      <p class="text-sm text-gray-400">Customize your profile theme and style</p>
     </div>
-
-    <div class="flex flex-wrap gap-3">
-      <label class="group flex items-center gap-2.5 px-5 py-2.5 glass border border-white/8 rounded-2xl text-sm font-medium text-gray-300 hover:text-white hover:border-white/20 transition-all cursor-pointer">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-        Importer
+    <div class="flex items-center gap-3">
+      <!-- Import JSON -->
+      <label
+        id="import-label"
+        class="group cursor-pointer flex items-center gap-2 px-4 py-2 glass border border-white/10 rounded-xl text-sm text-gray-300 hover:text-white hover:border-white/25 transition-all"
+        title="Import theme from JSON"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+        </svg>
+        Import
         <input type="file" id="import-file" accept=".json" class="hidden" />
       </label>
-
-      <button id="export-btn" class="flex items-center gap-2.5 px-5 py-2.5 glass border border-white/8 rounded-2xl text-sm font-medium text-gray-300 hover:text-white hover:border-white/20 transition-all">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-        Exporter
+      <!-- Export JSON -->
+      <button
+        id="export-btn"
+        class="flex items-center gap-2 px-4 py-2 glass border border-white/10 rounded-xl text-sm text-gray-300 hover:text-white hover:border-white/25 transition-all"
+        title="Export theme as JSON"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+        </svg>
+        Export
       </button>
     </div>
   </div>
 
-  <div id="server-data" class="hidden" data-theme={themeJson} data-profile={profileJson} data-default-theme={defaultThemeJson}></div>
+  <!-- Server vars bridge (read by module script below) -->
+  <div
+    id="server-data"
+    class="hidden"
+    data-theme={themeJson}
+    data-profile={profileJson}
+  ></div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8">
+  <!-- ===== MAIN GRID ===== -->
+  <div class="grid lg:grid-cols-3 gap-6 lg:gap-8 items-start">
 
-    <div class="lg:col-span-8 space-y-6 xl:space-y-8">
+    <!-- ========== LEFT: SETTINGS ========== -->
+    <div class="lg:col-span-2 space-y-5">
 
-      <Card title="Préréglages" description="Ambiances instantanées" className="overflow-hidden">
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-          {
-            [
-              { id: 'dark', label: 'Éclipse', bg: '#0a0a0a', primary: '#00ff9d', text: '#f0f0f0', thumb: 'from-gray-950 via-slate-900 to-black' },
-              { id: 'light', label: 'Aube', bg: '#fafafa', primary: '#0066ff', text: '#111111', thumb: 'from-gray-50 via-white to-gray-100' },
-              { id: 'neon', label: 'Cyber', bg: '#0f001a', primary: '#d600ff', text: '#f0f0ff', thumb: 'from-purple-950 to-fuchsia-950' },
-              { id: 'ocean', label: 'Abysse', bg: '#001522', primary: '#00eaff', text: '#e0f8ff', thumb: 'from-blue-950 to-cyan-950' },
-              { id: 'sunset', label: 'Braise', bg: '#1a0d00', primary: '#ff5e00', text: '#fff5e0', thumb: 'from-amber-950 to-red-950' },
-              { id: 'clay', label: 'Doux', bg: '#111111', primary: '#ff80ab', text: '#f5f5f5', thumb: 'from-rose-950 via-pink-950 to-purple-950' },
-            ].map(p => (
-              <button
-                class="preset-btn group relative aspect-[4/3] rounded-2xl overflow-hidden border-2 border-white/10 hover:border-emerald-400/50 hover:scale-105 active:scale-95 transition-all duration-200 shadow-sm hover:shadow-lg"
-                data-preset={p.id}
-                data-bg={p.bg}
-                data-primary={p.primary}
-                data-text={p.text}
-                aria-label={`Préréglage ${p.label}`}
-              >
-                <div class={`absolute inset-0 bg-gradient-to-br ${p.thumb}`}></div>
-                <div class="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/60 to-transparent">
-                  <span class="text-xs font-semibold text-white drop-shadow-md">{p.label}</span>
-                </div>
-                <div class="absolute inset-0 border-2 border-emerald-400/0 group-hover:border-emerald-400/40 rounded-2xl transition-all duration-300"></div>
-              </button>
-            ))
-          }
+      <!-- QUICK PRESETS -->
+      <Card title="Presets" description="Choose a starting point">
+        <div class="grid grid-cols-3 sm:grid-cols-6 gap-3">
+          {[
+            { id: 'dark',    label: 'Dark',    bg: '#0a0a0a', primary: '#00ff9d', text: '#ffffff', thumb: 'from-gray-900 to-black',          border: 'border-emerald-400/40' },
+            { id: 'light',   label: 'Light',   bg: '#f8f8f8', primary: '#0066ff', text: '#0a0a0a', thumb: 'from-white to-gray-200',           border: 'border-blue-400/40'    },
+            { id: 'neon',    label: 'Neon',    bg: '#1a0033', primary: '#bf00ff', text: '#ffffff', thumb: 'from-purple-900 to-pink-900',      border: 'border-purple-400/40'  },
+            { id: 'ocean',   label: 'Ocean',   bg: '#001a33', primary: '#00d4ff', text: '#ffffff', thumb: 'from-blue-900 to-cyan-900',        border: 'border-cyan-400/40'    },
+            { id: 'sunset',  label: 'Sunset',  bg: '#1a0800', primary: '#ff6b00', text: '#ffffff', thumb: 'from-orange-900 to-red-900',       border: 'border-orange-400/40'  },
+            { id: 'forest',  label: 'Forest',  bg: '#0d1f0d', primary: '#00cc66', text: '#ffffff', thumb: 'from-green-900 to-emerald-900',    border: 'border-green-400/40'   },
+          ].map(p => (
+            <button
+              class="preset-btn group relative p-0 rounded-xl border-2 border-white/10 overflow-hidden hover:scale-[1.03] active:scale-[0.97] transition-all duration-200"
+              data-preset={p.id}
+              data-bg={p.bg}
+              data-primary={p.primary}
+              data-text={p.text}
+              title={p.label}
+            >
+              <div class={`w-full h-14 bg-gradient-to-br ${p.thumb}`}></div>
+              <div class="py-2 text-center bg-white/5">
+                <span class="text-xs text-gray-300 font-medium">{p.label}</span>
+              </div>
+              <!-- active ring -->
+              <div class={`preset-ring absolute inset-0 border-2 ${p.border} rounded-xl opacity-0 transition-opacity`}></div>
+            </button>
+          ))}
         </div>
       </Card>
 
-      <Card title="Palette & Glass" description="Couleurs principales + intensité du verre">
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <!-- COLORS -->
+      <Card title="Colors" description="Fine-tune your palette">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {[
-            { id: 'background_color', label: 'Arrière-plan' },
-            { id: 'primary_color', label: 'Accent' },
-            { id: 'text_color', label: 'Texte' },
+            { id: 'background_color', label: 'Background', icon: '⬛' },
+            { id: 'primary_color',    label: 'Primary',    icon: '🎨' },
+            { id: 'text_color',       label: 'Text',        icon: '📝' },
           ].map(c => (
-            <div class="space-y-3">
-              <label class="block text-sm font-medium text-gray-300">{c.label}</label>
-              <div class="flex gap-3">
-                <input
-                  type="color"
-                  id={c.id}
-                  value={(theme as any)[c.id]}
-                  class="color-swatch w-14 h-14 rounded-2xl cursor-pointer border-2 border-white/10 shadow-sm"
-                />
+            <div class="space-y-2">
+              <label class="text-sm font-medium text-gray-300">{c.label}</label>
+              <div class="flex items-center gap-2">
+                <div class="relative">
+                  <input
+                    type="color"
+                    id={c.id}
+                    value={(theme as any)[c.id]}
+                    class="color-swatch w-11 h-11 rounded-xl cursor-pointer border border-white/10 bg-transparent p-0.5"
+                  />
+                </div>
                 <input
                   type="text"
-                  id={`${c.id}_hex`}
+                  id={`${c.id}_text`}
                   value={(theme as any)[c.id]}
                   maxlength="7"
-                  class="flex-1 px-4 py-2.5 glass rounded-2xl text-sm font-mono tracking-wider focus:border-emerald-500/50 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                  class="flex-1 px-3 py-2 glass border border-white/10 rounded-xl text-white text-sm font-mono tracking-wide focus:border-neon-green/50 focus:outline-none transition-colors"
                   placeholder="#000000"
                 />
               </div>
             </div>
           ))}
-
-          <div class="space-y-3">
-            <label class="block text-sm font-medium text-gray-300">Intensité Glass</label>
-            <div class="flex items-center gap-4">
-              <input
-                type="range"
-                id="glass_intensity"
-                min="4"
-                max="32"
-                step="2"
-                value={theme.glass_intensity ?? 12}
-                class="flex-1 accent-emerald-500"
-              />
-              <span id="glass-value" class="text-sm font-mono text-gray-300 w-10 text-right">
-                {theme.glass_intensity ?? 12}px
-              </span>
-            </div>
-          </div>
         </div>
       </Card>
 
-      <Card title="Type d'arrière-plan" description="Uni • Dégradé • Verre givré">
-        <div class="space-y-6">
-          <div class="grid grid-cols-3 gap-3">
+      <!-- BACKGROUND STYLE + GRADIENT BUILDER -->
+      <Card title="Background Style" description="Solid color, gradient, or blur">
+        <div class="space-y-5">
+          <!-- Style selector tabs -->
+          <div class="flex gap-2">
             {['solid', 'gradient', 'blur'].map(s => (
               <button
-                class="bg-style-tab py-3 px-4 rounded-2xl glass border-2 border-white/8 text-sm font-medium transition-all hover:border-emerald-500/40 hover:text-white data-[active]:border-emerald-500 data-[active]:bg-emerald-500/10 data-[active]:text-white"
+                class="bg-style-tab flex-1 py-2 rounded-xl text-sm font-medium border-2 border-white/10 text-gray-400 hover:text-white transition-all"
                 data-style={s}
-                aria-pressed={theme.background_style === s}
               >
-                {s === 'solid' ? 'Uni' : s === 'gradient' ? 'Dégradé' : 'Givré'}
+                {{ solid: 'Solid', gradient: 'Gradient', blur: 'Blur' }[s]}
               </button>
             ))}
           </div>
 
-          <div id="gradient-panel" class:list={['space-y-6', theme.background_style !== 'gradient' && 'hidden']}>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div class="space-y-3">
-                <label class="text-xs font-medium text-gray-400 uppercase tracking-wide">Couleur A</label>
-                <div class="flex gap-3">
-                  <input type="color" id="gradient_color_1" value={theme.background_color} class="color-swatch w-12 h-12 rounded-xl border border-white/10" />
-                  <input type="text" id="gradient_color_1_hex" value={theme.background_color} maxlength="7" class="flex-1 glass rounded-xl px-4 py-2.5 text-sm font-mono" />
+          <!-- Gradient builder (shown when gradient selected) -->
+          <div id="gradient-builder" class="hidden space-y-4 p-4 glass rounded-xl border border-white/10">
+            <div class="grid grid-cols-2 gap-4">
+              <div class="space-y-2">
+                <label class="text-xs text-gray-400 font-medium">Color 1</label>
+                <div class="flex gap-2">
+                  <input type="color" id="gradient_color_1" value={theme.background_color} class="color-swatch w-11 h-11 rounded-xl cursor-pointer border border-white/10 p-0.5" />
+                  <input type="text" id="gradient_color_1_text" value={theme.background_color} maxlength="7" class="flex-1 px-3 py-2 glass border border-white/10 rounded-xl text-white text-sm font-mono focus:border-neon-green/50 focus:outline-none transition-colors" />
                 </div>
               </div>
-              <div class="space-y-3">
-                <label class="text-xs font-medium text-gray-400 uppercase tracking-wide">Couleur B</label>
-                <div class="flex gap-3">
-                  <input type="color" id="gradient_color_2" value={theme.gradient_color_2} class="color-swatch w-12 h-12 rounded-xl border border-white/10" />
-                  <input type="text" id="gradient_color_2_hex" value={theme.gradient_color_2} maxlength="7" class="flex-1 glass rounded-xl px-4 py-2.5 text-sm font-mono" />
+              <div class="space-y-2">
+                <label class="text-xs text-gray-400 font-medium">Color 2</label>
+                <div class="flex gap-2">
+                  <input type="color" id="gradient_color_2" value={theme.gradient_color_2} class="color-swatch w-11 h-11 rounded-xl cursor-pointer border border-white/10 p-0.5" />
+                  <input type="text" id="gradient_color_2_text" value={theme.gradient_color_2} maxlength="7" class="flex-1 px-3 py-2 glass border border-white/10 rounded-xl text-white text-sm font-mono focus:border-neon-green/50 focus:outline-none transition-colors" />
                 </div>
               </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-3">
+            <!-- Gradient type -->
+            <div class="flex gap-2">
               {['linear', 'radial'].map(t => (
                 <button
-                  class="gradient-type py-3 rounded-2xl glass border-2 border-white/8 hover:border-emerald-500/40 data-[active]:border-emerald-500 data-[active]:bg-emerald-500/10 transition-all"
+                  class="gradient-type-btn flex-1 py-2 rounded-xl text-sm font-medium border-2 border-white/10 text-gray-400 hover:text-white transition-all"
                   data-type={t}
                 >
-                  {t === 'linear' ? 'Linéaire ⟶' : 'Radial ◎'}
+                  {{ linear: '⟶ Linear', radial: '◎ Radial' }[t]}
                 </button>
               ))}
             </div>
 
-            <div id="angle-container" class:list={['space-y-4', theme.gradient_type !== 'linear' && 'hidden']}>
-              <div class="flex justify-between text-xs text-gray-400">
-                <span>Angle</span>
-                <span id="angle-display">{theme.gradient_angle}°</span>
+            <!-- Angle (linear only) -->
+            <div id="angle-wrap" class="space-y-2">
+              <div class="flex justify-between items-center">
+                <label class="text-xs text-gray-400 font-medium">Angle</label>
+                <span id="gradient-angle-value" class="text-xs font-mono text-white">{theme.gradient_angle}°</span>
               </div>
-              <input type="range" id="gradient_angle" min="0" max="360" value={theme.gradient_angle} class="w-full accent-emerald-500" />
-              <div class="flex flex-wrap gap-2">
+              <input type="range" id="gradient_angle" min="0" max="360" value={theme.gradient_angle} class="w-full accent-neon-green" />
+              <!-- Angle presets -->
+              <div class="flex gap-2 flex-wrap">
                 {[0, 45, 90, 135, 180, 225, 270, 315].map(a => (
-                  <button class="angle-preset text-xs px-3 py-1.5 glass rounded-lg hover:border-emerald-500/40 data-[active]:border-emerald-500 transition-colors" data-angle={a}>
+                  <button
+                    class="angle-preset-btn text-xs px-2 py-1 glass rounded-lg border border-white/10 text-gray-400 hover:text-white hover:border-neon-green/40 transition-all"
+                    data-angle={a}
+                  >
                     {a}°
                   </button>
                 ))}
@@ -251,353 +257,721 @@ const profileJson = JSON.stringify({
             </div>
           </div>
 
-          <div id="blur-hint" class:list={['p-5 glass rounded-2xl border border-white/8 text-sm text-gray-300 leading-relaxed', theme.background_style !== 'blur' && 'hidden']}>
-            Effet verre givré — l'intensité est contrôlée par le curseur « Intensité Glass » ci-dessus.
+          <!-- Blur info -->
+          <div id="blur-info" class="hidden p-4 glass rounded-xl border border-white/10">
+            <p class="text-sm text-gray-400">Blur effect adds a frosted glass overlay on top of your background color.</p>
           </div>
         </div>
       </Card>
 
-      <Card title="Style des boutons" description="Apparence de tes liens">
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <!-- BUTTON STYLE -->
+      <Card title="Button Style" description="How links look on your profile">
+        <div class="grid grid-cols-3 gap-3">
           {[
-            { id: 'filled', label: 'Plein', preview: 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white' },
-            { id: 'outline', label: 'Contour', preview: 'border-2 border-emerald-400/70 text-emerald-300' },
-            { id: 'shadow', label: 'Glow', preview: 'bg-emerald-500/90 shadow-[0_0_24px_#00ff9d80] text-black' },
-            { id: 'minimal', label: 'Minimal', preview: 'text-emerald-400 hover:underline' },
+            { id: 'filled',  label: 'Filled',  preview: 'bg-neon-green' },
+            { id: 'outline', label: 'Outline', preview: 'border-2 border-neon-green' },
+            { id: 'shadow',  label: 'Glow',    preview: 'bg-neon-green shadow-neon' },
           ].map(s => (
             <button
-              class="style-btn group p-4 glass rounded-2xl border-2 border-transparent hover:border-emerald-500/30 transition-all data-[active]:border-emerald-500 data-[active]:bg-emerald-500/10"
+              class="button-style-btn p-3 glass border-2 border-white/10 rounded-xl hover:border-neon-green/40 transition-all group"
               data-style={s.id}
             >
-              <div class={`h-14 rounded-xl flex items-center justify-center text-sm font-semibold transition-transform group-hover:scale-105 ${s.preview}`}>
-                Bouton
-              </div>
-              <p class="mt-3 text-xs text-center text-gray-300 font-medium">{s.label}</p>
+              <div class={`w-full h-10 rounded-lg mb-3 ${s.preview} group-hover:scale-[1.02] transition-transform`}
+                   style={s.id === 'shadow' ? 'box-shadow: 0 0 20px rgba(0,255,157,0.5)' : ''}
+              ></div>
+              <p class="text-sm text-center text-gray-300 font-medium">{s.label}</p>
             </button>
           ))}
         </div>
       </Card>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 xl:gap-8">
-        <Card title="Coins" description="Arrondi & douceur">
-          <div class="space-y-6">
-            <div class="grid grid-cols-6 gap-2">
-              {[0, 8, 14, 20, 28, 40].map(r => (
-                <button
-                  class="radius-preset py-2.5 text-xs font-medium glass rounded-xl hover:border-emerald-500/40 data-[active]:border-emerald-500 data-[active]:bg-emerald-500/10 transition-colors"
-                  data-radius={r}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-            <div class="space-y-3">
-              <input type="range" id="border_radius" min="0" max="40" step="2" value={theme.border_radius} class="w-full accent-emerald-500" />
-              <div class="flex justify-between text-xs text-gray-400">
-                <span>Pointu</span>
-                <span id="radius-display">{theme.border_radius}px</span>
-                <span>Pilule</span>
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        <Card title="Typographie" description="Police d'écriture">
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {ALLOWED_FONTS.map(f => (
+      <!-- BORDER RADIUS -->
+      <Card title="Border Radius" description="Corner roundness">
+        <div class="space-y-4">
+          <!-- Quick picks -->
+          <div class="flex gap-2">
+            {[0, 6, 12, 18, 24, 32].map(r => (
               <button
-                class="font-swatch py-4 px-3 glass rounded-2xl border-2 border-transparent hover:border-emerald-500/30 data-[active]:border-emerald-500 data-[active]:bg-emerald-500/10 transition-all text-sm truncate"
-                style={`font-family: "${f}", system-ui, sans-serif;`}
-                data-font={f}
+                class="radius-preset-btn flex-1 py-2 glass rounded-xl border-2 border-white/10 text-xs text-gray-400 hover:text-white hover:border-neon-green/40 transition-all font-medium"
+                data-radius={r}
               >
-                {f}
+                {r}px
               </button>
             ))}
           </div>
-        </Card>
-      </div>
+          <input type="range" id="border_radius" min="0" max="32" value={theme.border_radius} class="w-full accent-neon-green" />
+          <div class="flex justify-between text-xs text-gray-500">
+            <span>Sharp</span>
+            <span id="radius-value" class="text-white font-mono font-medium">{theme.border_radius}px</span>
+            <span>Pill</span>
+          </div>
+        </div>
+      </Card>
 
-      <Card title="Préférences" description="Options supplémentaires">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <!-- TYPOGRAPHY -->
+      <Card title="Typography" description="Choose your font">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {['Inter', 'Poppins', 'Roboto', 'Montserrat', 'Open Sans', 'Lato', 'Geist', 'Figtree'].map(font => (
+            <button
+              class="font-btn py-3 px-2 glass border-2 border-white/10 rounded-xl text-sm text-white hover:border-neon-green/40 transition-all truncate"
+              data-font={font}
+              style={`font-family: '${font}', sans-serif`}
+            >
+              {font}
+            </button>
+          ))}
+        </div>
+      </Card>
+
+      <!-- ADVANCED -->
+      <Card title="Advanced" description="Extra settings">
+        <div class="space-y-3">
           {[
-            { id: 'block_shadow', label: 'Ombres en profondeur', desc: 'Effet 3D sur les blocs' },
-            { id: 'animations', label: 'Micro-animations', desc: 'Effets au survol et clic' },
+            { id: 'block_shadow', label: 'Block Shadows',    desc: 'Add depth to link blocks',    checked: theme.block_shadow  },
+            { id: 'animations',   label: 'Hover Animations', desc: 'Subtle hover & click effects', checked: theme.animations    },
           ].map(opt => (
-            <label class="group flex items-center justify-between p-5 glass rounded-2xl cursor-pointer hover:bg-white/5 transition-colors border border-white/10">
+            <label class="flex items-center justify-between p-4 glass rounded-xl cursor-pointer hover:bg-white/5 transition-colors border border-white/5">
               <div>
-                <div class="font-medium">{opt.label}</div>
-                <div class="text-xs text-gray-400 mt-0.5">{opt.desc}</div>
+                <div class="text-white font-medium text-sm">{opt.label}</div>
+                <div class="text-xs text-gray-400">{opt.desc}</div>
               </div>
-              <div class="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  id={opt.id}
-                  checked={theme[opt.id as keyof Theme]}
-                  class="sr-only peer"
-                />
-                <div class="w-12 h-7 bg-white/10 rounded-full peer peer-checked:bg-emerald-600/70 transition-colors duration-200"></div>
-                <div class="absolute left-1 top-1 w-5 h-5 bg-white rounded-full transition-all duration-200 peer-checked:translate-x-5 shadow-md"></div>
-              </div>
+              <input
+                type="checkbox"
+                id={opt.id}
+                checked={opt.checked}
+                class="toggle w-11 h-6 rounded-full appearance-none bg-white/10 relative cursor-pointer transition-colors checked:bg-neon-green/80 focus:outline-none"
+              />
             </label>
           ))}
         </div>
       </Card>
 
-      <div class="flex flex-wrap gap-4 pt-4">
-        <Button id="save-theme-btn" variant="primary" size="lg" className="flex-1 min-w-[160px]">
-          <span id="save-text">Enregistrer le thème</span>
+      <!-- ACTIONS -->
+      <div class="flex items-center gap-3">
+        <Button variant="primary" id="save-theme-btn" class="flex-1 relative overflow-hidden">
+          <span id="save-btn-text" class="flex items-center justify-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            Save Theme
+          </span>
         </Button>
-        <Button id="reset-theme-btn" variant="outline" size="lg">Réinitialiser</Button>
-        <Button variant="secondary" href={`/${profile.username}`} target="_blank" size="lg">
-          Aperçu en direct →
+        <Button variant="ghost" id="reset-theme-btn" title="Reset to default">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          Reset
+        </Button>
+        <Button variant="secondary" href={`/${profile.username}`} target="_blank" title="Open live profile">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+          </svg>
+          Preview
         </Button>
       </div>
 
     </div>
 
-    <div class="lg:col-span-4 space-y-6 xl:space-y-8">
-      <div class="sticky top-6 space-y-6 xl:space-y-8">
+    <!-- ========== RIGHT: PREVIEW + HISTORY ========== -->
+    <div class="lg:col-span-1 space-y-5">
 
-        <Card title="Aperçu en direct" description="Ton profil en temps réel" className="overflow-hidden">
-          <div class="relative rounded-3xl overflow-hidden aspect-[9/16] max-h-[640px] bg-black/40 border border-white/5 shadow-2xl">
+      <!-- LIVE PREVIEW (iframe) -->
+      <div class="sticky top-6 space-y-5">
+        <Card title="Live Preview" description="Real-time render" class="overflow-hidden">
+          <div class="relative rounded-xl overflow-hidden" style="height: 520px;">
             <iframe
               id="preview-iframe"
-              class="absolute inset-0 w-full h-full border-0"
-              sandbox="allow-same-origin allow-scripts"
-              title="Aperçu du thème du profil"
-              loading="lazy"
+              class="w-full h-full border-0 rounded-xl"
+              sandbox="allow-same-origin"
+              title="Theme preview"
             ></iframe>
-            <div class="pointer-events-none absolute top-0 inset-x-0 h-6 flex justify-center">
-              <div class="w-28 h-1.5 bg-white/15 rounded-b-3xl"></div>
+            <!-- Mobile notch decoration -->
+            <div class="pointer-events-none absolute top-0 inset-x-0 flex justify-center">
+              <div class="w-20 h-1 bg-white/10 rounded-b-full"></div>
             </div>
           </div>
         </Card>
 
-        <Card title="Historique" description="Versions récentes (local)">
-          <div id="history-list" class="space-y-3 min-h-[180px]">
-            <p class="text-center text-sm text-gray-500 py-8">Aucune version enregistrée pour l'instant</p>
+        <!-- THEME HISTORY -->
+        <Card title="Recent Themes" description="Last 5 saved">
+          <div id="history-list" class="space-y-2">
+            <p class="text-xs text-gray-500 text-center py-3">No history yet</p>
           </div>
         </Card>
-
       </div>
+
     </div>
   </div>
 
 </DashboardLayout>
 
-<style is:global>
-  .glass {
-    background: rgba(255,255,255,0.04);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255,255,255,0.08);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+<!-- ===================== STYLES ===================== -->
+<style>
+  /* Toggle checkbox style */
+  input[type="checkbox"].toggle {
+    transition: background-color 0.2s;
+  }
+  input[type="checkbox"].toggle:checked::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    top: 2px;
+    left: calc(100% - 22px);
+    transition: left 0.2s;
+  }
+  input[type="checkbox"].toggle::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    top: 2px;
+    left: 2px;
+    transition: left 0.2s;
   }
 
+  /* Color swatch */
   input[type="color"].color-swatch {
     -webkit-appearance: none;
     appearance: none;
-    padding: 3px;
-    border-radius: 14px;
-    overflow: hidden;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12);
   }
-  input[type="color"].color-swatch::-webkit-color-swatch-wrapper { padding: 0; }
-  input[type="color"].color-swatch::-webkit-color-swatch { border: none; border-radius: 10px; }
+  input[type="color"].color-swatch::-webkit-color-swatch-wrapper { padding: 2px; }
+  input[type="color"].color-swatch::-webkit-color-swatch { border: none; border-radius: 8px; }
 
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0,0,0,0);
-    border: 0;
-  }
+  /* Active states */
+  .preset-btn.active .preset-ring { opacity: 1; }
+  .button-style-btn.active { border-color: rgb(0 255 157 / 0.7); }
+  .font-btn.active { border-color: rgb(0 255 157 / 0.7); }
+  .bg-style-tab.active { border-color: rgb(0 255 157 / 0.7); color: white; }
+  .gradient-type-btn.active { border-color: rgb(0 255 157 / 0.7); color: white; }
 
-  [data-active] {
-    border-color: #10b981 !important;
-    background: rgba(16, 185, 129, 0.12) !important;
-    color: white !important;
-  }
+  /* Shadow neon helper */
+  .shadow-neon { box-shadow: 0 0 20px rgba(0, 255, 157, 0.45); }
 
-  .preset-btn.active {
-    border-color: #10b981 !important;
-    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3);
+  /* Save btn loading state */
+  #save-theme-btn.loading {
+    opacity: 0.7;
+    pointer-events: none;
   }
 </style>
 
+<!-- ===================== SCRIPT ===================== -->
 <script>
-if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-  document.addEventListener('DOMContentLoaded', () => {
+  import { toast } from '@/lib/utils/toast';
 
-    const serverData = document.getElementById('server-data');
-    if (!serverData) {
-      console.error('Element #server-data introuvable');
+  // Read server-side vars from DOM bridge (avoids define:vars + import conflict)
+  const serverData = document.getElementById('server-data');
+  const themeJson   = serverData?.dataset.theme   ?? '{}';
+  const profileJson = serverData?.dataset.profile ?? '{}';
+
+  // ==================== CONSTANTS ====================
+  const HISTORY_KEY = 'theme_history_v1';
+  const MAX_HISTORY = 5;
+  const ALLOWED_FONTS = ['Inter', 'Poppins', 'Roboto', 'Montserrat', 'Open Sans', 'Lato', 'Space Grotesk', 'DM Sans', 'Geist', 'Figtree'];
+
+  // ==================== STATE ====================
+  let currentTheme = JSON.parse(themeJson);
+  const profileData = JSON.parse(profileJson);
+
+  // ==================== SECURITY: INPUT SANITIZATION ====================
+  function sanitizeHex(val) {
+    return /^#[0-9A-Fa-f]{6}$/.test(val) ? val : null;
+  }
+  function sanitizeFont(val) {
+    return ALLOWED_FONTS.includes(val) ? val : null;
+  }
+  function sanitizeInt(val, min, max, fallback) {
+    const n = parseInt(val);
+    return (!isNaN(n) && n >= min && n <= max) ? n : fallback;
+  }
+
+  // ==================== DEBOUNCE + RAF ====================
+  let rafId = null;
+  function schedulePreviewUpdate() {
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(renderIframePreview);
+  }
+
+  // ==================== IFRAME PREVIEW ====================
+  function buildPreviewHTML(theme, profile) {
+    const fontUrl = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(theme.font_family)}:wght@400;500;600;700&display=swap`;
+
+    const bgStyle = (() => {
+      if (theme.background_style === 'gradient') {
+        if (theme.gradient_type === 'radial') {
+          return `radial-gradient(circle, ${theme.background_color}, ${theme.gradient_color_2})`;
+        }
+        return `linear-gradient(${theme.gradient_angle}deg, ${theme.background_color}, ${theme.gradient_color_2})`;
+      }
+      return theme.background_color;
+    })();
+
+    const btnStyles = (() => {
+      const base = `
+        display: block; width: 100%; padding: 14px 20px;
+        font-size: 15px; font-weight: 600; cursor: pointer;
+        border-radius: ${theme.border_radius}px;
+        font-family: '${theme.font_family}', sans-serif;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        ${theme.block_shadow ? 'box-shadow: 0 4px 14px rgba(0,0,0,0.3);' : ''}
+      `;
+      if (theme.button_style === 'outline') {
+        return `${base} background: transparent; border: 2px solid ${theme.primary_color}; color: ${theme.primary_color};`;
+      }
+      if (theme.button_style === 'shadow') {
+        return `${base} background: ${theme.primary_color}; border: none; color: ${theme.background_color};
+          box-shadow: 0 0 24px ${theme.primary_color}60;`;
+      }
+      return `${base} background: ${theme.primary_color}; border: none; color: ${theme.background_color};`;
+    })();
+
+    const blurOverlay = theme.background_style === 'blur'
+      ? `<div style="position:fixed;inset:0;backdrop-filter:blur(60px);-webkit-backdrop-filter:blur(60px);background:${theme.background_color}88;z-index:0;"></div>`
+      : '';
+
+    const animCSS = theme.animations
+      ? `button:hover { transform: scale(1.03) !important; } button:active { transform: scale(0.97) !important; }`
+      : '';
+
+    const sampleLinks = ['✦ My Portfolio', '✦ Twitter / X', '✦ Latest Project'];
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="${fontUrl}">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      min-height: 100%;
+      font-family: '${theme.font_family}', sans-serif;
+      background: ${bgStyle};
+      color: ${theme.text_color};
+      ${theme.background_style === 'blur' ? `background-color: ${theme.background_color};` : ''}
+    }
+    .page { position: relative; z-index: 1; max-width: 360px; margin: 0 auto; padding: 40px 20px; }
+    .avatar { width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, ${theme.primary_color}, ${theme.text_color}40); margin: 0 auto 16px; }
+    .name { font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 6px; }
+    .bio  { font-size: 13px; text-align: center; opacity: 0.65; margin-bottom: 28px; line-height: 1.5; }
+    .links { display: flex; flex-direction: column; gap: 12px; }
+    button { ${btnStyles} }
+    ${animCSS}
+  </style>
+</head>
+<body>
+  ${blurOverlay}
+  <div class="page">
+    <div class="avatar"></div>
+    <div class="name">${profile.display_name || profile.username || 'Your Name'}</div>
+    <div class="bio">${profile.bio || 'Your bio here ✨'}</div>
+    <div class="links">
+      ${sampleLinks.map(t => `<button>${t}</button>`).join('\n      ')}
+    </div>
+  </div>
+</body>
+</html>`;
+  }
+
+  function renderIframePreview() {
+    const iframe = document.getElementById('preview-iframe');
+    if (!iframe) return;
+    const html = buildPreviewHTML(currentTheme, profileData);
+    iframe.srcdoc = html;
+  }
+
+  // ==================== THEME HISTORY ====================
+  function getHistory() {
+    try {
+      return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    } catch {
+      return [];
+    }
+  }
+
+  function pushHistory(theme) {
+    const history = getHistory();
+    const entry = { theme: { ...theme }, savedAt: new Date().toISOString() };
+    history.unshift(entry);
+    if (history.length > MAX_HISTORY) history.pop();
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    renderHistory();
+  }
+
+  function renderHistory() {
+    const list = document.getElementById('history-list');
+    if (!list) return;
+    const history = getHistory();
+
+    if (history.length === 0) {
+      list.innerHTML = '<p class="text-xs text-gray-500 text-center py-3">No history yet</p>';
       return;
     }
 
-    const initialTheme = JSON.parse(serverData.dataset.theme || '{}');
-    const profileData = JSON.parse(serverData.dataset.profile || '{}');
-    const defaultTheme = JSON.parse(serverData.dataset.defaultTheme || '{}');
+    list.innerHTML = history.map((entry, i) => {
+      const date = new Date(entry.savedAt);
+      const label = date.toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+      return `
+        <button
+          class="history-restore-btn w-full flex items-center gap-3 p-3 glass rounded-xl border border-white/5 hover:border-white/15 transition-all group text-left"
+          data-index="${i}"
+        >
+          <div class="flex gap-1 shrink-0">
+            <div class="w-4 h-8 rounded" style="background:${entry.theme.background_color}; border: 1px solid rgba(255,255,255,0.1)"></div>
+            <div class="w-4 h-8 rounded" style="background:${entry.theme.primary_color}"></div>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-xs text-gray-300 font-medium capitalize truncate">${entry.theme.preset || 'custom'}</div>
+            <div class="text-xs text-gray-500">${label}</div>
+          </div>
+          <svg class="w-3.5 h-3.5 text-gray-500 group-hover:text-neon-green transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9"/>
+          </svg>
+        </button>
+      `;
+    }).join('');
 
-    let currentTheme = { ...initialTheme };
-    let isSaving = false;
-
-    const sanitizeHex = v => /^#[0-9A-Fa-f]{6}$/.test(v) ? v : null;
-    const clamp = (v, min, max) => Math.min(Math.max(Number(v), min), max);
-
-    function debounce(fn, delay = 80) {
-      let timer;
-      return (...args) => {
-        clearTimeout(timer);
-        timer = setTimeout(() => fn(...args), delay);
-      };
-    }
-
-    const updatePreview = debounce(() => {
-      const iframe = document.getElementById('preview-iframe');
-      if (!iframe) return;
-
-      const bgStyle = currentTheme.background_style === 'gradient'
-        ? currentTheme.gradient_type === 'radial'
-          ? `radial-gradient(circle at center, ${currentTheme.background_color}, ${currentTheme.gradient_color_2} 80%)`
-          : `linear-gradient(${currentTheme.gradient_angle}deg, ${currentTheme.background_color}, ${currentTheme.gradient_color_2})`
-        : currentTheme.background_color;
-
-      const glass = currentTheme.background_style === 'blur'
-        ? `backdrop-filter: blur(${currentTheme.glass_intensity}px); background: ${currentTheme.background_color}0d;`
-        : '';
-
-      iframe.srcdoc = `
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-*{margin:0;padding:0;box-sizing:border-box;}
-html,body{min-height:100%;background:${bgStyle};color:${currentTheme.text_color};font-family:"${currentTheme.font_family}",system-ui,sans-serif;}
-.frame{max-width:380px;margin:0 auto;padding:60px 24px;}
-button{
-display:block;width:100%;padding:16px;font-weight:600;font-size:15px;
-border-radius:${currentTheme.border_radius}px;
-background:${currentTheme.primary_color};
-color:#000;
-margin-bottom:12px;
-cursor:pointer;
-transition:transform .15s ease;
-}
-button:hover{transform:scale(1.03);}
-</style>
-</head>
-<body>
-${currentTheme.background_style === 'blur' ? `<div style="position:fixed;inset:0;${glass} z-index:0;"></div>` : ''}
-<div class="frame">
-<h2>${profileData.display_name || 'Toi'}</h2>
-<p>${profileData.bio || ''}</p>
-<button>Portfolio</button>
-<button>Projet</button>
-<button>Contact</button>
-</div>
-</body>
-</html>`;
-    });
-
-    function applyTheme(t) {
-      currentTheme = { ...currentTheme, ...t };
-      updatePreview();
-    }
-
-    /* ===============================
-       CLICKABLE INPUTS (AUTO-BIND)
-    =============================== */
-
-    const themeInputs = document.querySelectorAll('[data-theme-key]');
-
-    themeInputs.forEach(input => {
-      input.addEventListener('input', e => {
-        const key = e.target.dataset.themeKey;
-        let value = e.target.value;
-
-        if (value && value.startsWith('#')) {
-          const clean = sanitizeHex(value);
-          if (!clean) return;
-          value = clean;
+    // Restore click
+    list.querySelectorAll('.history-restore-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.index);
+        const entry = getHistory()[idx];
+        if (entry) {
+          applyTheme(entry.theme);
+          toast.success('Theme restored!');
         }
-
-        if (key === 'border_radius' || key === 'glass_intensity' || key === 'gradient_angle') {
-          value = clamp(value, 0, 100);
-        }
-
-        applyTheme({ [key]: value });
       });
     });
+  }
 
-    /* ===============================
-       SAVE
-    =============================== */
+  // ==================== APPLY FULL THEME ====================
+  function applyTheme(t) {
+    currentTheme = { ...currentTheme, ...t };
 
-    const saveBtn = document.getElementById('save-theme-btn');
+    // Update all inputs
+    setColorInput('background_color', currentTheme.background_color);
+    setColorInput('primary_color', currentTheme.primary_color);
+    setColorInput('text_color', currentTheme.text_color);
+    setColorInput('gradient_color_1', currentTheme.background_color);
+    setColorInput('gradient_color_2', currentTheme.gradient_color_2);
 
-    if (saveBtn) {
-      saveBtn.addEventListener('click', async () => {
+    const radiusSlider = document.getElementById('border_radius');
+    const radiusValue = document.getElementById('radius-value');
+    if (radiusSlider) radiusSlider.value = currentTheme.border_radius;
+    if (radiusValue) radiusValue.textContent = `${currentTheme.border_radius}px`;
 
-        if (isSaving) return;
+    const angleSlider = document.getElementById('gradient_angle');
+    const angleValue = document.getElementById('gradient-angle-value');
+    if (angleSlider) angleSlider.value = currentTheme.gradient_angle;
+    if (angleValue) angleValue.textContent = `${currentTheme.gradient_angle}°`;
 
-        isSaving = true;
-        saveBtn.disabled = true;
-        saveBtn.innerText = 'Sauvegarde...';
+    const blockShadow = document.getElementById('block_shadow');
+    const animations = document.getElementById('animations');
+    if (blockShadow) blockShadow.checked = currentTheme.block_shadow;
+    if (animations) animations.checked = currentTheme.animations;
 
-        try {
-          const res = await fetch('/api/profile', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ theme: currentTheme }),
-          });
+    // Active states
+    setActiveClass('.preset-btn', `[data-preset="${currentTheme.preset}"]`);
+    setActiveClass('.button-style-btn', `[data-style="${currentTheme.button_style}"]`);
+    setActiveClass('.font-btn', `[data-font="${currentTheme.font_family}"]`);
+    setActiveClass('.bg-style-tab', `[data-style="${currentTheme.background_style}"]`);
+    setActiveClass('.gradient-type-btn', `[data-type="${currentTheme.gradient_type}"]`);
 
-          if (!res.ok) throw new Error();
+    toggleGradientUI(currentTheme.background_style);
+    toggleAngleUI(currentTheme.gradient_type);
+    schedulePreviewUpdate();
+  }
 
-          if (window.toast) toast.success('Thème enregistré avec succès ✨');
-        } catch (err) {
-          console.error(err);
-          if (window.toast) toast.error('Erreur lors de la sauvegarde');
-        } finally {
-          isSaving = false;
-          saveBtn.disabled = false;
-          saveBtn.innerText = 'Enregistrer';
-        }
-      });
-    }
+  function setColorInput(id, value) {
+    const picker = document.getElementById(id);
+    const text = document.getElementById(`${id}_text`);
+    if (picker) picker.value = value;
+    if (text) text.value = value;
+  }
 
-    /* ===============================
-       RESET
-    =============================== */
+  function setActiveClass(groupSelector, targetSelector) {
+    document.querySelectorAll(groupSelector).forEach(el => el.classList.remove('active'));
+    document.querySelector(groupSelector + targetSelector)?.classList.add('active');
+  }
 
-    const resetBtn = document.getElementById('reset-theme-btn');
+  function toggleGradientUI(style) {
+    const gb = document.getElementById('gradient-builder');
+    const bi = document.getElementById('blur-info');
+    gb?.classList.toggle('hidden', style !== 'gradient');
+    bi?.classList.toggle('hidden', style !== 'blur');
+  }
 
-    if (resetBtn) {
-      resetBtn.addEventListener('click', () => {
-        if (!confirm('Réinitialiser le thème ?')) return;
+  function toggleAngleUI(type) {
+    document.getElementById('angle-wrap')?.classList.toggle('hidden', type !== 'linear');
+  }
 
-        currentTheme = { ...defaultTheme };
-        updatePreview();
+  // ==================== COLOR PICKERS ====================
+  const colorBindings = [
+    { id: 'background_color',  key: 'background_color' },
+    { id: 'primary_color',     key: 'primary_color'    },
+    { id: 'text_color',        key: 'text_color'       },
+    { id: 'gradient_color_1',  key: 'background_color' },
+    { id: 'gradient_color_2',  key: 'gradient_color_2' },
+  ];
 
-        if (window.toast) toast.info('Thème réinitialisé');
+  colorBindings.forEach(({ id, key }) => {
+    const picker = document.getElementById(id);
+    const text = document.getElementById(`${id}_text`);
 
-        // remet visuellement les inputs
-        themeInputs.forEach(input => {
-          const key = input.dataset.themeKey;
-          if (defaultTheme[key] !== undefined) {
-            input.value = defaultTheme[key];
-          }
-        });
-      });
-    }
+    picker?.addEventListener('input', (e) => {
+      const val = e.target.value;
+      currentTheme[key] = val;
+      // Sync gradient_color_1 <-> background_color
+      if (id === 'background_color') setColorInput('gradient_color_1', val);
+      if (id === 'gradient_color_1') setColorInput('background_color', val);
+      if (text) text.value = val;
+      schedulePreviewUpdate();
+    });
 
-    applyTheme(currentTheme);
-
+    text?.addEventListener('input', (e) => {
+      const val = e.target.value;
+      const clean = sanitizeHex(val);
+      if (clean) {
+        currentTheme[key] = clean;
+        if (picker) picker.value = clean;
+        schedulePreviewUpdate();
+      }
+    });
   });
-}
+
+  // ==================== PRESETS ====================
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const { preset, bg, primary, text } = btn.dataset;
+      if (!sanitizeHex(bg) || !sanitizeHex(primary) || !sanitizeHex(text)) return;
+      currentTheme = { ...currentTheme, preset, background_color: bg, primary_color: primary, text_color: text };
+      setColorInput('background_color', bg);
+      setColorInput('gradient_color_1', bg);
+      setColorInput('primary_color', primary);
+      setColorInput('text_color', text);
+      setActiveClass('.preset-btn', `[data-preset="${preset}"]`);
+      schedulePreviewUpdate();
+    });
+  });
+
+  // ==================== BUTTON STYLE ====================
+  document.querySelectorAll('.button-style-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentTheme.button_style = btn.dataset.style;
+      setActiveClass('.button-style-btn', `[data-style="${btn.dataset.style}"]`);
+      schedulePreviewUpdate();
+    });
+  });
+
+  // ==================== FONT ====================
+  document.querySelectorAll('.font-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const font = sanitizeFont(btn.dataset.font);
+      if (!font) return;
+      currentTheme.font_family = font;
+      setActiveClass('.font-btn', `[data-font="${font}"]`);
+      schedulePreviewUpdate();
+    });
+  });
+
+  // ==================== BG STYLE TABS ====================
+  document.querySelectorAll('.bg-style-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentTheme.background_style = btn.dataset.style;
+      setActiveClass('.bg-style-tab', `[data-style="${btn.dataset.style}"]`);
+      toggleGradientUI(btn.dataset.style);
+      schedulePreviewUpdate();
+    });
+  });
+
+  // ==================== GRADIENT TYPE ====================
+  document.querySelectorAll('.gradient-type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentTheme.gradient_type = btn.dataset.type;
+      setActiveClass('.gradient-type-btn', `[data-type="${btn.dataset.type}"]`);
+      toggleAngleUI(btn.dataset.type);
+      schedulePreviewUpdate();
+    });
+  });
+
+  // ==================== GRADIENT ANGLE ====================
+  const angleSlider = document.getElementById('gradient_angle');
+  const angleValue = document.getElementById('gradient-angle-value');
+  angleSlider?.addEventListener('input', (e) => {
+    const val = sanitizeInt(e.target.value, 0, 360, 135);
+    currentTheme.gradient_angle = val;
+    if (angleValue) angleValue.textContent = `${val}°`;
+    schedulePreviewUpdate();
+  });
+
+  document.querySelectorAll('.angle-preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const val = sanitizeInt(btn.dataset.angle, 0, 360, 135);
+      currentTheme.gradient_angle = val;
+      if (angleSlider) angleSlider.value = val;
+      if (angleValue) angleValue.textContent = `${val}°`;
+      schedulePreviewUpdate();
+    });
+  });
+
+  // ==================== BORDER RADIUS ====================
+  const radiusSlider = document.getElementById('border_radius');
+  const radiusDisplay = document.getElementById('radius-value');
+
+  radiusSlider?.addEventListener('input', (e) => {
+    const val = sanitizeInt(e.target.value, 0, 32, 12);
+    currentTheme.border_radius = val;
+    if (radiusDisplay) radiusDisplay.textContent = `${val}px`;
+    schedulePreviewUpdate();
+  });
+
+  document.querySelectorAll('.radius-preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const val = sanitizeInt(btn.dataset.radius, 0, 32, 12);
+      currentTheme.border_radius = val;
+      if (radiusSlider) radiusSlider.value = val;
+      if (radiusDisplay) radiusDisplay.textContent = `${val}px`;
+      schedulePreviewUpdate();
+    });
+  });
+
+  // ==================== ADVANCED TOGGLES ====================
+  document.getElementById('block_shadow')?.addEventListener('change', (e) => {
+    currentTheme.block_shadow = e.target.checked;
+    schedulePreviewUpdate();
+  });
+  document.getElementById('animations')?.addEventListener('change', (e) => {
+    currentTheme.animations = e.target.checked;
+    schedulePreviewUpdate();
+  });
+
+  // ==================== SAVE (rate-limited) ====================
+  let lastSaveTime = 0;
+  const SAVE_COOLDOWN = 2000; // 2s
+
+  document.getElementById('save-theme-btn')?.addEventListener('click', async () => {
+    const now = Date.now();
+    if (now - lastSaveTime < SAVE_COOLDOWN) {
+      toast.error('Please wait before saving again');
+      return;
+    }
+
+    const btn = document.getElementById('save-theme-btn');
+    const btnText = document.getElementById('save-btn-text');
+    btn?.classList.add('loading');
+    if (btnText) btnText.innerHTML = `
+      <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+      </svg>
+      Saving…
+    `;
+
+    try {
+      const response = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ theme: currentTheme }),
+      });
+
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error || `HTTP ${response.status}`);
+      }
+
+      lastSaveTime = Date.now();
+      pushHistory(currentTheme); // Save to local history
+      toast.success('Theme saved!');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save theme');
+    } finally {
+      btn?.classList.remove('loading');
+      if (btnText) btnText.innerHTML = `
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+        </svg>
+        Save Theme
+      `;
+    }
+  });
+
+  // ==================== RESET ====================
+  document.getElementById('reset-theme-btn')?.addEventListener('click', () => {
+    if (!confirm('Reset to default dark theme?')) return;
+    applyTheme({
+      preset: 'dark',
+      background_color: '#0a0a0a',
+      primary_color: '#00ff9d',
+      text_color: '#ffffff',
+      button_style: 'filled',
+      border_radius: 12,
+      font_family: 'Inter',
+      background_style: 'solid',
+      gradient_color_2: '#1a1a2e',
+      gradient_angle: 135,
+      gradient_type: 'linear',
+      block_shadow: true,
+      animations: true,
+    });
+    toast.success('Theme reset!');
+  });
+
+  // ==================== EXPORT ====================
+  document.getElementById('export-btn')?.addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(currentTheme, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `theme-${currentTheme.preset || 'custom'}-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('Theme exported!');
+  });
+
+  // ==================== IMPORT ====================
+  document.getElementById('import-file')?.addEventListener('change', (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 50_000) { toast.error('File too large (max 50KB)'); return; }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const raw = JSON.parse(ev.target.result);
+
+        // Validate & sanitize all fields
+        const safe = {
+          preset:           typeof raw.preset === 'string' ? raw.preset.slice(0, 20) : 'custom',
+          background_color: sanitizeHex(raw.background_color) || '#0a0a0a',
+          primary_color:    sanitizeHex(raw.primary_color)    || '#00ff9d',
+          text_color:       sanitizeHex(raw.text_color)       || '#ffffff',
+          gradient_color_2: sanitizeHex(raw.gradient_color_2) || '#1a1a2e',
+          gradient_angle:   sanitizeInt(raw.gradient_angle, 0, 360, 135),
+          gradient_type:    ['linear','radial'].includes(raw.gradient_type) ? raw.gradient_type : 'linear',
+          background_style: ['solid','gradient','blur'].includes(raw.background_style) ? raw.background_style : 'solid',
+          button_style:     ['filled','outline','shadow'].includes(raw.button_style) ? raw.button_style : 'filled',
+          border_radius:    sanitizeInt(raw.border_radius, 0, 32, 12),
+          font_family:      sanitizeFont(raw.font_family) || 'Inter',
+          block_shadow:     typeof raw.block_shadow === 'boolean' ? raw.block_shadow : true,
+          animations:       typeof raw.animations === 'boolean' ? raw.animations : true,
+        };
+
+        applyTheme(safe);
+        toast.success('Theme imported!');
+      } catch {
+        toast.error('Invalid theme file');
+      }
+    };
+    reader.readAsText(file);
+    // Reset file input so same file can be re-imported
+    e.target.value = '';
+  });
+
+  // ==================== INIT ====================
+  applyTheme(currentTheme);
+  renderHistory();
 </script>
