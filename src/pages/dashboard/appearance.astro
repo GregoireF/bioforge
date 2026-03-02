@@ -429,109 +429,215 @@ const profileJson = JSON.stringify({
 </style>
 
 <script>
-  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', () => {
+if (typeof window !== 'undefined') {
+document.addEventListener('DOMContentLoaded', () => {
 
-      const serverData = document.getElementById('server-data');
-      if (!serverData) {
-        console.error('Element #server-data introuvable');
-        return;
-      }
+  const serverData = document.getElementById('server-data');
+  if (!serverData) return;
 
-      const initialTheme = JSON.parse(serverData.dataset.theme || '{}');
-      const profileData = JSON.parse(serverData.dataset.profile || '{}');
-      const defaultTheme = JSON.parse(serverData.dataset.defaultTheme || '{}');
+  const initialTheme = JSON.parse(serverData.dataset.theme || '{}');
+  const profileData = JSON.parse(serverData.dataset.profile || '{}');
+  const defaultTheme = JSON.parse(serverData.dataset.defaultTheme || '{}');
 
-      let currentTheme = { ...initialTheme };
+  let currentTheme = { ...initialTheme };
 
-      const sanitizeHex = v => /^#[0-9A-Fa-f]{6}$/.test(v) ? v : null;
-      const clamp = (v, min, max) => Math.min(Math.max(Number(v), min), max);
+  const sanitizeHex = v => /^#[0-9A-Fa-f]{6}$/.test(v) ? v : null;
+  const clamp = (v, min, max) => Math.min(Math.max(Number(v), min), max);
 
-      function debounce(fn, delay = 80) {
-        let timer;
-        return (...args) => {
-          clearTimeout(timer);
-          timer = setTimeout(() => fn(...args), delay);
-        };
-      }
+  const debounce = (fn, delay = 80) => {
+    let t;
+    return (...args) => {
+      clearTimeout(t);
+      t = setTimeout(() => fn(...args), delay);
+    };
+  };
 
-      const updatePreview = debounce(() => {
-        const iframe = document.getElementById('preview-iframe');
-        if (!iframe) return;
-
-        const bgStyle = currentTheme.background_style === 'gradient'
-          ? currentTheme.gradient_type === 'radial'
-            ? `radial-gradient(circle at center, ${currentTheme.background_color}, ${currentTheme.gradient_color_2} 80%)`
-            : `linear-gradient(${currentTheme.gradient_angle}deg, ${currentTheme.background_color}, ${currentTheme.gradient_color_2})`
-          : currentTheme.background_color;
-
-        const glass = currentTheme.background_style === 'blur'
-          ? `backdrop-filter: blur(${currentTheme.glass_intensity}px); background: ${currentTheme.background_color}0d;`
-          : '';
-
-        iframe.srcdoc = `
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-*{margin:0;padding:0;box-sizing:border-box;}
-html,body{min-height:100%;background:${bgStyle};color:${currentTheme.text_color};font-family:"${currentTheme.font_family}",system-ui,sans-serif;}
-.frame{max-width:380px;margin:0 auto;padding:60px 24px;}
-button{
-display:block;width:100%;padding:16px;font-weight:600;font-size:15px;
-border-radius:${currentTheme.border_radius}px;
-background:${currentTheme.primary_color};
-color:#000;
-margin-bottom:12px;
-}
-</style>
-</head>
-<body>
-${currentTheme.background_style === 'blur' ? `<div style="position:fixed;inset:0;${glass} z-index:0;"></div>` : ''}
-<div class="frame">
-<h2>${profileData.display_name || 'Toi'}</h2>
-<p>${profileData.bio || ''}</p>
-<button>Portfolio</button>
-<button>Projet</button>
-<button>Contact</button>
-</div>
-</body>
-</html>`;
-      });
-
-      function applyTheme(t) {
-        currentTheme = { ...currentTheme, ...t };
-        updatePreview();
-      }
-
-      // SAVE
-      document.getElementById('save-theme-btn')?.addEventListener('click', async () => {
-        try {
-          const res = await fetch('/api/profile', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ theme: currentTheme }),
-          });
-
-          if (!res.ok) throw new Error('Erreur sauvegarde');
-
-          alert('Thème enregistré');
-        } catch (err) {
-          console.error(err);
-          alert('Erreur sauvegarde');
-        }
-      });
-
-      // RESET
-      document.getElementById('reset-theme-btn')?.addEventListener('click', () => {
-        if (confirm('Réinitialiser ?')) {
-          applyTheme(defaultTheme);
-        }
-      });
-
-      applyTheme(currentTheme);
+  function setActive(selector, value) {
+    document.querySelectorAll(selector).forEach(el => {
+      el.removeAttribute('data-active');
+      el.classList.remove('active');
     });
+
+    const el = document.querySelector(`${selector}[data-${selector.replace('.', '').replace('[','').replace(']','')}="${value}"]`);
+    if (el) {
+      el.setAttribute('data-active', '');
+      el.classList.add('active');
+    }
   }
+
+  function updateUI() {
+    document.getElementById('radius-display')?.textContent = `${currentTheme.border_radius}px`;
+    document.getElementById('angle-display')?.textContent = `${currentTheme.gradient_angle}°`;
+    document.getElementById('glass-value')?.textContent = `${currentTheme.glass_intensity}px`;
+
+    document.getElementById('gradient-panel')
+      ?.classList.toggle('hidden', currentTheme.background_style !== 'gradient');
+
+    document.getElementById('blur-hint')
+      ?.classList.toggle('hidden', currentTheme.background_style !== 'blur');
+
+    document.getElementById('angle-container')
+      ?.classList.toggle('hidden', currentTheme.gradient_type !== 'linear');
+  }
+
+  const updatePreview = debounce(() => {
+    const iframe = document.getElementById('preview-iframe');
+    if (!iframe) return;
+
+    const bg =
+      currentTheme.background_style === 'gradient'
+        ? currentTheme.gradient_type === 'radial'
+          ? `radial-gradient(circle at center, ${currentTheme.background_color}, ${currentTheme.gradient_color_2})`
+          : `linear-gradient(${currentTheme.gradient_angle}deg, ${currentTheme.background_color}, ${currentTheme.gradient_color_2})`
+        : currentTheme.background_color;
+
+    iframe.srcdoc = `
+      <html>
+      <body style="
+        margin:0;
+        padding:40px 20px;
+        background:${bg};
+        color:${currentTheme.text_color};
+        font-family:${currentTheme.font_family},system-ui;
+      ">
+        <h2 style="text-align:center">${profileData.display_name || 'Toi'}</h2>
+        <p style="text-align:center;opacity:.7">${profileData.bio || ''}</p>
+        <div style="margin-top:30px">
+          <button style="
+            width:100%;
+            padding:14px;
+            border-radius:${currentTheme.border_radius}px;
+            background:${currentTheme.primary_color};
+            color:#000;
+            border:none;
+            font-weight:600;
+            margin-bottom:12px;
+          ">Portfolio</button>
+        </div>
+      </body>
+      </html>
+    `;
+  });
+
+  function applyTheme(partial, showToast = false) {
+    currentTheme = { ...currentTheme, ...partial };
+    updateUI();
+    updatePreview();
+    if (showToast) toast.success("Modifications appliquées");
+  }
+
+  /* ---------------- PRESETS ---------------- */
+
+  document.querySelectorAll('.preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const { preset, bg, primary, text } = btn.dataset;
+      applyTheme({
+        preset,
+        background_color: bg,
+        primary_color: primary,
+        text_color: text
+      }, true);
+      toast.success(`Preset "${preset}" appliqué`);
+    });
+  });
+
+  /* ---------------- BACKGROUND STYLE ---------------- */
+
+  document.querySelectorAll('.bg-style-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      applyTheme({ background_style: tab.dataset.style }, true);
+    });
+  });
+
+  document.querySelectorAll('.gradient-type').forEach(btn => {
+    btn.addEventListener('click', () => {
+      applyTheme({ gradient_type: btn.dataset.type }, true);
+    });
+  });
+
+  /* ---------------- BUTTON STYLE ---------------- */
+
+  document.querySelectorAll('.style-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      applyTheme({ button_style: btn.dataset.style }, true);
+    });
+  });
+
+  /* ---------------- FONT ---------------- */
+
+  document.querySelectorAll('.font-swatch').forEach(btn => {
+    btn.addEventListener('click', () => {
+      applyTheme({ font_family: btn.dataset.font }, true);
+    });
+  });
+
+  /* ---------------- RANGE ---------------- */
+
+  document.getElementById('border_radius')
+    ?.addEventListener('input', e =>
+      applyTheme({ border_radius: clamp(e.target.value, 0, 40) })
+    );
+
+  document.getElementById('gradient_angle')
+    ?.addEventListener('input', e =>
+      applyTheme({ gradient_angle: clamp(e.target.value, 0, 360) })
+    );
+
+  document.getElementById('glass_intensity')
+    ?.addEventListener('input', e =>
+      applyTheme({ glass_intensity: clamp(e.target.value, 4, 32) })
+    );
+
+  /* ---------------- CHECKBOX ---------------- */
+
+  ['block_shadow', 'animations'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', e => {
+      applyTheme({ [id]: e.target.checked }, true);
+    });
+  });
+
+  /* ---------------- COLORS ---------------- */
+
+  ['background_color', 'primary_color', 'text_color', 'gradient_color_2']
+    .forEach(id => {
+      document.getElementById(id)?.addEventListener('input', e => {
+        const val = sanitizeHex(e.target.value);
+        if (!val) return toast.error("Couleur invalide");
+        applyTheme({ [id]: val });
+      });
+    });
+
+  /* ---------------- SAVE ---------------- */
+
+  document.getElementById('save-theme-btn')?.addEventListener('click', async () => {
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ theme: currentTheme }),
+      });
+
+      if (!res.ok) throw new Error();
+
+      toast.success("Thème enregistré avec succès ✨");
+    } catch {
+      toast.error("Erreur lors de l'enregistrement");
+    }
+  });
+
+  /* ---------------- RESET ---------------- */
+
+  document.getElementById('reset-theme-btn')?.addEventListener('click', () => {
+    if (confirm("Réinitialiser le thème ?")) {
+      currentTheme = { ...defaultTheme };
+      updateUI();
+      updatePreview();
+      toast.info("Thème réinitialisé");
+    }
+  });
+
+  updateUI();
+  updatePreview();
+});
+}
 </script>
