@@ -11,7 +11,7 @@ import playformInline from '@playform/inline';
 import min from 'astro-min';
 import compressor from 'astro-compressor';
 import purgecss from 'astro-purgecss';
-import vercel from '@astrojs/vercel/serverless';
+import vercel from '@astrojs/vercel';
 
 // https://astro.build/config
 export default defineConfig({
