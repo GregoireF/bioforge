@@ -7,7 +7,6 @@ import QRCode from 'qrcode';
 // Lucide Icons
 import { SiX, SiInstagram, SiFacebook, SiYoutube, SiGithub, SiTiktok, SiTwitch, SiKick, SiDiscord } from '@icons-pack/react-simple-icons';
 
-// ==================== GET USERNAME ====================
 const { username } = Astro.params;
 if (!username) return Astro.redirect('/404');
 
@@ -123,9 +122,7 @@ const socialIconsMap: Record<string, any> = {
             if (block.type === 'heading') {
               return (
                 <div class={`text-xl lg:text-2xl font-bold text-center py-3 animate-fade-in-up ${staggerClass}`}
-                     style={`color: ${theme.text_color}`}>
-                  {block.title || 'Heading'}
-                </div>
+                     style={`color: ${theme.text_color}`}>{block.title || 'Heading'}</div>
               );
             }
 
@@ -158,14 +155,13 @@ const socialIconsMap: Record<string, any> = {
               const imageLink = block.config?.link;
               if (!imageUrl) return null;
 
-              const imageElement = (
+              const imgEl = (
                 <img src={imageUrl} alt={block.title || 'Image'}
                      class={`w-full rounded-lg transition-all hover:scale-105 animate-fade-in-up ${staggerClass}`}
                      style={`border-radius: ${theme.border_radius}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''}`} />
               );
 
-              if (imageLink) return <a href={imageLink} target="_blank" rel="noopener noreferrer">{imageElement}</a>;
-              return <div>{imageElement}</div>;
+              return imageLink ? <a href={imageLink} target="_blank" rel="noopener noreferrer">{imgEl}</a> : <div>{imgEl}</div>;
             }
 
             // VIDEO
