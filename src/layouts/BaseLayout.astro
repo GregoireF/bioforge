@@ -144,7 +144,9 @@ const finalJsonLd = pageJsonLd || defaultJsonLd;
   </head>
   <body class="min-h-screen bg-dark-900 text-white font-sans antialiased smooth-font">
     <!-- Smooth scroll container -->
-    <slot />
+    <div data-scroll-container>
+      <slot />
+    </div>
 
     <!-- Global Scripts (cursor trail, particles, etc.) -->
     <GlobalScripts />
