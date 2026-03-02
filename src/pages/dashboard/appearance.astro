@@ -1,4 +1,7 @@
 ---
+// src/pages/dashboard/appearance.astro — Appearance/Theme Page v2
+// Réécriture complète : UX 2026, perf, sécurité, nouvelles features
+
 import DashboardLayout from '@/layouts/DashboardLayout.astro';
 import Button from '@/components/ui/Button.astro';
 import Card from '@/components/ui/Card.astro';
@@ -109,6 +112,14 @@ const profileJson = JSON.stringify({
       </button>
     </div>
   </div>
+
+  <!-- Server vars bridge (read by module script below) -->
+  <div
+    id="server-data"
+    class="hidden"
+    data-theme={themeJson}
+    data-profile={profileJson}
+  ></div>
 
   <!-- ===== MAIN GRID ===== -->
   <div class="grid lg:grid-cols-3 gap-6 lg:gap-8 items-start">
@@ -449,8 +460,13 @@ const profileJson = JSON.stringify({
 </style>
 
 <!-- ===================== SCRIPT ===================== -->
-<script define:vars={{ themeJson, profileJson }}>
+<script>
   import { toast } from '@/lib/utils/toast';
+
+  // Read server-side vars from DOM bridge (avoids define:vars + import conflict)
+  const serverData = document.getElementById('server-data');
+  const themeJson   = serverData?.dataset.theme   ?? '{}';
+  const profileJson = serverData?.dataset.profile ?? '{}';
 
   // ==================== CONSTANTS ====================
   const HISTORY_KEY = 'theme_history_v1';
