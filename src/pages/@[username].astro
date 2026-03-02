@@ -211,29 +211,28 @@ function getSocialIcon(url: string): string {
             }
 
             // SOCIAL
-            if (block.type === 'social') {
-              const links = block.config?.links || [];
-              if (!Array.isArray(links) || links.length === 0) return null;
+          if (block.type === 'social') {
+            const links = block.config?.links || [];
+            if (!Array.isArray(links) || links.length === 0) return null;
 
-              return (
-                <div class={`flex items-center justify-center flex-wrap gap-4 animate-fade-in-up ${staggerClass}`}>
-                  {links.map(link => {
-                    const url = typeof link === 'string' ? link : link?.url;
-                    if (!url) return null;
+            return (
+              <div class={`flex items-center justify-center flex-wrap gap-4 animate-fade-in-up ${staggerClass}`}>
+                {links.map(link => {
+                  const url = typeof link === 'string' ? link : link?.url;
+                  if (!url) return null;
 
-                    return (
-                      <a href={url} target="_blank" rel="noopener noreferrer"
-                        class="w-14 h-14 flex items-center justify-center rounded-full transition-all hover:scale-110"
-                        data-block-id={blockId}
-                        style={`background-color: ${theme.primary_color}; color: ${theme.background_color}; ${theme.block_shadow ? `box-shadow: 0 4px 16px ${theme.primary_color}60;` : ''}`}>
-                      <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor"
-                          dangerouslySetInnerHTML={{ __html: getSocialIcon(url) }} />
-                      </a>
-                    );
-                  })}
-                </div>
-              );
-            }
+                  return (
+                    <a href={url} target="_blank" rel="noopener noreferrer"
+                      class="w-14 h-14 flex items-center justify-center rounded-full transition-all hover:scale-110"
+                      data-block-id={blockId}
+                      style={`background-color: ${theme.primary_color}; color: ${theme.background_color}; ${theme.block_shadow ? `box-shadow: 0 4px 16px ${theme.primary_color}60;` : ''}`}>
+                      <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor" set:html={getSocialIcon(url)} />
+                    </a>
+                  );
+                })}
+              </div>
+            );
+          }
 
             return null;
           })}
