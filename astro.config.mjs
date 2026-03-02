@@ -23,6 +23,9 @@ export default defineConfig({
   },
 
   vite: {
+    server: {
+      host: 'bioforge-three.vercel.app'
+    },
     plugins: [
       tailwindcss(),
       Sonda({

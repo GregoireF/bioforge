@@ -17,7 +17,13 @@ export function createSupabaseServer(context: {
           return context.cookies.get(name)?.value
         },
         set(name: string, value: string, options) {
-          context.cookies.set(name, value)
+          context.cookies.set(name, value, {
+            path: '/',
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none',
+            ...options,
+          })
         },
         remove(name: string, options) {
           context.cookies.delete(name, {
