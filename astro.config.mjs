@@ -11,14 +11,13 @@ import playformInline from '@playform/inline';
 import min from 'astro-min';
 import compressor from 'astro-compressor';
 import purgecss from 'astro-purgecss';
+import vercel from '@astrojs/vercel/serverless';
 
 // https://astro.build/config
 export default defineConfig({
   output: 'server',
 
-  adapter: node({
-    mode: 'standalone'
-  }),
+  adapter: vercel(),
 
   vite: {
     plugins: [
@@ -33,7 +32,7 @@ export default defineConfig({
   },
 
   server: { 
-    host: '0.0.0.0'
+    host: 'bioforge-three.vercel.app'
   },
 
   integrations: [sitemap(), purgecss({
