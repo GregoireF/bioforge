@@ -460,7 +460,7 @@ const { user, profile, planLimits } = authResult.data;
       console.log('[JSON envoyé]', JSON.stringify(data));
 
       try {
-        const response = await fetch('https://bioforge-three.vercel.app/api/profile', {
+        const response = await fetch('https://bioforge.click/api/profile', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
@@ -543,7 +543,7 @@ const { user, profile, planLimits } = authResult.data;
       if (!doubleConfirm) return;
 
       try {
-        const response = await fetch('https://bioforge-three.vercel.app/api/profile/delete', {
+        const response = await fetch('https://bioforge.click/api/profile/delete', {
           method: 'POST'
         });
 
