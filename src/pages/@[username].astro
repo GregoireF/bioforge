@@ -51,7 +51,7 @@ if (theme.background_style === 'gradient') {
 // ==================== GENERATE QR CODE ====================
 let qrDataUrl = '';
 try {
-  qrDataUrl = await QRCode.toDataURL(`https://bioforge.click/${profile.username}`, {
+  qrDataUrl = await QRCode.toDataURL(`https://bioforge.click/@${profile.username}`, {
     width: 256,
     margin: 1,
     color: { dark: theme.primary_color, light: '#00000000' }
