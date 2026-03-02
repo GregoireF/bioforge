@@ -1,10 +1,10 @@
 ---
 import Button from '@/components/ui/Button.astro';
+import { Image } from 'astro:assets';
 
 const navItems = [
   { label: 'Features', href: '/features' },
   { label: 'Pricing', href: '/pricing' },
-  { label: 'Sign In', href: '/signin' },
 ];
 ---
 
@@ -33,16 +33,7 @@ const navItems = [
         aria-label="BioForge Home"
       >
         <div class="relative">
-          <svg
-            class="w-10 h-10 text-neon-green transition-all duration-300 group-hover:scale-110 group-hover:rotate-12"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="group-hover:drop-shadow-[0_0_8px_rgba(0,255,157,0.8)]" />
-            <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="group-hover:drop-shadow-[0_0_8px_rgba(0,255,157,0.8)]" />
-            <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="group-hover:drop-shadow-[0_0_8px_rgba(0,255,157,0.8)]" />
-          </svg>
+          <Image src="/images/logo.webp" alt="BioForge Logo" width="60" height="60" />
           <div class="absolute inset-0 bg-neon-green/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
         </div>
         <span class="text-glow-green group-hover:tracking-wider transition-all duration-300">BIOFORGE</span>
@@ -67,7 +58,7 @@ const navItems = [
           href="/signup"
           class="magnetic glow-green"
         >
-          <span class="relative z-10">Sign Up Now</span>
+          <span class="relative z-10">Sign In</span>
           <svg class="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
           </svg>
@@ -102,8 +93,8 @@ const navItems = [
         </a>
       ))}
       <div class="pt-4 px-4">
-        <Button variant="primary" size="md" href="/signup" class="w-full glow-green">
-          Sign Up Now
+        <Button variant="primary" size="md" href="/signin" class="w-full glow-green">
+          Sign In
         </Button>
       </div>
     </div>
