@@ -22,16 +22,16 @@ const DEFAULT_THEME = {
   primary_color: '#00ff9d',
   text_color: '#ffffff',
   button_style: 'filled' as const,
-  border_radius: 14,           // légèrement augmenté – tendance 2026
+  border_radius: 14,
   font_family: 'Geist' as const,
   block_shadow: true,
   animations: true,
-  glass_intensity: 12,         // nouveauté – force du blur glass
+  glass_intensity: 12,
 } satisfies Record<string, any>;
 
 type Theme = typeof DEFAULT_THEME;
 
-// Sanitizers renforcés + typage strict
+// Sanitizers renforcés
 function sanitizeHex(value: unknown, fallback: string): string {
   return typeof value === 'string' && /^#[0-9A-Fa-f]{6}$/.test(value) ? value : fallback;
 }
@@ -52,7 +52,6 @@ function clamp(n: unknown, min: number, max: number, fallback: number): number {
   return Number.isFinite(v) ? Math.min(Math.max(v, min), max) : fallback;
 }
 
-// Parsing + sanitization server-side (important pour éviter injection)
 let theme: Theme = { ...DEFAULT_THEME };
 
 if (profile.theme) {
@@ -80,53 +79,50 @@ if (profile.theme) {
 
 const themeJson   = JSON.stringify(theme);
 const profileJson = JSON.stringify({
-  display_name: profile.display_name ?? user.email?.split('@')[0] ?? 'User',
+  display_name: profile.display_name ?? user.email?.split('@')[0] ?? 'Utilisateur',
   username:     profile.username ?? '',
   bio:          profile.bio ?? '',
 });
 ---
 
-<DashboardLayout title="Appearance • 2026 Edition">
+<DashboardLayout title="Apparence • 2026">
 
   <div class="mb-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
     <div>
-      <h1 class="text-2xl font-bold tracking-tight bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">Appearance</h1>
-      <p class="text-sm text-gray-400 mt-1.5">Craft your personal vibe — glass, clay, motion & color</p>
+      <h1 class="text-2xl font-bold tracking-tight bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">Apparence</h1>
+      <p class="text-sm text-gray-400 mt-1.5">Personnalise ton profil — glass, couleurs, mouvements</p>
     </div>
 
     <div class="flex flex-wrap gap-3">
       <label class="group flex items-center gap-2.5 px-5 py-2.5 glass border border-white/8 rounded-2xl text-sm font-medium text-gray-300 hover:text-white hover:border-white/20 transition-all cursor-pointer">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-        Import
+        Importer
         <input type="file" id="import-file" accept=".json" class="hidden" />
       </label>
 
       <button id="export-btn" class="flex items-center gap-2.5 px-5 py-2.5 glass border border-white/8 rounded-2xl text-sm font-medium text-gray-300 hover:text-white hover:border-white/20 transition-all">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-        Export
+        Exporter
       </button>
     </div>
   </div>
 
   <div id="server-data" class="hidden" data-theme={themeJson} data-profile={profileJson}></div>
 
-  <!-- Bento-inspired main layout – plus organique et moderne -->
   <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8">
 
-    <!-- Left column – controls (span 8) -->
     <div class="lg:col-span-8 space-y-6 xl:space-y-8">
 
-      <!-- Presets – bento cards -->
-      <Card title="Presets" description="Instant vibes" className="overflow-hidden">
+      <Card title="Préréglages" description="Ambiances instantanées" className="overflow-hidden">
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {
             [
-              { id: 'dark',    label: 'Eclipse', bg: '#0a0a0a', primary: '#00ff9d', text: '#f0f0f0', thumb: 'from-gray-950 via-slate-900 to-black' },
-              { id: 'light',   label: 'Dawn',    bg: '#fafafa', primary: '#0066ff', text: '#111111', thumb: 'from-gray-50 via-white to-gray-100' },
+              { id: 'dark',    label: 'Éclipse', bg: '#0a0a0a', primary: '#00ff9d', text: '#f0f0f0', thumb: 'from-gray-950 via-slate-900 to-black' },
+              { id: 'light',   label: 'Aube',    bg: '#fafafa', primary: '#0066ff', text: '#111111', thumb: 'from-gray-50 via-white to-gray-100' },
               { id: 'neon',    label: 'Cyber',   bg: '#0f001a', primary: '#d600ff', text: '#f0f0ff', thumb: 'from-purple-950 to-fuchsia-950' },
-              { id: 'ocean',   label: 'Abyss',   bg: '#001522', primary: '#00eaff', text: '#e0f8ff', thumb: 'from-blue-950 to-cyan-950' },
-              { id: 'sunset',  label: 'Ember',   bg: '#1a0d00', primary: '#ff5e00', text: '#fff5e0', thumb: 'from-amber-950 to-red-950' },
-              { id: 'clay',    label: 'Soft',    bg: '#111111', primary: '#ff80ab', text: '#f5f5f5', thumb: 'from-rose-950 via-pink-950 to-purple-950' },
+              { id: 'ocean',   label: 'Abysse',  bg: '#001522', primary: '#00eaff', text: '#e0f8ff', thumb: 'from-blue-950 to-cyan-950' },
+              { id: 'sunset',  label: 'Braise',  bg: '#1a0d00', primary: '#ff5e00', text: '#fff5e0', thumb: 'from-amber-950 to-red-950' },
+              { id: 'clay',    label: 'Doux',    bg: '#111111', primary: '#ff80ab', text: '#f5f5f5', thumb: 'from-rose-950 via-pink-950 to-purple-950' },
             ].map(p => (
               <button
                 class="preset group relative aspect-[4/3] rounded-2xl overflow-hidden border-2 border-white/7 hover:border-white/20 hover:scale-[1.04] active:scale-95 transition-all duration-300 shadow-sm hover:shadow-lg"
@@ -134,7 +130,7 @@ const profileJson = JSON.stringify({
                 data-bg={p.bg}
                 data-primary={p.primary}
                 data-text={p.text}
-                aria-label={`Preset ${p.label}`}
+                aria-label={`Préréglage ${p.label}`}
               >
                 <div class={`absolute inset-0 bg-gradient-to-br ${p.thumb}`}></div>
                 <div class="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/60 to-transparent">
@@ -147,13 +143,12 @@ const profileJson = JSON.stringify({
         </div>
       </Card>
 
-      <!-- Colors + Glass intensity (nouveau) -->
-      <Card title="Palette & Glass" description="Core colors + frosted depth">
+      <Card title="Palette & Glass" description="Couleurs principales + intensité du verre">
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
           {[
-            { id: 'background_color', label: 'Background' },
-            { id: 'primary_color',    label: 'Accent'     },
-            { id: 'text_color',       label: 'Text'       },
+            { id: 'background_color', label: 'Arrière-plan' },
+            { id: 'primary_color',    label: 'Accent'      },
+            { id: 'text_color',       label: 'Texte'       },
           ].map(c => (
             <div class="space-y-3">
               <label class="block text-sm font-medium text-gray-300">{c.label}</label>
@@ -176,9 +171,8 @@ const profileJson = JSON.stringify({
             </div>
           ))}
 
-          <!-- Glass intensity (nouveau contrôle) -->
           <div class="space-y-3">
-            <label class="block text-sm font-medium text-gray-300">Glass Strength</label>
+            <label class="block text-sm font-medium text-gray-300">Intensité Glass</label>
             <div class="flex items-center gap-4">
               <input
                 type="range"
@@ -197,8 +191,7 @@ const profileJson = JSON.stringify({
         </div>
       </Card>
 
-      <!-- Background style – tabs modernes -->
-      <Card title="Background Type" description="Solid • Gradient • Frosted Glass">
+      <Card title="Type d'arrière-plan" description="Uni • Dégradé • Verre givré">
         <div class="space-y-6">
           <div class="grid grid-cols-3 gap-3">
             {['solid', 'gradient', 'blur'].map(s => (
@@ -207,23 +200,22 @@ const profileJson = JSON.stringify({
                 data-style={s}
                 aria-pressed={theme.background_style === s}
               >
-                {s === 'solid' ? 'Solid' : s === 'gradient' ? 'Gradient' : 'Frosted'}
+                {s === 'solid' ? 'Uni' : s === 'gradient' ? 'Dégradé' : 'Givré'}
               </button>
             ))}
           </div>
 
-          <!-- Gradient controls -->
           <div id="gradient-panel" class:list={['space-y-6', theme.background_style !== 'gradient' && 'hidden']}>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div class="space-y-3">
-                <label class="text-xs font-medium text-gray-400 uppercase tracking-wide">Color A</label>
+                <label class="text-xs font-medium text-gray-400 uppercase tracking-wide">Couleur A</label>
                 <div class="flex gap-3">
                   <input type="color" id="gradient_color_1" value={theme.background_color} class="color-swatch w-12 h-12 rounded-xl border border-white/10" />
                   <input type="text" id="gradient_color_1_hex" value={theme.background_color} maxlength="7" class="flex-1 glass rounded-xl px-4 py-2.5 text-sm font-mono" />
                 </div>
               </div>
               <div class="space-y-3">
-                <label class="text-xs font-medium text-gray-400 uppercase tracking-wide">Color B</label>
+                <label class="text-xs font-medium text-gray-400 uppercase tracking-wide">Couleur B</label>
                 <div class="flex gap-3">
                   <input type="color" id="gradient_color_2" value={theme.gradient_color_2} class="color-swatch w-12 h-12 rounded-xl border border-white/10" />
                   <input type="text" id="gradient_color_2_hex" value={theme.gradient_color_2} maxlength="7" class="flex-1 glass rounded-xl px-4 py-2.5 text-sm font-mono" />
@@ -237,7 +229,7 @@ const profileJson = JSON.stringify({
                   class="gradient-type py-3 rounded-2xl glass border-2 border-white/8 hover:border-emerald-500/40 data-[active]:border-emerald-500 data-[active]:shadow-sm transition-all"
                   data-type={t}
                 >
-                  {t === 'linear' ? 'Linear ⟶' : 'Radial ◎'}
+                  {t === 'linear' ? 'Linéaire ⟶' : 'Radial ◎'}
                 </button>
               ))}
             </div>
@@ -259,18 +251,17 @@ const profileJson = JSON.stringify({
           </div>
 
           <div id="blur-hint" class:list={['p-5 glass rounded-2xl border border-white/8 text-sm text-gray-300 leading-relaxed', theme.background_style !== 'blur' && 'hidden']}>
-            Frosted glass overlay — strength controlled by <strong>Glass Strength</strong> slider above.
+            Effet verre givré — l'intensité est contrôlée par le curseur « Intensité Glass » ci-dessus.
           </div>
         </div>
       </Card>
 
-      <!-- Button style – plus de choix en 2026 -->
-      <Card title="Link Style" description="Your call-to-action look">
+      <Card title="Style des boutons" description="Apparence de tes liens">
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
-            { id: 'filled',  label: 'Filled',   preview: 'bg-gradient-to-br from-emerald-500 to-teal-600' },
-            { id: 'outline', label: 'Outline',  preview: 'border-2 border-emerald-400/70 text-emerald-300' },
-            { id: 'shadow',  label: 'Neon Glow',preview: 'bg-emerald-500/90 shadow-[0_0_24px_#00ff9d80]' },
+            { id: 'filled',  label: 'Plein',   preview: 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white' },
+            { id: 'outline', label: 'Contour',  preview: 'border-2 border-emerald-400/70 text-emerald-300' },
+            { id: 'shadow',  label: 'Glow',     preview: 'bg-emerald-500/90 shadow-[0_0_24px_#00ff9d80] text-black' },
             { id: 'minimal', label: 'Minimal',  preview: 'text-emerald-400 hover:underline' },
           ].map(s => (
             <button
@@ -278,7 +269,7 @@ const profileJson = JSON.stringify({
               data-style={s.id}
             >
               <div class={`h-14 rounded-xl flex items-center justify-center text-sm font-semibold transition-transform group-hover:scale-105 ${s.preview}`}>
-                Button
+                Bouton
               </div>
               <p class="mt-3 text-xs text-center text-gray-300 font-medium">{s.label}</p>
             </button>
@@ -286,9 +277,8 @@ const profileJson = JSON.stringify({
         </div>
       </Card>
 
-      <!-- Radius + Font – côte à côte -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 xl:gap-8">
-        <Card title="Corners" description="Radius & softness">
+        <Card title="Coins" description="Arrondi & douceur">
           <div class="space-y-6">
             <div class="grid grid-cols-6 gap-2">
               {[0, 8, 14, 20, 28, 40].map(r => (
@@ -303,15 +293,15 @@ const profileJson = JSON.stringify({
             <div class="space-y-3">
               <input type="range" id="border_radius" min="0" max="40" step="2" value={theme.border_radius} class="w-full accent-emerald-500" />
               <div class="flex justify-between text-xs text-gray-400">
-                <span>Sharp</span>
+                <span>Pointu</span>
                 <span id="radius-display">{theme.border_radius}px</span>
-                <span>Pill</span>
+                <span>Pilule</span>
               </div>
             </div>
           </div>
         </Card>
 
-        <Card title="Typography" description="Font family">
+        <Card title="Typographie" description="Police d'écriture">
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {ALLOWED_FONTS.map(f => (
               <button
@@ -326,12 +316,11 @@ const profileJson = JSON.stringify({
         </Card>
       </div>
 
-      <!-- Advanced toggles – clean & modern -->
-      <Card title="Preferences" description="Extra polish">
+      <Card title="Préférences" description="Options supplémentaires">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
-            { id: 'block_shadow', label: 'Depth shadows', desc: '3D lift on cards & links' },
-            { id: 'animations',   label: 'Micro-motions', desc: 'Hover & click animations' },
+            { id: 'block_shadow', label: 'Ombres en profondeur', desc: 'Effet 3D sur les blocs' },
+            { id: 'animations',   label: 'Micro-animations', desc: 'Effets au survol et clic' },
           ].map(opt => (
             <label class="group flex items-center justify-between p-5 glass rounded-2xl cursor-pointer hover:bg-white/4 transition-colors border border-white/6">
               <div>
@@ -342,49 +331,46 @@ const profileJson = JSON.stringify({
                 type="checkbox"
                 id={opt.id}
                 checked={theme[opt.id as keyof Theme]}
-                class="toggle-checkbox w-12 h-7 rounded-full bg-white/10 checked:bg-emerald-500/80 transition-colors cursor-pointer"
+                class="toggle-checkbox w-12 h-7 rounded-full bg-white/10 transition-colors cursor-pointer"
               />
             </label>
           ))}
         </div>
       </Card>
 
-      <!-- Actions bar -->
       <div class="flex flex-wrap gap-4 pt-4">
         <Button id="save-theme-btn" variant="primary" size="lg" className="flex-1 min-w-[160px]">
-          <span id="save-text">Save Theme</span>
+          <span id="save-text">Enregistrer le thème</span>
         </Button>
-        <Button id="reset-theme-btn" variant="outline" size="lg">Reset</Button>
+        <Button id="reset-theme-btn" variant="outline" size="lg">Réinitialiser</Button>
         <Button variant="secondary" href={`/${profile.username}`} target="_blank" size="lg">
-          Live Preview →
+          Aperçu en direct →
         </Button>
       </div>
 
     </div>
 
-    <!-- Right column – preview + history (sticky) -->
     <div class="lg:col-span-4 space-y-6 xl:space-y-8">
       <div class="sticky top-6 space-y-6 xl:space-y-8">
 
-        <Card title="Live Preview" description="Your profile in real-time" className="overflow-hidden">
+        <Card title="Aperçu en direct" description="Ton profil en temps réel" className="overflow-hidden">
           <div class="relative rounded-3xl overflow-hidden aspect-[9/16] max-h-[640px] bg-black/40 border border-white/5 shadow-2xl">
             <iframe
               id="preview-iframe"
               class="absolute inset-0 w-full h-full border-0"
               sandbox="allow-same-origin allow-scripts"
-              title="Profile theme preview"
+              title="Aperçu du thème du profil"
               loading="lazy"
             ></iframe>
-            <!-- fake mobile frame decoration -->
             <div class="pointer-events-none absolute top-0 inset-x-0 h-6 flex justify-center">
               <div class="w-28 h-1.5 bg-white/15 rounded-b-3xl"></div>
             </div>
           </div>
         </Card>
 
-        <Card title="History" description="Recent versions (local)">
+        <Card title="Historique" description="Versions récentes (local)">
           <div id="history-list" class="space-y-3 min-h-[180px]">
-            <p class="text-center text-sm text-gray-500 py-8">No saved versions yet</p>
+            <p class="text-center text-sm text-gray-500 py-8">Aucune version enregistrée pour l'instant</p>
           </div>
         </Card>
 
@@ -395,7 +381,6 @@ const profileJson = JSON.stringify({
 </DashboardLayout>
 
 <style is:global>
-  /* Glassmorphism 2026 – plus subtil */
   .glass {
     background: rgba(255,255,255,0.04);
     backdrop-filter: blur(16px);
@@ -404,7 +389,6 @@ const profileJson = JSON.stringify({
     box-shadow: 0 8px 32px rgba(0,0,0,0.25);
   }
 
-  /* Color swatch modernisé */
   input[type="color"].color-swatch {
     -webkit-appearance: none;
     appearance: none;
@@ -416,41 +400,43 @@ const profileJson = JSON.stringify({
   input[type="color"].color-swatch::-webkit-color-swatch-wrapper { padding: 0; }
   input[type="color"].color-swatch::-webkit-color-swatch { border: none; border-radius: 10px; }
 
-  /* Toggle moderne */
   .toggle-checkbox {
     position: relative;
     appearance: none;
   }
+
   .toggle-checkbox::before {
     content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: 9999px;
-    background: rgba(255,255,255,0.15);
-    transition: background 0.2s;
+    @apply absolute inset-0 rounded-full bg-white/15 transition-colors;
   }
-  .toggle-checkbox:checked::before { background: theme('colors.emerald.600 / 0.7'); }
+
+  .toggle-checkbox:checked::before {
+    @apply bg-emerald-600/70;
+  }
+
   .toggle-checkbox::after {
     content: '';
-    position: absolute;
-    top: 2px; left: 2px;
-    width: 20px; height: 20px;
-    background: white;
-    border-radius: 50%;
-    transition: transform 0.2s cubic-bezier(0.4,0,0.2,1);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    @apply absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow transition-transform;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
-  .toggle-checkbox:checked::after { transform: translateX(20px); }
 
-  /* Active states */
-  [data-active] { border-color: theme('colors.emerald.500 / 0.7') !important; }
-  .preset.active .preset-ring { opacity: 1; transform: scale(1); }
+  .toggle-checkbox:checked::after {
+    @apply translate-x-5;
+  }
+
+  [data-active] {
+    border-color: #10b98170 !important;
+  }
+
+  .preset.active .preset-ring {
+    opacity: 1;
+    transform: scale(1);
+  }
 </style>
 
 <script>
   import { toast } from '@/lib/utils/toast';
 
-  // ─── STATE ───────────────────────────────────────────────────
   const serverData = document.getElementById('server-data')!;
   const initialTheme = JSON.parse(serverData.dataset.theme || '{}');
   const profile     = JSON.parse(serverData.dataset.profile || '{}');
@@ -460,7 +446,6 @@ const profileJson = JSON.stringify({
   const HISTORY_KEY = 'theme_history_2026';
   const MAX_HISTORY = 6;
 
-  // ─── HELPERS ─────────────────────────────────────────────────
   const sanitizeHex = (v: string) => /^#[0-9A-Fa-f]{6}$/.test(v) ? v : null;
   const clamp       = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
 
@@ -533,11 +518,11 @@ const profileJson = JSON.stringify({
   ${currentTheme.background_style === 'blur' ? `<div style="position:fixed;inset:0;${glass} z-index:0;"></div>` : ''}
   <div class="frame">
     <div class="avatar"></div>
-    <div class="name">${profile.display_name || 'You'}</div>
-    <div class="bio">${profile.bio || 'Creating in 2026 •'}</div>
+    <div class="name">${profile.display_name || 'Toi'}</div>
+    <div class="bio">${profile.bio || 'Création en 2026 •'}</div>
     <div class="links">
       <button>Portfolio</button>
-      <button>Latest Work</button>
+      <button>Dernier projet</button>
       <button>Contact</button>
     </div>
   </div>
@@ -545,7 +530,6 @@ const profileJson = JSON.stringify({
 </html>`;
   }, 120);
 
-  // ─── HISTORY ─────────────────────────────────────────────────
   function loadHistory() {
     try {
       history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
@@ -563,7 +547,7 @@ const profileJson = JSON.stringify({
   function renderHistory() {
     const container = document.getElementById('history-list')!;
     if (history.length === 0) {
-      container.innerHTML = '<p class="text-center text-sm text-gray-500 py-8">No saved versions yet</p>';
+      container.innerHTML = '<p class="text-center text-sm text-gray-500 py-8">Aucune version enregistrée pour l\'instant</p>';
       return;
     }
 
@@ -579,7 +563,7 @@ const profileJson = JSON.stringify({
             <div class="w-5 h-10 rounded-lg" style="background:${entry.theme.primary_color}"></div>
           </div>
           <div class="flex-1 min-w-0">
-            <div class="text-sm font-medium truncate">${entry.theme.preset || 'Custom'}</div>
+            <div class="text-sm font-medium truncate">${entry.theme.preset || 'Personnalisé'}</div>
             <div class="text-xs text-gray-500">${date}</div>
           </div>
           <svg class="w-5 h-5 text-gray-500 group-hover:text-emerald-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
@@ -597,11 +581,9 @@ const profileJson = JSON.stringify({
     });
   }
 
-  // ─── APPLY THEME ─────────────────────────────────────────────
   function applyTheme(t: Partial<Theme>) {
     currentTheme = { ...currentTheme, ...t };
 
-    // Update inputs
     ['background_color', 'primary_color', 'text_color'].forEach(k => {
       const picker = document.getElementById(k) as HTMLInputElement;
       const text   = document.getElementById(`${k}_hex`) as HTMLInputElement;
@@ -630,7 +612,6 @@ const profileJson = JSON.stringify({
     set('block_shadow',      currentTheme.block_shadow);
     set('animations',        currentTheme.animations);
 
-    // Active classes
     document.querySelectorAll('[data-active]').forEach(el => el.removeAttribute('data-active'));
     document.querySelector(`[data-style="${currentTheme.background_style}"]`)?.setAttribute('data-active','');
     document.querySelector(`[data-type="${currentTheme.gradient_type}"]`)?.setAttribute('data-active','');
@@ -641,7 +622,6 @@ const profileJson = JSON.stringify({
     document.getElementById('angle-display')!.textContent  = `${currentTheme.gradient_angle}°`;
     document.getElementById('glass-value')!.textContent    = `${currentTheme.glass_intensity}px`;
 
-    // UI visibility
     document.getElementById('gradient-panel')!.classList.toggle('hidden', currentTheme.background_style !== 'gradient');
     document.getElementById('blur-hint')!.classList.toggle('hidden', currentTheme.background_style !== 'blur');
     document.getElementById('angle-container')!.classList.toggle('hidden', currentTheme.gradient_type !== 'linear');
@@ -649,8 +629,6 @@ const profileJson = JSON.stringify({
     updatePreview();
   }
 
-  // ─── EVENT LISTENERS ─────────────────────────────────────────
-  // Presets
   document.querySelectorAll('.preset').forEach(btn => {
     btn.addEventListener('click', () => {
       const ds = btn.dataset;
@@ -666,7 +644,6 @@ const profileJson = JSON.stringify({
     });
   });
 
-  // Color inputs (sync + validation)
   ['background_color', 'primary_color', 'text_color', 'gradient_color_1', 'gradient_color_2'].forEach(id => {
     const picker = document.getElementById(id) as HTMLInputElement;
     const hex    = document.getElementById(`${id}_hex` || `${id.replace('_1','')}_hex`) as HTMLInputElement;
@@ -690,7 +667,6 @@ const profileJson = JSON.stringify({
     hex?.addEventListener('change', e => update((e.target as HTMLInputElement).value));
   });
 
-  // Range sliders
   ['border_radius', 'gradient_angle', 'glass_intensity'].forEach(id => {
     const slider = document.getElementById(id) as HTMLInputElement;
     slider?.addEventListener('input', e => {
@@ -700,7 +676,6 @@ const profileJson = JSON.stringify({
     });
   });
 
-  // Presets rapides radius & angle
   document.querySelectorAll('.radius-preset, .angle-preset').forEach(el => {
     el.addEventListener('click', () => {
       const val = Number(el.dataset.radius ?? el.dataset.angle);
@@ -711,7 +686,6 @@ const profileJson = JSON.stringify({
     });
   });
 
-  // Toggles & styles
   ['background_style', 'gradient_type', 'button_style', 'font_family'].forEach(group => {
     document.querySelectorAll(`[data-${group}]`).forEach(el => {
       el.addEventListener('click', () => {
@@ -731,12 +705,11 @@ const profileJson = JSON.stringify({
     });
   });
 
-  // Save
   document.getElementById('save-theme-btn')?.addEventListener('click', async () => {
     const btn = document.getElementById('save-theme-btn')!;
     const txt = document.getElementById('save-text')!;
     btn.disabled = true;
-    txt.innerHTML = 'Saving…';
+    txt.innerHTML = 'Enregistrement…';
 
     try {
       const res = await fetch('/api/profile', {
@@ -745,7 +718,7 @@ const profileJson = JSON.stringify({
         body: JSON.stringify({ theme: currentTheme }),
       });
 
-      if (!res.ok) throw new Error(await res.text().catch(() => 'Save failed'));
+      if (!res.ok) throw new Error(await res.text().catch(() => 'Échec de la sauvegarde'));
 
       saveToHistory();
       toast.success('Thème enregistré avec succès');
@@ -753,18 +726,16 @@ const profileJson = JSON.stringify({
       toast.error(String(err).includes('Failed') ? 'Échec de la sauvegarde' : String(err));
     } finally {
       btn.disabled = false;
-      txt.innerHTML = 'Save Theme';
+      txt.innerHTML = 'Enregistrer le thème';
     }
   });
 
-  // Reset
   document.getElementById('reset-theme-btn')?.addEventListener('click', () => {
     if (!confirm('Revenir au thème par défaut ?')) return;
     applyTheme(DEFAULT_THEME);
     toast.info('Thème réinitialisé');
   });
 
-  // Export
   document.getElementById('export-btn')?.addEventListener('click', () => {
     const blob = new Blob([JSON.stringify(currentTheme, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -776,7 +747,6 @@ const profileJson = JSON.stringify({
     toast.success('Thème exporté');
   });
 
-  // Import
   document.getElementById('import-file')?.addEventListener('change', e => {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file) return;
@@ -812,7 +782,6 @@ const profileJson = JSON.stringify({
     reader.readAsText(file);
   });
 
-  // ─── INIT ────────────────────────────────────────────────────
   applyTheme(currentTheme);
   loadHistory();
 </script>
