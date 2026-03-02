@@ -12,31 +12,21 @@ const supabase = createSupabaseServer({
 const ALLOWED_PROVIDERS = ['google', 'discord', 'apple'] as const;
 type Provider = typeof ALLOWED_PROVIDERS[number];
 
+const siteUrl = import.meta.env.PUBLIC_SITE_URL || 'https://bioforge-three.vercel.app';
+
 if (Astro.request.method === 'POST') {
   const formData = await Astro.request.formData();
-  const provider = formData.get('provider')
-  //const email = formData.get('email')
-  const siteUrl = import.meta.env.PUBLIC_SITE_URL;
+  const provider = formData.get('provider');
 
-  if (provider && ALLOWED_PROVIDERS.includes(provider as Provider)) {
+  if (provider) {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: provider as Provider,
-      options: {
-        redirectTo: `https://bioforge-three.vercel.app/auth/callback`
-      }
+      options: { redirectTo: `${siteUrl}/auth/callback` }
     });
 
-    if (error) {
-      console.error('OAuth error:', error);
-      return Astro.redirect(`/signin?error=oauth_failed`);
-    }
-
-    if (data.url) {
-      return Astro.redirect(data.url);
-    }
-  } 
-
-  return Astro.redirect('/signin?error=invalid_request');
+    if (error) return Astro.redirect('/signin?error=oauth_failed');
+    return Astro.redirect(data.url);
+  }
 }
 ---
 
