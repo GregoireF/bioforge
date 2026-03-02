@@ -2,39 +2,11 @@
 import "@/styles/global.css";
 ---
 
-<!-- Containers -->
+<!-- On garde juste les containers vides pour le futur -->
 <div id="cursor-trail" class="pointer-events-none fixed inset-0 z-50"></div>
 <div id="particles-container" class="pointer-events-none fixed inset-0 z-0"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/locomotive-scroll@4.2.2/dist/locomotive-scroll.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/ScrollTrigger.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tsparticles@2.9.3/tsparticles.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tsparticles-slim@2.9.3/tsparticles.slim.min.js"></script>
-
-<script type="module">
-  // Import uniquement pour le client
-  import { initGlobalEffects } from '/scripts/globalEffects.js';
-  
-  const cleanup = initGlobalEffects();
-
-  // Cleanup sur navigation Astro
-  document.addEventListener('astro:before-preparation', () => {
-    cleanup?.();
-  });
-</script>
-
 <style>
-  #particles-container {
-    opacity: 0.4;
-  }
-
-  .cursor-particle {
-    position: fixed;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 50;
-  }
+  #particles-container { display: none; } /* désactive tsParticles */
+  .cursor-particle { display: none; }     /* désactive le trail */
 </style>
