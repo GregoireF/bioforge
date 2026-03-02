@@ -428,216 +428,110 @@ const profileJson = JSON.stringify({
   }
 </style>
 
-<script>
-if (typeof window !== 'undefined') {
-document.addEventListener('DOMContentLoaded', () => {
+<script is:inline>
+if (typeof window !== "undefined") {
 
-  const serverData = document.getElementById('server-data');
-  if (!serverData) return;
+  document.addEventListener("DOMContentLoaded", function () {
 
-  const initialTheme = JSON.parse(serverData.dataset.theme || '{}');
-  const profileData = JSON.parse(serverData.dataset.profile || '{}');
-  const defaultTheme = JSON.parse(serverData.dataset.defaultTheme || '{}');
+    const serverData = document.getElementById("server-data");
+    if (!serverData) return;
 
-  let currentTheme = { ...initialTheme };
+    const initialTheme = JSON.parse(serverData.dataset.theme || "{}");
+    const profileData = JSON.parse(serverData.dataset.profile || "{}");
+    const defaultTheme = JSON.parse(serverData.dataset.defaultTheme || "{}");
 
-  const sanitizeHex = v => /^#[0-9A-Fa-f]{6}$/.test(v) ? v : null;
-  const clamp = (v, min, max) => Math.min(Math.max(Number(v), min), max);
+    let currentTheme = { ...initialTheme };
 
-  const debounce = (fn, delay = 80) => {
-    let t;
-    return (...args) => {
-      clearTimeout(t);
-      t = setTimeout(() => fn(...args), delay);
-    };
-  };
-
-  function setActive(selector, value) {
-    document.querySelectorAll(selector).forEach(el => {
-      el.removeAttribute('data-active');
-      el.classList.remove('active');
-    });
-
-    const el = document.querySelector(`${selector}[data-${selector.replace('.', '').replace('[','').replace(']','')}="${value}"]`);
-    if (el) {
-      el.setAttribute('data-active', '');
-      el.classList.add('active');
+    function sanitizeHex(v) {
+      return /^#[0-9A-Fa-f]{6}$/.test(v) ? v : null;
     }
-  }
 
-  function updateUI() {
-    document.getElementById('radius-display')?.textContent = `${currentTheme.border_radius}px`;
-    document.getElementById('angle-display')?.textContent = `${currentTheme.gradient_angle}°`;
-    document.getElementById('glass-value')?.textContent = `${currentTheme.glass_intensity}px`;
-
-    document.getElementById('gradient-panel')
-      ?.classList.toggle('hidden', currentTheme.background_style !== 'gradient');
-
-    document.getElementById('blur-hint')
-      ?.classList.toggle('hidden', currentTheme.background_style !== 'blur');
-
-    document.getElementById('angle-container')
-      ?.classList.toggle('hidden', currentTheme.gradient_type !== 'linear');
-  }
-
-  const updatePreview = debounce(() => {
-    const iframe = document.getElementById('preview-iframe');
-    if (!iframe) return;
-
-    const bg =
-      currentTheme.background_style === 'gradient'
-        ? currentTheme.gradient_type === 'radial'
-          ? `radial-gradient(circle at center, ${currentTheme.background_color}, ${currentTheme.gradient_color_2})`
-          : `linear-gradient(${currentTheme.gradient_angle}deg, ${currentTheme.background_color}, ${currentTheme.gradient_color_2})`
-        : currentTheme.background_color;
-
-    iframe.srcdoc = `
-      <html>
-      <body style="
-        margin:0;
-        padding:40px 20px;
-        background:${bg};
-        color:${currentTheme.text_color};
-        font-family:${currentTheme.font_family},system-ui;
-      ">
-        <h2 style="text-align:center">${profileData.display_name || 'Toi'}</h2>
-        <p style="text-align:center;opacity:.7">${profileData.bio || ''}</p>
-        <div style="margin-top:30px">
-          <button style="
-            width:100%;
-            padding:14px;
-            border-radius:${currentTheme.border_radius}px;
-            background:${currentTheme.primary_color};
-            color:#000;
-            border:none;
-            font-weight:600;
-            margin-bottom:12px;
-          ">Portfolio</button>
-        </div>
-      </body>
-      </html>
-    `;
-  });
-
-  function applyTheme(partial, showToast = false) {
-    currentTheme = { ...currentTheme, ...partial };
-    updateUI();
-    updatePreview();
-    if (showToast) toast.success("Modifications appliquées");
-  }
-
-  /* ---------------- PRESETS ---------------- */
-
-  document.querySelectorAll('.preset-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const { preset, bg, primary, text } = btn.dataset;
-      applyTheme({
-        preset,
-        background_color: bg,
-        primary_color: primary,
-        text_color: text
-      }, true);
-      toast.success(`Preset "${preset}" appliqué`);
-    });
-  });
-
-  /* ---------------- BACKGROUND STYLE ---------------- */
-
-  document.querySelectorAll('.bg-style-tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      applyTheme({ background_style: tab.dataset.style }, true);
-    });
-  });
-
-  document.querySelectorAll('.gradient-type').forEach(btn => {
-    btn.addEventListener('click', () => {
-      applyTheme({ gradient_type: btn.dataset.type }, true);
-    });
-  });
-
-  /* ---------------- BUTTON STYLE ---------------- */
-
-  document.querySelectorAll('.style-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      applyTheme({ button_style: btn.dataset.style }, true);
-    });
-  });
-
-  /* ---------------- FONT ---------------- */
-
-  document.querySelectorAll('.font-swatch').forEach(btn => {
-    btn.addEventListener('click', () => {
-      applyTheme({ font_family: btn.dataset.font }, true);
-    });
-  });
-
-  /* ---------------- RANGE ---------------- */
-
-  document.getElementById('border_radius')
-    ?.addEventListener('input', e =>
-      applyTheme({ border_radius: clamp(e.target.value, 0, 40) })
-    );
-
-  document.getElementById('gradient_angle')
-    ?.addEventListener('input', e =>
-      applyTheme({ gradient_angle: clamp(e.target.value, 0, 360) })
-    );
-
-  document.getElementById('glass_intensity')
-    ?.addEventListener('input', e =>
-      applyTheme({ glass_intensity: clamp(e.target.value, 4, 32) })
-    );
-
-  /* ---------------- CHECKBOX ---------------- */
-
-  ['block_shadow', 'animations'].forEach(id => {
-    document.getElementById(id)?.addEventListener('change', e => {
-      applyTheme({ [id]: e.target.checked }, true);
-    });
-  });
-
-  /* ---------------- COLORS ---------------- */
-
-  ['background_color', 'primary_color', 'text_color', 'gradient_color_2']
-    .forEach(id => {
-      document.getElementById(id)?.addEventListener('input', e => {
-        const val = sanitizeHex(e.target.value);
-        if (!val) return toast.error("Couleur invalide");
-        applyTheme({ [id]: val });
-      });
-    });
-
-  /* ---------------- SAVE ---------------- */
-
-  document.getElementById('save-theme-btn')?.addEventListener('click', async () => {
-    try {
-      const res = await fetch('/api/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ theme: currentTheme }),
-      });
-
-      if (!res.ok) throw new Error();
-
-      toast.success("Thème enregistré avec succès ✨");
-    } catch {
-      toast.error("Erreur lors de l'enregistrement");
+    function clamp(v, min, max) {
+      v = Number(v);
+      if (!Number.isFinite(v)) return min;
+      return Math.min(Math.max(v, min), max);
     }
-  });
 
-  /* ---------------- RESET ---------------- */
+    function updatePreview() {
+      const iframe = document.getElementById("preview-iframe");
+      if (!iframe) return;
 
-  document.getElementById('reset-theme-btn')?.addEventListener('click', () => {
-    if (confirm("Réinitialiser le thème ?")) {
-      currentTheme = { ...defaultTheme };
-      updateUI();
+      const bg =
+        currentTheme.background_style === "gradient"
+          ? currentTheme.gradient_type === "radial"
+            ? "radial-gradient(circle at center," +
+              currentTheme.background_color +
+              "," +
+              currentTheme.gradient_color_2 +
+              ")"
+            : "linear-gradient(" +
+              currentTheme.gradient_angle +
+              "deg," +
+              currentTheme.background_color +
+              "," +
+              currentTheme.gradient_color_2 +
+              ")"
+          : currentTheme.background_color;
+
+      iframe.srcdoc =
+        "<html><body style='margin:0;padding:40px;background:" +
+        bg +
+        ";color:" +
+        currentTheme.text_color +
+        ";font-family:" +
+        currentTheme.font_family +
+        ",system-ui'>" +
+        "<h2 style='text-align:center'>" +
+        (profileData.display_name || "Toi") +
+        "</h2>" +
+        "<button style='width:100%;padding:14px;margin-top:30px;border-radius:" +
+        currentTheme.border_radius +
+        "px;background:" +
+        currentTheme.primary_color +
+        ";border:none;font-weight:600'>Portfolio</button>" +
+        "</body></html>";
+    }
+
+    function applyTheme(partial) {
+      currentTheme = Object.assign({}, currentTheme, partial);
       updatePreview();
-      toast.info("Thème réinitialisé");
     }
-  });
 
-  updateUI();
-  updatePreview();
-});
+    /* SAVE */
+
+    const saveBtn = document.getElementById("save-theme-btn");
+    if (saveBtn) {
+      saveBtn.addEventListener("click", async function () {
+        try {
+          const res = await fetch("/api/profile", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ theme: currentTheme })
+          });
+
+          if (!res.ok) throw new Error();
+          if (window.toast) toast.success("Thème enregistré ✨");
+
+        } catch (e) {
+          if (window.toast) toast.error("Erreur lors de l'enregistrement");
+        }
+      });
+    }
+
+    /* RESET */
+
+    const resetBtn = document.getElementById("reset-theme-btn");
+    if (resetBtn) {
+      resetBtn.addEventListener("click", function () {
+        if (confirm("Réinitialiser le thème ?")) {
+          currentTheme = Object.assign({}, defaultTheme);
+          updatePreview();
+          if (window.toast) toast.info("Thème réinitialisé");
+        }
+      });
+    }
+
+    updatePreview();
+  });
 }
 </script>
