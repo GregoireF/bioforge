@@ -1,133 +1,114 @@
 ---
 ---
-<div id="cursor-trail"></div>
-<div id="particles-container" class="fixed inset-0 pointer-events-none z-0"></div>
 
-<script type="module">
-  // =========================
+<div id="cursor-trail" aria-hidden="true"></div>
+
+<script>
+  // ===============================
   // SAFETY WRAPPER
-  // =========================
-  function safe(fn) {
-    try { fn(); } catch (e) { console.error(e); }
-  }
+  // ===============================
+  const safe = (fn) => {
+    try { fn(); } catch (err) { console.warn("Feature disabled:", err); }
+  };
 
-  // =========================
-  // SIMPLE SCROLL REVEAL
-  // =========================
+  // ===============================
+  // SCROLL REVEAL
+  // ===============================
   function initScrollReveal() {
-    const elements = document.querySelectorAll('.reveal');
+    const elements = document.querySelectorAll(".reveal");
     if (!elements.length) return;
 
-    const observer = new IntersectionObserver((entries) => {
+    const observer = new IntersectionObserver((entries, obs) => {
       entries.forEach(entry => {
         if (!entry.isIntersecting) return;
-        entry.target.classList.add('visible');
-        observer.unobserve(entry.target);
+        entry.target.classList.add("visible");
+        obs.unobserve(entry.target);
       });
     }, { threshold: 0.15 });
 
     elements.forEach(el => observer.observe(el));
   }
 
-  // =========================
-  // MAGNETIC BUTTONS (SAFE)
-  // =========================
+  // ===============================
+  // MAGNETIC BUTTONS
+  // ===============================
   function initMagneticButtons() {
-    const buttons = document.querySelectorAll('.magnetic');
+    const buttons = document.querySelectorAll(".magnetic");
+    if (!buttons.length) return;
 
     buttons.forEach(button => {
-      button.addEventListener('mousemove', (e) => {
+      button.addEventListener("mousemove", (e) => {
         const rect = button.getBoundingClientRect();
         const x = e.clientX - rect.left - rect.width / 2;
         const y = e.clientY - rect.top - rect.height / 2;
-
         button.style.transform = `translate(${x * 0.2}px, ${y * 0.2}px)`;
       });
 
-      button.addEventListener('mouseleave', () => {
-        button.style.transform = 'translate(0,0)';
+      button.addEventListener("mouseleave", () => {
+        button.style.transform = "translate(0, 0)";
       });
     });
   }
 
-  // =========================
-  // CURSOR TRAIL (OPTIMIZED)
-  // =========================
+  // ===============================
+  // CURSOR TRAIL (THROTTLED)
+  // ===============================
   function initCursorTrail() {
-    const container = document.getElementById('cursor-trail');
+    const container = document.getElementById("cursor-trail");
     if (!container) return;
 
     let particles = [];
-    const max = 15;
+    const max = 12;
+    let ticking = false;
 
-    document.addEventListener('mousemove', (e) => {
-      const p = document.createElement('div');
-      p.className = 'cursor-particle';
-      p.style.left = e.clientX + 'px';
-      p.style.top = e.clientY + 'px';
+    document.addEventListener("mousemove", (e) => {
+      if (ticking) return;
+      ticking = true;
 
-      container.appendChild(p);
-      particles.push(p);
+      requestAnimationFrame(() => {
+        const dot = document.createElement("div");
+        dot.className = "cursor-dot";
+        dot.style.left = e.clientX + "px";
+        dot.style.top = e.clientY + "px";
 
-      if (particles.length > max) {
-        const old = particles.shift();
-        old?.remove();
-      }
+        container.appendChild(dot);
+        particles.push(dot);
 
-      setTimeout(() => {
-        p.remove();
-        particles = particles.filter(x => x !== p);
-      }, 600);
+        if (particles.length > max) {
+          particles.shift()?.remove();
+        }
+
+        setTimeout(() => {
+          dot.remove();
+          particles = particles.filter(p => p !== dot);
+        }, 500);
+
+        ticking = false;
+      });
     });
   }
 
-  // =========================
-  // PARTICLES (OPTIONAL SAFE LOAD)
-  // =========================
-  async function initParticles() {
-    try {
-      const { tsParticles } = await import('@tsparticles/engine');
-      const { loadSlim } = await import('@tsparticles/slim');
-
-      await loadSlim(tsParticles);
-
-      await tsParticles.load({
-        id: 'particles-container',
-        options: {
-          fullScreen: false,
-          background: { color: 'transparent' },
-          particles: {
-            number: { value: 40 },
-            size: { value: { min: 1, max: 3 } },
-            move: { enable: true, speed: 1 },
-            opacity: { value: 0.3 }
-          }
-        }
-      });
-    } catch (e) {
-      console.warn('Particles disabled:', e);
-    }
-  }
-
-  // =========================
+  // ===============================
   // INIT
-  // =========================
+  // ===============================
   function initAll() {
     safe(initScrollReveal);
     safe(initMagneticButtons);
     safe(initCursorTrail);
-    safe(initParticles);
   }
 
-  document.addEventListener('DOMContentLoaded', initAll);
-  document.addEventListener('astro:after-swap', initAll);
+  document.addEventListener("DOMContentLoaded", initAll);
+  document.addEventListener("astro:after-swap", initAll);
 </script>
 
 <style>
+  /* ===============================
+     SCROLL REVEAL
+  =============================== */
   .reveal {
     opacity: 0;
     transform: translateY(40px);
-    transition: all 0.8s ease;
+    transition: opacity 0.8s ease, transform 0.8s ease;
   }
 
   .reveal.visible {
@@ -135,7 +116,44 @@
     transform: translateY(0);
   }
 
-  #particles-container {
-    opacity: 0.3;
+  /* ===============================
+     CURSOR TRAIL
+  =============================== */
+  #cursor-trail {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  .cursor-dot {
+    position: fixed;
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: rgba(0, 255, 157, 0.7);
+    transform: translate(-50%, -50%);
+    animation: fadeOut 0.5s forwards;
+  }
+
+  @keyframes fadeOut {
+    to {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.5);
+    }
+  }
+
+  /* ===============================
+     PREMIUM BACKGROUND (NO JS)
+  =============================== */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(0,255,157,0.12), transparent 50%),
+      radial-gradient(circle at 80% 70%, rgba(191,0,255,0.12), transparent 50%);
   }
 </style>
