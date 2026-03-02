@@ -2,6 +2,7 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { getProfileByUsername, getActiveBlocks, incrementProfileView } from '@/lib/supabase/queries';
 import QRCode from 'qrcode';
+import { Image } from 'astro:assets'
 
 // ==================== GET USERNAME ====================
 const { username } = Astro.params;
@@ -69,7 +70,7 @@ try {
       <!-- PROFILE HEADER -->
       <div class="text-center mb-10 animate-fade-in-up">
         {profile.avatar_url ? (
-          <img src={profile.avatar_url} alt={profile.display_name || profile.username}
+          <Image src={profile.avatar_url} alt={profile.display_name || profile.username}
                class="w-28 h-28 rounded-full mx-auto mb-6 object-cover avatar-glow"
                style={`border: 4px solid ${theme.primary_color}; box-shadow: 0 0 40px ${theme.primary_color}60;`} />
         ) : (
@@ -142,7 +143,7 @@ try {
               if (!imageUrl) return null;
 
               const imageElement = (
-                <img src={imageUrl} alt={block.title || 'Image'}
+                <Image src={imageUrl} alt={block.title || 'Image'}
                      class={`w-full rounded-lg transition-all hover:scale-105 animate-fade-in-up ${staggerClass}`}
                      style={`border-radius: ${theme.border_radius}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''}`} />
               );
@@ -193,7 +194,11 @@ try {
                 youtube: 'M22.54 6.42a2.78 2.78 0 00-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 00-1.94 2A29 29 0 001 11.75a29 29 0 00.46 5.33A2.78 2.78 0 003.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 001.94-2 29 29 0 00.46-5.25 29 29 0 00-.46-5.33z M9.75 15.02l0-6.89 5.75 3.44z',
                 linkedin: 'M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z M4 6a2 2 0 100-4 2 2 0 000 4z',
                 github: 'M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 00-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0020 4.77 5.07 5.07 0 0019.91 1S18.73.65 16 2.48a13.38 13.38 0 00-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 005 4.77a5.44 5.44 0 00-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 009 18.13V22',
-                tiktok: 'M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5'
+                tiktok: 'M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5',
+                twitch: 'M4 2C2.9 2 2 2.9 2 4v16l4-4h4l4 4h6V4c0-1.1-.9-2-2-2H4zm3 9H5V7h2v4zm4 0H9V7h2v4zm4 0h-2V7h2v4z',
+                discord: 'M20.317 4.369a19.791 19.791 0 00-4.885-1.515s-.453.85-.983 1.577c-1.928-.288-3.826-.288-5.754 0-.53-.727-.983-1.577-.983-1.577a19.791 19.791 0 00-4.885 1.515C2.358 9.11 1.197 13.774 1.554 18.389c1.836 1.472 4.016 2.331 6.189 2.562 0 0 .667-1.098.922-1.658-1.262-.394-2.097-2.03-2.097-2.03s-.506-.636-.858-0.981c3.88-.356 7.665-.391 11.524.0-.348.358-.748 1.01-1.068 1.81 0 0-.834 1.64-3.094 2.03.26.56.933 1.66.933 1.66 2.172-.231 4.35-1.09 6.186-2.562.36-4.616-0.802-9.28-2.807-14.016z',
+                kick: 'M20.5 4h-17C2.672 4 2 4.672 2 5.5v13c0 .828.672 1.5 1.5 1.5h17c.828 0 1.5-.672 1.5-1.5v-13c0-.828-.672-1.5-1.5-1.5zm-3 10h-2v3h-2v-3H9v-2h4v-3h2v3h2v2z',
+                snapchat: 'M12 2C9.243 2 7 4.243 7 7c0 2.356 1.828 3.888 1.828 5.784 0 1.899-1.828 3.416-1.828 5.716h9c0-2.3-1.828-3.817-1.828-5.716C16.172 10.888 18 9.356 18 7c0-2.757-2.243-5-5-5z'
               };
 
               function getSocialIcon(url: string) {
@@ -204,7 +209,12 @@ try {
                 if (url.includes('linkedin.com')) return socialIcons.linkedin;
                 if (url.includes('github.com')) return socialIcons.github;
                 if (url.includes('tiktok.com')) return socialIcons.tiktok;
-                return 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71';
+                if (url.includes('twitch.tv')) return socialIcons.twitch;
+                if (url.includes('discord.com') || url.includes('discord.gg')) return socialIcons.discord;
+                if (url.includes('kick.com')) return socialIcons.kick;
+                if (url.includes('snapchat.com')) return socialIcons.snapchat;
+
+                return 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71'; // icône par défaut
               }
 
               return (
