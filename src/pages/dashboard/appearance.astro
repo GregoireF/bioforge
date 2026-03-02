@@ -429,47 +429,48 @@ const profileJson = JSON.stringify({
 </style>
 
 <script>
-  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-    document.addEventListener('DOMContentLoaded', () => {
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => {
 
-      const serverData = document.getElementById('server-data');
-      if (!serverData) {
-        console.error('Element #server-data introuvable');
-        return;
-      }
+    const serverData = document.getElementById('server-data');
+    if (!serverData) {
+      console.error('Element #server-data introuvable');
+      return;
+    }
 
-      const initialTheme = JSON.parse(serverData.dataset.theme || '{}');
-      const profileData = JSON.parse(serverData.dataset.profile || '{}');
-      const defaultTheme = JSON.parse(serverData.dataset.defaultTheme || '{}');
+    const initialTheme = JSON.parse(serverData.dataset.theme || '{}');
+    const profileData = JSON.parse(serverData.dataset.profile || '{}');
+    const defaultTheme = JSON.parse(serverData.dataset.defaultTheme || '{}');
 
-      let currentTheme = { ...initialTheme };
+    let currentTheme = { ...initialTheme };
+    let isSaving = false;
 
-      const sanitizeHex = v => /^#[0-9A-Fa-f]{6}$/.test(v) ? v : null;
-      const clamp = (v, min, max) => Math.min(Math.max(Number(v), min), max);
+    const sanitizeHex = v => /^#[0-9A-Fa-f]{6}$/.test(v) ? v : null;
+    const clamp = (v, min, max) => Math.min(Math.max(Number(v), min), max);
 
-      function debounce(fn, delay = 80) {
-        let timer;
-        return (...args) => {
-          clearTimeout(timer);
-          timer = setTimeout(() => fn(...args), delay);
-        };
-      }
+    function debounce(fn, delay = 80) {
+      let timer;
+      return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), delay);
+      };
+    }
 
-      const updatePreview = debounce(() => {
-        const iframe = document.getElementById('preview-iframe');
-        if (!iframe) return;
+    const updatePreview = debounce(() => {
+      const iframe = document.getElementById('preview-iframe');
+      if (!iframe) return;
 
-        const bgStyle = currentTheme.background_style === 'gradient'
-          ? currentTheme.gradient_type === 'radial'
-            ? `radial-gradient(circle at center, ${currentTheme.background_color}, ${currentTheme.gradient_color_2} 80%)`
-            : `linear-gradient(${currentTheme.gradient_angle}deg, ${currentTheme.background_color}, ${currentTheme.gradient_color_2})`
-          : currentTheme.background_color;
+      const bgStyle = currentTheme.background_style === 'gradient'
+        ? currentTheme.gradient_type === 'radial'
+          ? `radial-gradient(circle at center, ${currentTheme.background_color}, ${currentTheme.gradient_color_2} 80%)`
+          : `linear-gradient(${currentTheme.gradient_angle}deg, ${currentTheme.background_color}, ${currentTheme.gradient_color_2})`
+        : currentTheme.background_color;
 
-        const glass = currentTheme.background_style === 'blur'
-          ? `backdrop-filter: blur(${currentTheme.glass_intensity}px); background: ${currentTheme.background_color}0d;`
-          : '';
+      const glass = currentTheme.background_style === 'blur'
+        ? `backdrop-filter: blur(${currentTheme.glass_intensity}px); background: ${currentTheme.background_color}0d;`
+        : '';
 
-        iframe.srcdoc = `
+      iframe.srcdoc = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -485,7 +486,10 @@ border-radius:${currentTheme.border_radius}px;
 background:${currentTheme.primary_color};
 color:#000;
 margin-bottom:12px;
+cursor:pointer;
+transition:transform .15s ease;
 }
+button:hover{transform:scale(1.03);}
 </style>
 </head>
 <body>
@@ -499,15 +503,53 @@ ${currentTheme.background_style === 'blur' ? `<div style="position:fixed;inset:0
 </div>
 </body>
 </html>`;
+    });
+
+    function applyTheme(t) {
+      currentTheme = { ...currentTheme, ...t };
+      updatePreview();
+    }
+
+    /* ===============================
+       CLICKABLE INPUTS (AUTO-BIND)
+    =============================== */
+
+    const themeInputs = document.querySelectorAll('[data-theme-key]');
+
+    themeInputs.forEach(input => {
+      input.addEventListener('input', e => {
+        const key = e.target.dataset.themeKey;
+        let value = e.target.value;
+
+        if (value && value.startsWith('#')) {
+          const clean = sanitizeHex(value);
+          if (!clean) return;
+          value = clean;
+        }
+
+        if (key === 'border_radius' || key === 'glass_intensity' || key === 'gradient_angle') {
+          value = clamp(value, 0, 100);
+        }
+
+        applyTheme({ [key]: value });
       });
+    });
 
-      function applyTheme(t) {
-        currentTheme = { ...currentTheme, ...t };
-        updatePreview();
-      }
+    /* ===============================
+       SAVE
+    =============================== */
 
-      // SAVE
-      document.getElementById('save-theme-btn')?.addEventListener('click', async () => {
+    const saveBtn = document.getElementById('save-theme-btn');
+
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async () => {
+
+        if (isSaving) return;
+
+        isSaving = true;
+        saveBtn.disabled = true;
+        saveBtn.innerText = 'Sauvegarde...';
+
         try {
           const res = await fetch('/api/profile', {
             method: 'PUT',
@@ -515,23 +557,47 @@ ${currentTheme.background_style === 'blur' ? `<div style="position:fixed;inset:0
             body: JSON.stringify({ theme: currentTheme }),
           });
 
-          if (!res.ok) throw new Error('Erreur sauvegarde');
+          if (!res.ok) throw new Error();
 
-          alert('Thème enregistré');
+          if (window.toast) toast.success('Thème enregistré avec succès ✨');
         } catch (err) {
           console.error(err);
-          alert('Erreur sauvegarde');
+          if (window.toast) toast.error('Erreur lors de la sauvegarde');
+        } finally {
+          isSaving = false;
+          saveBtn.disabled = false;
+          saveBtn.innerText = 'Enregistrer';
         }
       });
+    }
 
-      // RESET
-      document.getElementById('reset-theme-btn')?.addEventListener('click', () => {
-        if (confirm('Réinitialiser ?')) {
-          applyTheme(defaultTheme);
-        }
+    /* ===============================
+       RESET
+    =============================== */
+
+    const resetBtn = document.getElementById('reset-theme-btn');
+
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        if (!confirm('Réinitialiser le thème ?')) return;
+
+        currentTheme = { ...defaultTheme };
+        updatePreview();
+
+        if (window.toast) toast.info('Thème réinitialisé');
+
+        // remet visuellement les inputs
+        themeInputs.forEach(input => {
+          const key = input.dataset.themeKey;
+          if (defaultTheme[key] !== undefined) {
+            input.value = defaultTheme[key];
+          }
+        });
       });
+    }
 
-      applyTheme(currentTheme);
-    });
-  }
+    applyTheme(currentTheme);
+
+  });
+}
 </script>
