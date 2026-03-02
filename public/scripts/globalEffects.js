@@ -1,9 +1,11 @@
+// public/scripts/globalEffects.js
 export function initGlobalEffects() {
   // -------------------------
   // Smooth scroll
   // -------------------------
   let locoScroll;
   const container = document.querySelector('[data-scroll-container]');
+
   if (container && window.LocomotiveScroll && window.gsap && window.ScrollTrigger) {
     locoScroll = new window.LocomotiveScroll({ el: container, smooth: true });
     locoScroll.on('scroll', window.ScrollTrigger.update);
@@ -31,6 +33,7 @@ export function initGlobalEffects() {
   if (trailContainer) {
     const colors = ['#00ff9d', '#bf00ff', '#00d4ff'];
     let particles = [];
+
     document.addEventListener('mousemove', (e) => {
       const p = document.createElement('div');
       p.className = 'cursor-particle';
@@ -55,25 +58,27 @@ export function initGlobalEffects() {
   // -------------------------
   // Scroll reveal
   // -------------------------
-  document.querySelectorAll('.reveal').forEach((el) => {
-    window.gsap.fromTo(
-      el,
-      { opacity: 0, y: 100 },
-      {
-        opacity: 1,
-        y: 0,
-        duration: 1,
-        ease: 'power3.out',
-        scrollTrigger: {
-          trigger: el,
-          start: 'top 80%',
-          end: 'bottom 20%',
-          toggleActions: 'play none none reverse',
-          scroller: '[data-scroll-container]',
-        },
-      }
-    );
-  });
+  if (window.gsap) {
+    document.querySelectorAll('.reveal').forEach((el) => {
+      window.gsap.fromTo(
+        el,
+        { opacity: 0, y: 100 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 1,
+          ease: 'power3.out',
+          scrollTrigger: {
+            trigger: el,
+            start: 'top 80%',
+            end: 'bottom 20%',
+            toggleActions: 'play none none reverse',
+            scroller: '[data-scroll-container]',
+          },
+        }
+      );
+    });
+  }
 
   // -------------------------
   // Magnetic buttons
@@ -83,10 +88,10 @@ export function initGlobalEffects() {
       const rect = btn.getBoundingClientRect();
       const x = e.clientX - rect.left - rect.width / 2;
       const y = e.clientY - rect.top - rect.height / 2;
-      window.gsap.to(btn, { x: x * 0.3, y: y * 0.3, duration: 0.3, ease: 'power2.out' });
+      window.gsap?.to(btn, { x: x * 0.3, y: y * 0.3, duration: 0.3, ease: 'power2.out' });
     });
     btn.addEventListener('mouseleave', () =>
-      window.gsap.to(btn, { x: 0, y: 0, duration: 0.3, ease: 'elastic.out(1,0.5)' })
+      window.gsap?.to(btn, { x: 0, y: 0, duration: 0.3, ease: 'elastic.out(1,0.5)' })
     );
   });
 
@@ -94,7 +99,7 @@ export function initGlobalEffects() {
   // Particles (tsParticles)
   // -------------------------
   if (window.tsParticles && window.loadSlim) {
-    window.loadSlim(window.tsParticles).then(() =>
+    window.loadSlim(window.tsParticles).then(() => {
       window.tsParticles.load({
         id: 'particles-container',
         options: {
@@ -114,15 +119,15 @@ export function initGlobalEffects() {
             modes: { grab: { distance: 200, links: { opacity: 0.5 } } },
           },
         },
-      })
-    );
+      });
+    }).catch((e) => console.warn('tsParticles failed to load', e));
   }
 
   // -------------------------
-  // Cleanup
+  // Cleanup function
   // -------------------------
   return () => {
     if (locoScroll) locoScroll.destroy();
-    window.ScrollTrigger.getAll().forEach((t) => t.kill());
+    window.ScrollTrigger?.getAll().forEach((t) => t.kill());
   };
 }
