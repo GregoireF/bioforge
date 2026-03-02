@@ -1,125 +1,33 @@
 ---
+import "../styles/global.css";
 ---
-<div id="cursor-trail"></div>
-<div id="particles-container" class="fixed inset-0 pointer-events-none z-0"></div>
+
+<div id="cursor-trail" class="pointer-events-none fixed inset-0 z-50"></div>
+<div id="particles-container" class="pointer-events-none fixed inset-0 z-0"></div>
 
 <script type="module">
-  import LocomotiveScroll from 'locomotive-scroll';
-  import { gsap } from 'gsap';
-  import { ScrollTrigger } from 'gsap/ScrollTrigger';
+  // Import uniquement ici pour le client
+  import { initGlobalEffects } from '@/scripts/globalEffects.ts';
+  
+  const cleanup = initGlobalEffects();
 
-  gsap.registerPlugin(ScrollTrigger);
-
-  let locoScroll;
-
-  // ========================
-  // SAFE LOCOMOTIVE INIT
-  // ========================
-  function initSmoothScroll() {
-    try {
-      const container = document.querySelector('[data-scroll-container]');
-      if (!container) return;
-
-      locoScroll = new LocomotiveScroll({
-        el: container,
-        smooth: true,
-        smartphone: { smooth: true }
-      });
-
-      locoScroll.on('scroll', ScrollTrigger.update);
-
-      ScrollTrigger.scrollerProxy(container, {
-        scrollTop(value) {
-          return arguments.length ? locoScroll.scrollTo(value, 0, 0) : locoScroll.scroll.instance.scroll.y;
-        },
-        getBoundingClientRect() {
-          return { top:0, left:0, width: window.innerWidth, height: window.innerHeight };
-        },
-        pinType: container.style.transform ? 'transform' : 'fixed'
-      });
-
-      ScrollTrigger.addEventListener('refresh', () => locoScroll.update());
-      ScrollTrigger.refresh();
-    } catch (e) {
-      console.warn('Smooth scroll failed, content fallback visible', e);
-      // Fallback: force overflow visible si Locomotive crash
-      const container = document.querySelector('[data-scroll-container]');
-      if(container) container.style.overflow = 'visible';
-    }
-  }
-
-  // ========================
-  // SAFE SCROLL REVEAL
-  // ========================
-  function initScrollReveal() {
-    const reveals = document.querySelectorAll('.reveal');
-    if (!reveals.length) return;
-
-    try {
-      reveals.forEach(el => {
-        gsap.fromTo(el, {opacity:0, y:100}, {
-          opacity:1, y:0, duration:1, ease:'power3.out',
-          scrollTrigger: { trigger: el, start:'top 80%', end:'bottom 20%', toggleActions:'play none none reverse', scroller:'[data-scroll-container]' }
-        });
-      });
-    } catch(e) {
-      console.warn('ScrollReveal failed, forcing visibility', e);
-      reveals.forEach(el => el.classList.add('visible'));
-    }
-  }
-
-  // ========================
-  // CURSOR TRAIL SAFE
-  // ========================
-  function initCursorTrail() {
-    const container = document.getElementById('cursor-trail');
-    if(!container) return;
-    let particles = [], max=15;
-
-    document.addEventListener('mousemove', (e) => {
-      const p = document.createElement('div');
-      p.className = 'cursor-particle';
-      p.style.left = e.clientX+'px';
-      p.style.top = e.clientY+'px';
-      container.appendChild(p);
-      particles.push(p);
-
-      if(particles.length > max) particles.shift()?.remove();
-      setTimeout(() => { p.remove(); particles = particles.filter(x=>x!==p); }, 600);
-    });
-  }
-
-  // ========================
-  // PARTICLES SAFE
-  // ========================
-  async function initParticles() {
-    try {
-      const { tsParticles } = await import('@tsparticles/engine');
-      const { loadSlim } = await import('@tsparticles/slim');
-      await loadSlim(tsParticles);
-      await tsParticles.load({ id:'particles-container', options:{ fullScreen:false, background:{color:'transparent'} }});
-    } catch(e) {
-      console.warn('Particles disabled', e);
-    }
-  }
-
-  // ========================
-  // INIT ALL
-  // ========================
-  document.addEventListener('DOMContentLoaded', () => {
-    initSmoothScroll();
-    initScrollReveal();
-    initCursorTrail();
-    initParticles();
-  });
-
+  // Cleanup sur navigation Astro
   document.addEventListener('astro:before-preparation', () => {
-    if(locoScroll) locoScroll.destroy();
-    ScrollTrigger.getAll().forEach(t=>t.kill());
+    cleanup?.();
   });
 </script>
 
 <style>
-  #particles-container { opacity:0.4; }
-  .reveal.visible { opacity:1; transform:translateY(0); transition:all 0.8s ease; }
+  #particles-container {
+    opacity: 0.4;
+  }
+
+  .cursor-particle {
+    position: fixed;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 50;
+  }
 </style>
