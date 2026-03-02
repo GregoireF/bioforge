@@ -400,6 +400,7 @@ const profileJson = JSON.stringify({
   input[type="color"].color-swatch::-webkit-color-swatch-wrapper { padding: 0; }
   input[type="color"].color-swatch::-webkit-color-swatch { border: none; border-radius: 10px; }
 
+  /* Toggle – version SÛRE sans inset-0 via @apply */
   .toggle-checkbox {
     position: relative;
     appearance: none;
@@ -407,25 +408,39 @@ const profileJson = JSON.stringify({
 
   .toggle-checkbox::before {
     content: '';
-    @apply absolute inset-0 rounded-full bg-white/15 transition-colors;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.15);
+    transition: background 0.2s;
   }
 
   .toggle-checkbox:checked::before {
-    @apply bg-emerald-600/70;
+    background: rgb(5 150 105 / 0.7);   /* emerald-600 ≈ #059669 */
   }
 
   .toggle-checkbox::after {
     content: '';
-    @apply absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow transition-transform;
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
     transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .toggle-checkbox:checked::after {
-    @apply translate-x-5;
+    transform: translateX(20px);
   }
 
   [data-active] {
-    border-color: #10b98170 !important;
+    border-color: #10b98170 !important; /* emerald-500/70 approx */
   }
 
   .preset.active .preset-ring {
