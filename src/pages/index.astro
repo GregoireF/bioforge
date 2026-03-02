@@ -11,7 +11,7 @@ import FloatingCTA from '@/components/landing/FloatingCTA.astro';
 import Footer from '@/components/layout/Footer.astro';
 ---
 
-<BaseLayout title="BioForge - Level Up Your Link-in-Bio">
+<BaseLayout title="BioForge - Level Up Your Link-in-Bio" data-count="0">
   <Header />
   
   <main>
@@ -34,7 +34,7 @@ import Footer from '@/components/layout/Footer.astro';
 </BaseLayout>
 
 <script type="module">
-  import { CountUp } from 'countup.js';
+  import { CountUp } from 'https://cdn.jsdelivr.net/npm/countup.js@2.6.2/dist/countUp.min.js';
 
   function initCountUps() {
     const counters = document.querySelectorAll('.count-up:not(.count-up-initialized)');
