@@ -427,7 +427,6 @@ const profileJson = JSON.stringify({
 </style>
 
 <script>
-  // Exécuté côté client après chargement
   document.addEventListener('DOMContentLoaded', () => {
     const serverData = document.getElementById('server-data');
     if (!serverData) return console.error('server-data manquant');
@@ -528,7 +527,7 @@ const profileJson = JSON.stringify({
         if (hex) hex.value = currentTheme[k];
       });
 
-      // Gradient colors sync
+      // Gradient sync
       const g1 = document.getElementById('gradient_color_1');
       const g1hex = document.getElementById('gradient_color_1_hex');
       const g2 = document.getElementById('gradient_color_2');
@@ -552,7 +551,7 @@ const profileJson = JSON.stringify({
       setVal('block_shadow', currentTheme.block_shadow);
       setVal('animations', currentTheme.animations);
 
-      // Affichage valeurs
+      // Affichage
       document.getElementById('radius-display')?.textContent = `${currentTheme.border_radius}px`;
       document.getElementById('angle-display')?.textContent = `${currentTheme.gradient_angle}°`;
       document.getElementById('glass-value')?.textContent = `${currentTheme.glass_intensity}px`;
@@ -577,7 +576,7 @@ const profileJson = JSON.stringify({
         }
       });
 
-      // Visibility panels
+      // Panels
       document.getElementById('gradient-panel')?.classList.toggle('hidden', currentTheme.background_style !== 'gradient');
       document.getElementById('blur-hint')?.classList.toggle('hidden', currentTheme.background_style !== 'blur');
       document.getElementById('angle-container')?.classList.toggle('hidden', currentTheme.gradient_type !== 'linear');
@@ -585,7 +584,7 @@ const profileJson = JSON.stringify({
       updatePreview();
     }
 
-    // ─── ÉCOUTEURS ───
+    // ÉCOUTEURS
     document.querySelectorAll('.preset-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const { preset, bg, primary, text } = btn.dataset;
@@ -643,7 +642,7 @@ const profileJson = JSON.stringify({
       });
     });
 
-    // Couleurs (input + hex)
+    // Couleurs (picker + hex)
     ['background_color', 'primary_color', 'text_color', 'gradient_color_1', 'gradient_color_2'].forEach(id => {
       const picker = document.getElementById(id);
       const hexInput = document.getElementById(`${id}_hex`);
@@ -669,7 +668,95 @@ const profileJson = JSON.stringify({
       }
     });
 
-    // Save / Reset / Export / Import (ton code original, inchangé ici pour brevité)
+    // SAVE – TON ENDPOINT API EST ICI, INTACT
+    document.getElementById('save-theme-btn')?.addEventListener('click', async () => {
+      const btn = document.getElementById('save-theme-btn');
+      const txt = document.getElementById('save-text');
+      if (!btn || !txt) return;
+
+      btn.disabled = true;
+      txt.innerHTML = 'Enregistrement…';
+
+      try {
+        const res = await fetch('/api/profile', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ theme: currentTheme }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Erreur serveur' }));
+          throw new Error(err.error || `HTTP ${res.status}`);
+        }
+
+        // Historique local
+        const history = JSON.parse(localStorage.getItem('theme_history') || '[]');
+        history.unshift({ theme: { ...currentTheme }, savedAt: new Date().toISOString() });
+        if (history.length > 5) history.pop();
+        localStorage.setItem('theme_history', JSON.stringify(history));
+
+        toast.success('Thème enregistré avec succès');
+      } catch (err) {
+        console.error('Erreur sauvegarde:', err);
+        toast.error(err.message || 'Impossible d\'enregistrer le thème');
+      } finally {
+        btn.disabled = false;
+        txt.innerHTML = 'Enregistrer le thème';
+      }
+    });
+
+    // Reset
+    document.getElementById('reset-theme-btn')?.addEventListener('click', () => {
+      if (confirm('Réinitialiser le thème ?')) {
+        applyTheme(DEFAULT_THEME);
+        toast.info('Thème réinitialisé');
+      }
+    });
+
+    // Export
+    document.getElementById('export-btn')?.addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify(currentTheme, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `theme-${currentTheme.preset || 'custom'}-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Thème exporté');
+    });
+
+    // Import
+    document.getElementById('import-file')?.addEventListener('change', e => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const raw = JSON.parse(ev.target.result);
+          const safe = {
+            ...DEFAULT_THEME,
+            ...raw,
+            background_color: sanitizeHex(raw.background_color, DEFAULT_THEME.background_color),
+            primary_color: sanitizeHex(raw.primary_color, DEFAULT_THEME.primary_color),
+            text_color: sanitizeHex(raw.text_color, DEFAULT_THEME.text_color),
+            gradient_color_2: sanitizeHex(raw.gradient_color_2, DEFAULT_THEME.gradient_color_2),
+            font_family: sanitizeFont(raw.font_family, DEFAULT_THEME.font_family),
+            border_radius: clamp(raw.border_radius, 0, 40, 14),
+            gradient_angle: clamp(raw.gradient_angle, 0, 360, 135),
+            glass_intensity: clamp(raw.glass_intensity, 4, 32, 12),
+            background_style: sanitizeEnum(raw.background_style, ['solid','gradient','blur'], 'solid'),
+            gradient_type: sanitizeEnum(raw.gradient_type, ['linear','radial'], 'linear'),
+            button_style: sanitizeEnum(raw.button_style, ['filled','outline','shadow','minimal'], 'filled'),
+          };
+          applyTheme(safe);
+          toast.success('Thème importé');
+        } catch {
+          toast.error('Fichier invalide');
+        }
+      };
+      reader.readAsText(file);
+    });
 
     // Init
     applyTheme(currentTheme);
