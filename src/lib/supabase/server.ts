@@ -20,8 +20,8 @@ export function createSupabaseServer(context: {
           context.cookies.set(name, value, {
             path: '/',
             httpOnly: true,
-            secure: isProd,
-            sameSite: 'lax',
+            secure: true,
+            sameSite: 'none',
             ...options,
           })
         },
