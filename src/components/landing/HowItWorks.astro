@@ -34,7 +34,7 @@ const steps = [
 
   <div class="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8">
     <!-- Section Header -->
-    <div class="text-center max-w-3xl mx-auto mb-20 reveal">
+    <div class="text-center max-w-3xl mx-auto mb-20">
       <div class="inline-flex items-center space-x-2 px-4 py-2 glass rounded-full text-sm text-neon-green mb-6">
         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
           <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/>
@@ -60,7 +60,7 @@ const steps = [
         <div class="hidden md:block absolute top-24 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-neon-green/30 to-transparent"></div>
 
         {steps.map((step, index) => (
-          <div class="reveal" style={`animation-delay: ${index * 0.2}s`}>
+          <div style={`animation-delay: ${index * 0.2}s`}>
             <div class="relative group">
               <!-- Card -->
               <div class="glass-strong rounded-3xl p-8 border border-white/10 hover:border-neon-green/30 transition-all duration-500 h-full">
@@ -108,7 +108,7 @@ const steps = [
       </div>
 
       <!-- CTA Below Steps -->
-      <div class="text-center mt-16 reveal">
+      <div class="text-center mt-16">
         <a 
           href="/signup" 
           class="inline-flex items-center space-x-3 px-8 py-4 bg-gradient-to-r from-neon-green to-neon-blue text-dark-900 font-semibold rounded-xl hover:opacity-90 transition-all duration-300 magnetic glow-green text-lg group"

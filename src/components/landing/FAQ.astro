@@ -45,7 +45,7 @@ const faqs = [
 
   <div class="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8">
     <!-- Section Header -->
-    <div class="text-center max-w-3xl mx-auto mb-20 reveal">
+    <div class="text-center max-w-3xl mx-auto mb-20">
       <div class="inline-flex items-center space-x-2 px-4 py-2 glass rounded-full text-sm text-neon-blue mb-6">
         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
           <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
@@ -66,7 +66,7 @@ const faqs = [
     </div>
 
     <!-- FAQ Accordion -->
-    <div class="max-w-4xl mx-auto space-y-4 reveal">
+    <div class="max-w-4xl mx-auto space-y-4">
       {faqs.map((faq, index) => (
         <div class="faq-item glass-strong rounded-2xl border border-white/10 overflow-hidden transition-all duration-300 hover:border-neon-blue/30">
           <button 
@@ -96,7 +96,7 @@ const faqs = [
     </div>
 
     <!-- Still have questions CTA -->
-    <div class="text-center mt-16 reveal">
+    <div class="text-center mt-16">
       <p class="text-gray-400 mb-6">Still have questions?</p>
       <a 
         href="/contact" 
