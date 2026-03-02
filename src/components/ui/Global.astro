@@ -1,240 +1,125 @@
 ---
-// Global scripts component for animations and effects
 ---
-
-<!-- Cursor Trail Container -->
 <div id="cursor-trail"></div>
-
-<!-- Particles Container -->
 <div id="particles-container" class="fixed inset-0 pointer-events-none z-0"></div>
 
-<script>
+<script type="module">
   import LocomotiveScroll from 'locomotive-scroll';
   import { gsap } from 'gsap';
   import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
-  // Register GSAP plugins
   gsap.registerPlugin(ScrollTrigger);
 
-  // Initialize Locomotive Scroll
-  let locoScroll: any;
-  
+  let locoScroll;
+
+  // ========================
+  // SAFE LOCOMOTIVE INIT
+  // ========================
   function initSmoothScroll() {
-    const scrollContainer = document.querySelector('[data-scroll-container]');
-    if (scrollContainer) {
+    try {
+      const container = document.querySelector('[data-scroll-container]');
+      if (!container) return;
+
       locoScroll = new LocomotiveScroll({
-        el: scrollContainer as HTMLElement,
+        el: container,
         smooth: true,
-        smartphone: {
-          smooth: true
-        },
+        smartphone: { smooth: true }
       });
 
-      // Sync with ScrollTrigger
       locoScroll.on('scroll', ScrollTrigger.update);
 
-      ScrollTrigger.scrollerProxy('[data-scroll-container]', {
+      ScrollTrigger.scrollerProxy(container, {
         scrollTop(value) {
           return arguments.length ? locoScroll.scrollTo(value, 0, 0) : locoScroll.scroll.instance.scroll.y;
         },
         getBoundingClientRect() {
-          return {top: 0, left: 0, width: window.innerWidth, height: window.innerHeight};
+          return { top:0, left:0, width: window.innerWidth, height: window.innerHeight };
         },
-        pinType: (scrollContainer as HTMLElement).style.transform ? 'transform' : 'fixed'
+        pinType: container.style.transform ? 'transform' : 'fixed'
       });
 
       ScrollTrigger.addEventListener('refresh', () => locoScroll.update());
       ScrollTrigger.refresh();
+    } catch (e) {
+      console.warn('Smooth scroll failed, content fallback visible', e);
+      // Fallback: force overflow visible si Locomotive crash
+      const container = document.querySelector('[data-scroll-container]');
+      if(container) container.style.overflow = 'visible';
     }
   }
 
-  // Cursor Trail Effect
-  function initCursorTrail() {
-    const trailContainer = document.getElementById('cursor-trail');
-    if (!trailContainer) return;
-
-    let particles: HTMLElement[] = [];
-    const maxParticles = 20;
-
-    document.addEventListener('mousemove', (e) => {
-      // Create particle
-      const particle = document.createElement('div');
-      particle.className = 'cursor-particle';
-      particle.style.left = e.clientX + 'px';
-      particle.style.top = e.clientY + 'px';
-      
-      // Random color variation
-      const colors = ['#00ff9d', '#bf00ff', '#00d4ff'];
-      particle.style.background = colors[Math.floor(Math.random() * colors.length)];
-      
-      trailContainer.appendChild(particle);
-      particles.push(particle);
-
-      // Remove old particles
-      if (particles.length > maxParticles) {
-        const oldParticle = particles.shift();
-        oldParticle?.remove();
-      }
-
-      // Auto remove after animation
-      setTimeout(() => {
-        particle.remove();
-        particles = particles.filter(p => p !== particle);
-      }, 1000);
-    });
-  }
-
-  // Scroll Reveal Animations
+  // ========================
+  // SAFE SCROLL REVEAL
+  // ========================
   function initScrollReveal() {
     const reveals = document.querySelectorAll('.reveal');
-    
-    reveals.forEach((element) => {
-      gsap.fromTo(element,
-        {
-          opacity: 0,
-          y: 100
-        },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 1,
-          ease: 'power3.out',
-          scrollTrigger: {
-            trigger: element,
-            start: 'top 80%',
-            end: 'bottom 20%',
-            toggleActions: 'play none none reverse',
-            scroller: '[data-scroll-container]'
-          }
-        }
-      );
-    });
-  }
+    if (!reveals.length) return;
 
-  // Magnetic Buttons Effect
-  function initMagneticButtons() {
-    const magneticButtons = document.querySelectorAll('.magnetic');
-    
-    magneticButtons.forEach((button) => {
-      button.addEventListener('mousemove', (e: Event) => {
-        const mouseEvent = e as MouseEvent;
-        const rect = (button as HTMLElement).getBoundingClientRect();
-        const x = mouseEvent.clientX - rect.left - rect.width / 2;
-        const y = mouseEvent.clientY - rect.top - rect.height / 2;
-        
-        gsap.to(button, {
-          x: x * 0.3,
-          y: y * 0.3,
-          duration: 0.3,
-          ease: 'power2.out'
+    try {
+      reveals.forEach(el => {
+        gsap.fromTo(el, {opacity:0, y:100}, {
+          opacity:1, y:0, duration:1, ease:'power3.out',
+          scrollTrigger: { trigger: el, start:'top 80%', end:'bottom 20%', toggleActions:'play none none reverse', scroller:'[data-scroll-container]' }
         });
       });
-      
-      button.addEventListener('mouseleave', () => {
-        gsap.to(button, {
-          x: 0,
-          y: 0,
-          duration: 0.3,
-          ease: 'elastic.out(1, 0.5)'
-        });
-      });
-    });
-  }
-
-  // Initialize tsParticles
-  async function initParticles() {
-    const { tsParticles } = await import('@tsparticles/engine');
-    const { loadSlim } = await import('@tsparticles/slim');
-
-    await loadSlim(tsParticles);
-
-    await tsParticles.load({
-      id: 'particles-container',
-      options: {
-        fullScreen: false,
-        background: {
-          color: 'transparent'
-        },
-        particles: {
-          number: {
-            value: 50,
-            density: {
-              enable: true,
-            }
-          },
-          color: {
-            value: ['#00ff9d', '#bf00ff', '#00d4ff']
-          },
-          shape: {
-            type: 'circle'
-          },
-          opacity: {
-            value: { min: 0.1, max: 0.5 }
-          },
-          size: {
-            value: { min: 1, max: 3 }
-          },
-          links: {
-            enable: true,
-            distance: 150,
-            color: '#00ff9d',
-            opacity: 0.2,
-            width: 1
-          },
-          move: {
-            enable: true,
-            speed: 1,
-            direction: 'none',
-            random: true,
-            straight: false,
-            outModes: 'bounce'
-          }
-        },
-        interactivity: {
-          events: {
-            onHover: {
-              enable: true,
-              mode: 'grab'
-            }
-          },
-          modes: {
-            grab: {
-              distance: 200,
-              links: {
-                opacity: 0.5
-              }
-            }
-          }
-        }
-      }
-    });
-  }
-
-  // Check for reduced motion preference
-  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  // Initialize everything on load
-  document.addEventListener('DOMContentLoaded', () => {
-    if (!prefersReducedMotion) {
-      initSmoothScroll();
-      initCursorTrail();
-      initScrollReveal();
-      initMagneticButtons();
-      initParticles();
+    } catch(e) {
+      console.warn('ScrollReveal failed, forcing visibility', e);
+      reveals.forEach(el => el.classList.add('visible'));
     }
+  }
+
+  // ========================
+  // CURSOR TRAIL SAFE
+  // ========================
+  function initCursorTrail() {
+    const container = document.getElementById('cursor-trail');
+    if(!container) return;
+    let particles = [], max=15;
+
+    document.addEventListener('mousemove', (e) => {
+      const p = document.createElement('div');
+      p.className = 'cursor-particle';
+      p.style.left = e.clientX+'px';
+      p.style.top = e.clientY+'px';
+      container.appendChild(p);
+      particles.push(p);
+
+      if(particles.length > max) particles.shift()?.remove();
+      setTimeout(() => { p.remove(); particles = particles.filter(x=>x!==p); }, 600);
+    });
+  }
+
+  // ========================
+  // PARTICLES SAFE
+  // ========================
+  async function initParticles() {
+    try {
+      const { tsParticles } = await import('@tsparticles/engine');
+      const { loadSlim } = await import('@tsparticles/slim');
+      await loadSlim(tsParticles);
+      await tsParticles.load({ id:'particles-container', options:{ fullScreen:false, background:{color:'transparent'} }});
+    } catch(e) {
+      console.warn('Particles disabled', e);
+    }
+  }
+
+  // ========================
+  // INIT ALL
+  // ========================
+  document.addEventListener('DOMContentLoaded', () => {
+    initSmoothScroll();
+    initScrollReveal();
+    initCursorTrail();
+    initParticles();
   });
 
-  // Cleanup on navigation
   document.addEventListener('astro:before-preparation', () => {
-    if (locoScroll) {
-      locoScroll.destroy();
-    }
-    ScrollTrigger.getAll().forEach(trigger => trigger.kill());
+    if(locoScroll) locoScroll.destroy();
+    ScrollTrigger.getAll().forEach(t=>t.kill());
   });
 </script>
 
 <style>
-  #particles-container {
-    opacity: 0.4;
-  }
+  #particles-container { opacity:0.4; }
+  .reveal.visible { opacity:1; transform:translateY(0); transition:all 0.8s ease; }
 </style>
