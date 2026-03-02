@@ -2,7 +2,6 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { getProfileByUsername, getActiveBlocks, incrementProfileView } from '@/lib/supabase/queries';
 import QRCode from 'qrcode';
-import { Image } from 'astro:assets'
 
 // ==================== GET USERNAME ====================
 const { username } = Astro.params;
@@ -70,7 +69,7 @@ try {
       <!-- PROFILE HEADER -->
       <div class="text-center mb-10 animate-fade-in-up">
         {profile.avatar_url ? (
-          <Image src={profile.avatar_url} alt={profile.display_name || profile.username}
+          <img src={profile.avatar_url} alt={profile.display_name || profile.username}
                class="w-28 h-28 rounded-full mx-auto mb-6 object-cover avatar-glow"
                style={`border: 4px solid ${theme.primary_color}; box-shadow: 0 0 40px ${theme.primary_color}60;`} />
         ) : (
@@ -103,7 +102,7 @@ try {
             const blockId = block.id;
             const staggerClass = `stagger-${Math.min(index + 2, 6)}`;
 
-            // ========== HEADING ==========
+            // HEADING
             if (block.type === 'heading') {
               return (
                 <div class={`text-xl lg:text-2xl font-bold text-center py-3 animate-fade-in-up ${staggerClass}`}
@@ -113,10 +112,10 @@ try {
               );
             }
 
-            // ========== SPACER ==========
+            // SPACER
             if (block.type === 'spacer') return <div class="h-8"></div>;
 
-            // ========== LINK ==========
+            // LINK
             if (block.type === 'link') {
               const url = block.config?.url || '#';
               return (
@@ -136,26 +135,23 @@ try {
               );
             }
 
-            // ========== IMAGE ==========
+            // IMAGE
             if (block.type === 'image') {
               const imageUrl = block.config?.url;
               const imageLink = block.config?.link;
               if (!imageUrl) return null;
 
               const imageElement = (
-                <Image src={imageUrl} alt={block.title || 'Image'}
+                <img src={imageUrl} alt={block.title || 'Image'}
                      class={`w-full rounded-lg transition-all hover:scale-105 animate-fade-in-up ${staggerClass}`}
                      style={`border-radius: ${theme.border_radius}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''}`} />
               );
 
-              if (imageLink) {
-                return <a href={imageLink} target="_blank" rel="noopener noreferrer">{imageElement}</a>;
-              }
-
+              if (imageLink) return <a href={imageLink} target="_blank" rel="noopener noreferrer">{imageElement}</a>;
               return <div>{imageElement}</div>;
             }
 
-            // ========== VIDEO ==========
+            // VIDEO
             if (block.type === 'video') {
               const videoUrl = block.config?.url;
               if (!videoUrl) return null;
@@ -182,7 +178,7 @@ try {
               );
             }
 
-            // ========== SOCIAL ==========
+            // SOCIAL
             if (block.type === 'social') {
               const links = block.config?.links || [];
               if (!Array.isArray(links) || links.length === 0) return null;
@@ -213,8 +209,7 @@ try {
                 if (url.includes('discord.com') || url.includes('discord.gg')) return socialIcons.discord;
                 if (url.includes('kick.com')) return socialIcons.kick;
                 if (url.includes('snapchat.com')) return socialIcons.snapchat;
-
-                return 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71'; // icône par défaut
+                return 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71'; // default
               }
 
               return (
@@ -227,8 +222,7 @@ try {
                          class="w-14 h-14 flex items-center justify-center rounded-full transition-all hover:scale-110"
                          data-block-id={blockId}
                          style={`background-color: ${theme.primary_color}; color: ${theme.background_color}; ${theme.block_shadow ? `box-shadow: 0 4px 16px ${theme.primary_color}60;` : ''}`}>
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2"
-                             stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+                        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
                           <path d={getSocialIcon(url)} />
                         </svg>
                       </a>
@@ -245,26 +239,24 @@ try {
 
       <!-- FOOTER -->
       <div class="text-center py-8 animate-fade-in-up stagger-6">
-        <p class="text-sm mb-3" style={`color: ${theme.text_color}; opacity: 0.5;`}>
-          Powered by BioForge
-        </p>
-        <a href="/" class="text-sm hover:underline transition-all" style={`color: ${theme.primary_color}`}>
-          Create your own page →
-        </a>
+        <p class="text-sm mb-3" style={`color: ${theme.text_color}; opacity: 0.5;`}>Powered by BioForge</p>
+        <a href="/" class="text-sm hover:underline transition-all" style={`color: ${theme.primary_color}`}>Create your own page →</a>
       </div>
     </div>
   </div>
 
-  <!-- QR CODE CÔTÉ SERVEUR -->
-  <div id="qr-container"
-       class="fixed bottom-6 right-6 z-50 opacity-100 translate-y-0 transition-all duration-500 hover:scale-105">
-    <div class="p-4 rounded-2xl backdrop-blur-xl shadow-2xl border"
-         style={`background-color: ${theme.background_color}CC; border-color: ${theme.primary_color}40;`}>
-      <img src={qrDataUrl} alt="QR code" class="w-28 h-28 rounded-2xl"/>
+  <!-- QR CODE -->
+  {qrDataUrl && (
+    <div id="qr-container"
+         class="fixed bottom-6 right-6 z-50 opacity-100 translate-y-0 transition-all duration-500 hover:scale-105">
+      <div class="p-4 rounded-2xl backdrop-blur-xl shadow-2xl border"
+           style={`background-color: ${theme.background_color}CC; border-color: ${theme.primary_color}40;`}>
+        <img src={qrDataUrl} alt="QR code" class="w-28 h-28 rounded-2xl"/>
+      </div>
     </div>
-  </div>
+  )}
 
-  <!-- SCRIPT CLIC CORRIGÉ -->
+  <!-- CLICK TRACKING -->
   <script define:vars={{ profileId: profile.id }}>
     let isClicking = false;
     document.querySelectorAll('[data-block-id]').forEach(element => {
