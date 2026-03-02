@@ -301,7 +301,7 @@ const progressPercent =
     // ==================== LOAD BLOCKS ====================
     async function loadBlocks(forceRefresh = false) {
       try {
-        const response = await fetch('https://bioforge.click/api/blocks', {
+        const response = await fetch('/api/blocks', {
           cache: forceRefresh ? 'no-store' : 'default',
           credentials: 'include'
         });
@@ -387,7 +387,7 @@ const progressPercent =
           const active = e.target.checked;
           
           try {
-            const res = await fetch(`https://bioforge.click/api/blocks/${id}`, {
+            const res = await fetch(`/api/blocks/${id}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ active })
@@ -433,7 +433,7 @@ const progressPercent =
           const blockIds = Array.from(container.children).map(el => el.dataset.id);
           
           try {
-            const res = await fetch('https://bioforge.click/api/blocks/reorder', {
+            const res = await fetch('/api/blocks/reorder', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ blockIds })
@@ -646,7 +646,7 @@ const progressPercent =
       }
 
       try {
-        const url = blockId ? `https://bioforge.click/api/blocks/${blockId}` : 'https://bioforge.click/api/blocks';
+        const url = blockId ? `/api/blocks/${blockId}` : '/api/blocks';
         const method = blockId ? 'PUT' : 'POST';
 
         const response = await fetch(url, {
@@ -690,7 +690,7 @@ const progressPercent =
       if (!confirm('Are you sure you want to delete this block?')) return;
 
       try {
-        const response = await fetch(`https://bioforge.click/api/blocks/${id}`, {
+        const response = await fetch(`/api/blocks/${id}`, {
           method: 'DELETE'
         });
         
