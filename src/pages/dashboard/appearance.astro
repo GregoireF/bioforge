@@ -115,12 +115,12 @@ const profileJson = JSON.stringify({
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {
             [
-              { id: 'dark',    label: 'Éclipse', bg: '#0a0a0a', primary: '#00ff9d', text: '#f0f0f0', thumb: 'from-gray-950 via-slate-900 to-black' },
-              { id: 'light',   label: 'Aube',    bg: '#fafafa', primary: '#0066ff', text: '#111111', thumb: 'from-gray-50 via-white to-gray-100' },
-              { id: 'neon',    label: 'Cyber',   bg: '#0f001a', primary: '#d600ff', text: '#f0f0ff', thumb: 'from-purple-950 to-fuchsia-950' },
-              { id: 'ocean',   label: 'Abysse',  bg: '#001522', primary: '#00eaff', text: '#e0f8ff', thumb: 'from-blue-950 to-cyan-950' },
-              { id: 'sunset',  label: 'Braise',  bg: '#1a0d00', primary: '#ff5e00', text: '#fff5e0', thumb: 'from-amber-950 to-red-950' },
-              { id: 'clay',    label: 'Doux',    bg: '#111111', primary: '#ff80ab', text: '#f5f5f5', thumb: 'from-rose-950 via-pink-950 to-purple-950' },
+              { id: 'dark', label: 'Éclipse', bg: '#0a0a0a', primary: '#00ff9d', text: '#f0f0f0', thumb: 'from-gray-950 via-slate-900 to-black' },
+              { id: 'light', label: 'Aube', bg: '#fafafa', primary: '#0066ff', text: '#111111', thumb: 'from-gray-50 via-white to-gray-100' },
+              { id: 'neon', label: 'Cyber', bg: '#0f001a', primary: '#d600ff', text: '#f0f0ff', thumb: 'from-purple-950 to-fuchsia-950' },
+              { id: 'ocean', label: 'Abysse', bg: '#001522', primary: '#00eaff', text: '#e0f8ff', thumb: 'from-blue-950 to-cyan-950' },
+              { id: 'sunset', label: 'Braise', bg: '#1a0d00', primary: '#ff5e00', text: '#fff5e0', thumb: 'from-amber-950 to-red-950' },
+              { id: 'clay', label: 'Doux', bg: '#111111', primary: '#ff80ab', text: '#f5f5f5', thumb: 'from-rose-950 via-pink-950 to-purple-950' },
             ].map(p => (
               <button
                 class="preset-btn group relative aspect-[4/3] rounded-2xl overflow-hidden border-2 border-white/10 hover:border-emerald-400/50 hover:scale-105 active:scale-95 transition-all duration-200 shadow-sm hover:shadow-lg"
@@ -145,8 +145,8 @@ const profileJson = JSON.stringify({
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
           {[
             { id: 'background_color', label: 'Arrière-plan' },
-            { id: 'primary_color',    label: 'Accent'      },
-            { id: 'text_color',       label: 'Texte'       },
+            { id: 'primary_color', label: 'Accent' },
+            { id: 'text_color', label: 'Texte' },
           ].map(c => (
             <div class="space-y-3">
               <label class="block text-sm font-medium text-gray-300">{c.label}</label>
@@ -257,10 +257,10 @@ const profileJson = JSON.stringify({
       <Card title="Style des boutons" description="Apparence de tes liens">
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
-            { id: 'filled',  label: 'Plein',   preview: 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white' },
-            { id: 'outline', label: 'Contour',  preview: 'border-2 border-emerald-400/70 text-emerald-300' },
-            { id: 'shadow',  label: 'Glow',     preview: 'bg-emerald-500/90 shadow-[0_0_24px_#00ff9d80] text-black' },
-            { id: 'minimal', label: 'Minimal',  preview: 'text-emerald-400 hover:underline' },
+            { id: 'filled', label: 'Plein', preview: 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white' },
+            { id: 'outline', label: 'Contour', preview: 'border-2 border-emerald-400/70 text-emerald-300' },
+            { id: 'shadow', label: 'Glow', preview: 'bg-emerald-500/90 shadow-[0_0_24px_#00ff9d80] text-black' },
+            { id: 'minimal', label: 'Minimal', preview: 'text-emerald-400 hover:underline' },
           ].map(s => (
             <button
               class="style-btn group p-4 glass rounded-2xl border-2 border-transparent hover:border-emerald-500/30 transition-all data-[active]:border-emerald-500 data-[active]:bg-emerald-500/10"
@@ -318,7 +318,7 @@ const profileJson = JSON.stringify({
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
             { id: 'block_shadow', label: 'Ombres en profondeur', desc: 'Effet 3D sur les blocs' },
-            { id: 'animations',   label: 'Micro-animations', desc: 'Effets au survol et clic' },
+            { id: 'animations', label: 'Micro-animations', desc: 'Effets au survol et clic' },
           ].map(opt => (
             <label class="group flex items-center justify-between p-5 glass rounded-2xl cursor-pointer hover:bg-white/5 transition-colors border border-white/10">
               <div>
@@ -402,7 +402,6 @@ const profileJson = JSON.stringify({
   input[type="color"].color-swatch::-webkit-color-swatch-wrapper { padding: 0; }
   input[type="color"].color-swatch::-webkit-color-swatch { border: none; border-radius: 10px; }
 
-  /* Toggle moderne et visible */
   .sr-only {
     position: absolute;
     width: 1px;
@@ -427,9 +426,10 @@ const profileJson = JSON.stringify({
 </style>
 
 <script>
-  // Protection complète contre l'exécution serveur
-  if (typeof window !== 'undefined') {
+  // Protection maximale : rien n'est exécuté côté serveur
+  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     document.addEventListener('DOMContentLoaded', () => {
+      // Récupération des données serveur
       const serverData = document.getElementById('server-data');
       if (!serverData) {
         console.error('Element #server-data introuvable');
@@ -453,6 +453,7 @@ const profileJson = JSON.stringify({
         };
       }
 
+      // Aperçu iframe
       const updatePreview = debounce(() => {
         const iframe = document.getElementById('preview-iframe');
         if (!iframe) return;
@@ -583,7 +584,7 @@ const profileJson = JSON.stringify({
         updatePreview();
       }
 
-      // ÉCOUTEURS
+      // ─── ÉCOUTEURS ───
       document.querySelectorAll('.preset-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const { preset, bg, primary, text } = btn.dataset;
@@ -687,7 +688,7 @@ const profileJson = JSON.stringify({
             throw new Error(err.error || `HTTP ${res.status}`);
           }
 
-          // Historique local (exemple)
+          // Historique local
           const history = JSON.parse(localStorage.getItem('theme_history') || '[]');
           history.unshift({ theme: { ...currentTheme }, savedAt: new Date().toISOString() });
           if (history.length > 5) history.pop();
