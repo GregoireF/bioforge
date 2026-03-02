@@ -48,6 +48,7 @@
     "@tailwindcss/vite": "^4.1.18",
     "@types/locomotive-scroll": "^4.1.4",
     "@types/node": "^25.2.1",
+    "@types/qrcode": "^1.5.6",
     "@types/sortablejs": "^1.15.9",
     "@vite-pwa/astro": "^1.2.0",
     "prettier": "^3.8.1",
