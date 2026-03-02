@@ -24,7 +24,7 @@ export default defineConfig({
 
   vite: {
     server: {
-      host: 'bioforge-three.vercel.app'
+      host: 'https://bioforge.click'
     },
     plugins: [
       tailwindcss(),
@@ -38,6 +38,6 @@ export default defineConfig({
   },
 
   server: { 
-    host: 'bioforge-three.vercel.app'
+    host: 'https://bioforge.click'
   },
 });
