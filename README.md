@@ -4,7 +4,7 @@ BioForge is a premium link-in-bio platform specifically designed for streamers a
 
 ## ✨ Features
 
-- 🎨 **Customizable Profiles** - Personalize your page with custom colors, avatar, and bio
+- 🎨 **Customizable Profiles** - Personalize your page with custom colors, avatar, and bioz
 - 🔗 **Link Management** - Add, edit, reorder, and toggle links with ease
 - 📊 **Analytics** - Track profile views and link clicks
 - ⚡ **Lightning Fast** - Built with Astro SSR for optimal performance
