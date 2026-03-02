@@ -1,0 +1,237 @@
+---
+import { supabase } from '@/lib/supabase/client'
+import type { Profile, PlanLimit } from '../../lib/supabase/database.types'
+import CommandPalette from '@/components/features/CommandPalette.astro'
+import OnboardingTour from '@/components/features/OnboardingTour.astro'
+
+interface Props {
+  title: string
+}
+
+const { title } = Astro.props
+
+// Get user from cookies (already verified by middleware)
+const accessToken = Astro.cookies.get('sb-access-token')?.value!
+const { data: { user } } = await supabase.auth.getUser(accessToken)
+
+// Get profile with plan limits
+const { data: profile } = await supabase
+  .from('profiles')
+  .select(`
+    *,
+    plan_limits:plan (*)
+  `)
+  .eq('id', user!.id)
+  .is('deleted_at', null)
+  .single() as { data: Profile & { plan_limits: PlanLimit } | null }
+
+const navItems = [
+  { name: 'Overview', href: '/dashboard', icon: 'home', badge: null },
+  { name: 'Blocks', href: '/dashboard/blocks', icon: 'blocks', badge: null },
+  { name: 'Analytics', href: '/dashboard/analytics', icon: 'chart', badge: 'Pro' },
+  { name: 'Appearance', href: '/dashboard/appearance', icon: 'palette', badge: null },
+  { name: 'Settings', href: '/dashboard/settings', icon: 'settings', badge: null },
+]
+
+const currentPath = Astro.url.pathname
+---
+
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title} - BioForge</title>
+  <link rel="stylesheet" href="/src/styles/global.css" />
+</head>
+<body class="bg-dark-900 text-white antialiased">
+  <!-- Mobile Header -->
+  <header class="lg:hidden fixed top-0 left-0 right-0 z-50 bg-dark-900/80 backdrop-blur-2xl border-b border-white/[0.08]">
+    <div class="flex items-center justify-between px-4 h-14">
+      <a href="/" class="flex items-center space-x-2 text-lg font-bold">
+        <svg class="w-6 h-6 text-neon-green" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2"/>
+          <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2"/>
+          <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <span>BioForge</span>
+      </a>
+      <button id="mobile-menu-btn" class="p-2 hover:bg-white/5 rounded-lg transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="flex min-h-screen pt-14 lg:pt-0">
+    <!-- Desktop Sidebar -->
+    <aside class="hidden lg:flex fixed inset-y-0 left-0 w-64 bg-dark-800/50 backdrop-blur-xl border-r border-white/[0.08] flex-col">
+      <!-- Logo -->
+      <div class="h-16 flex items-center px-6 border-b border-white/[0.08]">
+        <a href="/" class="flex items-center space-x-2.5 text-lg font-bold group">
+          <svg class="w-6 h-6 text-neon-green transition-transform group-hover:scale-110 duration-300" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2"/>
+            <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2"/>
+            <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          <span>BioForge</span>
+        </a>
+      </div>
+
+      <!-- Plan Badge -->
+      <div class="px-4 pt-4">
+        <div class="px-3 py-2 bg-gradient-to-r from-neon-green/10 to-neon-blue/10 border border-neon-green/20 rounded-lg">
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-gray-400">Plan</span>
+            <span class="text-neon-green font-semibold">{profile?.plan}</span>
+          </div>
+          {profile?.plan === 'Free' && (
+            <a href="/pricing" class="mt-2 block text-xs text-neon-blue hover:text-neon-green transition-colors">
+              Upgrade →
+            </a>
+          )}
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+        {navItems.map((item) => {
+          const isActive = currentPath === item.href || (item.href !== '/dashboard' && currentPath.startsWith(item.href))
+          return (
+            <a
+              href={item.href}
+              class={`group flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                isActive
+                  ? 'bg-white/[0.08] text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-white/[0.04]'
+              }`}
+            >
+              <div class="flex items-center space-x-3">
+                <svg class={`w-4 h-4 transition-transform group-hover:scale-110 ${isActive ? 'text-neon-green' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {item.icon === 'home' && (
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                  )}
+                  {item.icon === 'blocks' && (
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                  )}
+                  {item.icon === 'chart' && (
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                  )}
+                  {item.icon === 'palette' && (
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
+                  )}
+                  {item.icon === 'settings' && (
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                  )}
+                </svg>
+                <span>{item.name}</span>
+              </div>
+              {item.badge && (
+                <span class="px-1.5 py-0.5 text-[10px] font-semibold bg-neon-purple/20 text-neon-purple rounded">
+                  {item.badge}
+                </span>
+              )}
+            </a>
+          )
+        })}
+      </nav>
+
+      <!-- User Profile -->
+      <div class="p-4 border-t border-white/[0.08]">
+        <div class="flex items-center space-x-3 p-2.5 rounded-lg hover:bg-white/[0.04] transition-colors cursor-pointer group">
+          {profile?.avatar_url ? (
+            <img src={profile.avatar_url} alt={profile.display_name || profile.username} class="w-9 h-9 rounded-full ring-2 ring-white/10" />
+          ) : (
+            <div class="w-9 h-9 rounded-full bg-gradient-to-br from-neon-purple/30 to-neon-blue/30 ring-2 ring-white/10 flex items-center justify-center text-sm font-semibold">
+              {(profile?.display_name || profile?.username || 'U')[0].toUpperCase()}
+            </div>
+          )}
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-white truncate">{profile?.display_name || profile?.username}</p>
+            <p class="text-xs text-gray-400 truncate">@{profile?.username}</p>
+          </div>
+          <svg class="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Mobile Sidebar Overlay -->
+    <div id="mobile-sidebar" class="lg:hidden fixed inset-0 z-40 hidden">
+      <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" id="mobile-backdrop"></div>
+      <div class="fixed inset-y-0 left-0 w-64 bg-dark-800 border-r border-white/[0.08] flex flex-col transform -translate-x-full transition-transform duration-300" id="mobile-sidebar-content">
+        <div class="h-14 flex items-center justify-between px-4 border-b border-white/[0.08]">
+          <span class="text-lg font-bold">BioForge</span>
+          <button id="mobile-close" class="p-2 hover:bg-white/5 rounded-lg transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+          {navItems.map((item) => {
+            const isActive = currentPath === item.href || (item.href !== '/dashboard' && currentPath.startsWith(item.href))
+            return (
+              <a href={item.href} class={`flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium ${isActive ? 'bg-white/[0.08] text-white' : 'text-gray-400'}`}>
+                <span>{item.name}</span>
+                {item.badge && <span class="px-1.5 py-0.5 text-[10px] font-semibold bg-neon-purple/20 text-neon-purple rounded">{item.badge}</span>}
+              </a>
+            )
+          })}
+        </nav>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex-1 lg:ml-64">
+      <!-- Top Bar -->
+      <header class="sticky top-14 lg:top-0 z-10 h-16 bg-dark-900/80 backdrop-blur-2xl border-b border-white/[0.08]">
+        <div class="h-full flex items-center justify-between px-4 lg:px-8">
+          <h1 class="text-lg lg:text-xl font-bold text-white">{title}</h1>
+          <div class="flex items-center space-x-3">
+            <a href={`/${profile?.username}`} target="_blank" class="hidden sm:flex items-center space-x-2 px-3 py-1.5 text-xs font-medium text-gray-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] rounded-lg transition-all">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+              </svg>
+              <span>View Page</span>
+            </a>
+          </div>
+        </div>
+      </header>
+
+      <!-- Page Content -->
+      <div class="p-4 lg:p-8 pb-24 lg:pb-8">
+        <slot />
+        <CommandPalette />
+        <OnboardingTour />
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // Mobile menu
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn')
+    const mobileSidebar = document.getElementById('mobile-sidebar')
+    const mobileSidebarContent = document.getElementById('mobile-sidebar-content')
+    const mobileBackdrop = document.getElementById('mobile-backdrop')
+    const mobileClose = document.getElementById('mobile-close')
+
+    function openMobile() {
+      mobileSidebar?.classList.remove('hidden')
+      setTimeout(() => mobileSidebarContent?.classList.remove('-translate-x-full'), 10)
+    }
+
+    function closeMobile() {
+      mobileSidebarContent?.classList.add('-translate-x-full')
+      setTimeout(() => mobileSidebar?.classList.add('hidden'), 300)
+    }
+
+    mobileMenuBtn?.addEventListener('click', openMobile)
+    mobileClose?.addEventListener('click', closeMobile)
+    mobileBackdrop?.addEventListener('click', closeMobile)
+  </script>
+</body>
+</html>

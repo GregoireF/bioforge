@@ -1,0 +1,82 @@
+---
+import { cn } from '@/lib/utils/cn';
+
+interface Props {
+  label?: string;
+  error?: string;
+  hint?: string;
+  leftIcon?: string;
+  rightIcon?: string;
+  class?: string;
+  type?: string;
+  required?: boolean;
+}
+
+const {
+  label,
+  error,
+  hint,
+  leftIcon,
+  rightIcon,
+  class: className,
+  type = 'text',
+  required = false,
+  ...rest
+} = Astro.props;
+
+const hasError = !!error;
+
+const inputClasses = cn(
+  'w-full px-4 py-3 glass border rounded-xl text-white placeholder-gray-500 transition-all',
+  'focus:outline-none focus:ring-2',
+  hasError 
+    ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/20' 
+    : 'border-white/10 focus:border-neon-green/50 focus:ring-neon-green/20',
+  leftIcon && 'pl-11',
+  rightIcon && 'pr-11',
+  className
+);
+---
+
+<div class="space-y-2">
+  {label && (
+    <label class="block text-sm font-medium text-gray-300">
+      {label}
+      {required && <span class="text-red-400 ml-1">*</span>}
+    </label>
+  )}
+
+  <div class="relative">
+    {leftIcon && (
+      <div class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+        <slot name="left-icon" />
+      </div>
+    )}
+
+    <input
+      type={type}
+      class={inputClasses}
+      required={required}
+      {...rest}
+    />
+
+    {rightIcon && (
+      <div class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+        <slot name="right-icon" />
+      </div>
+    )}
+  </div>
+
+  {error && (
+    <p class="text-sm text-red-400 flex items-center space-x-1">
+      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+      </svg>
+      <span>{error}</span>
+    </p>
+  )}
+
+  {hint && !error && (
+    <p class="text-xs text-gray-500">{hint}</p>
+  )}
+</div>

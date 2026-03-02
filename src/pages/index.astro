@@ -1,0 +1,108 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import Header from '@/components/layout/Header.astro';
+import HowItWorks from '@/components/landing/HowItWorks.astro'
+import Hero from '@/components/landing/Hero.astro';
+import Testimonials from '@/components/landing/Testimonials.astro';
+import CreatorsSection from '@/components/landing/CreatorsSection.astro';
+import FAQ from '@/components/landing/FAQ.astro';
+import CTA from '@/components/landing/CTA.astro';
+import FloatingCTA from '@/components/landing/FloatingCTA.astro';
+import Footer from '@/components/layout/Footer.astro';
+---
+
+<BaseLayout title="BioForge - Level Up Your Link-in-Bio">
+  <Header />
+  
+  <main>
+    <Hero />
+
+    <HowItWorks />
+
+    <Testimonials client:visible />
+    
+    <CreatorsSection client:visible />
+
+    <FAQ client:visible />
+
+    <CTA client:visible />
+
+    <FloatingCTA client:idle />
+  </main>
+
+  <Footer />
+</BaseLayout>
+
+<script defer>
+  import { CountUp } from 'countup.js';
+
+  // Exécute sur chaque navigation (View Transitions friendly)
+  document.addEventListener('astro:after-swap', () => {
+    initCountUps();
+  });
+
+  // Aussi au load initial
+  document.addEventListener('DOMContentLoaded', () => {
+    initCountUps();
+  });
+
+  function initCountUps() {
+    const counters = document.querySelectorAll('.count-up:not(.count-up-initialized)');
+    
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const el = entry.target;
+          const count = parseFloat(el.dataset.count || '0');
+          const suffix = el.dataset.suffix || '';
+
+          const countUp = new CountUp(el, count, {
+            duration: 2,
+            useEasing: true,
+            suffix,
+          });
+
+          if (!countUp.error) {
+            countUp.start();
+            el.classList.add('count-up-initialized'); // évite de recommencer
+          } else {
+            el.textContent = count + suffix; // fallback
+          }
+
+          observer.unobserve(el);
+        }
+      });
+    }, { threshold: 0.4, rootMargin: '0px 0px 100px 0px' });
+
+    counters.forEach(c => observer.observe(c));
+  }
+</script>
+
+<style>
+  @keyframes blob {
+    0%, 100% {
+      transform: translate(0, 0) scale(1);
+    }
+    25% {
+      transform: translate(20px, -50px) scale(1.1);
+    }
+    50% {
+      transform: translate(-20px, 20px) scale(0.9);
+    }
+    75% {
+      transform: translate(50px, 50px) scale(1.05);
+    }
+  }
+
+  .animate-blob {
+    animation: blob 20s ease-in-out infinite;
+  }
+
+  .animation-delay-2000 {
+    animation-delay: 2s;
+  }
+
+  .animation-delay-4000 {
+    animation-delay: 4s;
+  }
+</style>

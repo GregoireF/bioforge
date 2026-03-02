@@ -1,0 +1,215 @@
+---
+const creators = [
+  {
+    name: 'Sunseamor65',
+    category: 'Pro Gamer',
+    avatar: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    verified: true,
+  },
+  {
+    name: 'Prozer flow',
+    category: 'Streamer',
+    avatar: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+    verified: true,
+  },
+  {
+    name: 'Sowser05',
+    category: 'Creator',
+    avatar: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+    verified: false,
+  },
+  {
+    name: 'Eomy6ooa',
+    category: 'Artist',
+    avatar: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+    verified: false,
+  },
+  {
+    name: 'Yordelor fror',
+    category: 'Influencer',
+    avatar: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+    verified: true,
+  },
+  {
+    name: 'Arosee Edaces',
+    category: 'Designer',
+    avatar: 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
+    verified: false,
+  },
+  {
+    name: 'Free 8Ran',
+    category: 'Developer',
+    avatar: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+    verified: true,
+  },
+];
+---
+
+<section class="relative py-28 overflow-hidden" data-scroll-section>
+  <!-- Background -->
+  <div class="absolute inset-0 bg-dark-800/30 backdrop-blur-sm"></div>
+  
+  <!-- Animated gradient orbs -->
+  <div class="absolute inset-0 overflow-hidden opacity-30">
+    <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-neon-purple rounded-full blur-[150px] animate-pulse-slow"></div>
+    <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-neon-green rounded-full blur-[150px] animate-pulse-slow" style="animation-delay: 1.5s;"></div>
+  </div>
+
+  <!-- Content -->
+  <div class="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8">
+    <!-- Section Header -->
+    <div class="text-center max-w-4xl mx-auto mb-16 reveal">
+      <div class="inline-flex items-center space-x-2 px-4 py-2 glass rounded-full text-sm text-neon-green mb-6">
+        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
+        </svg>
+        <span>Trusted by thousands</span>
+      </div>
+      
+      <h2 class="text-5xl sm:text-6xl font-display font-bold text-white mb-6">
+        Join Thousands of
+        <span class="block mt-2 text-transparent bg-clip-text bg-gradient-to-r from-neon-green to-neon-purple animate-gradient text-glow-green">
+          Creators
+        </span>
+      </h2>
+      <p class="text-xl text-gray-400 leading-relaxed">
+        From gamers to influencers, creators worldwide trust BioForge to level up their online presence
+      </p>
+    </div>
+
+    <!-- Creators Grid with 3D hover -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-16 reveal">
+      {creators.map((creator, index) => (
+        <div 
+          class="group relative glass rounded-2xl p-5 border border-white/5 hover:border-neon-green/30 transition-all duration-500 cursor-pointer transform hover:scale-105 hover:z-10 tilt-card"
+          data-tilt
+          data-tilt-max="10"
+          style={`animation-delay: ${index * 0.1}s`}
+        >
+          <!-- Avatar -->
+          <div class="relative mb-4">
+            <div 
+              class="w-20 h-20 mx-auto rounded-full group-hover:scale-110 transition-transform duration-500 glow-green"
+              style={`background: ${creator.avatar}`}
+            >
+            </div>
+            {creator.verified && (
+              <div class="absolute -bottom-1 -right-1 bg-neon-green rounded-full p-1.5 glow-green">
+                <svg class="w-3.5 h-3.5 text-dark-900" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+              </div>
+            )}
+            <!-- Status indicator -->
+            <div class="absolute -top-1 -left-1 w-4 h-4 bg-neon-green rounded-full border-2 border-dark-800 animate-pulse"></div>
+          </div>
+          
+          <!-- Name and Category -->
+          <div class="text-center space-y-1.5">
+            <p class="text-sm font-semibold text-white truncate group-hover:text-neon-green transition-colors smooth-font">
+              {creator.name}
+            </p>
+            <p class="text-xs text-gray-500 truncate group-hover:text-gray-400 transition-colors">
+              {creator.category}
+            </p>
+          </div>
+
+          <!-- Hover effect overlay -->
+          <div class="absolute inset-0 bg-gradient-to-br from-neon-green/5 to-neon-purple/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl pointer-events-none"></div>
+          
+          <!-- Glow effect on hover -->
+          <div class="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 glow-green"></div>
+        </div>
+      ))}
+    </div>
+
+    <!-- Stats with Animated Counters -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-8 max-w-5xl mx-auto reveal">
+      <!-- Stat 1 -->
+      <div class="glass-strong rounded-3xl p-8 text-center border border-white/10 hover:border-neon-green/30 transition-all duration-500 group cursor-pointer transform hover:scale-105">
+        <div class="relative inline-block">
+          <div class="text-6xl font-display font-bold mb-2">
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-neon-green to-neon-blue text-glow-green count-up" data-count="10" data-suffix="K+">0</span>
+          </div>
+          <!-- Animated ring -->
+          <div class="absolute inset-0 rounded-full border-2 border-neon-green/30 animate-ping opacity-0 group-hover:opacity-100"></div>
+        </div>
+        <div class="text-lg text-gray-400 font-medium group-hover:text-white transition-colors">Active Creators</div>
+        <p class="text-sm text-gray-500 mt-2">Growing daily</p>
+      </div>
+
+      <!-- Stat 2 -->
+      <div class="glass-strong rounded-3xl p-8 text-center border border-white/10 hover:border-neon-purple/30 transition-all duration-500 group cursor-pointer transform hover:scale-105">
+        <div class="relative inline-block">
+          <div class="text-6xl font-display font-bold mb-2">
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-neon-purple to-neon-pink text-glow-purple count-up" data-count="50" data-suffix="M+">0</span>
+          </div>
+          <div class="absolute inset-0 rounded-full border-2 border-neon-purple/30 animate-ping opacity-0 group-hover:opacity-100"></div>
+        </div>
+        <div class="text-lg text-gray-400 font-medium group-hover:text-white transition-colors">Monthly Clicks</div>
+        <p class="text-sm text-gray-500 mt-2">And counting</p>
+      </div>
+
+      <!-- Stat 3 -->
+      <div class="glass-strong rounded-3xl p-8 text-center border border-white/10 hover:border-neon-blue/30 transition-all duration-500 group cursor-pointer transform hover:scale-105">
+        <div class="relative inline-block">
+          <div class="text-6xl font-display font-bold mb-2">
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-neon-blue to-neon-green text-glow-blue count-up" data-count="99.9" data-suffix="%">0</span>
+          </div>
+          <div class="absolute inset-0 rounded-full border-2 border-neon-blue/30 animate-ping opacity-0 group-hover:opacity-100"></div>
+        </div>
+        <div class="text-lg text-gray-400 font-medium group-hover:text-white transition-colors">Uptime</div>
+        <p class="text-sm text-gray-500 mt-2">Enterprise grade</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  import VanillaTilt from 'vanilla-tilt';
+  import { CountUp } from 'countup.js';
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // Tilt effect on creator cards
+    const tiltElements = document.querySelectorAll('[data-tilt]');
+    tiltElements.forEach((element) => {
+      VanillaTilt.init(element as HTMLElement, {
+        max: 10,
+        speed: 800,
+        glare: true,
+        'max-glare': 0.2
+      });
+    });
+
+    // Animated counters
+    const counters = document.querySelectorAll('.count-up');
+    const observerOptions = {
+      threshold: 0.5
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const element = entry.target as HTMLElement;
+          const count = parseFloat(element.dataset.count || '0');
+          const suffix = element.dataset.suffix || '';
+          
+          const countUp = new CountUp(element, count, {
+            duration: 2.5,
+            useEasing: true,
+            useGrouping: true,
+            separator: ',',
+            decimal: '.',
+            suffix: suffix,
+            decimalPlaces: count % 1 !== 0 ? 1 : 0
+          });
+          
+          countUp.start();
+          observer.unobserve(element);
+        }
+      });
+    }, observerOptions);
+
+    counters.forEach(counter => observer.observe(counter));
+  });
+</script>

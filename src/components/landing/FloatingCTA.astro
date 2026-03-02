@@ -1,0 +1,119 @@
+---
+// Floating CTA that appears intelligently during scroll
+---
+
+<div 
+  id="floating-cta"
+  class="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-40 opacity-0 pointer-events-none transition-all duration-500"
+>
+  <div class="glass-strong rounded-2xl px-6 py-4 border border-neon-green/30 glow-green">
+    <div class="flex items-center space-x-4">
+      <div class="hidden sm:block">
+        <p class="text-sm text-gray-300 mb-1">Ready to level up?</p>
+        <p class="text-xs text-gray-500">Join 10K+ creators today</p>
+      </div>
+      
+      <a
+        href="/signup"
+        class="magnetic inline-flex items-center px-6 py-3 bg-gradient-to-r from-neon-green to-neon-blue text-dark-900 font-semibold rounded-xl hover:opacity-90 transition-all duration-300 text-sm group whitespace-nowrap"
+      >
+        <span>Start Free</span>
+        <svg class="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+        </svg>
+      </a>
+
+      <button 
+        id="close-floating-cta"
+        class="p-2 text-gray-400 hover:text-white transition-colors"
+        aria-label="Close"
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { gsap } from 'gsap';
+
+  const floatingCta = document.getElementById('floating-cta');
+  const closeCta = document.getElementById('close-floating-cta');
+  let ctaClosed = false;
+  let lastShowTime = 0;
+
+  function handleFloatingCta() {
+    if (ctaClosed) return;
+
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const windowHeight = window.innerHeight;
+    const documentHeight = document.documentElement.scrollHeight;
+    const scrollPercent = (scrollTop / (documentHeight - windowHeight)) * 100;
+
+    // Show CTA when:
+    // 1. User has scrolled past 30%
+    // 2. Not near the bottom (where footer CTA is)
+    // 3. Not shown recently (cooldown)
+    const now = Date.now();
+    const shouldShow = scrollPercent > 30 && scrollPercent < 85 && (now - lastShowTime > 3000);
+
+    if (shouldShow && floatingCta?.classList.contains('opacity-0')) {
+      floatingCta.classList.remove('opacity-0', 'pointer-events-none');
+      floatingCta.classList.add('opacity-100');
+      
+      gsap.from(floatingCta, {
+        y: 20,
+        duration: 0.5,
+        ease: 'back.out(1.7)'
+      });
+      
+      lastShowTime = now;
+    } else if (!shouldShow && !floatingCta?.classList.contains('opacity-0')) {
+      floatingCta?.classList.add('opacity-0', 'pointer-events-none');
+      floatingCta?.classList.remove('opacity-100');
+    }
+  }
+
+  // Close button
+  closeCta?.addEventListener('click', () => {
+    ctaClosed = true;
+    floatingCta?.classList.add('opacity-0', 'pointer-events-none');
+    gsap.to(floatingCta, {
+      y: 20,
+      duration: 0.3,
+      ease: 'power2.in'
+    });
+  });
+
+  // Listen to scroll
+  window.addEventListener('scroll', handleFloatingCta, { passive: true });
+
+  // Magnetic effect
+  const magneticBtn = floatingCta?.querySelector('.magnetic');
+  if (magneticBtn) {
+    magneticBtn.addEventListener('mousemove', (e: Event) => {
+      const mouseEvent = e as MouseEvent;
+      const rect = (magneticBtn as HTMLElement).getBoundingClientRect();
+      const x = mouseEvent.clientX - rect.left - rect.width / 2;
+      const y = mouseEvent.clientY - rect.top - rect.height / 2;
+      
+      gsap.to(magneticBtn, {
+        x: x * 0.3,
+        y: y * 0.3,
+        duration: 0.3,
+        ease: 'power2.out'
+      });
+    });
+    
+    magneticBtn.addEventListener('mouseleave', () => {
+      gsap.to(magneticBtn, {
+        x: 0,
+        y: 0,
+        duration: 0.3,
+        ease: 'elastic.out(1, 0.5)'
+      });
+    });
+  }
+</script>

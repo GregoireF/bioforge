@@ -1,0 +1,217 @@
+---
+//
+---
+
+<div id="onboarding-tour" class="hidden">
+  <!-- Overlay -->
+  <div id="tour-overlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9998]"></div>
+
+  <!-- Spotlight (highlights current element) -->
+  <div id="tour-spotlight" class="fixed z-[9999] pointer-events-none"></div>
+
+  <!-- Tooltip -->
+  <div id="tour-tooltip" class="fixed z-[9999] glass-strong border border-neon-green/30 rounded-2xl p-6 max-w-md shadow-2xl">
+    <div class="mb-4">
+      <h3 id="tour-title" class="text-xl font-bold text-white mb-2"></h3>
+      <p id="tour-description" class="text-gray-300"></p>
+    </div>
+
+    <div class="flex items-center justify-between">
+      <div class="text-sm text-gray-400">
+        <span id="tour-step-current">1</span> of <span id="tour-step-total">5</span>
+      </div>
+
+      <div class="flex items-center space-x-2">
+        <button id="tour-skip" class="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">
+          Skip
+        </button>
+        <button id="tour-prev" class="px-4 py-2 text-sm glass border border-white/10 rounded-lg hover:bg-white/5 transition-colors">
+          Previous
+        </button>
+        <button id="tour-next" class="px-4 py-2 text-sm bg-neon-green text-black font-medium rounded-lg hover:bg-neon-green/90 transition-colors">
+          Next
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Onboarding tour steps
+  const steps = [
+    {
+      title: '👋 Welcome to BioForge!',
+      description: 'Let\'s take a quick tour to help you get started. We\'ll show you the key features.',
+      target: null, // No specific target, just show tooltip
+      position: 'center'
+    },
+    {
+      title: '📦 Manage Your Blocks',
+      description: 'Click here to add, edit, and organize your blocks. Drag and drop to reorder them.',
+      target: 'a[href="/dashboard/blocks"]',
+      position: 'right'
+    },
+    {
+      title: '🎨 Customize Appearance',
+      description: 'Make your profile unique! Choose themes, colors, and styles that match your brand.',
+      target: 'a[href="/dashboard/appearance"]',
+      position: 'right'
+    },
+    {
+      title: '📊 Track Analytics',
+      description: 'See how many people visit your profile and which blocks get the most clicks.',
+      target: 'a[href="/dashboard/analytics"]',
+      position: 'right'
+    },
+    {
+      title: '🚀 You\'re All Set!',
+      description: 'That\'s it! Start building your page and share it with the world. Press ⌘K anytime for quick actions.',
+      target: null,
+      position: 'center'
+    }
+  ];
+
+  let currentStep = 0;
+
+  // Elements
+  const tour = document.getElementById('onboarding-tour');
+  const overlay = document.getElementById('tour-overlay');
+  const spotlight = document.getElementById('tour-spotlight');
+  const tooltip = document.getElementById('tour-tooltip');
+  const titleEl = document.getElementById('tour-title');
+  const descEl = document.getElementById('tour-description');
+  const stepCurrent = document.getElementById('tour-step-current');
+  const stepTotal = document.getElementById('tour-step-total');
+  const skipBtn = document.getElementById('tour-skip');
+  const prevBtn = document.getElementById('tour-prev');
+  const nextBtn = document.getElementById('tour-next');
+
+  // Check if tour was completed
+  function checkTourCompleted() {
+    return localStorage.getItem('onboarding-completed') === 'true';
+  }
+
+  // Start tour
+  function startTour() {
+    if (checkTourCompleted()) return;
+
+    currentStep = 0;
+    tour?.classList.remove('hidden');
+    showStep(currentStep);
+  }
+
+  // Show step
+  function showStep(index: number) {
+    const step = steps[index];
+    if (!step) return;
+
+    // Update content
+    if (titleEl) titleEl.textContent = step.title;
+    if (descEl) descEl.textContent = step.description;
+    if (stepCurrent) stepCurrent.textContent = (index + 1).toString();
+    if (stepTotal) stepTotal.textContent = steps.length.toString();
+
+    // Update buttons
+    if (prevBtn) {
+      prevBtn.style.display = index === 0 ? 'none' : 'block';
+    }
+    if (nextBtn) {
+      nextBtn.textContent = index === steps.length - 1 ? 'Finish' : 'Next';
+    }
+
+    // Position tooltip and spotlight
+    if (step.target) {
+      const target = document.querySelector(step.target) as HTMLElement;
+      if (target) {
+        positionElements(target, step.position);
+      }
+    } else {
+      // Center position
+      if (tooltip) {
+        tooltip.style.top = '50%';
+        tooltip.style.left = '50%';
+        tooltip.style.transform = 'translate(-50%, -50%)';
+      }
+      if (spotlight) {
+        spotlight.style.display = 'none';
+      }
+    }
+  }
+
+  // Position elements
+  function positionElements(target: HTMLElement, position: string) {
+    const rect = target.getBoundingClientRect();
+    const padding = 8;
+
+    // Spotlight
+    if (spotlight) {
+      spotlight.style.display = 'block';
+      spotlight.style.top = `${rect.top - padding}px`;
+      spotlight.style.left = `${rect.left - padding}px`;
+      spotlight.style.width = `${rect.width + padding * 2}px`;
+      spotlight.style.height = `${rect.height + padding * 2}px`;
+      spotlight.style.border = '3px solid #00ff9d';
+      spotlight.style.borderRadius = '12px';
+      spotlight.style.boxShadow = '0 0 0 9999px rgba(0, 0, 0, 0.6)';
+    }
+
+    // Tooltip
+    if (tooltip) {
+      if (position === 'right') {
+        tooltip.style.top = `${rect.top + rect.height / 2}px`;
+        tooltip.style.left = `${rect.right + 20}px`;
+        tooltip.style.transform = 'translateY(-50%)';
+      } else if (position === 'bottom') {
+        tooltip.style.top = `${rect.bottom + 20}px`;
+        tooltip.style.left = `${rect.left + rect.width / 2}px`;
+        tooltip.style.transform = 'translateX(-50%)';
+      }
+    }
+  }
+
+  // Next step
+  function nextStep() {
+    if (currentStep < steps.length - 1) {
+      currentStep++;
+      showStep(currentStep);
+    } else {
+      completeTour();
+    }
+  }
+
+  // Previous step
+  function prevStep() {
+    if (currentStep > 0) {
+      currentStep--;
+      showStep(currentStep);
+    }
+  }
+
+  // Complete tour
+  function completeTour() {
+    localStorage.setItem('onboarding-completed', 'true');
+    tour?.classList.add('hidden');
+  }
+
+  // Skip tour
+  function skipTour() {
+    completeTour();
+  }
+
+  // Event listeners
+  nextBtn?.addEventListener('click', nextStep);
+  prevBtn?.addEventListener('click', prevStep);
+  skipBtn?.addEventListener('click', skipTour);
+
+  // Close on ESC
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !tour?.classList.contains('hidden')) {
+      skipTour();
+    }
+  });
+
+  // Start tour on page load (after 1 second)
+  setTimeout(() => {
+    startTour();
+  }, 1000);
+</script>

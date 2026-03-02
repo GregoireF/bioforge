@@ -1,0 +1,140 @@
+---
+import type { HTMLAttributes } from 'astro/types';
+export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'success';
+export type ButtonSize = 'sm' | 'md' | 'lg' | 'icon';
+export type ButtonType = 'button' | 'submit' | 'reset';
+
+export interface Props extends HTMLAttributes<'button' | 'a'> {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  href?: string;
+  disabled?: boolean;
+  loading?: boolean;
+  asChild?: boolean;
+  class?: string;
+  type?: ButtonType;
+  ariaLabel?: string;
+  iconLeft?: boolean;
+  iconRight?: boolean;
+  [key: string]: any;
+}
+
+const {
+  variant = 'primary',
+  size = 'md',
+  href,
+  disabled = false,
+  loading = false,
+  asChild = false,
+  class: userClass = '',
+  type = 'button',
+  ariaLabel,
+  srLabel,
+  ...props
+} = Astro.props;
+
+const isLink = !!href && !disabled && !loading && !asChild;
+const Tag = asChild ? 'slot' : (isLink ? 'a' : 'button');
+
+// Helper pour merger les classes proprement (tu peux aussi importer { cn } depuis un utilitaire)
+const cn = (...classes: (string | false | undefined)[]) => 
+  classes.filter(Boolean).join(' ').trim();
+
+const baseStyles = cn(
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap',
+  'rounded-md text-smfont-medium rounded-lg transition-colors',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neon-green focus-visible:ring-offset-dark-900 focus-visible:ring-opacity-70',
+  'disabled:opacity-55 disabled:pointer-events-none disabled:cursor-not-allowed',
+  'aria-disabled:opacity-55 aria-disabled:pointer-events-none aria-disabled:cursor-not-allowed',
+  'select-none touch-manipulation',
+  '[&>svg]:shrink-0',
+  'motion-reduce:transition-none',
+);
+
+const variants = {
+  primary: cn(
+    'bg-neon-green text-dark-900 hover:bg-neon-green/92 active:bg-neon-green/85',
+    'shadow-md shadow-neon-green/25 hover:shadow-lg hover:shadow-neon-green/35'
+  ),
+  secondary: cn(
+    'bg-neon-purple text-white hover:bg-neon-purple/92 active:bg-neon-purple/85',
+    'shadow-md shadow-neon-purple/25 hover:shadow-lg hover:shadow-neon-purple/35'
+  ),
+  outline: cn(
+    'border-2 border-neon-green text-neon-green',
+    'hover:bg-neon-green/10 active:bg-neon-green/20',
+    'hover:border-neon-green/90 active:border-neon-green/80'
+  ),
+  ghost: cn(
+    'text-current hover:bg-white/8 active:bg-white/14',
+    'dark:hover:bg-white/10 dark:active:bg-white/18'
+  ),
+  destructive: cn(
+    'bg-red-600 hover:bg-red-650 active:bg-red-700 text-white',
+    'shadow-md shadow-red-600/25 hover:shadow-red-700/35'
+  ),
+  success: cn(
+    'bg-emerald-600 hover:bg-emerald-650 active:bg-emerald-700 text-white',
+    'shadow-md shadow-emerald-600/25 hover:shadow-emerald-700/35'
+  ),
+};
+
+const sizes = {
+  sm: 'px-4 py-2 text-sm',
+  md: 'px-6 py-2.5 text-base',
+  lg: 'px-8 py-3.5 text-lg',
+  icon: 'h-10 w-10 p-0 text-xl',
+};
+
+const buttonClasses = cn(
+  baseStyles,
+  variants[variant],
+  sizes[size],
+  loading && 'relative text-transparent hover:text-transparent cursor-wait',
+  userClass
+);
+---
+
+<Tag
+  href={isLink ? href : undefined}
+  type={isLink ? undefined : type}
+  disabled={!isLink && (disabled || loading)}
+  aria-disabled={disabled || loading}
+  aria-label={ariaLabel}
+  aria-busy={loading}
+
+  role={isLink ? "button" : undefined}
+  class={buttonClasses}
+  data-state={loading ? 'loading' : undefined}
+  {...props}
+>
+  {
+    loading && (
+      <span class="absolute inset-0 z-10 flex items-center justify-center">
+        <svg
+          class="animate-spin h-5 w-5 text-current"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <circle class="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+          <path
+            class="opacity-80"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8v8h8a8 8 0 01-16 0z"
+          />
+        </svg>
+      </span>
+    )
+  }
+
+  <slot name="icon" />
+  <slot />
+
+  {
+    srLabel && (
+      <span class="sr-only">{srLabel}</span>
+    )
+  }
+</Tag>

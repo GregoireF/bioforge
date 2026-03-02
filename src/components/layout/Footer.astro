@@ -1,0 +1,360 @@
+---
+const currentYear = new Date().getFullYear();
+
+const footerLinks = {
+  product: [
+    { label: 'Features', href: '/features' },
+    { label: 'Pricing', href: '/pricing' },
+    { label: 'Templates', href: '/templates' },
+    { label: 'Integrations', href: '/integrations' },
+  ],
+  company: [
+    { label: 'About', href: '/company/about' },
+    { label: 'Blog', href: '/company/blog' },
+    { label: 'Careers', href: '/company/careers' },
+    { label: 'Contact', href: '/company/contact' },
+  ],
+  resources: [
+    { label: 'Documentation', href: '/docs' },
+    { label: 'Help Center', href: '/support/help' },
+    { label: 'Community', href: '/community' },
+    { label: 'Status', href: '/status' },
+  ],
+  legal: [
+    { label: 'Privacy', href: '/legal/privacy' },
+    { label: 'Terms', href: '/legal/terms' },
+    { label: 'Security', href: '/legal/security' },
+    { label: 'Cookies', href: '/legal/cookies' },
+  ],
+};
+
+const socialLinks = [
+  {
+    name: 'Twitter',
+    href: 'https://twitter.com/bioforge',
+    icon: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/></svg>',
+    color: 'hover:text-[#1DA1F2]'
+  },
+  {
+    name: 'Discord',
+    href: 'https://discord.gg/bioforge',
+    icon: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03z"/></svg>',
+    color: 'hover:text-[#5865F2]'
+  },
+  {
+    name: 'GitHub',
+    href: 'https://github.com/bioforge',
+    icon: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clip-rule="evenodd"/></svg>',
+    color: 'hover:text-white'
+  },
+  {
+    name: 'Instagram',
+    href: 'https://instagram.com/bioforge',
+    icon: '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M12.315 2c2.43 0 2.784.013 3.808.06 1.064.049 1.791.218 2.427.465a4.902 4.902 0 011.772 1.153 4.902 4.902 0 011.153 1.772c.247.636.416 1.363.465 2.427.048 1.067.06 1.407.06 4.123v.08c0 2.643-.012 2.987-.06 4.043-.049 1.064-.218 1.791-.465 2.427a4.902 4.902 0 01-1.153 1.772 4.902 4.902 0 01-1.772 1.153c-.636.247-1.363.416-2.427.465-1.067.048-1.407.06-4.123.06h-.08c-2.643 0-2.987-.012-4.043-.06-1.064-.049-1.791-.218-2.427-.465a4.902 4.902 0 01-1.772-1.153 4.902 4.902 0 01-1.153-1.772c-.247-.636-.416-1.363-.465-2.427-.047-1.024-.06-1.379-.06-3.808v-.63c0-2.43.013-2.784.06-3.808.049-1.064.218-1.791.465-2.427a4.902 4.902 0 011.153-1.772A4.902 4.902 0 015.45 2.525c.636-.247 1.363-.416 2.427-.465C8.901 2.013 9.256 2 11.685 2h.63z" clip-rule="evenodd"/></svg>',
+    color: 'hover:text-[#E4405F]'
+  },
+];
+---
+
+<footer class="relative bg-dark-900 overflow-hidden" data-scroll-section>
+  <!-- Animated Wave -->
+  <div class="absolute top-0 left-0 right-0 overflow-hidden h-24 -mt-px">
+    <svg class="absolute w-full h-full" viewBox="0 0 1200 120" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="wave-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" style="stop-color:#00ff9d;stop-opacity:0.3" />
+          <stop offset="50%" style="stop-color:#bf00ff;stop-opacity:0.3" />
+          <stop offset="100%" style="stop-color:#00d4ff;stop-opacity:0.3" />
+        </linearGradient>
+      </defs>
+      <path 
+        d="M0,40 C300,90 600,10 900,50 C1050,70 1150,50 1200,40 L1200,00 L0,0 Z" 
+        fill="url(#wave-gradient)"
+        class="wave-path"
+      >
+        <animate
+          attributeName="d"
+          dur="10s"
+          repeatCount="indefinite"
+          values="
+            M0,40 C300,90 600,10 900,50 C1050,70 1150,50 1200,40 L1200,00 L0,0 Z;
+            M0,50 C300,10 600,80 900,40 C1050,60 1150,70 1200,50 L1200,00 L0,0 Z;
+            M0,40 C300,90 600,10 900,50 C1050,70 1150,50 1200,40 L1200,00 L0,0 Z
+          "
+        />
+      </path>
+    </svg>
+  </div>
+
+  <!-- Background gradient -->
+  <div class="absolute inset-0 bg-gradient-to-t from-dark-900 via-dark-800 to-transparent opacity-50 pointer-events-none"></div>
+
+  <div class="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-8">
+    <!-- Newsletter Section -->
+    <div class="max-w-4xl mx-auto mb-20">
+      <div class="glass-strong rounded-3xl p-8 md:p-12 border border-white/10 text-center reveal">
+        <div class="mb-6">
+          <h3 class="text-3xl md:text-4xl font-display font-bold text-white mb-3">
+            Stay in the
+            <span class="text-transparent bg-clip-text bg-gradient-to-r from-neon-green to-neon-blue text-glow-green">
+              Loop
+            </span>
+          </h3>
+          <p class="text-gray-400 text-lg">Get the latest updates, tips, and exclusive features delivered to your inbox.</p>
+        </div>
+        
+        <!-- Newsletter Form -->
+        <form class="flex flex-col sm:flex-row gap-3 max-w-2xl mx-auto" id="newsletter-form">
+          <input 
+            type="email" 
+            placeholder="Enter your email" 
+            required
+            class="flex-1 px-6 py-4 glass rounded-xl border border-white/10 text-white placeholder-gray-500 focus:border-neon-green/50 focus:outline-none focus:ring-2 focus:ring-neon-green/20 transition-all duration-300"
+          />
+          <button 
+            type="submit"
+            class="px-8 py-4 bg-gradient-to-r from-neon-green to-neon-blue text-dark-900 font-semibold rounded-xl hover:opacity-90 transition-all duration-300 magnetic glow-green"
+          >
+            Subscribe
+            <svg class="inline w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+            </svg>
+          </button>
+        </form>
+
+        <!-- Success message -->
+        <div id="newsletter-success" class="hidden mt-4 p-4 glass rounded-xl border border-neon-green/30">
+          <p class="text-neon-green font-medium">🎉 Thanks for subscribing! Check your email.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Footer Content -->
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-8 lg:gap-12 mb-12">
+      <!-- Brand Column -->
+      <div class="col-span-2">
+        <a href="/" class="inline-flex items-center space-x-3 mb-6 group">
+          <svg 
+            class="w-10 h-10 text-neon-green transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path 
+              d="M12 2L2 7L12 12L22 7L12 2Z" 
+              stroke="currentColor" 
+              stroke-width="2" 
+              stroke-linecap="round" 
+              stroke-linejoin="round"
+            />
+            <path 
+              d="M2 17L12 22L22 17" 
+              stroke="currentColor" 
+              stroke-width="2" 
+              stroke-linecap="round" 
+              stroke-linejoin="round"
+            />
+            <path 
+              d="M2 12L12 17L22 12" 
+              stroke="currentColor" 
+              stroke-width="2" 
+              stroke-linecap="round" 
+              stroke-linejoin="round"
+            />
+          </svg>
+          <span class="text-2xl font-display font-bold text-white text-glow-green">BIOFORGE</span>
+        </a>
+        <p class="text-sm text-gray-400 mb-6 leading-relaxed max-w-xs">
+          Level up your link-in-bio with modern design, powerful analytics, and seamless integrations.
+        </p>
+        
+        <!-- Social Links with 3D effect -->
+        <div class="flex space-x-3">
+          {socialLinks.map((social) => (
+            <a
+              href={social.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              class={`group relative p-3 glass rounded-xl border border-white/5 hover:border-neon-green/30 transition-all duration-300 ${social.color} transform hover:scale-110 hover:-translate-y-1`}
+              aria-label={social.name}
+            >
+              <Fragment set:html={social.icon} />
+              <!-- Glow effect -->
+              <div class="absolute inset-0 bg-neon-green/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 blur-md -z-10"></div>
+            </a>
+          ))}
+        </div>
+      </div>
+
+      <!-- Links Columns -->
+      <div>
+        <h3 class="text-sm font-semibold text-white uppercase tracking-wider mb-4 flex items-center">
+          <span class="w-2 h-2 bg-neon-green rounded-full mr-2"></span>
+          Product
+        </h3>
+        <ul class="space-y-3">
+          {footerLinks.product.map((link) => (
+            <li>
+              <a href={link.href} class="text-sm text-gray-400 hover:text-neon-green transition-colors duration-200 flex items-center group">
+                <span class="w-0 group-hover:w-2 h-0.5 bg-neon-green mr-0 group-hover:mr-2 transition-all duration-300"></span>
+                {link.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div>
+        <h3 class="text-sm font-semibold text-white uppercase tracking-wider mb-4 flex items-center">
+          <span class="w-2 h-2 bg-neon-purple rounded-full mr-2"></span>
+          Company
+        </h3>
+        <ul class="space-y-3">
+          {footerLinks.company.map((link) => (
+            <li>
+              <a href={link.href} class="text-sm text-gray-400 hover:text-neon-purple transition-colors duration-200 flex items-center group">
+                <span class="w-0 group-hover:w-2 h-0.5 bg-neon-purple mr-0 group-hover:mr-2 transition-all duration-300"></span>
+                {link.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div>
+        <h3 class="text-sm font-semibold text-white uppercase tracking-wider mb-4 flex items-center">
+          <span class="w-2 h-2 bg-neon-blue rounded-full mr-2"></span>
+          Resources
+        </h3>
+        <ul class="space-y-3">
+          {footerLinks.resources.map((link) => (
+            <li>
+              <a href={link.href} class="text-sm text-gray-400 hover:text-neon-blue transition-colors duration-200 flex items-center group">
+                <span class="w-0 group-hover:w-2 h-0.5 bg-neon-blue mr-0 group-hover:mr-2 transition-all duration-300"></span>
+                {link.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div>
+        <h3 class="text-sm font-semibold text-white uppercase tracking-wider mb-4 flex items-center">
+          <span class="w-2 h-2 bg-neon-pink rounded-full mr-2"></span>
+          Legal
+        </h3>
+        <ul class="space-y-3">
+          {footerLinks.legal.map((link) => (
+            <li>
+              <a href={link.href} class="text-sm text-gray-400 hover:text-neon-pink transition-colors duration-200 flex items-center group">
+                <span class="w-0 group-hover:w-2 h-0.5 bg-neon-pink mr-0 group-hover:mr-2 transition-all duration-300"></span>
+                {link.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+
+    <!-- Bottom Bar -->
+    <div class="border-t border-white/5 pt-8">
+      <div class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+        <p class="text-sm text-gray-400">
+          © {currentYear} <span class="text-neon-green font-semibold">BioForge</span>. All rights reserved.
+        </p>
+        <div class="flex items-center space-x-2 text-sm text-gray-400">
+          <span>Made with</span>
+          <span class="text-neon-green animate-pulse text-lg">♥</span>
+          <span>for creators</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scroll to Top Button -->
+  <button 
+    id="scroll-to-top"
+    class="fixed bottom-8 right-8 p-4 glass-strong rounded-full border border-neon-green/30 text-neon-green opacity-0 pointer-events-none transition-all duration-300 hover:scale-110 glow-green z-40 group"
+    aria-label="Scroll to top"
+  >
+    <svg class="w-6 h-6 group-hover:-translate-y-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+    </svg>
+  </button>
+</footer>
+
+<script>
+  import { gsap } from 'gsap';
+
+  // Newsletter form
+  const newsletterForm = document.getElementById('newsletter-form') as HTMLFormElement;
+  const newsletterSuccess = document.getElementById('newsletter-success');
+
+  newsletterForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    newsletterSuccess?.classList.remove('hidden');
+    gsap.from(newsletterSuccess, {
+      opacity: 0,
+      y: -10,
+      duration: 0.5,
+      ease: 'power2.out'
+    });
+    
+    // Hide after 5 seconds
+    setTimeout(() => {
+      newsletterSuccess?.classList.add('hidden');
+      newsletterForm?.reset();
+    }, 5000);
+  });
+
+  // Scroll to top button
+  const scrollToTopBtn = document.getElementById('scroll-to-top');
+  
+  function handleFooterScroll() {
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    
+    if (scrollTop > 300) {
+      scrollToTopBtn?.classList.remove('opacity-0', 'pointer-events-none');
+      scrollToTopBtn?.classList.add('opacity-100');
+    } else {
+      scrollToTopBtn?.classList.add('opacity-0', 'pointer-events-none');
+      scrollToTopBtn?.classList.remove('opacity-100');
+    }
+  }
+
+  window.addEventListener('scroll', handleFooterScroll, { passive: true });
+
+  scrollToTopBtn?.addEventListener('click', () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  });
+
+  // Magnetic effect on social links
+  const socialLinks = document.querySelectorAll('footer .magnetic');
+  socialLinks.forEach((element) => {
+    element.addEventListener('mousemove', (e: Event) => {
+      const mouseEvent = e as MouseEvent;
+      const rect = (element as HTMLElement).getBoundingClientRect();
+      const x = mouseEvent.clientX - rect.left - rect.width / 2;
+      const y = mouseEvent.clientY - rect.top - rect.height / 2;
+      
+      gsap.to(element, {
+        x: x * 0.3,
+        y: y * 0.3,
+        duration: 0.3,
+        ease: 'power2.out'
+      });
+    });
+    
+    element.addEventListener('mouseleave', () => {
+      gsap.to(element, {
+        x: 0,
+        y: 0,
+        duration: 0.3,
+        ease: 'elastic.out(1, 0.5)'
+      });
+    });
+  });
+</script>

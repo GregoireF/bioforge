@@ -1,0 +1,37 @@
+---
+// src/components/ui/Skeleton.astro - Skeleton loading state
+import { cn } from '@/lib/utils/cn';
+
+interface Props {
+  variant?: 'text' | 'circular' | 'rectangular';
+  width?: string;
+  height?: string;
+  class?: string;
+}
+
+const {
+  variant = 'text',
+  width,
+  height,
+  class: className,
+} = Astro.props;
+
+const variantStyles = {
+  text: 'rounded h-4',
+  circular: 'rounded-full',
+  rectangular: 'rounded-lg',
+};
+
+const classes = cn(
+  'bg-white/10 animate-pulse',
+  variantStyles[variant],
+  className
+);
+
+const style = {
+  width: width || (variant === 'circular' ? '40px' : '100%'),
+  height: height || (variant === 'circular' ? '40px' : undefined),
+};
+---
+
+<div class={classes} style={style}></div>

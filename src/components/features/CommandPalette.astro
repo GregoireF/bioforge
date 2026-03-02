@@ -1,0 +1,221 @@
+<div id="command-palette" class="hidden fixed inset-0 z-[9999] flex items-start justify-center pt-20">
+  <!-- Backdrop -->
+  <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" id="palette-backdrop"></div>
+  
+  <!-- Palette Container -->
+  <div class="relative w-full max-w-2xl mx-4 glass-strong border border-white/20 rounded-2xl shadow-2xl overflow-hidden">
+    <!-- Search Input -->
+    <div class="flex items-center space-x-3 p-4 border-b border-white/10">
+      <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+      </svg>
+      <input
+        type="text"
+        id="command-search"
+        placeholder="Type a command or search..."
+        class="flex-1 bg-transparent text-white placeholder-gray-500 focus:outline-none"
+        autocomplete="off"
+      />
+      <kbd class="px-2 py-1 text-xs bg-white/5 rounded border border-white/10">ESC</kbd>
+    </div>
+
+    <!-- Commands List -->
+    <div id="commands-list" class="max-h-[400px] overflow-y-auto">
+      <!-- Navigation Commands -->
+      <div class="p-2">
+        <div class="px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Navigation</div>
+        <button class="command-item w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors text-left" data-action="navigate" data-url="/dashboard">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-neon-green/20 to-neon-green/10 border border-neon-green/30 flex items-center justify-center">
+            <svg class="w-4 h-4 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+            </svg>
+          </div>
+          <div class="flex-1">
+            <div class="text-white font-medium">Go to Dashboard</div>
+            <div class="text-xs text-gray-400">View your overview</div>
+          </div>
+          <kbd class="px-2 py-1 text-xs bg-white/5 rounded border border-white/10">G H</kbd>
+        </button>
+
+        <button class="command-item w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors text-left" data-action="navigate" data-url="/dashboard/blocks">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-neon-purple/20 to-neon-purple/10 border border-neon-purple/30 flex items-center justify-center">
+            <svg class="w-4 h-4 text-neon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"/>
+            </svg>
+          </div>
+          <div class="flex-1">
+            <div class="text-white font-medium">Manage Blocks</div>
+            <div class="text-xs text-gray-400">Add or edit your blocks</div>
+          </div>
+          <kbd class="px-2 py-1 text-xs bg-white/5 rounded border border-white/10">G B</kbd>
+        </button>
+
+        <button class="command-item w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors text-left" data-action="navigate" data-url="/dashboard/analytics">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-neon-blue/20 to-neon-blue/10 border border-neon-blue/30 flex items-center justify-center">
+            <svg class="w-4 h-4 text-neon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+          </div>
+          <div class="flex-1">
+            <div class="text-white font-medium">View Analytics</div>
+            <div class="text-xs text-gray-400">Check your stats</div>
+          </div>
+          <kbd class="px-2 py-1 text-xs bg-white/5 rounded border border-white/10">G A</kbd>
+        </button>
+
+        <button class="command-item w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors text-left" data-action="navigate" data-url="/dashboard/settings">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-neon-pink/20 to-neon-pink/10 border border-neon-pink/30 flex items-center justify-center">
+            <svg class="w-4 h-4 text-neon-pink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            </svg>
+          </div>
+          <div class="flex-1">
+            <div class="text-white font-medium">Settings</div>
+            <div class="text-xs text-gray-400">Manage your account</div>
+          </div>
+          <kbd class="px-2 py-1 text-xs bg-white/5 rounded border border-white/10">G S</kbd>
+        </button>
+      </div>
+
+      <!-- Actions Commands -->
+      <div class="p-2 border-t border-white/10">
+        <div class="px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Actions</div>
+        <button class="command-item w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors text-left" data-action="navigate" data-url="/dashboard/blocks">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-neon-green/20 to-neon-green/10 border border-neon-green/30 flex items-center justify-center">
+            <svg class="w-4 h-4 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+          </div>
+          <div class="flex-1">
+            <div class="text-white font-medium">Add New Block</div>
+            <div class="text-xs text-gray-400">Create a new block</div>
+          </div>
+          <kbd class="px-2 py-1 text-xs bg-white/5 rounded border border-white/10">N</kbd>
+        </button>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="flex items-center justify-between p-3 border-t border-white/10 text-xs text-gray-500">
+      <div class="flex items-center space-x-2">
+        <kbd class="px-1.5 py-0.5 bg-white/5 rounded border border-white/10">↑↓</kbd>
+        <span>Navigate</span>
+      </div>
+      <div class="flex items-center space-x-2">
+        <kbd class="px-1.5 py-0.5 bg-white/5 rounded border border-white/10">↵</kbd>
+        <span>Select</span>
+      </div>
+      <div class="flex items-center space-x-2">
+        <kbd class="px-1.5 py-0.5 bg-white/5 rounded border border-white/10">ESC</kbd>
+        <span>Close</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Command Palette Logic
+  const palette = document.getElementById('command-palette');
+  const searchInput = document.getElementById('command-search') as HTMLInputElement;
+  const backdrop = document.getElementById('palette-backdrop');
+  let selectedIndex = 0;
+
+  // Open palette
+  function openPalette() {
+    palette?.classList.remove('hidden');
+    searchInput?.focus();
+    selectedIndex = 0;
+    updateSelection();
+  }
+
+  // Close palette
+  function closePalette() {
+    palette?.classList.add('hidden');
+    searchInput && (searchInput.value = '');
+  }
+
+  // Global function for external triggers
+  (window as any).openCommandPalette = openPalette;
+
+  // Keyboard shortcut (Cmd+K or Ctrl+K)
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      openPalette();
+    }
+
+    if (e.key === 'Escape' && !palette?.classList.contains('hidden')) {
+      closePalette();
+    }
+
+    // Navigation
+    if (!palette?.classList.contains('hidden')) {
+      const items = document.querySelectorAll('.command-item');
+      
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+        updateSelection();
+      }
+      
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        selectedIndex = Math.max(selectedIndex - 1, 0);
+        updateSelection();
+      }
+
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        items[selectedIndex]?.dispatchEvent(new Event('click'));
+      }
+    }
+  });
+
+  // Update selection
+  function updateSelection() {
+    const items = document.querySelectorAll('.command-item');
+    items.forEach((item, index) => {
+      if (index === selectedIndex) {
+        item.classList.add('bg-white/10');
+        item.scrollIntoView({ block: 'nearest' });
+      } else {
+        item.classList.remove('bg-white/10');
+      }
+    });
+  }
+
+  // Click backdrop to close
+  backdrop?.addEventListener('click', closePalette);
+
+  // Command actions
+  document.querySelectorAll('.command-item').forEach((item) => {
+    item.addEventListener('click', () => {
+      const action = (item as HTMLElement).dataset.action;
+      const url = (item as HTMLElement).dataset.url;
+
+      if (action === 'navigate' && url) {
+        window.location.href = url;
+      }
+
+      closePalette();
+    });
+  });
+
+  // Search filter
+  searchInput?.addEventListener('input', (e) => {
+    const query = (e.target as HTMLInputElement).value.toLowerCase();
+    const items = document.querySelectorAll('.command-item');
+
+    items.forEach((item) => {
+      const text = item.textContent?.toLowerCase() || '';
+      if (text.includes(query)) {
+        (item as HTMLElement).style.display = 'flex';
+      } else {
+        (item as HTMLElement).style.display = 'none';
+      }
+    });
+
+    selectedIndex = 0;
+    updateSelection();
+  });
+</script>

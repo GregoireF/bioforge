@@ -1,0 +1,156 @@
+---
+// How It Works section with 3 animated steps
+const steps = [
+  {
+    number: '01',
+    title: 'Create Your Page',
+    description: 'Sign up in seconds and claim your unique bioforge.link/yourname. No credit card needed.',
+    icon: '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>',
+    color: 'neon-green'
+  },
+  {
+    number: '02',
+    title: 'Customize & Add Links',
+    description: 'Choose from stunning templates, customize colors, add your links, social media, and content in minutes.',
+    icon: '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>',
+    color: 'neon-purple'
+  },
+  {
+    number: '03',
+    title: 'Share & Track',
+    description: 'Share your link everywhere and watch real-time analytics. See what works and optimize for growth.',
+    icon: '<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>',
+    color: 'neon-blue'
+  }
+];
+---
+
+<section class="relative py-32 overflow-hidden" data-scroll-section>
+  <!-- Background -->
+  <div class="absolute inset-0 bg-dark-900"></div>
+  <div class="absolute inset-0 opacity-5">
+    <div class="absolute top-1/4 right-1/4 w-96 h-96 bg-neon-green rounded-full blur-[150px] animate-pulse-slow"></div>
+  </div>
+
+  <div class="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8">
+    <!-- Section Header -->
+    <div class="text-center max-w-3xl mx-auto mb-20 reveal">
+      <div class="inline-flex items-center space-x-2 px-4 py-2 glass rounded-full text-sm text-neon-green mb-6">
+        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/>
+        </svg>
+        <span>Simple & Fast</span>
+      </div>
+      
+      <h2 class="text-5xl sm:text-6xl font-display font-bold text-white mb-6">
+        How It
+        <span class="text-transparent bg-clip-text bg-gradient-to-r from-neon-green to-neon-blue text-glow-green">
+          Works
+        </span>
+      </h2>
+      <p class="text-xl text-gray-400 leading-relaxed">
+        Get your professional link-in-bio up and running in under 5 minutes. No tech skills required.
+      </p>
+    </div>
+
+    <!-- Steps -->
+    <div class="max-w-6xl mx-auto">
+      <div class="grid md:grid-cols-3 gap-8 relative">
+        <!-- Connecting Line (Desktop) -->
+        <div class="hidden md:block absolute top-24 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-neon-green/30 to-transparent"></div>
+
+        {steps.map((step, index) => (
+          <div class="reveal" style={`animation-delay: ${index * 0.2}s`}>
+            <div class="relative group">
+              <!-- Card -->
+              <div class="glass-strong rounded-3xl p-8 border border-white/10 hover:border-neon-green/30 transition-all duration-500 h-full">
+                <!-- Step Number -->
+                <div class="flex items-start justify-between mb-6">
+                  <div class="text-6xl font-display font-bold text-neon-green/20 group-hover:text-neon-green/40 transition-opacity">
+                    {step.number}
+                  </div>
+                  
+                  <!-- Icon -->
+                  <div class={`inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-${step.color}/20 to-${step.color}/10 border border-${step.color}/30 text-${step.color} group-hover:scale-110 transition-transform duration-300`}>
+                    <Fragment set:html={step.icon} />
+                  </div>
+                </div>
+
+                <!-- Content -->
+                <h3 class="text-2xl font-display font-bold text-white mb-4 group-hover:text-neon-green transition-colors">
+                  {step.title}
+                </h3>
+                <p class="text-gray-400 leading-relaxed">
+                  {step.description}
+                </p>
+
+                <!-- Animated Arrow (on hover) -->
+                <div class="mt-6 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <div class="inline-flex items-center space-x-2 text-neon-green text-sm font-medium">
+                    <span>Learn more</span>
+                    <svg class="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                  </div>
+                </div>
+
+                <!-- Hover Glow Effect -->
+                <div class="absolute inset-0 bg-gradient-to-br from-neon-green/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl pointer-events-none"></div>
+              </div>
+
+              <!-- Step Connector Dot (Desktop) -->
+              <div class="hidden md:block absolute top-24 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-dark-900 border-2 border-neon-green group-hover:scale-150 group-hover:border-neon-blue transition-all duration-300 z-10">
+                <div class="absolute inset-0 rounded-full bg-neon-green animate-ping opacity-50"></div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <!-- CTA Below Steps -->
+      <div class="text-center mt-16 reveal">
+        <a 
+          href="/signup" 
+          class="inline-flex items-center space-x-3 px-8 py-4 bg-gradient-to-r from-neon-green to-neon-blue text-dark-900 font-semibold rounded-xl hover:opacity-90 transition-all duration-300 magnetic glow-green text-lg group"
+        >
+          <span>Start Building Now</span>
+          <svg class="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+          </svg>
+        </a>
+        <p class="text-sm text-gray-500 mt-4">No credit card required • Free forever plan</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { gsap } from 'gsap';
+
+  // Magnetic effect on CTA button
+  const magneticBtn = document.querySelector('.magnetic');
+  if (magneticBtn) {
+    magneticBtn.addEventListener('mousemove', (e: Event) => {
+      const mouseEvent = e as MouseEvent;
+      const rect = (magneticBtn as HTMLElement).getBoundingClientRect();
+      const x = mouseEvent.clientX - rect.left - rect.width / 2;
+      const y = mouseEvent.clientY - rect.top - rect.height / 2;
+      
+      gsap.to(magneticBtn, {
+        x: x * 0.3,
+        y: y * 0.3,
+        duration: 0.3,
+        ease: 'power2.out'
+      });
+    });
+    
+    magneticBtn.addEventListener('mouseleave', () => {
+      gsap.to(magneticBtn, {
+        x: 0,
+        y: 0,
+        duration: 0.3,
+        ease: 'elastic.out(1, 0.5)'
+      });
+    });
+  }
+</script>

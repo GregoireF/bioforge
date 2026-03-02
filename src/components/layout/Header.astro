@@ -1,0 +1,232 @@
+---
+import Button from '@/components/ui/Button.astro';
+
+const navItems = [
+  { label: 'Features', href: '/features' },
+  { label: 'Pricing', href: '/pricing' },
+  { label: 'Sign In', href: '/signin' },
+];
+---
+
+<header
+  id="main-header"
+  class="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
+  data-scroll-state="top"
+>
+  <!-- Glass background -->
+  <div class="absolute inset-0 glass-strong border-b border-white/10 pointer-events-none"></div>
+
+  <!-- Scroll progress bar -->
+  <div
+    id="scroll-progress"
+    class="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-neon-green via-neon-blue to-neon-purple transition-all duration-300"
+    style="width: 0%"
+  ></div>
+
+  <nav class="relative container mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between h-20">
+      <!-- Logo -->
+      <a
+        href="/"
+        class="flex items-center space-x-3 text-2xl font-display font-bold text-white hover:text-neon-green transition-all duration-300 group"
+        aria-label="BioForge Home"
+      >
+        <div class="relative">
+          <svg
+            class="w-10 h-10 text-neon-green transition-all duration-300 group-hover:scale-110 group-hover:rotate-12"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="group-hover:drop-shadow-[0_0_8px_rgba(0,255,157,0.8)]" />
+            <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="group-hover:drop-shadow-[0_0_8px_rgba(0,255,157,0.8)]" />
+            <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="group-hover:drop-shadow-[0_0_8px_rgba(0,255,157,0.8)]" />
+          </svg>
+          <div class="absolute inset-0 bg-neon-green/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        </div>
+        <span class="text-glow-green group-hover:tracking-wider transition-all duration-300">BIOFORGE</span>
+      </a>
+
+      <!-- Desktop Navigation -->
+      <div class="hidden md:flex items-center space-x-8">
+        {navItems.map((item) => (
+          <a
+            key={item.href}
+            href={item.href}
+            class="relative text-gray-300 hover:text-white transition-colors duration-300 font-medium group py-2"
+          >
+            <span class="relative z-10">{item.label}</span>
+            <span class="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-neon-green to-neon-blue group-hover:w-full transition-all duration-300"></span>
+            <span class="absolute inset-0 bg-neon-green/5 rounded-lg scale-0 group-hover:scale-100 transition-transform duration-300 -z-10"></span>
+          </a>
+        ))}
+        <Button
+          variant="primary"
+          size="md"
+          href="/signup"
+          class="magnetic glow-green"
+        >
+          <span class="relative z-10">Sign Up Now</span>
+          <svg class="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+          </svg>
+        </Button>
+      </div>
+
+      <!-- Mobile toggle button -->
+      <button
+        id="mobile-menu-button"
+        class="md:hidden relative p-2 text-gray-400 hover:text-white transition-colors group"
+        aria-label="Toggle menu"
+        aria-expanded="false"
+        aria-controls="mobile-menu"
+      >
+        <div class="relative w-6 h-6">
+          <span class="absolute top-1 left-0 w-full h-0.5 bg-current transition-all duration-300 origin-center"></span>
+          <span class="absolute top-2.5 left-0 w-full h-0.5 bg-current transition-all duration-300"></span>
+          <span class="absolute top-4 left-0 w-full h-0.5 bg-current transition-all duration-300 origin-center"></span>
+        </div>
+      </button>
+    </div>
+
+    <!-- Mobile menu -->
+    <div id="mobile-menu" class="hidden md:hidden pb-6 pt-2 space-y-2">
+      {navItems.map((item) => (
+        <a
+          key={item.href}
+          href={item.href}
+          class="block px-4 py-3 text-gray-300 hover:text-white hover:bg-white/5 rounded-lg transition-all duration-200 font-medium"
+        >
+          {item.label}
+        </a>
+      ))}
+      <div class="pt-4 px-4">
+        <Button variant="primary" size="md" href="/signup" class="w-full glow-green">
+          Sign Up Now
+        </Button>
+      </div>
+    </div>
+  </nav>
+</header>
+
+<!-- Script client unique – optimisé perf -->
+<script>
+  // ────────────────────────────────────────────────
+  // Mobile menu toggle + hamburger animation
+  // ────────────────────────────────────────────────
+  const menuButton = document.getElementById('mobile-menu-button');
+  const mobileMenu = document.getElementById('mobile-menu');
+
+  if (menuButton && mobileMenu) {
+    menuButton.addEventListener('click', () => {
+      const expanded = menuButton.getAttribute('aria-expanded') === 'true';
+      menuButton.setAttribute('aria-expanded', (!expanded).toString());
+      menuButton.classList.toggle('active');
+
+      if (expanded) {
+        mobileMenu.classList.add('hidden');
+      } else {
+        mobileMenu.classList.remove('hidden');
+
+        // Lazy GSAP pour l'animation stagger
+        import('gsap').then(({ gsap }) => {
+          gsap.from(mobileMenu.children, {
+            opacity: 0,
+            y: -10,
+            stagger: 0.05,
+            duration: 0.3,
+            ease: 'power2.out'
+          });
+        });
+      }
+    });
+  }
+
+  // ────────────────────────────────────────────────
+  // Scroll: progress bar + hide/show + scrolled class
+  // ────────────────────────────────────────────────
+  let lastScroll = 0;
+  let rafScheduled = false;
+
+  const header = document.getElementById('main-header');
+  const progress = document.getElementById('scroll-progress');
+
+  function updateScroll() {
+    rafScheduled = false;
+
+    const scrollTop = window.pageYOffset;
+    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    const percent = Math.min((scrollTop / docHeight) * 100, 100);
+
+    if (progress) progress.style.width = `${percent}%`;
+
+    if (scrollTop > lastScroll && scrollTop > 100) {
+      header?.setAttribute('data-scroll-state', 'hidden');
+    } else {
+      header?.setAttribute('data-scroll-state', 'top');
+    }
+
+    header?.classList.toggle('header-scrolled', scrollTop > 50);
+
+    lastScroll = scrollTop;
+  }
+
+  function onScroll() {
+    if (!rafScheduled) {
+      rafScheduled = true;
+      requestAnimationFrame(updateScroll);
+    }
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll(); // initial call
+
+  // ────────────────────────────────────────────────
+  // Magnetic effect sur éléments .magnetic
+  // ────────────────────────────────────────────────
+  document.querySelectorAll('.magnetic').forEach(el => {
+    let currentX = 0;
+    let currentY = 0;
+
+    const onMove = e => {
+      const rect = el.getBoundingClientRect();
+      const x = e.clientX - rect.left - rect.width / 2;
+      const y = e.clientY - rect.top - rect.height / 2;
+
+      currentX = x * 0.3;
+      currentY = y * 0.3;
+
+      import('gsap').then(({ gsap }) => {
+        gsap.to(el, { x: currentX, y: currentY, duration: 0.3, ease: 'power2.out' });
+      });
+    };
+
+    const onLeave = () => {
+      import('gsap').then(({ gsap }) => {
+        gsap.to(el, { x: 0, y: 0, duration: 0.3, ease: 'elastic.out(1,0.5)' });
+      });
+    };
+
+    el.addEventListener('mousemove', onMove);
+    el.addEventListener('mouseleave', onLeave);
+  });
+</script>
+
+<style is:global>
+  header {
+    transition: transform 0.3s ease-in-out;
+  }
+  .header-scrolled {
+    backdrop-filter: blur(30px) saturate(200%);
+  }
+  .header-scrolled::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgba(18,18,26,0.95), rgba(18,18,26,0.9));
+    pointer-events: none;
+  }
+  header[data-scroll-state="hidden"] {
+    transform: translateY(-100%);
+  }
+</style>

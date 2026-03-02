@@ -1,0 +1,355 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Sign Up - BioForge">
+  <main class="relative min-h-screen flex items-center justify-center overflow-hidden py-12">
+    <!-- Animated Background -->
+    <div class="absolute inset-0 bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900">
+      <div class="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-neon-purple/15 rounded-full blur-[150px] animate-pulse-slow"></div>
+      <div class="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-neon-blue/15 rounded-full blur-[150px] animate-pulse-slow" style="animation-delay: 1.5s;"></div>
+      <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-neon-pink/10 rounded-full blur-[150px] animate-pulse-slow" style="animation-delay: 3s;"></div>
+      <div class="absolute inset-0 opacity-[0.02]" style="background-image: linear-gradient(#bf00ff 1px, transparent 1px), linear-gradient(90deg, #bf00ff 1px, transparent 1px); background-size: 50px 50px;"></div>
+    </div>
+
+    <!-- Content -->
+    <div class="relative z-10 w-full max-w-6xl mx-4 grid lg:grid-cols-2 gap-12 items-center">
+      
+      <!-- Left Column - Branding -->
+      <div class="hidden lg:block space-y-8">
+        <a href="/" class="inline-flex items-center space-x-3 text-4xl font-display font-bold text-white group">
+          <svg class="w-12 h-12 text-neon-purple transition-transform group-hover:scale-110 group-hover:rotate-12" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2"/>
+            <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2"/>
+            <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          <span class="text-glow-purple">BIOFORGE</span>
+        </a>
+
+        <div>
+          <h1 class="text-6xl font-display font-bold text-white leading-tight mb-6">
+            Start Your
+            <span class="block text-transparent bg-clip-text bg-gradient-to-r from-neon-purple to-neon-pink text-glow-purple">Journey</span>
+          </h1>
+          <p class="text-xl text-gray-400 leading-relaxed">Join 10K+ creators who've transformed their online presence.</p>
+        </div>
+
+        <div class="space-y-4">
+          <div class="flex items-start space-x-4">
+            <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br from-neon-purple/20 to-neon-purple/10 border border-neon-purple/30 flex items-center justify-center">
+              <svg class="w-5 h-5 text-neon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-white font-semibold mb-1">Free Forever Plan</h3>
+              <p class="text-gray-400 text-sm">Start free, upgrade when ready</p>
+            </div>
+          </div>
+          
+          <div class="flex items-start space-x-4">
+            <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br from-neon-pink/20 to-neon-pink/10 border border-neon-pink/30 flex items-center justify-center">
+              <svg class="w-5 h-5 text-neon-pink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-white font-semibold mb-1">No Credit Card</h3>
+              <p class="text-gray-400 text-sm">Start immediately</p>
+            </div>
+          </div>
+          
+          <div class="flex items-start space-x-4">
+            <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br from-neon-blue/20 to-neon-blue/10 border border-neon-blue/30 flex items-center justify-center">
+              <svg class="w-5 h-5 text-neon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-white font-semibold mb-1">Setup in 5 Minutes</h3>
+              <p class="text-gray-400 text-sm">Live in minutes</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-8">
+          <div>
+            <div class="text-3xl font-bold text-white mb-1">10K+</div>
+            <div class="text-sm text-gray-400">Creators</div>
+          </div>
+          <div class="border-l border-white/10 h-12"></div>
+          <div>
+            <div class="text-3xl font-bold text-white mb-1">50M+</div>
+            <div class="text-sm text-gray-400">Clicks</div>
+          </div>
+          <div class="border-l border-white/10 h-12"></div>
+          <div>
+            <div class="text-3xl font-bold text-white mb-1">4.9/5</div>
+            <div class="text-sm text-gray-400">Rating</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column - Form -->
+      <div class="w-full">
+        <!-- Mobile Logo -->
+        <div class="lg:hidden text-center mb-8">
+          <a href="/" class="inline-flex items-center space-x-3 text-3xl font-display font-bold text-white group">
+            <svg class="w-10 h-10 text-neon-purple" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" stroke-width="2"/>
+              <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2"/>
+              <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            <span class="text-glow-purple">BIOFORGE</span>
+          </a>
+        </div>
+
+        <div class="glass-strong rounded-3xl p-10 border border-white/10 backdrop-blur-xl">
+          <div class="mb-8">
+            <h2 class="text-3xl font-display font-bold text-white mb-2">Create Account</h2>
+            <p class="text-gray-400">Start your free trial today.</p>
+          </div>
+
+          <!-- Error Message -->
+          <div id="error-message" class="hidden mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
+            <div class="flex items-center space-x-2">
+              <svg class="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+              </svg>
+              <p class="text-red-400 text-sm" id="error-text"></p>
+            </div>
+          </div>
+
+          <!-- Form -->
+          <form class="space-y-5" id="signup-form">
+            <!-- Name & Email -->
+            <div class="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label for="name" class="block text-sm font-medium text-gray-300 mb-2">Full name</label>
+                <input
+                  type="text"
+                  id="name"
+                  name="name"
+                  required
+                  class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white placeholder-gray-500 focus:border-neon-purple/50 focus:outline-none focus:ring-2 focus:ring-neon-purple/20 transition-all"
+                  placeholder="John Doe"
+                />
+              </div>
+
+              <div>
+                <label for="email" class="block text-sm font-medium text-gray-300 mb-2">Email</label>
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  required
+                  class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white placeholder-gray-500 focus:border-neon-purple/50 focus:outline-none focus:ring-2 focus:ring-neon-purple/20 transition-all"
+                  placeholder="you@example.com"
+                />
+              </div>
+            </div>
+
+            <!-- Username -->
+            <div>
+              <label for="username" class="block text-sm font-medium text-gray-300 mb-2">Username</label>
+              <div class="relative">
+                <span class="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">bioforge.link/</span>
+                <input
+                  type="text"
+                  id="username"
+                  name="username"
+                  required
+                  pattern="[a-z0-9_]{3,24}"
+                  class="w-full pl-[125px] pr-4 py-3 glass border border-white/10 rounded-xl text-white placeholder-gray-500 focus:border-neon-purple/50 focus:outline-none focus:ring-2 focus:ring-neon-purple/20 transition-all"
+                  placeholder="yourname"
+                />
+              </div>
+              <p class="text-xs text-gray-500 mt-1.5">3-24 characters, lowercase, numbers and underscores</p>
+            </div>
+
+            <!-- Password -->
+            <div>
+              <label for="password" class="block text-sm font-medium text-gray-300 mb-2">Password</label>
+              <input
+                type="password"
+                id="password"
+                name="password"
+                required
+                minlength="6"
+                class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white placeholder-gray-500 focus:border-neon-purple/50 focus:outline-none focus:ring-2 focus:ring-neon-purple/20 transition-all"
+                placeholder="••••••••"
+              />
+              <p class="text-xs text-gray-500 mt-1.5">Minimum 6 characters</p>
+            </div>
+
+            <!-- Terms -->
+            <div class="flex items-start">
+              <input type="checkbox" id="terms" required class="w-4 h-4 mt-0.5 rounded border-white/10 bg-white/5 text-neon-purple focus:ring-2 focus:ring-neon-purple/20" />
+              <label for="terms" class="ml-3 text-sm text-gray-300">
+                I agree to the <a href="/terms" class="text-neon-purple hover:text-neon-pink">Terms</a> and <a href="/privacy" class="text-neon-purple hover:text-neon-pink">Privacy Policy</a>
+              </label>
+            </div>
+
+            <!-- Submit -->
+            <button 
+              type="submit"
+              id="submit-btn"
+              class="w-full px-6 py-4 bg-gradient-to-r from-neon-purple to-neon-pink text-white font-semibold rounded-xl hover:opacity-90 transition-all glow-purple text-lg flex items-center justify-center"
+            >
+              <span id="button-text">Create Account</span>
+              <svg id="button-arrow" class="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+              </svg>
+              <svg id="loading-spinner" class="hidden w-5 h-5 animate-spin ml-2" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </button>
+          </form>
+
+          <p class="text-center text-sm text-gray-400 mt-8">
+            Already have an account?
+            <a href="/signin" class="text-neon-purple hover:text-neon-pink transition-colors font-semibold">Sign in</a>
+          </p>
+        </div>
+
+        <!-- Trust Badges -->
+        <div class="mt-6 flex items-center justify-center space-x-6 text-xs text-gray-500">
+          <div class="flex items-center space-x-1.5">
+            <svg class="w-4 h-4 text-neon-green" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+            </svg>
+            <span>SSL Secured</span>
+          </div>
+          <div class="flex items-center space-x-1.5">
+            <svg class="w-4 h-4 text-neon-green" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+            </svg>
+            <span>GDPR Compliant</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</BaseLayout>
+
+<script>
+  import { gsap } from 'gsap';
+
+  const form = document.getElementById('signup-form') as HTMLFormElement;
+  const submitBtn = document.getElementById('submit-btn') as HTMLButtonElement;
+  const buttonText = document.getElementById('button-text') as HTMLSpanElement;
+  const buttonArrow = document.querySelector('#button-arrow') as SVGElement | null;
+  const loadingSpinner = document.querySelector('#loading-spinner') as SVGElement | null;
+  const errorMessage = document.getElementById('error-message') as HTMLDivElement;
+  const errorText = document.getElementById('error-text') as HTMLParagraphElement;
+  const usernameInput = document.getElementById('username') as HTMLInputElement;
+
+  // Username validation
+  usernameInput?.addEventListener('input', (e) => {
+    const target = e.target as HTMLInputElement;
+    target.value = target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+  });
+
+  function showError(message: string) {
+    if (!errorText || !errorMessage) return;
+    errorText.textContent = message;
+    errorMessage.classList.remove('hidden');
+    gsap.fromTo(errorMessage, { opacity: 0, y: -10 }, { opacity: 1, y: 0, duration: 0.3 });
+  }
+
+  function hideError() {
+    if (!errorMessage) return;
+    gsap.to(errorMessage, {
+      opacity: 0,
+      y: -10,
+      duration: 0.3,
+      onComplete: () => errorMessage.classList.add('hidden')
+    });
+  }
+
+  function setLoading(loading: boolean) {
+    if (!submitBtn || !buttonText) return;
+    
+    submitBtn.disabled = loading;
+    if (loading) {
+      buttonText.textContent = 'Creating account...';
+      if (buttonArrow) buttonArrow.classList.add('hidden');
+      if (loadingSpinner) loadingSpinner.classList.remove('hidden');
+      submitBtn.classList.add('opacity-80');
+    } else {
+      buttonText.textContent = 'Create Account';
+      if (buttonArrow) buttonArrow.classList.remove('hidden');
+      if (loadingSpinner) loadingSpinner.classList.add('hidden');
+      submitBtn.classList.remove('opacity-80');
+    }
+  }
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideError();
+    setLoading(true);
+
+    const formData = new FormData(form);
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+    const username = formData.get('username') as string;
+    const name = formData.get('name') as string;
+
+    // Validation
+    if (username.length < 3 || username.length > 24) {
+      setLoading(false);
+      showError('Username must be 3-24 characters');
+      return;
+    }
+
+    if (!/^[a-z0-9_]+$/.test(username)) {
+      setLoading(false);
+      showError('Username can only contain lowercase letters, numbers and underscores');
+      return;
+    }
+
+    if (password.length < 6) {
+      setLoading(false);
+      showError('Password must be at least 6 characters');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          email, 
+          password, 
+          username,
+          display_name: name 
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Signup failed');
+      }
+
+      // Success!
+      gsap.to(form, {
+        opacity: 0,
+        y: -20,
+        duration: 0.3,
+        onComplete: () => {
+          if (data.needsEmailConfirmation) {
+            window.location.href = '/verify-email';
+          } else {
+            window.location.href = '/dashboard';
+          }
+        }
+      });
+
+    } catch (error) {
+      setLoading(false);
+      showError(error instanceof Error ? error.message : 'An error occurred');
+    }
+  });
+</script>

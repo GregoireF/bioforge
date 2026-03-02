@@ -1,0 +1,127 @@
+---
+import { tv, type VariantProps } from 'tailwind-variants';
+import { cn } from '@/lib/utils/cn';
+import type { HTMLAttributes } from 'astro/types';
+
+const badge = tv({
+  base: [
+    'inline-flex items-center justify-center gap-1.5',
+    'font-medium rounded-full transition-colors duration-200',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+    'select-none',
+  ],
+
+  variants: {
+    variant: {
+      default:   'bg-gray-500/20 text-gray-300 border border-gray-500/30',
+      success:   'bg-neon-green/20 text-neon-green border border-neon-green/30',
+      warning:   'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30',
+      danger:    'bg-red-500/20 text-red-400 border border-red-500/30',
+      info:      'bg-blue-500/20 text-blue-300 border border-blue-500/30',
+      premium:   'bg-gradient-to-r from-neon-purple/25 via-neon-pink/15 to-neon-purple/25 text-neon-purple border border-neon-purple/40 shadow-sm',
+      secondary: 'bg-secondary text-secondary-foreground border border-border/50',
+      outline:   'bg-transparent border text-foreground',
+      ghost:     'bg-transparent text-foreground hover:bg-muted/60',
+    },
+
+    size: {
+      sm: 'min-w-[1.75rem] px-2.5 py-0.5 text-xs',
+      md: 'min-w-[2rem]   px-3   py-0.5 text-sm',
+      lg: 'min-w-[2.5rem] px-4   py-1   text-base',
+    },
+
+    shape: {
+      pill:   'rounded-full',
+      rounded: 'rounded-lg',
+      square: 'rounded-md',
+    },
+
+    dot: {
+      true: '',
+    },
+  },
+
+  defaultVariants: {
+    variant: 'default',
+    size: 'md',
+    shape: 'pill',
+  },
+
+  compoundVariants: [
+    { dot: true, class: 'gap-2' },
+    { dot: true, size: 'sm', class: 'gap-1.5' },
+    {
+      variant: 'outline',
+      class: 'border-border/80',
+    },
+    {
+      variant: ['outline', 'premium'],
+      class: 'border-2 border-neon-purple/70 bg-gradient-to-r from-neon-purple/5 to-neon-pink/5',
+    },
+    {
+      variant: 'premium',
+      class: 'hover:brightness-110 hover:shadow-md transition-all duration-200',
+    },
+  ],
+});
+
+type BadgeVariantProps = VariantProps<typeof badge>;
+
+interface BadgeProps
+  extends BadgeVariantProps,
+    Omit<HTMLAttributes<'span'>, keyof BadgeVariantProps> {
+  class?: string;
+  dot?: boolean;
+}
+
+const {
+  variant,
+  size,
+  shape,
+  dot = false,
+  class: className,
+  ...props
+} = Astro.props as BadgeProps;
+
+const classes = cn(
+  badge({
+    variant,
+    size,
+    shape,
+    dot,
+  }),
+  className
+);
+---
+
+<span class={classes} {...props}>
+  {
+    dot && (
+      <span
+        class:list={[
+          'size-1.5 min-w-1.5 rounded-full bg-current flex-shrink-0',
+          variant === 'premium' && 'animate-pulse-slow',
+        ]}
+        aria-hidden="true"
+      />
+    )
+  }
+
+  {
+    Astro.slots.iconLeft && (
+      <span class="-ml-0.5 mr-1.5 flex-shrink-0">
+        <slot name="iconLeft" />
+      </span>
+    )
+  }
+
+  <slot />
+
+  {
+    Astro.slots.iconRight && (
+      <span class="ml-1.5 -mr-0.5 flex-shrink-0">
+        <slot name="iconRight" />
+      </span>
+    )
+  }
+</span>

@@ -1,0 +1,192 @@
+---
+// Profile Card component with 3D tilt effect
+---
+
+<div class="relative w-full max-w-sm mx-auto perspective-1000">
+  <!-- Phone mockup container with 3D effect -->
+  <div 
+    class="tilt-card relative glass-strong rounded-[2.5rem] border-2 border-neon-green/40 shadow-2xl glow-green p-6 backdrop-blur-xl transform-gpu preserve-3d"
+    data-tilt
+    data-tilt-max="15"
+    data-tilt-speed="1000"
+    data-tilt-glare="true"
+    data-tilt-max-glare="0.3"
+  >
+    <!-- Phone notch effect -->
+    <div class="absolute top-3 left-1/2 transform -translate-x-1/2 w-32 h-6 bg-dark-900 rounded-full z-10 border border-white/10"></div>
+    
+    <!-- Profile content -->
+    <div class="space-y-6 pt-6">
+      <!-- Profile Avatar with enhanced glow -->
+      <div class="flex justify-center">
+        <div class="relative group">
+          <!-- Avatar container with multi-layer animated border -->
+          <div class="relative w-36 h-36 rounded-full p-[3px]">
+            <!-- Rotating gradient border -->
+            <div class="absolute inset-0 rounded-full bg-gradient-to-r from-neon-green via-neon-purple to-neon-blue opacity-75 animate-spin-slow"></div>
+            <div class="absolute inset-0 rounded-full bg-gradient-to-r from-neon-green via-neon-purple to-neon-blue blur-xl opacity-50 animate-pulse-slow"></div>
+            
+            <!-- Avatar content -->
+            <div class="relative w-full h-full rounded-full bg-dark-900 flex items-center justify-center overflow-hidden border-2 border-dark-800">
+              <div class="w-full h-full bg-gradient-to-br from-neon-purple/30 to-neon-green/30 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
+                <svg class="w-20 h-20 text-neon-green drop-shadow-[0_0_10px_rgba(0,255,157,0.5)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Enhanced LIVE badge -->
+          <div class="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-xl flex items-center space-x-1.5 animate-pulse glow-green border border-red-400">
+            <span class="relative flex h-2.5 w-2.5">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+            </span>
+            <span class="text-shadow">LIVE</span>
+          </div>
+
+          <!-- Status ring animation -->
+          <div class="absolute inset-0 rounded-full border-2 border-neon-green/30 animate-ping"></div>
+        </div>
+      </div>
+
+      <!-- Username with enhanced glow -->
+      <div class="text-center space-y-2">
+        <h3 class="text-3xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-r from-neon-green via-neon-blue to-neon-purple animate-gradient text-glow-green">
+          VALOR_QUEEN
+        </h3>
+        <p class="text-sm text-gray-300 flex items-center justify-center space-x-2">
+          <span class="w-2 h-2 bg-neon-green rounded-full animate-pulse"></span>
+          <span>Professional Gamer</span>
+          <span class="text-gray-500">•</span>
+          <span>Content Creator</span>
+        </p>
+      </div>
+
+      <!-- Action Buttons with glassmorphism -->
+      <div class="flex gap-3">
+        <button class="flex-1 px-4 py-3.5 glass border border-neon-green/50 text-neon-green rounded-xl hover:glass-strong hover:glow-green transition-all duration-300 font-medium text-sm transform hover:scale-105 group">
+          <span class="flex items-center justify-center space-x-2">
+            <svg class="w-4 h-4 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+            </svg>
+            <span>Updates</span>
+          </span>
+        </button>
+        <button class="flex-1 px-4 py-3.5 bg-gradient-to-r from-neon-purple to-neon-blue text-white rounded-xl hover:opacity-90 transition-all duration-300 font-medium text-sm shadow-lg glow-purple transform hover:scale-105 group">
+          <span class="flex items-center justify-center space-x-2">
+            <svg class="w-4 h-4 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span>Sponsor</span>
+          </span>
+        </button>
+      </div>
+
+      <!-- Enhanced stats dots -->
+      <div class="flex justify-center space-x-2.5">
+        {[...Array(5)].map((_, i) => (
+          <div 
+            class={`h-2 rounded-full transition-all duration-300 ${
+              i === 0 
+                ? 'bg-neon-green w-8 glow-green' 
+                : 'bg-white/20 w-2 hover:bg-white/40 hover:w-4'
+            }`}
+          ></div>
+        ))}
+      </div>
+
+      <!-- Enhanced Links preview with glassmorphism -->
+      <div class="space-y-3">
+        <a href="#" class="block p-4 glass rounded-xl hover:glass-strong hover:border-neon-green/50 transition-all duration-300 group transform hover:scale-[1.02] hover:glow-green">
+          <div class="flex items-center space-x-4">
+            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-neon-purple/30 to-neon-green/30 flex items-center justify-center group-hover:scale-110 transition-transform border border-white/10">
+              <svg class="w-6 h-6 text-neon-green" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <span class="text-sm font-medium text-gray-300 group-hover:text-neon-green transition-colors">Twitter</span>
+              <p class="text-xs text-gray-500">@valorqueen_gg</p>
+            </div>
+            <svg class="w-5 h-5 text-gray-500 group-hover:text-neon-green group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </div>
+        </a>
+        
+        <a href="#" class="block p-4 glass rounded-xl hover:glass-strong hover:border-neon-green/50 transition-all duration-300 group transform hover:scale-[1.02] hover:glow-green">
+          <div class="flex items-center space-x-4">
+            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-neon-purple/30 to-neon-green/30 flex items-center justify-center group-hover:scale-110 transition-transform border border-white/10">
+              <svg class="w-6 h-6 text-neon-green" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm4.441 16.892c-2.102.144-6.784.144-8.883 0C5.282 16.736 5.017 15.622 5 12c.017-3.629.285-4.736 2.558-4.892 2.099-.144 6.782-.144 8.883 0C18.718 7.264 18.982 8.378 19 12c-.018 3.629-.285 4.736-2.559 4.892zM10 9.658l4.917 2.338L10 14.342V9.658z"/>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <span class="text-sm font-medium text-gray-300 group-hover:text-neon-green transition-colors">YouTube</span>
+              <p class="text-xs text-gray-500">1.2M subscribers</p>
+            </div>
+            <svg class="w-5 h-5 text-gray-500 group-hover:text-neon-green group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating particles effect (enhanced) -->
+  <div class="absolute -z-10 inset-0 pointer-events-none">
+    <div class="absolute top-0 left-0 w-3 h-3 bg-neon-green rounded-full animate-float opacity-70 glow-green"></div>
+    <div class="absolute bottom-20 right-10 w-2 h-2 bg-neon-purple rounded-full animate-float opacity-60 glow-purple" style="animation-delay: 1s;"></div>
+    <div class="absolute top-40 right-0 w-2.5 h-2.5 bg-neon-blue rounded-full animate-float opacity-50 glow-blue" style="animation-delay: 2s;"></div>
+    <div class="absolute top-1/2 left-10 w-2 h-2 bg-neon-pink rounded-full animate-float opacity-40" style="animation-delay: 3s;"></div>
+  </div>
+</div>
+
+<script>
+  import VanillaTilt from 'vanilla-tilt';
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const tiltElements = document.querySelectorAll('[data-tilt]');
+    
+    tiltElements.forEach((element) => {
+      VanillaTilt.init(element as HTMLElement, {
+        max: 15,
+        speed: 1000,
+        glare: true,
+        'max-glare': 0.3,
+        scale: 1.05,
+        gyroscope: true
+      });
+    });
+  });
+</script>
+
+<style>
+  @keyframes spin-slow {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  
+  .animate-spin-slow {
+    animation: spin-slow 10s linear infinite;
+  }
+
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+
+  .text-shadow {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+
+  /* 3D transform enhancement */
+  .tilt-card {
+    will-change: transform;
+  }
+</style>

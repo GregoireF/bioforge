@@ -1,0 +1,111 @@
+---
+import { tv, type VariantProps } from 'tailwind-variants';
+import { cn } from '@/lib/utils/cn';
+import type { HTMLAttributes } from 'astro/types';
+
+const card = tv({
+  base: [
+    'relative overflow-hidden',
+    'bg-black/30 backdrop-blur-xl backdrop-saturate-150', // glassmorphism moderne
+    'border border-white/10 rounded-2xl',
+    'text-white shadow-xl shadow-black/20',
+    'transition-all duration-300 ease-out',
+  ],
+
+  variants: {
+    hover: {
+      true: 'hover:border-neon-green/30 hover:shadow-neon-green/10 hover:scale-[1.015] hover:brightness-105',
+      false: '',
+    },
+
+    padding: {
+      none: '',
+      sm: 'p-4',
+      md: 'p-4 sm:p-5 lg:p-6',
+      lg: 'p-6 sm:p-7 lg:p-8',
+    },
+
+    elevated: {
+      true: 'shadow-2xl shadow-black/30',
+      false: '',
+    },
+
+    bordered: {
+      true: 'border-white/15',
+      false: 'border-transparent',
+    },
+  },
+
+  defaultVariants: {
+    padding: 'md',
+    hover: false,
+    elevated: false,
+    bordered: true,
+  },
+});
+
+type CardVariantProps = VariantProps<typeof card>;
+
+interface CardProps
+  extends CardVariantProps,
+    Omit<HTMLAttributes<'div'>, keyof CardVariantProps> {
+  title?: string;
+  description?: string;
+  /** Niveau de heading pour le titre (par défaut h3) */
+  headingLevel?: 'h2' | 'h3' | 'h4';
+  class?: string;
+}
+
+const {
+  title,
+  description,
+  headingLevel = 'h3',
+  padding,
+  hover = false,
+  elevated = false,
+  bordered = true,
+  class: className,
+  ...props
+} = Astro.props as CardProps;
+
+const classes = cn(
+  card({ padding, hover, elevated, bordered }),
+  className
+);
+
+const HeadingTag = headingLevel as keyof HTMLElementTagNameMap;
+const titleId = title ? `card-title-${Math.random().toString(36).slice(2, 8)}` : undefined;
+---
+
+<div
+  class={classes}
+  role={title ? 'region' : undefined}
+  aria-labelledby={titleId}
+  {...props}
+>
+  {(title || description || Astro.slots.header) && (
+    <div class="mb-5 lg:mb-6 space-y-1.5">
+      {Astro.slots.header && <slot name="header" />}
+
+      {title && (
+        <HeadingTag id={titleId} class="text-lg sm:text-xl font-semibold tracking-tight">
+          {title}
+        </HeadingTag>
+      )}
+
+      {description && (
+        <p class="text-sm text-gray-300/90 leading-relaxed">
+          {description}
+        </p>
+      )}
+    </div>
+  )}
+
+  <slot />
+
+  {Astro.slots.footer && (
+    <div class="mt-5 lg:mt-6 pt-4 lg:pt-5 border-t border-white/10">
+      <slot name="footer" />
+    </div>
+  )}
+</div>

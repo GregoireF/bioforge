@@ -1,0 +1,612 @@
+---
+// src/pages/dashboard/appearance.astro - Appearance/Theme Page
+
+import DashboardLayout from '@/layouts/DashboardLayout.astro';
+import Button from '@/components/ui/Button.astro';
+import Card from '@/components/ui/Card.astro';
+import Badge from '@/components/ui/Badge.astro';
+import { withAuth } from '@/lib/auth/auth';
+
+// ==================== AUTH CHECK ====================
+
+const authResult = await withAuth({
+  cookies: Astro.cookies,
+  request: Astro.request,
+});
+
+if (!authResult.success || !authResult.data) {
+  return Astro.redirect(authResult.redirect || '/signin?error=auth_failed');
+}
+
+const { user, profile, planLimits } = authResult.data;
+
+// Parse theme
+let theme = {
+  preset: 'dark',
+  background_color: '#0a0a0a',
+  primary_color: '#00ff9d',
+  text_color: '#ffffff',
+  button_style: 'filled',
+  border_radius: 12,
+  font_family: 'Inter',
+  background_style: 'solid', // solid, gradient, blur
+  block_shadow: true,
+  animations: true
+};
+
+if (profile.theme) {
+  try {
+    const parsedTheme = typeof profile.theme === 'string' 
+      ? JSON.parse(profile.theme) 
+      : profile.theme;
+    theme = { ...theme, ...parsedTheme };
+  } catch (error) {
+    console.error('Failed to parse theme:', error);
+  }
+}
+---
+
+<DashboardLayout title="Appearance">
+  <!-- Header -->
+  <div class="mb-6">
+    <h2 class="text-lg lg:text-xl font-semibold text-white mb-1">Appearance</h2>
+    <p class="text-sm text-gray-400">Customize your profile theme and style</p>
+  </div>
+
+  <div class="grid lg:grid-cols-3 gap-6 lg:gap-8">
+    <!-- Theme Settings (Left) -->
+    <div class="lg:col-span-2 space-y-6">
+      
+      <!-- Quick Presets -->
+      <Card title="Quick Presets" description="Choose a starting point">
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <!-- Dark Theme -->
+          <button 
+            class="preset-btn p-4 glass border-2 rounded-xl hover:border-neon-green/50 transition-all text-left group"
+            data-preset="dark"
+            data-bg="#0a0a0a"
+            data-primary="#00ff9d"
+            data-text="#ffffff"
+          >
+            <div class="w-full h-20 rounded-lg mb-3 bg-gradient-to-br from-gray-900 to-black border border-neon-green/30 group-hover:scale-105 transition-transform"></div>
+            <h4 class="text-white font-semibold mb-1">Dark</h4>
+            <p class="text-xs text-gray-400">Default theme</p>
+          </button>
+
+          <!-- Light Theme -->
+          <button 
+            class="preset-btn p-4 glass border-2 rounded-xl hover:border-neon-blue/50 transition-all text-left group"
+            data-preset="light"
+            data-bg="#ffffff"
+            data-primary="#0066ff"
+            data-text="#000000"
+          >
+            <div class="w-full h-20 rounded-lg mb-3 bg-gradient-to-br from-white to-gray-100 border border-blue-500/30 group-hover:scale-105 transition-transform"></div>
+            <h4 class="text-white font-semibold mb-1">Light</h4>
+            <p class="text-xs text-gray-400">Bright & clean</p>
+          </button>
+
+          <!-- Neon Theme -->
+          <button 
+            class="preset-btn p-4 glass border-2 rounded-xl hover:border-neon-purple/50 transition-all text-left group"
+            data-preset="neon"
+            data-bg="#1a0033"
+            data-primary="#bf00ff"
+            data-text="#ffffff"
+          >
+            <div class="w-full h-20 rounded-lg mb-3 bg-gradient-to-br from-purple-900 to-pink-900 border border-purple-500/30 group-hover:scale-105 transition-transform"></div>
+            <h4 class="text-white font-semibold mb-1">Neon</h4>
+            <p class="text-xs text-gray-400">Vibrant colors</p>
+          </button>
+
+          <!-- Ocean Theme -->
+          <button 
+            class="preset-btn p-4 glass border-2 rounded-xl hover:border-blue-500/50 transition-all text-left group"
+            data-preset="ocean"
+            data-bg="#001a33"
+            data-primary="#00d4ff"
+            data-text="#ffffff"
+          >
+            <div class="w-full h-20 rounded-lg mb-3 bg-gradient-to-br from-blue-900 to-cyan-900 border border-cyan-500/30 group-hover:scale-105 transition-transform"></div>
+            <h4 class="text-white font-semibold mb-1">Ocean</h4>
+            <p class="text-xs text-gray-400">Cool blues</p>
+          </button>
+
+          <!-- Sunset Theme -->
+          <button 
+            class="preset-btn p-4 glass border-2 rounded-xl hover:border-orange-500/50 transition-all text-left group"
+            data-preset="sunset"
+            data-bg="#331100"
+            data-primary="#ff6b00"
+            data-text="#ffffff"
+          >
+            <div class="w-full h-20 rounded-lg mb-3 bg-gradient-to-br from-orange-900 to-red-900 border border-orange-500/30 group-hover:scale-105 transition-transform"></div>
+            <h4 class="text-white font-semibold mb-1">Sunset</h4>
+            <p class="text-xs text-gray-400">Warm tones</p>
+          </button>
+
+          <!-- Forest Theme -->
+          <button 
+            class="preset-btn p-4 glass border-2 rounded-xl hover:border-green-500/50 transition-all text-left group"
+            data-preset="forest"
+            data-bg="#0d1f0d"
+            data-primary="#00cc66"
+            data-text="#ffffff"
+          >
+            <div class="w-full h-20 rounded-lg mb-3 bg-gradient-to-br from-green-900 to-emerald-900 border border-green-500/30 group-hover:scale-105 transition-transform"></div>
+            <h4 class="text-white font-semibold mb-1">Forest</h4>
+            <p class="text-xs text-gray-400">Natural greens</p>
+          </button>
+        </div>
+      </Card>
+
+      <!-- Custom Colors -->
+      <Card title="Colors" description="Fine-tune your palette">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <!-- Background Color -->
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">
+              Background
+            </label>
+            <div class="flex items-center space-x-2">
+              <input
+                type="color"
+                id="background_color"
+                value={theme.background_color}
+                class="w-12 h-12 rounded-lg cursor-pointer border border-white/10"
+              />
+              <input
+                type="text"
+                id="background_color_text"
+                value={theme.background_color}
+                class="flex-1 px-3 py-2 glass border border-white/10 rounded-lg text-white text-sm"
+                placeholder="#000000"
+              />
+            </div>
+          </div>
+
+          <!-- Primary Color -->
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">
+              Primary
+            </label>
+            <div class="flex items-center space-x-2">
+              <input
+                type="color"
+                id="primary_color"
+                value={theme.primary_color}
+                class="w-12 h-12 rounded-lg cursor-pointer border border-white/10"
+              />
+              <input
+                type="text"
+                id="primary_color_text"
+                value={theme.primary_color}
+                class="flex-1 px-3 py-2 glass border border-white/10 rounded-lg text-white text-sm"
+                placeholder="#00ff9d"
+              />
+            </div>
+          </div>
+
+          <!-- Text Color -->
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">
+              Text
+            </label>
+            <div class="flex items-center space-x-2">
+              <input
+                type="color"
+                id="text_color"
+                value={theme.text_color}
+                class="w-12 h-12 rounded-lg cursor-pointer border border-white/10"
+              />
+              <input
+                type="text"
+                id="text_color_text"
+                value={theme.text_color}
+                class="flex-1 px-3 py-2 glass border border-white/10 rounded-lg text-white text-sm"
+                placeholder="#ffffff"
+              />
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <!-- Button Style -->
+      <Card title="Button Style" description="Choose how buttons look">
+        <div class="grid grid-cols-3 gap-3">
+          <button class="button-style-btn p-4 glass border-2 rounded-xl hover:border-neon-green/50 transition-all" data-style="filled">
+            <div class="w-full h-12 bg-neon-green rounded-lg mb-2"></div>
+            <p class="text-sm text-white font-medium">Filled</p>
+          </button>
+          <button class="button-style-btn p-4 glass border-2 rounded-xl hover:border-neon-green/50 transition-all" data-style="outline">
+            <div class="w-full h-12 border-2 border-neon-green rounded-lg mb-2"></div>
+            <p class="text-sm text-white font-medium">Outline</p>
+          </button>
+          <button class="button-style-btn p-4 glass border-2 rounded-xl hover:border-neon-green/50 transition-all" data-style="shadow">
+            <div class="w-full h-12 bg-neon-green rounded-lg mb-2" style="box-shadow: 0 4px 20px rgba(0,255,157,0.5)"></div>
+            <p class="text-sm text-white font-medium">Shadow</p>
+          </button>
+        </div>
+      </Card>
+
+      <!-- Border Radius -->
+      <Card title="Border Radius" description="Adjust corner roundness">
+        <div class="space-y-4">
+          <input
+            type="range"
+            id="border_radius"
+            min="0"
+            max="24"
+            value={theme.border_radius}
+            class="w-full accent-neon-green"
+          />
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-gray-400">Sharp (0px)</span>
+            <span class="text-white font-semibold"><span id="radius-value">{theme.border_radius}</span>px</span>
+            <span class="text-gray-400">Round (24px)</span>
+          </div>
+        </div>
+      </Card>
+
+      <!-- Font Family -->
+      <Card title="Typography" description="Choose your font">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {['Inter', 'Poppins', 'Roboto', 'Montserrat', 'Open Sans', 'Lato', 'Space Grotesk', 'DM Sans'].map((font) => (
+            <button 
+              class="font-btn p-3 glass border-2 rounded-xl hover:border-neon-green/50 transition-all text-white"
+              data-font={font}
+              style={`font-family: ${font}, sans-serif`}
+            >
+              {font}
+            </button>
+          ))}
+        </div>
+      </Card>
+
+      <!-- Advanced Options -->
+      <Card title="Advanced" description="Extra customization">
+        <div class="space-y-4">
+          <!-- Block Shadow -->
+          <label class="flex items-center justify-between p-3 glass rounded-lg cursor-pointer">
+            <div>
+              <div class="text-white font-medium">Block Shadows</div>
+              <div class="text-xs text-gray-400">Add depth to blocks</div>
+            </div>
+            <input type="checkbox" id="block_shadow" checked={theme.block_shadow} class="toggle" />
+          </label>
+
+          <!-- Animations -->
+          <label class="flex items-center justify-between p-3 glass rounded-lg cursor-pointer">
+            <div>
+              <div class="text-white font-medium">Animations</div>
+              <div class="text-xs text-gray-400">Enable hover effects</div>
+            </div>
+            <input type="checkbox" id="animations" checked={theme.animations} class="toggle" />
+          </label>
+
+          <!-- Background Style -->
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">Background Style</label>
+            <select id="background_style" class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white">
+              <option value="solid" selected={theme.background_style === 'solid'}>Solid Color</option>
+              <option value="gradient" selected={theme.background_style === 'gradient'}>Gradient</option>
+              <option value="blur" selected={theme.background_style === 'blur'}>Blur Effect</option>
+            </select>
+          </div>
+        </div>
+      </Card>
+
+      <!-- Actions -->
+      <div class="flex items-center space-x-3">
+        <Button variant="primary" id="save-theme-btn" class="flex-1">
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+          </svg>
+          Save Theme
+        </Button>
+        <Button variant="ghost" id="reset-theme-btn">
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          Reset
+        </Button>
+        <Button variant="secondary" href={`/${profile.username}`} target="_blank">
+          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+          </svg>
+          Preview Live
+        </Button>
+      </div>
+    </div>
+
+    <!-- Live Preview (Right) -->
+    <div class="lg:col-span-1">
+      <div class="sticky top-6">
+        <Card title="Live Preview" description="See your changes" class="overflow-hidden">
+          <div id="preview-container" class="rounded-xl p-6 min-h-[500px] transition-all duration-300" style={`background-color: ${theme.background_color}`}>
+            <!-- Profile Preview -->
+            <div class="text-center mb-6">
+              <div class="w-20 h-20 rounded-full bg-gradient-to-br from-neon-green to-neon-blue mx-auto mb-4 animate-pulse"></div>
+              <h3 id="preview-name" style={`color: ${theme.text_color}`} class="font-bold text-lg mb-1">
+                {profile.display_name}
+              </h3>
+              <p id="preview-bio" style={`color: ${theme.text_color}`} class="text-sm opacity-70">
+                {profile.bio || 'Your bio here'}
+              </p>
+            </div>
+
+            <!-- Block Previews -->
+            <div class="space-y-3">
+              <button
+                id="preview-button-1"
+                class="w-full py-3 px-4 font-medium transition-all hover:scale-105"
+                style={`
+                  background-color: ${theme.primary_color};
+                  color: ${theme.background_color};
+                  border-radius: ${theme.border_radius}px;
+                  ${theme.block_shadow ? 'box-shadow: 0 4px 12px rgba(0,0,0,0.3);' : ''}
+                `}
+              >
+                Sample Link 1
+              </button>
+              <button
+                id="preview-button-2"
+                class="w-full py-3 px-4 font-medium transition-all hover:scale-105"
+                style={`
+                  background-color: ${theme.primary_color};
+                  color: ${theme.background_color};
+                  border-radius: ${theme.border_radius}px;
+                  ${theme.block_shadow ? 'box-shadow: 0 4px 12px rgba(0,0,0,0.3);' : ''}
+                `}
+              >
+                Sample Link 2
+              </button>
+              <button
+                id="preview-button-3"
+                class="w-full py-3 px-4 font-medium transition-all hover:scale-105"
+                style={`
+                  background-color: ${theme.primary_color};
+                  color: ${theme.background_color};
+                  border-radius: ${theme.border_radius}px;
+                  ${theme.block_shadow ? 'box-shadow: 0 4px 12px rgba(0,0,0,0.3);' : ''}
+                `}
+              >
+                Sample Link 3
+              </button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    import { toast } from '@/lib/utils/toast';
+
+    // ==================== STATE ====================
+    let currentTheme = {
+      preset: 'dark',
+      background_color: '#0a0a0a',
+      primary_color: '#00ff9d',
+      text_color: '#ffffff',
+      button_style: 'filled',
+      border_radius: 12,
+      font_family: 'Inter',
+      background_style: 'solid',
+      block_shadow: true,
+      animations: true
+    };
+
+    // ==================== UPDATE PREVIEW ====================
+    function updatePreview() {
+      const container = document.getElementById('preview-container');
+      const buttons = [1, 2, 3].map(i => document.getElementById(`preview-button-${i}`));
+      const name = document.getElementById('preview-name');
+      const bio = document.getElementById('preview-bio');
+
+      if (container) {
+        container.style.backgroundColor = currentTheme.background_color;
+        container.style.fontFamily = `${currentTheme.font_family}, sans-serif`;
+      }
+
+      buttons.forEach(btn => {
+        if (btn) {
+          btn.style.backgroundColor = currentTheme.primary_color;
+          btn.style.color = currentTheme.background_color;
+          btn.style.borderRadius = `${currentTheme.border_radius}px`;
+          btn.style.boxShadow = currentTheme.block_shadow ? '0 4px 12px rgba(0,0,0,0.3)' : 'none';
+          btn.style.fontFamily = `${currentTheme.font_family}, sans-serif`;
+        }
+      });
+
+      if (name) {
+        name.style.color = currentTheme.text_color;
+        name.style.fontFamily = `${currentTheme.font_family}, sans-serif`;
+      }
+      if (bio) {
+        bio.style.color = currentTheme.text_color;
+        bio.style.fontFamily = `${currentTheme.font_family}, sans-serif`;
+      }
+    }
+
+    // ==================== COLOR PICKERS ====================
+    const bgPicker = document.getElementById('background_color') as HTMLInputElement;
+    const bgText = document.getElementById('background_color_text') as HTMLInputElement;
+    const primaryPicker = document.getElementById('primary_color') as HTMLInputElement;
+    const primaryText = document.getElementById('primary_color_text') as HTMLInputElement;
+    const textPicker = document.getElementById('text_color') as HTMLInputElement;
+    const textText = document.getElementById('text_color_text') as HTMLInputElement;
+
+    // Sync color picker with text input
+    [
+      { picker: bgPicker, text: bgText, key: 'background_color' },
+      { picker: primaryPicker, text: primaryText, key: 'primary_color' },
+      { picker: textPicker, text: textText, key: 'text_color' }
+    ].forEach(({ picker, text, key }) => {
+      picker?.addEventListener('input', (e) => {
+        const value = (e.target as HTMLInputElement).value;
+        currentTheme[key] = value;
+        if (text) text.value = value;
+        updatePreview();
+      });
+
+      text?.addEventListener('input', (e) => {
+        const value = (e.target as HTMLInputElement).value;
+        if (/^#[0-9A-F]{6}$/i.test(value)) {
+          currentTheme[key] = value;
+          if (picker) picker.value = value;
+          updatePreview();
+        }
+      });
+    });
+
+    // ==================== BORDER RADIUS ====================
+    const radiusSlider = document.getElementById('border_radius') as HTMLInputElement;
+    const radiusValue = document.getElementById('radius-value');
+
+    radiusSlider?.addEventListener('input', (e) => {
+      const value = parseInt((e.target as HTMLInputElement).value);
+      currentTheme.border_radius = value;
+      if (radiusValue) radiusValue.textContent = value.toString();
+      updatePreview();
+    });
+
+    // ==================== PRESETS ====================
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const preset = (btn as HTMLElement).dataset.preset;
+        const bg = (btn as HTMLElement).dataset.bg;
+        const primary = (btn as HTMLElement).dataset.primary;
+        const text = (btn as HTMLElement).dataset.text;
+
+        if (preset && bg && primary && text) {
+          currentTheme.preset = preset;
+          currentTheme.background_color = bg;
+          currentTheme.primary_color = primary;
+          currentTheme.text_color = text;
+
+          // Update pickers
+          if (bgPicker) bgPicker.value = bg;
+          if (bgText) bgText.value = bg;
+          if (primaryPicker) primaryPicker.value = primary;
+          if (primaryText) primaryText.value = primary;
+          if (textPicker) textPicker.value = text;
+          if (textText) textText.value = text;
+
+          updatePreview();
+          toast.success(`Applied ${preset} theme!`);
+        }
+      });
+    });
+
+    // ==================== BUTTON STYLE ====================
+    document.querySelectorAll('.button-style-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const style = (btn as HTMLElement).dataset.style;
+        if (style) {
+          currentTheme.button_style = style;
+          // Highlight selected
+          document.querySelectorAll('.button-style-btn').forEach(b => b.classList.remove('border-neon-green'));
+          btn.classList.add('border-neon-green');
+          updatePreview();
+        }
+      });
+    });
+
+    // ==================== FONT FAMILY ====================
+    document.querySelectorAll('.font-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const font = (btn as HTMLElement).dataset.font;
+        if (font) {
+          currentTheme.font_family = font;
+          // Highlight selected
+          document.querySelectorAll('.font-btn').forEach(b => b.classList.remove('border-neon-green'));
+          btn.classList.add('border-neon-green');
+          updatePreview();
+          toast.success(`Font changed to ${font}`);
+        }
+      });
+    });
+
+    // ==================== ADVANCED OPTIONS ====================
+    const blockShadow = document.getElementById('block_shadow') as HTMLInputElement;
+    const animations = document.getElementById('animations') as HTMLInputElement;
+    const bgStyle = document.getElementById('background_style') as HTMLSelectElement;
+
+    blockShadow?.addEventListener('change', (e) => {
+      currentTheme.block_shadow = (e.target as HTMLInputElement).checked;
+      updatePreview();
+    });
+
+    animations?.addEventListener('change', (e) => {
+      currentTheme.animations = (e.target as HTMLInputElement).checked;
+      updatePreview();
+    });
+
+    bgStyle?.addEventListener('change', (e) => {
+      currentTheme.background_style = (e.target as HTMLSelectElement).value;
+      updatePreview();
+    });
+
+    // ==================== SAVE THEME ====================
+    const saveBtn = document.getElementById('save-theme-btn');
+
+    saveBtn?.addEventListener('click', async () => {
+      try {
+        const response = await fetch('/api/profile', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ theme: currentTheme })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to save theme');
+        }
+
+        toast.success('Theme saved successfully!');
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to save theme');
+      }
+    });
+
+    // ==================== RESET THEME ====================
+    const resetBtn = document.getElementById('reset-theme-btn');
+
+    resetBtn?.addEventListener('click', () => {
+      if (!confirm('Reset to default theme?')) return;
+
+      currentTheme = {
+        preset: 'dark',
+        background_color: '#0a0a0a',
+        primary_color: '#00ff9d',
+        text_color: '#ffffff',
+        button_style: 'filled',
+        border_radius: 12,
+        font_family: 'Inter',
+        background_style: 'solid',
+        block_shadow: true,
+        animations: true
+      };
+
+      if (bgPicker) bgPicker.value = currentTheme.background_color;
+      if (bgText) bgText.value = currentTheme.background_color;
+      if (primaryPicker) primaryPicker.value = currentTheme.primary_color;
+      if (primaryText) primaryText.value = currentTheme.primary_color;
+      if (textPicker) textPicker.value = currentTheme.text_color;
+      if (textText) textText.value = currentTheme.text_color;
+      if (radiusSlider) radiusSlider.value = currentTheme.border_radius.toString();
+      if (radiusValue) radiusValue.textContent = currentTheme.border_radius.toString();
+      if (blockShadow) blockShadow.checked = currentTheme.block_shadow;
+      if (animations) animations.checked = currentTheme.animations;
+      if (bgStyle) bgStyle.value = currentTheme.background_style;
+
+      updatePreview();
+      toast.success('Theme reset to default!');
+    });
+
+    // Initial preview
+    updatePreview();
+  </script>
+</DashboardLayout>

@@ -1,0 +1,200 @@
+---
+interface Props {
+  feature?: string;
+  currentPlan?: string;
+}
+
+const { feature, currentPlan = 'Free' } = Astro.props;
+---
+
+<div id="upgrade-modal" class="hidden fixed inset-0 z-[9999] flex items-center justify-center p-4">
+  <!-- Backdrop -->
+  <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" id="upgrade-backdrop"></div>
+
+  <!-- Modal -->
+  <div class="relative w-full max-w-4xl glass-strong border border-white/20 rounded-2xl p-8 shadow-2xl">
+    <!-- Close Button -->
+    <button id="upgrade-close" class="absolute top-4 right-4 p-2 text-gray-400 hover:text-white transition-colors">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+      </svg>
+    </button>
+
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <h2 class="text-3xl font-bold text-white mb-2">Upgrade Your Plan</h2>
+      <p class="text-gray-400">Unlock more features and grow your audience</p>
+    </div>
+
+    <!-- Plans Grid -->
+    <div class="grid md:grid-cols-3 gap-6 mb-6">
+      <!-- Creator Plan -->
+      <div class="glass border border-neon-green/30 rounded-2xl p-6 hover:border-neon-green/50 transition-all">
+        <div class="mb-4">
+          <h3 class="text-xl font-bold text-white mb-2">Creator</h3>
+          <div class="flex items-baseline space-x-2 mb-4">
+            <span class="text-4xl font-bold text-white">$9</span>
+            <span class="text-gray-400">/month</span>
+          </div>
+        </div>
+
+        <ul class="space-y-3 mb-6">
+          <li class="flex items-center space-x-2 text-sm text-gray-300">
+            <svg class="w-5 h-5 text-neon-green flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span>50 blocks</span>
+          </li>
+          <li class="flex items-center space-x-2 text-sm text-gray-300">
+            <svg class="w-5 h-5 text-neon-green flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span>Advanced analytics</span>
+          </li>
+          <li class="flex items-center space-x-2 text-sm text-gray-300">
+            <svg class="w-5 h-5 text-neon-green flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span>Custom themes</span>
+          </li>
+          <li class="flex items-center space-x-2 text-sm text-gray-300">
+            <svg class="w-5 h-5 text-neon-green flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span>Priority support</span>
+          </li>
+        </ul>
+
+        <button class="w-full py-3 bg-neon-green text-black font-semibold rounded-xl hover:bg-neon-green/90 transition-colors">
+          Upgrade to Creator
+        </button>
+      </div>
+
+      <!-- Pro Plan -->
+      <div class="glass border-2 border-neon-purple/50 rounded-2xl p-6 relative">
+        <div class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-neon-purple text-white text-xs font-bold rounded-full">
+          POPULAR
+        </div>
+
+        <div class="mb-4">
+          <h3 class="text-xl font-bold text-white mb-2">Pro</h3>
+          <div class="flex items-baseline space-x-2 mb-4">
+            <span class="text-4xl font-bold text-white">$29</span>
+            <span class="text-gray-400">/month</span>
+          </div>
+        </div>
+
+        <ul class="space-y-3 mb-6">
+          <li class="flex items-center space-x-2 text-sm text-gray-300">
+            <svg class="w-5 h-5 text-neon-purple flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span>Unlimited blocks</span>
+          </li>
+          <li class="flex items-center space-x-2 text-sm text-gray-300">
+            <svg class="w-5 h-5 text-neon-purple flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span>Deep analytics</span>
+          </li>
+          <li class="flex items-center space-x-2 text-sm text-gray-300">
+            <svg class="w-5 h-5 text-neon-purple flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span>Custom domain</span>
+          </li>
+          <li class="flex items-center space-x-2 text-sm text-gray-300">
+            <svg class="w-5 h-5 text-neon-purple flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span>API access</span>
+          </li>
+          <li class="flex items-center space-x-2 text-sm text-gray-300">
+            <svg class="w-5 h-5 text-neon-purple flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span>24/7 support</span>
+          </li>
+        </ul>
+
+        <button class="w-full py-3 bg-neon-purple text-white font-semibold rounded-xl hover:bg-neon-purple/90 transition-colors">
+          Upgrade to Pro
+        </button>
+      </div>
+
+      <!-- Enterprise Plan -->
+      <div class="glass border border-neon-blue/30 rounded-2xl p-6 hover:border-neon-blue/50 transition-all">
+        <div class="mb-4">
+          <h3 class="text-xl font-bold text-white mb-2">Enterprise</h3>
+          <div class="flex items-baseline space-x-2 mb-4">
+            <span class="text-4xl font-bold text-white">$99</span>
+            <span class="text-gray-400">/month</span>
+          </div>
+        </div>
+
+        <ul class="space-y-3 mb-6">
+          <li class="flex items-center space-x-2 text-sm text-gray-300">
+            <svg class="w-5 h-5 text-neon-blue flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span>Everything in Pro</span>
+          </li>
+          <li class="flex items-center space-x-2 text-sm text-gray-300">
+            <svg class="w-5 h-5 text-neon-blue flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span>Team accounts</span>
+          </li>
+          <li class="flex items-center space-x-2 text-sm text-gray-300">
+            <svg class="w-5 h-5 text-neon-blue flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span>White-label</span>
+          </li>
+          <li class="flex items-center space-x-2 text-sm text-gray-300">
+            <svg class="w-5 h-5 text-neon-blue flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span>Dedicated support</span>
+          </li>
+        </ul>
+
+        <button class="w-full py-3 bg-neon-blue text-white font-semibold rounded-xl hover:bg-neon-blue/90 transition-colors">
+          Contact Sales
+        </button>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="text-center text-sm text-gray-400">
+      <p>All plans include a 14-day free trial. Cancel anytime.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Modal controls
+  const modal = document.getElementById('upgrade-modal');
+  const backdrop = document.getElementById('upgrade-backdrop');
+  const closeBtn = document.getElementById('upgrade-close');
+
+  // Open modal function (global)
+  (window as any).openUpgradeModal = function() {
+    modal?.classList.remove('hidden');
+  };
+
+  // Close modal
+  function closeModal() {
+    modal?.classList.add('hidden');
+  }
+
+  closeBtn?.addEventListener('click', closeModal);
+  backdrop?.addEventListener('click', closeModal);
+
+  // ESC key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal?.classList.contains('hidden')) {
+      closeModal();
+    }
+  });
+</script>

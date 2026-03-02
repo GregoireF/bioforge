@@ -1,0 +1,72 @@
+---
+interface Props {
+  title?: string;
+  url?: string;
+  blockId: string;
+  primaryColor?: string;
+  type?: string;
+}
+
+const {
+  title = 'Sans titre',
+  url,
+  blockId,
+  primaryColor = '#0ea5e9',
+  type = 'link'
+} = Astro.props;
+
+const isClickable = !!url && url.trim() !== '';
+
+const href = isClickable ? `/api/track-click?id=${blockId}&url=${encodeURIComponent(url)}` : undefined;
+---
+
+{
+  isClickable ? (
+    <a
+      href={href}
+      class="link-button"
+      style={`--primary-color: ${primaryColor}`}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      {type === 'donation' && '💰 '}
+      {type === 'live-stream' && '🔴 '}
+      {type === 'clip' && '🎥 '}
+      {title}
+    </a>
+  ) : (
+    <div class="non-clickable">
+      {title}
+    </div>
+  )
+}
+
+<style>
+  .link-button {
+    display: block;
+    width: 100%;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1rem;
+    text-align: center;
+    font-weight: 600;
+    color: white;
+    background-color: var(--primary-color, #0ea5e9);
+    border-radius: 0.75rem;
+    text-decoration: none;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .link-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  }
+
+  .non-clickable {
+    padding: 1rem;
+    background: rgba(255,255,255,0.1);
+    border-radius: 0.75rem;
+    text-align: center;
+    color: white;
+  }
+</style>

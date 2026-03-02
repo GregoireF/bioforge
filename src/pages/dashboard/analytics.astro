@@ -1,0 +1,445 @@
+---
+import DashboardLayout from '@/layouts/DashboardLayout.astro';
+import Card from '@/components/ui/Card.astro';
+import Badge from '@/components/ui/Badge.astro';
+import Alert from '@/components/ui/Alert.astro';
+import { withAuth } from '@/lib/auth/auth';
+import { getAnalyticsSummary } from '@/lib/db/queries.server';
+import { getBlocks } from '@/lib/supabase/queries';
+import { createServerClient } from '@supabase/ssr';
+import { parse } from 'cookie';
+
+// Crée le client Supabase (obligatoire pour getAnalyticsSummary et getBlocks)
+const cookies = parse(Astro.request.headers.get('cookie') ?? '');
+const supabaseClient = createServerClient(
+  import.meta.env.PUBLIC_SUPABASE_URL!,
+  import.meta.env.PUBLIC_SUPABASE_ANON_KEY!,
+  {
+    cookies: {
+      get: (key) => cookies[key],
+      set: () => {},
+      remove: () => {},
+    },
+  }
+);
+
+// Auth
+const authResult = await withAuth({
+  cookies: Astro.cookies,
+  request: Astro.request,
+});
+
+if (!authResult.success || !authResult.data) {
+  console.error('[SSR AUTH] Auth échouée :', authResult);
+  return Astro.redirect(authResult.redirect || '/signin?error=auth_failed');
+}
+
+const { user, profile, planLimits } = authResult.data;
+
+// Logs auth pour debug
+console.log('[SSR AUTH] profile.id reçu :', profile?.id ?? 'UNDEFINED');
+console.log('[SSR AUTH] Type de profile.id :', typeof profile?.id);
+
+// Fallback si profile.id absent (évite crash)
+const safeProfileId = profile?.id;
+if (!safeProfileId) {
+  console.error('[SSR] profile.id est undefined → stats désactivées');
+}
+
+// Analytics
+const days = 7;
+
+let analyticsResult;
+let blocksResult;
+
+if (safeProfileId) {
+  analyticsResult = await getAnalyticsSummary(supabaseClient, safeProfileId, days);
+  blocksResult = await getBlocks(supabaseClient, safeProfileId);
+} else {
+  analyticsResult = { success: false, error: new Error('No profile ID') };
+  blocksResult = { success: false, error: new Error('No profile ID') };
+}
+
+// Fallback valeurs
+let analytics = {
+  summary: {
+    totalViews: 0,
+    totalClicks: 0,
+    clickRate: 0,
+    activeBlocks: 0
+  },
+  profileStats: [],
+  blockStats: [],
+  topBlocks: []
+};
+
+let blocks = [];
+let analyticsError = null;
+
+if (analyticsResult.success) {
+  analytics = analyticsResult.data;
+  console.log('[SSR] Analytics OK → totalClicks :', analytics.summary.totalClicks);
+  console.log('[SSR] profileStats length :', analytics.profileStats?.length ?? 0);
+  console.log('[SSR] blockStats length :', analytics.blockStats?.length ?? 0);
+} else {
+  analyticsError = analyticsResult.error?.message ?? 'Erreur inconnue';
+  console.error('[SSR] Erreur analytics :', analyticsResult.error);
+}
+
+if (blocksResult.success) {
+  blocks = blocksResult.data ?? [];
+  console.log('[SSR] Blocks chargés :', blocks.length);
+} else {
+  console.error('[SSR] Erreur blocks :', blocksResult.error);
+}
+
+// Prepare chart data
+const profileStats = analytics.profileStats ?? [];
+const blockStats = analytics.blockStats ?? [];
+
+const chartLabels = profileStats.map(s => 
+  new Date(s.date).toLocaleDateString('fr-FR', { weekday: 'short', month: 'short', day: 'numeric' })
+) || [];
+
+const chartViews = profileStats.map(s => s.views ?? 0) || [];
+
+// Calcul clics par date
+const clicksByDate = new Map();
+blockStats.forEach(bs => {
+  const existing = clicksByDate.get(bs.date) ?? 0;
+  clicksByDate.set(bs.date, existing + (bs.clicks ?? 0));
+});
+
+const chartClicks = profileStats.map(s => clicksByDate.get(s.date) ?? 0) || [];
+
+console.log('[SSR] chartData préparé :', {
+  labelsCount: chartLabels.length,
+  viewsSum: chartViews.reduce((a, b) => a + b, 0),
+  clicksSum: chartClicks.reduce((a, b) => a + b, 0)
+});
+
+// Export pour define:vars
+const exportedChartData = { labels: chartLabels, views: chartViews, clicks: chartClicks };
+---
+
+<DashboardLayout title="Analytics">
+  <!-- Header -->
+  <div class="mb-6">
+    <h2 class="text-lg lg:text-xl font-semibold text-white mb-1">Analytics</h2>
+    <p class="text-sm text-gray-400">Track your performance and engagement</p>
+  </div>
+
+  <!-- Error Alert -->
+  {analyticsError && (
+    <Alert variant="danger" title="Error loading analytics">
+      <p>{analyticsError}</p>
+      <p class="text-sm mt-2">Please refresh the page. If the problem persists, contact support.</p>
+    </Alert>
+  )}
+
+  <!-- Summary Stats -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
+    <!-- Total Views -->
+    <Card padding="md" hover={true}>
+      <div class="flex items-center justify-between mb-3">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-green/20 to-neon-green/10 border border-neon-green/30 flex items-center justify-center">
+          <svg class="w-5 h-5 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+          </svg>
+        </div>
+      </div>
+      <div class="text-2xl lg:text-3xl font-bold text-white mb-1">
+        {analytics.summary.totalViews.toLocaleString()}
+      </div>
+      <p class="text-xs lg:text-sm text-gray-400">Profile Views</p>
+    </Card>
+
+    <!-- Total Clicks -->
+    <Card padding="md" hover={true}>
+      <div class="flex items-center justify-between mb-3">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-purple/20 to-neon-purple/10 border border-neon-purple/30 flex items-center justify-center">
+          <svg class="w-5 h-5 text-neon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/>
+          </svg>
+        </div>
+      </div>
+      <div class="text-2xl lg:text-3xl font-bold text-white mb-1">
+        {analytics.summary.totalClicks.toLocaleString()}
+      </div>
+      <p class="text-xs lg:text-sm text-gray-400">Total Clicks</p>
+    </Card>
+
+    <!-- Click Rate -->
+    <Card padding="md" hover={true}>
+      <div class="flex items-center justify-between mb-3">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-blue/20 to-neon-blue/10 border border-neon-blue/30 flex items-center justify-center">
+          <svg class="w-5 h-5 text-neon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+          </svg>
+        </div>
+      </div>
+      <div class="text-2xl lg:text-3xl font-bold text-white mb-1">
+        {analytics.summary.clickRate.toFixed(1)}%
+      </div>
+      <p class="text-xs lg:text-sm text-gray-400">Click Rate</p>
+    </Card>
+
+    <!-- Active Blocks -->
+    <Card padding="md" hover={true}>
+      <div class="flex items-center justify-between mb-3">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-pink/20 to-neon-pink/10 border border-neon-pink/30 flex items-center justify-center">
+          <svg class="w-5 h-5 text-neon-pink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+          </svg>
+        </div>
+      </div>
+      <div class="text-2xl lg:text-3xl font-bold text-white mb-1">
+        {analytics.summary.activeBlocks}
+      </div>
+      <p class="text-xs lg:text-sm text-gray-400">Active Blocks</p>
+    </Card>
+  </div>
+
+  <!-- Charts Section -->
+  <div class="grid lg:grid-cols-2 gap-6 lg:gap-8 mb-8">
+    <!-- Views & Clicks Chart -->
+    <Card title="Views & Clicks" description="Last 7 days">
+      <canvas id="traffic-chart" class="w-full" style="max-height: 300px;"></canvas>
+    </Card>
+
+    <!-- Performance Chart -->
+    <Card title="Click Rate" description="Daily performance">
+      <canvas id="performance-chart" class="w-full" style="max-height: 300px;"></canvas>
+    </Card>
+  </div>
+
+  <!-- Top Performing Blocks -->
+  <Card title="Top Performing Blocks" description="Most clicked" class="mb-8">
+    {!analytics.topBlocks || analytics.topBlocks.length === 0 ? (
+      <div class="text-center py-12 text-gray-400">
+        <p>No analytics data yet</p>
+      </div>
+    ) : (
+      <div class="space-y-3">
+        {analytics.topBlocks.slice(0, 10).map((block, index) => {
+          const blockClicks = block.clicks || 0;
+          const ctr = analytics.summary.totalViews > 0 
+            ? ((blockClicks / analytics.summary.totalViews) * 100).toFixed(1) 
+            : '0.0';
+          
+          return (
+            <div class="flex items-center justify-between p-4 glass rounded-xl border border-white/10 hover:border-neon-green/30 transition-all">
+              <div class="flex items-center space-x-4 flex-1 min-w-0">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-green/20 to-neon-green/10 border border-neon-green/30 flex items-center justify-center flex-shrink-0 text-neon-green font-bold">
+                  {index + 1}
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center space-x-2 mb-1">
+                    <Badge variant="default" size="sm">{block.type}</Badge>
+                    <h3 class="text-white font-semibold truncate">
+                      {block.title || 'Untitled'}
+                    </h3>
+                  </div>
+                  <div class="flex items-center space-x-4 text-sm text-gray-400">
+                    <span>{blockClicks} clicks</span>
+                    <span>{ctr}% CTR</span>
+                  </div>
+                </div>
+              </div>
+              <div class="text-right">
+                <div class="text-2xl font-bold text-neon-green">{blockClicks}</div>
+                <p class="text-xs text-gray-500">clicks</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </Card>
+
+  <!-- All Blocks Performance -->
+  <Card title="All Blocks Performance" description="Detailed breakdown">
+    {blocks.length === 0 ? (
+      <div class="text-center py-12 text-gray-400">
+        <p>No blocks yet. <a href="/dashboard/blocks" class="text-neon-green hover:underline">Add your first block!</a></p>
+      </div>
+    ) : (
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead>
+            <tr class="border-b border-white/10">
+              <th class="text-left py-3 px-4 text-sm font-semibold text-gray-400">Block</th>
+              <th class="text-right py-3 px-4 text-sm font-semibold text-gray-400">Clicks</th>
+              <th class="text-right py-3 px-4 text-sm font-semibold text-gray-400">CTR</th>
+              <th class="text-center py-3 px-4 text-sm font-semibold text-gray-400">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {blocks.map((block) => {
+              const blockClicks = analytics.topBlocks?.find(tb => tb.id === block.id)?.clicks || 0;
+              const ctr = analytics.summary.totalViews > 0 
+                ? ((blockClicks / analytics.summary.totalViews) * 100).toFixed(1) 
+                : '0.0';
+              
+              return (
+                <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+                  <td class="py-3 px-4">
+                    <div class="flex items-center space-x-3">
+                      <Badge variant="default" size="sm">{block.type}</Badge>
+                      <span class="text-white text-sm truncate">
+                        {block.title || 'Untitled'}
+                      </span>
+                    </div>
+                  </td>
+                  <td class="py-3 px-4 text-right">
+                    <span class="text-white font-semibold">{blockClicks}</span>
+                  </td>
+                  <td class="py-3 px-4 text-right">
+                    <span class="text-gray-400">{ctr}%</span>
+                  </td>
+                  <td class="py-3 px-4 text-center">
+                    <Badge variant={block.active ? 'success' : 'default'} size="sm">
+                      {block.active ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </Card>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  
+  <!-- Charts Script -->
+  <script define:vars={{ chartData: exportedChartData, analytics }}>
+    window.addEventListener('load', function() {
+      console.log('📊 Chart.js loaded:', typeof Chart !== 'undefined');
+      console.log('📊 Chart data reçu :', chartData);
+      console.log('📊 Analytics reçu :', analytics);
+      console.log('📊 Total clics SSR :', analytics?.summary?.totalClicks ?? 'absent');
+      console.log('📊 Total vues SSR :', analytics?.summary?.totalViews ?? 'absent');
+
+      if (typeof Chart === 'undefined') {
+        console.error('❌ Chart.js non chargé !');
+        return;
+      }
+
+      if (!chartData || !chartData.labels || chartData.labels.length === 0) {
+        console.warn('⚠️ No chart data available (labels vide)');
+        return;
+      }
+
+      // Traffic Chart (Views & Clicks)
+      const trafficCtx = document.getElementById('traffic-chart');
+      if (trafficCtx) {
+        new Chart(trafficCtx, {
+          type: 'line',
+          data: {
+            labels: chartData.labels || [],
+            datasets: [
+              {
+                label: 'Views',
+                data: chartData.views || [],
+                borderColor: '#00ff9d',
+                backgroundColor: 'rgba(0, 255, 157, 0.1)',
+                tension: 0.4,
+                fill: true,
+                borderWidth: 2,
+              },
+              {
+                label: 'Clicks',
+                data: chartData.clicks || [],
+                borderColor: '#bf00ff',
+                backgroundColor: 'rgba(191, 0, 255, 0.1)',
+                tension: 0.4,
+                fill: true,
+                borderWidth: 2,
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                display: true,
+                labels: { color: '#9ca3af', font: { size: 11 } }
+              },
+              tooltip: {
+                backgroundColor: 'rgba(17, 17, 17, 0.9)',
+                titleColor: '#fff',
+                bodyColor: '#9ca3af',
+                borderColor: 'rgba(0, 255, 157, 0.3)',
+                borderWidth: 1
+              }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: { color: '#9ca3af', font: { size: 11 } },
+                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+              },
+              x: {
+                ticks: { color: '#9ca3af', font: { size: 11 } },
+                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+              }
+            }
+          }
+        });
+        console.log('📊 Traffic chart créé');
+      }
+
+      // Performance Chart (Click Rate)
+      const perfCtx = document.getElementById('performance-chart');
+      if (perfCtx) {
+        const clickRates = (chartData.labels || []).map((_, index) => {
+          const views = chartData.views?.[index] || 0;
+          const clicks = chartData.clicks?.[index] || 0;
+          return views > 0 ? parseFloat(((clicks / views) * 100).toFixed(1)) : 0;
+        });
+
+        new Chart(perfCtx, {
+          type: 'bar',
+          data: {
+            labels: chartData.labels || [],
+            datasets: [{
+              label: 'Click Rate (%)',
+              data: clickRates,
+              backgroundColor: 'rgba(0, 255, 157, 0.2)',
+              borderColor: '#00ff9d',
+              borderWidth: 2,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false }
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                ticks: { 
+                  color: '#9ca3af', 
+                  font: { size: 11 },
+                  callback: (value) => value + '%'
+                },
+                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+              },
+              x: {
+                ticks: { color: '#9ca3af', font: { size: 11 } },
+                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+              }
+            }
+          }
+        });
+        console.log('📊 Click Rate chart créé');
+      }
+    });
+  </script>
+</DashboardLayout>

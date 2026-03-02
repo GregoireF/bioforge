@@ -1,0 +1,85 @@
+---
+interface Props {
+  current: number;
+  limit: number;
+  feature: string;
+  showUpgrade?: boolean;
+}
+
+const { current, limit, feature, showUpgrade = true } = Astro.props;
+
+// Calculate percentage
+const isUnlimited = limit === -1;
+const percentage = isUnlimited ? 0 : Math.min((current / limit) * 100, 100);
+const isNearLimit = percentage >= 80;
+const isAtLimit = percentage >= 100;
+
+// Determine variant
+let variant = 'default';
+if (isAtLimit) variant = 'danger';
+else if (isNearLimit) variant = 'warning';
+else variant = 'success';
+
+const colors = {
+  success: 'bg-green-500',
+  warning: 'bg-yellow-500',
+  danger: 'bg-red-500',
+  default: 'bg-neon-green'
+};
+---
+
+<div class="space-y-2">
+  <!-- Label & Stats -->
+  <div class="flex items-center justify-between text-sm">
+    <span class="text-gray-400">{feature}</span>
+    <div class="flex items-center space-x-2">
+      <span class="text-white font-semibold">
+        {current} / {isUnlimited ? '∞' : limit}
+      </span>
+      {!isUnlimited && (
+        <span class="text-gray-500">
+          ({percentage.toFixed(0)}%)
+        </span>
+      )}
+    </div>
+  </div>
+
+  <!-- Progress Bar -->
+  {!isUnlimited && (
+    <div class="relative w-full h-2 bg-white/10 rounded-full overflow-hidden">
+      <div 
+        class={`h-full ${colors[variant]} transition-all duration-500`}
+        style={`width: ${percentage}%`}
+      ></div>
+    </div>
+  )}
+
+  <!-- Warning Messages -->
+  {isAtLimit && showUpgrade && (
+    <div class="flex items-center justify-between p-3 glass border border-red-500/30 rounded-lg">
+      <div class="flex items-center space-x-2">
+        <svg class="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+        </svg>
+        <span class="text-sm text-red-400">Limit reached</span>
+      </div>
+      <a href="/pricing" class="text-sm text-neon-green hover:underline">
+        Upgrade →
+      </a>
+    </div>
+  )}
+
+  {isNearLimit && !isAtLimit && showUpgrade && (
+    <div class="flex items-center justify-between p-3 glass border border-yellow-500/30 rounded-lg">
+      <div class="flex items-center space-x-2">
+        <svg class="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <span class="text-sm text-yellow-400">Approaching limit</span>
+      </div>
+      <a href="/pricing" class="text-sm text-neon-green hover:underline">
+        Upgrade →
+      </a>
+    </div>
+  )}
+</div>

@@ -1,0 +1,170 @@
+---
+import { createSupabaseServer } from '@/lib/supabase/server';
+
+const errorMessage = Astro.url.searchParams.get('error');
+const successMessage = Astro.url.searchParams.get('success');
+
+const supabase = createSupabaseServer({
+  request: Astro.request,
+  cookies: Astro.cookies,
+});
+
+const ALLOWED_PROVIDERS = ['google', 'discord', 'apple'] as const;
+type Provider = typeof ALLOWED_PROVIDERS[number];
+
+if (Astro.request.method === 'POST') {
+  const formData = await Astro.request.formData();
+  const provider = formData.get('provider')
+  //const email = formData.get('email')
+  const siteUrl = import.meta.env.PUBLIC_SITE_URL;
+
+  if (provider && ALLOWED_PROVIDERS.includes(provider as Provider)) {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: provider as Provider,
+      options: {
+        redirectTo: `${siteUrl}/auth/callback`
+      }
+    });
+
+    if (error) {
+      console.error('OAuth error:', error);
+      return Astro.redirect(`/signin?error=oauth_failed`);
+    }
+
+    if (data.url) {
+      return Astro.redirect(data.url);
+    }
+  } 
+
+  return Astro.redirect('/signin?error=invalid_request');
+}
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sign In</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family: system-ui, sans-serif;
+      background: linear-gradient(135deg, #0a0a0a, #1a1a1a);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 1rem;
+      padding: 2rem;
+      max-width: 450px;
+      width: 100%;
+    }
+    h1 { font-size: 2rem; color: white; text-align: center; margin-bottom: 0.5rem; }
+    .subtitle { text-align: center; color: #888; margin-bottom: 2rem; }
+    .message { padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem; }
+    .error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #ef4444; }
+    .success { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); color: #22c55e; }
+    .oauth-buttons { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem; }
+    .oauth-form { margin: 0; }
+    .oauth-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      padding: 1rem;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 0.75rem;
+      background: rgba(255,255,255,0.05);
+      color: white;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .oauth-btn:hover { background: rgba(255,255,255,0.1); }
+    .divider {
+      display: flex;
+      align-items: center;
+      margin: 1.5rem 0;
+      color: #666;
+      font-size: 0.875rem;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(255,255,255,0.1);
+    }
+    .divider span { padding: 0 1rem; }
+    .email-form { display: flex; flex-direction: column; gap: 0.75rem; }
+    input {
+      padding: 0.875rem;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 0.75rem;
+      background: rgba(255,255,255,0.05);
+      color: white;
+    }
+    input::placeholder { color: #666; }
+    input:focus { outline: none; border-color: #00ff9d; }
+    .submit-btn {
+      padding: 0.875rem;
+      background: #00ff9d;
+      color: black;
+      border: none;
+      border-radius: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .terms { text-align: center; font-size: 0.75rem; color: #666; margin-top: 1.5rem; }
+    .terms a { color: #00ff9d; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Welcome Back</h1>
+    <p class="subtitle">Sign in to BioForge</p>
+
+    {errorMessage && <div class="message error">{errorMessage}</div>}
+    {successMessage && <div class="message success">{successMessage}</div>}
+
+    <div class="oauth-buttons">
+      <form method="POST" class="oauth-form">
+        <input type="hidden" name="provider" value="google" />
+        <button type="submit" class="oauth-btn">
+          Continue with Google
+        </button>
+      </form>
+
+      <form method="POST" class="oauth-form">
+        <input type="hidden" name="provider" value="discord" />
+        <button type="submit" class="oauth-btn">
+          Continue with Discord
+        </button>
+      </form>
+
+      <form method="POST" class="oauth-form">
+        <input type="hidden" name="provider" value="apple" />
+        <button type="submit" class="oauth-btn" style="background: black;">
+          Continue with Apple
+        </button>
+      </form>
+    </div>
+
+    <div class="divider"><span>or email</span></div>
+
+    <form method="POST" class="email-form">
+      <input type="email" name="email" placeholder="you@example.com" required />
+      <button type="submit" class="submit-btn">Send Magic Link</button>
+    </form>
+
+    <p class="terms">
+      By continuing, you agree to our <a href="/terms">Terms</a>
+    </p>
+  </div>
+</body>
+</html>
