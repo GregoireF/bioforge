@@ -54,7 +54,7 @@ const { user, profile, planLimits } = authResult.data;
         <label for="username" class="block text-sm font-medium text-gray-300 mb-2">
           Username
           <span class="text-red-400 ml-1">*</span>
-          <span class="text-gray-500 text-xs ml-2">yoursite.com/{profile.username}</span>
+          <span class="text-gray-500 text-xs ml-2">https://bioforge.click/@{profile.username}</span>
         </label>
         <div class="flex items-center space-x-2">
           <Input
@@ -231,7 +231,7 @@ const { user, profile, planLimits } = authResult.data;
       <div class="flex items-center space-x-3">
         <Input
           type="text"
-          value={`https://bioforge-three.vercel.app/@${profile.username}`}
+          value={`https://bioforge.click/@${profile.username}`}
           readonly
           id="profile-url"
           class="flex-1"
