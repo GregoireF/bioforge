@@ -2,7 +2,6 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { getProfileByUsername, getActiveBlocks, incrementProfileView } from '@/lib/supabase/queries';
 import QRCode from 'qrcode';
-import { Image } from 'astro:assets'
 
 // ==================== GET USERNAME ====================
 const { username } = Astro.params;
@@ -70,7 +69,8 @@ try {
       <!-- PROFILE HEADER -->
       <div class="text-center mb-10 animate-fade-in-up">
         {profile.avatar_url ? (
-          <Image src={profile.avatar_url} alt={profile.display_name || profile.username}
+          <img src={profile.avatar_url}
+               alt={profile.display_name || profile.username}
                class="w-28 h-28 rounded-full mx-auto mb-6 object-cover avatar-glow"
                style={`border: 4px solid ${theme.primary_color}; box-shadow: 0 0 40px ${theme.primary_color}60;`} />
         ) : (
@@ -103,7 +103,7 @@ try {
             const blockId = block.id;
             const staggerClass = `stagger-${Math.min(index + 2, 6)}`;
 
-            // ========== HEADING ==========
+            // HEADING
             if (block.type === 'heading') {
               return (
                 <div class={`text-xl lg:text-2xl font-bold text-center py-3 animate-fade-in-up ${staggerClass}`}
@@ -113,15 +113,15 @@ try {
               );
             }
 
-            // ========== SPACER ==========
+            // SPACER
             if (block.type === 'spacer') return <div class="h-8"></div>;
 
-            // ========== LINK ==========
+            // LINK
             if (block.type === 'link') {
               const url = block.config?.url || '#';
               return (
                 <a href={url} target="_blank" rel="noopener noreferrer"
-                   class={`block-link block w-full py-4 px-6 font-semibold text-center transition-all animate-fade-in-up ${staggerClass}`}
+                   class={`block w-full py-4 px-6 font-semibold text-center transition-all animate-fade-in-up ${staggerClass}`}
                    data-block-id={blockId}
                    style={`
                      background-color: ${theme.button_style === 'outline' ? 'transparent' : theme.primary_color};
@@ -136,14 +136,15 @@ try {
               );
             }
 
-            // ========== IMAGE ==========
+            // IMAGE
             if (block.type === 'image') {
               const imageUrl = block.config?.url;
               const imageLink = block.config?.link;
               if (!imageUrl) return null;
 
               const imageElement = (
-                <Image src={imageUrl} alt={block.title || 'Image'}
+                <img src={imageUrl}
+                     alt={block.title || 'Image'}
                      class={`w-full rounded-lg transition-all hover:scale-105 animate-fade-in-up ${staggerClass}`}
                      style={`border-radius: ${theme.border_radius}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''}`} />
               );
@@ -155,7 +156,7 @@ try {
               return <div>{imageElement}</div>;
             }
 
-            // ========== VIDEO ==========
+            // VIDEO
             if (block.type === 'video') {
               const videoUrl = block.config?.url;
               if (!videoUrl) return null;
@@ -175,14 +176,18 @@ try {
               return (
                 <div class={`relative w-full overflow-hidden animate-fade-in-up ${staggerClass}`}
                      style={`padding-bottom: 56.25%; border-radius: ${theme.border_radius}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''}`}>
-                  <iframe src={embedUrl} class="absolute top-0 left-0 w-full h-full"
-                          frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowfullscreen style={`border-radius: ${theme.border_radius}px;`}></iframe>
+                  <iframe src={embedUrl}
+                          class="absolute top-0 left-0 w-full h-full"
+                          frameborder="0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowfullscreen
+                          style={`border-radius: ${theme.border_radius}px;`}>
+                  </iframe>
                 </div>
               );
             }
 
-            // ========== SOCIAL ==========
+            // SOCIAL (TON CODE EXACT)
             if (block.type === 'social') {
               const links = block.config?.links || [];
               if (!Array.isArray(links) || links.length === 0) return null;
@@ -197,7 +202,10 @@ try {
                 tiktok: 'M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5'
               };
 
-              function getSocialIcon(url: string) {
+              function getSocialIcon(url?: string) {
+                if (!url) return 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71'; // icon fallback
+                url = url.toLowerCase(); // optionnel, pour uniformiser
+
                 if (url.includes('twitter.com') || url.includes('x.com')) return socialIcons.twitter;
                 if (url.includes('instagram.com')) return socialIcons.instagram;
                 if (url.includes('facebook.com')) return socialIcons.facebook;
@@ -205,6 +213,7 @@ try {
                 if (url.includes('linkedin.com')) return socialIcons.linkedin;
                 if (url.includes('github.com')) return socialIcons.github;
                 if (url.includes('tiktok.com')) return socialIcons.tiktok;
+
                 return 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71';
               }
 
@@ -246,16 +255,15 @@ try {
     </div>
   </div>
 
-  <!-- QR CODE CÔTÉ SERVEUR -->
-  <div id="qr-container"
-       class="fixed bottom-6 right-6 z-50 opacity-100 translate-y-0 transition-all duration-500 hover:scale-105">
+  <!-- QR -->
+  <div class="fixed bottom-6 right-6 z-50">
     <div class="p-4 rounded-2xl backdrop-blur-xl shadow-2xl border"
          style={`background-color: ${theme.background_color}CC; border-color: ${theme.primary_color}40;`}>
       <img src={qrDataUrl} alt="QR code" class="w-28 h-28 rounded-2xl"/>
     </div>
   </div>
 
-  <!-- SCRIPT CLIC CORRIGÉ -->
+  <!-- ANALYTICS SCRIPT -->
   <script define:vars={{ profileId: profile.id }}>
     let isClicking = false;
     document.querySelectorAll('[data-block-id]').forEach(element => {
@@ -268,12 +276,11 @@ try {
         if (!blockId) return;
 
         try {
-          const res = await fetch('/api/analytics/click', {
+          await fetch('/api/analytics/click', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'x-csrf-token': 'dev-bypass' },
             body: JSON.stringify({ block_id: blockId, profile_id: profileId })
           });
-          if (!res.ok) console.error('Click tracking failed', await res.text());
         } catch (err) { console.error(err); }
       });
     });
