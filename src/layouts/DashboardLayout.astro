@@ -171,16 +171,13 @@ function navClass(href: string, exact: boolean): string {
           <div class="absolute top-2 right-2 z-10">
             <span class="text-xs text-gray-600 bg-black/40 px-1.5 py-0.5 rounded">Ad</span>
           </div>
-          <!-- AdSense Manual Ad Unit — sidebar
-               Crée un ad unit "Display" dans AdSense > Ads > By ad unit
-               puis remplace data-ad-slot par ton ID -->
-          <ins class="adsbygoogle"
-            style="display:block"
+          <!-- AdSense Manual Ad Unit — sidebar -->
+          <ins class="adsbygoogle adsense-sidebar"
+            style="display:block;width:100%;min-width:200px;min-height:100px;"
             data-ad-client="ca-pub-2203788383686517"
             data-ad-slot="2242281532"
-            data-ad-format="auto"
-            data-full-width-responsive="true"></ins>
-          <script>(window.adsbygoogle = window.adsbygoogle || []).push({});</script>
+            data-ad-format="rectangle"
+            data-full-width-responsive="false"></ins>
           <!-- Upgrade nudge below ad -->
           <a href="/dashboard/billing"
             class="flex items-center gap-2 mt-3 pt-3 border-t border-white/8 text-xs text-gray-500 hover:text-neon-green transition-colors group">
@@ -296,7 +293,7 @@ function navClass(href: string, exact: boolean): string {
 
         <!-- View profile shortcut -->
         {profile?.username && (
-          <a href={`/${profile.username}`} target="_blank"
+          <a href={`/@${profile.username}`} target="_blank"
             class="hidden lg:flex items-center gap-1.5 px-3 py-1.5 glass border border-white/10 rounded-lg hover:border-white/20 transition-all text-xs text-gray-400 hover:text-white">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
@@ -398,15 +395,13 @@ function navClass(href: string, exact: boolean): string {
             <span class="text-xs text-gray-600">Sponsored</span>
             <a href="/dashboard/billing" class="text-xs text-neon-green hover:underline">Remove ads</a>
           </div>
-          <!-- AdSense Manual Ad Unit — mobile drawer
-               Même process : crée un 2e ad unit et remplace le slot -->
-          <ins class="adsbygoogle"
-            style="display:block"
+          <!-- AdSense Manual Ad Unit — mobile drawer -->
+          <ins class="adsbygoogle adsense-mobile"
+            style="display:block;width:100%;min-width:200px;min-height:100px;"
             data-ad-client="ca-pub-2203788383686517"
             data-ad-slot="2242281532"
-            data-ad-format="auto"
-            data-full-width-responsive="true"></ins>
-          <script>(window.adsbygoogle = window.adsbygoogle || []).push({});</script>
+            data-ad-format="rectangle"
+            data-full-width-responsive="false"></ins>
         </div>
       </div>
     )}
@@ -525,5 +520,25 @@ function navClass(href: string, exact: boolean): string {
   });
 </script>
 
+<script>
+  // Push AdSense units only after layout is painted and elements have real width
+  function initAdsense() {
+    document.querySelectorAll('.adsbygoogle').forEach(function(ins) {
+      // Skip if already filled or has no parent width
+      if (ins.getAttribute('data-adsbygoogle-status')) return;
+      var w = ins.parentElement ? ins.parentElement.offsetWidth : 0;
+      if (w < 50) return; // skip if still not visible
+      try {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+      } catch(e) {}
+    });
+  }
+  // Run after paint
+  if (document.readyState === 'complete') {
+    setTimeout(initAdsense, 300);
+  } else {
+    window.addEventListener('load', function() { setTimeout(initAdsense, 300); });
+  }
+</script>
 </body>
 </html>
