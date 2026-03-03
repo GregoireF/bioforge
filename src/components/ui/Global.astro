@@ -2,11 +2,40 @@
 import "@/styles/global.css";
 ---
 
-<!-- On garde juste les containers vides pour le futur -->
+<!-- Containers futurs -->
 <div id="cursor-trail" class="pointer-events-none fixed inset-0 z-50"></div>
 <div id="particles-container" class="pointer-events-none fixed inset-0 z-0"></div>
 
 <style>
-  #particles-container { display: none; } /* désactive tsParticles */
-  .cursor-particle { display: none; }     /* désactive le trail */
+  #particles-container { display: none; } /* désactive tsParticles si pas voulu */
+  .cursor-particle { display: none; }     /* désactive le trail si pas utilisé */
 </style>
+
+<!-- Island global : tous les inits client-side -->
+<script is:inline client:load>
+  // Import tous les inits que tu as validés
+  import { initClipboard } from '@/components/client/initClipboard';
+  import { initConfetti } from '@/components/client/initConfetti';
+  import { initCountUp } from '@/components/client/initCountUp';
+  import { initIntersectionReveal } from '@/components/client/initIntersectionReveal';
+  import { initLenis } from '@/components/client/initLenis';
+  import { initMagnetic } from '@/components/client/initMagnetic';
+  import { initPageTransition } from '@/components/client/initPageTransition';
+  import { initParticles } from '@/components/client/initParticles';
+  //import { initSwiper } from '@/components/client/initSwiper';
+  import { initTilt } from '@/components/client/initTilt';
+
+  // Appel séquentiel
+  initClipboard();
+  initConfetti();
+  initCountUp();
+  initIntersectionReveal();
+  initLenis();
+  initMagnetic();
+  initPageTransition();
+  initParticles();      // async, mais safe dans client:load
+  //initSwiper();
+  initTilt();
+
+  console.log('All client behaviors initialized from Global.astro');
+</script>

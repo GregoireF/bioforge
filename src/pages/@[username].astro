@@ -81,7 +81,7 @@ try {
         )}
 
         <h1 class="text-3xl lg:text-4xl font-bold mb-3 animate-scale-in"
-            style={`color: ${theme.text_color}`}>{profile.display_name || profile.username}</h1>
+            style={`color: ${theme.text_color}`}>@{profile.display_name || profile.username}</h1>
 
         {profile.bio && (
           <p class="text-base lg:text-lg mb-6 max-w-lg mx-auto leading-relaxed animate-fade-in-up stagger-1"
