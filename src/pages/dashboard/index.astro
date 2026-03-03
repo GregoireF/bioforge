@@ -1,11 +1,10 @@
 ---
-// src/pages/dashboard/index.astro - VERSION COMPLÈTE AVEC TOUT LE DESIGN RESTAURÉ
+// src/pages/dashboard/index.astro — Dashboard v2 (bugfixes)
 
 import DashboardLayout from '@/layouts/DashboardLayout.astro';
 import Button from '@/components/ui/Button.astro';
 import Card from '@/components/ui/Card.astro';
 import Badge from '@/components/ui/Badge.astro';
-import Alert from '@/components/ui/Alert.astro';
 import { withAuth } from '@/lib/auth/auth';
 import { getAnalyticsSummary } from '@/lib/db/queries.server';
 import { getBlocks } from '@/lib/supabase/queries';
@@ -17,347 +16,702 @@ const authResult = await withAuth({
   cookies: Astro.cookies,
   request: Astro.request,
 });
-
 if (!authResult.success || !authResult.data) {
   return Astro.redirect(authResult.redirect || '/signin?error=auth_failed');
 }
-
 const { user, profile, planLimits } = authResult.data;
 
-// Debug
-console.log('[DASHBOARD] profile.id :', profile?.id);
-console.log('[DASHBOARD] display_name :', profile?.display_name);
+// ==================== SANITIZATION ====================
+function escapeHtml(str: unknown): string {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+function safeNum(val: unknown, fallback = 0): number {
+  const n = Number(val);
+  return isFinite(n) ? n : fallback;
+}
 
-// Client Supabase
+// ==================== DATA LOADING ====================
 const cookies = parse(Astro.request.headers.get('cookie') ?? '');
 const supabaseClient = createServerClient(
   import.meta.env.PUBLIC_SUPABASE_URL!,
   import.meta.env.PUBLIC_SUPABASE_ANON_KEY!,
-  {
-    cookies: {
-      get: (key) => cookies[key],
-      set: () => {},
-      remove: () => {},
-    },
-  }
+  { cookies: { get: (k) => cookies[k], set: () => {}, remove: () => {} } }
 );
 
-const safeProfileId = profile?.id?.trim();
-if (!safeProfileId) {
-  console.error('[DASHBOARD] profile.id manquant');
-}
+const safeProfileId = profile?.id?.trim() ?? '';
 
-// Chargement stats + blocks
-const days = 7;
-let analyticsResult = { success: false, error: new Error('No profile ID') };
-let blocksResult = { success: false, error: new Error('No profile ID') };
+// FIX: isPaid only true for explicitly paid plans — not when plan is undefined
+const isPaid = ['Pro', 'Business', 'Enterprise'].includes(profile?.plan ?? '');
 
-if (safeProfileId) {
-  analyticsResult = await getAnalyticsSummary(supabaseClient, safeProfileId, days);
-  blocksResult = await getBlocks(safeProfileId);
-}
+const [analyticsResult, blocksResult] = await Promise.all([
+  safeProfileId ? getAnalyticsSummary(supabaseClient, safeProfileId, 7) : Promise.resolve({ success: false, data: null }),
+  safeProfileId ? getBlocks(safeProfileId) : Promise.resolve({ success: false, data: [] }),
+]);
 
-let analytics = {
+// ==================== ANALYTICS PROCESSING ====================
+// FIX: guard against analyticsResult.data being null even when success=true
+const ANALYTICS_FALLBACK = {
   summary: { totalViews: 0, totalClicks: 0, clickRate: 0, activeBlocks: 0 },
-  profileStats: [],
-  blockStats: [],
-  topBlocks: []
+  profileStats: [] as any[],
+  blockStats:   [] as any[],
+  topBlocks:    [] as any[],
+};
+const analytics = (analyticsResult.success && analyticsResult.data)
+  ? analyticsResult.data
+  : ANALYTICS_FALLBACK;
+
+// FIX: don't mutate source array — use spread before sort
+const blocks = [...((blocksResult.success ? blocksResult.data : []) ?? [])];
+
+const profileStats = analytics.profileStats ?? [];
+const blockStats   = analytics.blockStats   ?? [];
+const topBlocks    = analytics.topBlocks    ?? [];
+
+// FIX: safe planLimits access with fallback
+const maxBlocks = planLimits?.max_blocks_total ?? -1;
+
+// Chart data (7d)
+const chartLabels = profileStats.map((s: any) =>
+  new Date(s.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })
+);
+const chartViews  = profileStats.map((s: any) => safeNum(s.views));
+const clicksByDate = new Map<string, number>();
+blockStats.forEach((bs: any) => {
+  clicksByDate.set(bs.date, (clicksByDate.get(bs.date) ?? 0) + safeNum(bs.clicks));
+});
+const chartClicks = profileStats.map((s: any) => clicksByDate.get(s.date) ?? 0);
+
+const sparkViews  = chartViews.slice(-7);
+const sparkClicks = chartClicks.slice(-7);
+const sparkRate   = profileStats.map((s: any) => {
+  const v = safeNum(s.views);
+  const c = clicksByDate.get(s.date) ?? 0;
+  return v > 0 ? Math.round((c / v) * 100 * 10) / 10 : 0;
+}).slice(-7);
+
+function calcDelta(arr: number[]): { text: string; positive: boolean; neutral: boolean } {
+  if (arr.length < 2) return { text: '—', positive: false, neutral: true };
+  const half = Math.floor(arr.length / 2);
+  const prev = arr.slice(0, half).reduce((a, b) => a + b, 0);
+  const curr = arr.slice(half).reduce((a, b) => a + b, 0);
+  if (prev === 0) return curr > 0
+    ? { text: '+∞%', positive: true,  neutral: false }
+    : { text: '—',   positive: false, neutral: true  };
+  const pct = Math.round(((curr - prev) / prev) * 100);
+  return { text: pct >= 0 ? `+${pct}%` : `${pct}%`, positive: pct >= 0, neutral: false };
+}
+
+const deltaViews  = calcDelta(chartViews);
+const deltaClicks = calcDelta(chartClicks);
+const deltaRate   = calcDelta(sparkRate);
+
+// FIX: activeBlocks — use null coalescing, not ||, so 0 doesn't fall back
+const activeBlockCount = analytics.summary.activeBlocks ?? blocks.filter((b: any) => b.active).length;
+
+// ==================== ONBOARDING ====================
+const onboardingSteps = [
+  { id: 'avatar', label: 'Add a profile picture',  done: !!profile?.avatar_url, href: '/dashboard/settings'   },
+  { id: 'bio',    label: 'Write your bio',          done: !!profile?.bio,        href: '/dashboard/settings'   },
+  { id: 'block',  label: 'Create your first block', done: blocks.length > 0,     href: '/dashboard/blocks'     },
+  { id: 'theme',  label: 'Customize your theme',    done: !!profile?.theme,      href: '/dashboard/appearance' },
+  { id: 'share',  label: 'Share your profile',      done: false,                 href: '#share'                },
+];
+const onboardingDone  = onboardingSteps.filter(s => s.done).length;
+const onboardingTotal = onboardingSteps.length;
+const onboardingPct   = Math.round((onboardingDone / onboardingTotal) * 100);
+const showOnboarding  = onboardingDone < onboardingTotal;
+
+// ==================== ACTIVITY FEED ====================
+// FIX: static dot colors instead of dynamic Tailwind class generation (gets purged)
+const DOT_COLORS: Record<string, string> = {
+  'text-neon-green':  '#00ff9d',
+  'text-neon-blue':   '#00d4ff',
+  'text-neon-purple': '#bf00ff',
+  'text-orange-400':  '#fb923c',
 };
 
-let blocks = [];
-let loadError = null;
+const activityFeed: { iconPath: string; dotColor: string; text: string; time: string }[] = [];
 
-if (analyticsResult.success) {
-  analytics = analyticsResult.data;
-} else {
-  loadError = analyticsResult.error?.message ?? 'Erreur chargement stats';
-  console.error('[DASHBOARD] Erreur analytics :', analyticsResult.error);
+// FIX: don't mutate blocks — sort a copy
+[...blocks]
+  .sort((a: any, b: any) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())
+  .slice(0, 3)
+  .forEach((b: any) => {
+    activityFeed.push({
+      iconPath: 'M12 4v16m8-8H4',
+      dotColor: DOT_COLORS['text-neon-green'],
+      text: `Block <strong>${escapeHtml(b.title || b.type)}</strong> created`,
+      time: b.created_at
+        ? new Date(b.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
+        : '',
+    });
+  });
+
+const maxViews = Math.max(...chartViews, 0);
+if (maxViews > 0) {
+  const spikeIdx = chartViews.indexOf(maxViews);
+  activityFeed.push({
+    iconPath: 'M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z',
+    dotColor: DOT_COLORS['text-neon-blue'],
+    text: `Peak of <strong>${maxViews} views</strong> on ${chartLabels[spikeIdx] ?? 'recent day'}`,
+    time: 'this week',
+  });
 }
 
-if (blocksResult.success) {
-  blocks = blocksResult.data ?? [];
-} else {
-  console.error('[DASHBOARD] Erreur blocks :', blocksResult.error);
+if (profile?.updated_at) {
+  activityFeed.push({
+    iconPath: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
+    dotColor: DOT_COLORS['text-neon-purple'],
+    text: 'Profile settings updated',
+    time: new Date(profile.updated_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }),
+  });
 }
 
-// Chart data
-const profileStats = analytics.profileStats ?? [];
-const blockStats = analytics.blockStats ?? [];
+// ==================== BRIDGE ====================
+// FIX: safe username access
+const safeUsername    = profile?.username ?? '';
+const displayName     = escapeHtml(profile?.display_name || safeUsername || 'Creator');
 
-const chartLabels = profileStats.map(s => 
-  new Date(s.date).toLocaleDateString('fr-FR', { weekday: 'short', month: 'short', day: 'numeric' })
-) || [];
-
-const chartViews = profileStats.map(s => s.views ?? 0) || [];
-
-const clicksByDate = new Map();
-blockStats.forEach(bs => {
-  const existing = clicksByDate.get(bs.date) ?? 0;
-  clicksByDate.set(bs.date, existing + (bs.clicks ?? 0));
+const bridgeData = JSON.stringify({
+  chartLabels,
+  chartViews,
+  chartClicks,
+  isPaid,
+  plan:     escapeHtml(profile?.plan ?? 'Free'),
+  username: escapeHtml(safeUsername),
 });
-
-const chartClicks = profileStats.map(s => clicksByDate.get(s.date) ?? 0) || [];
-
-// Display name
-const displayName = profile?.display_name || profile?.username || 'Creator';
 ---
 
 <DashboardLayout title="Dashboard">
-  <!-- Welcome Section -->
-  <div class="mb-8">
-    <h1 class="text-2xl lg:text-3xl font-bold text-white mb-2">
-      Welcome back, {displayName}! 👋
-    </h1>
-    <p class="text-gray-400">Here's what's happening with your profile</p>
+
+  <div id="server-data" class="hidden" data-bridge={bridgeData}></div>
+
+  <!-- ===== WELCOME ===== -->
+  <div class="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <p class="text-xs font-medium text-gray-500 uppercase tracking-widest mb-1">Overview</p>
+      <h1 class="text-2xl lg:text-3xl font-bold text-white tracking-tight">
+        Welcome back, <span class="text-neon-green">{displayName}</span> 👋
+      </h1>
+      <p class="text-sm text-gray-400 mt-1">Here's what's happening with your profile today.</p>
+    </div>
+    <div class="flex items-center gap-3 shrink-0">
+      <!-- FIX: safe username in href -->
+      {safeUsername && (
+        <a
+          href={`/${safeUsername}`}
+          target="_blank"
+          class="flex items-center gap-2 px-4 py-2.5 glass border border-white/10 rounded-xl text-sm text-gray-300 hover:text-white hover:border-white/25 transition-all"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+          </svg>
+          View Profile
+        </a>
+      )}
+      <a
+        href="/dashboard/blocks"
+        class="flex items-center gap-2 px-4 py-2.5 bg-neon-green text-black text-sm font-semibold rounded-xl hover:bg-neon-green/90 active:scale-[0.98] transition-all"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Add Block
+      </a>
+    </div>
   </div>
 
-  <!-- Error Alert -->
-  {loadError && (
-    <Alert variant="danger" title="Erreur chargement">
-      {loadError}
-      <button class="ml-2 underline hover:text-white" on:click="location.reload()">Réessayer</button>
-    </Alert>
+  <!-- ===== ONBOARDING ===== -->
+  {showOnboarding && (
+    <div id="onboarding-card" class="mb-8 p-5 glass border border-neon-green/20 rounded-2xl relative overflow-hidden">
+      <div class="absolute inset-0 bg-gradient-to-r from-neon-green/5 to-transparent pointer-events-none"></div>
+      <div class="relative">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <p class="text-xs font-semibold text-neon-green uppercase tracking-widest mb-1">Getting started</p>
+            <h3 class="text-white font-semibold">Set up your profile</h3>
+            <p class="text-xs text-gray-400 mt-0.5">{onboardingDone} of {onboardingTotal} steps completed</p>
+          </div>
+          <button id="dismiss-onboarding" class="text-gray-600 hover:text-gray-400 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <div class="h-1.5 bg-white/10 rounded-full mb-5 overflow-hidden">
+          <div class="h-full bg-neon-green rounded-full transition-all duration-700" style={`width: ${onboardingPct}%`}></div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+          {onboardingSteps.map((step) => (
+            <a
+              href={step.href}
+              class={`flex items-center gap-2.5 p-3 rounded-xl border transition-all text-sm
+                ${step.done
+                  ? 'border-neon-green/30 bg-neon-green/5 text-gray-400 cursor-default pointer-events-none'
+                  : 'border-white/10 hover:border-neon-green/30 hover:bg-white/5 text-white'
+                }`}
+            >
+              <div class={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border
+                ${step.done ? 'bg-neon-green border-neon-green' : 'border-white/20'}`}>
+                {step.done ? (
+                  <svg class="w-3 h-3 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                  </svg>
+                ) : (
+                  <div class="w-1.5 h-1.5 rounded-full bg-white/30"></div>
+                )}
+              </div>
+              <span class={`text-xs font-medium truncate ${step.done ? 'line-through opacity-50' : ''}`}>
+                {step.label}
+              </span>
+            </a>
+          ))}
+        </div>
+      </div>
+    </div>
   )}
 
-  <!-- Quick Stats -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
-    <!-- Profile Views -->
-    <Card padding="md" hover={true}>
-      <div class="flex items-center justify-between mb-3">
-        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-green/20 to-neon-green/10 border border-neon-green/30 flex items-center justify-center">
-          <svg class="w-5 h-5 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-          </svg>
-        </div>
-      </div>
-      <div class="text-2xl lg:text-3xl font-bold text-white mb-1">
-        {analytics.summary.totalViews.toLocaleString()}
-      </div>
-      <p class="text-xs lg:text-sm text-gray-400">Profile Views</p>
-    </Card>
+  <!-- ===== STAT CARDS ===== -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
 
-    <!-- Total Clicks -->
-    <Card padding="md" hover={true}>
-      <div class="flex items-center justify-between mb-3">
-        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-purple/20 to-neon-purple/10 border border-neon-purple/30 flex items-center justify-center">
-          <svg class="w-5 h-5 text-neon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/>
+    <!-- Views -->
+    <div class="stat-card p-5 glass border border-white/10 rounded-2xl hover:border-neon-green/30 transition-all duration-300">
+      <div class="flex items-start justify-between mb-3">
+        <div class="w-9 h-9 rounded-xl bg-neon-green/10 border border-neon-green/20 flex items-center justify-center">
+          <svg class="w-4 h-4 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
           </svg>
         </div>
+        <span class={`text-xs font-semibold px-2 py-0.5 rounded-lg
+          ${deltaViews.neutral ? 'text-gray-500 bg-white/5' : deltaViews.positive ? 'text-neon-green bg-neon-green/10' : 'text-red-400 bg-red-400/10'}`}>
+          {deltaViews.text}
+        </span>
       </div>
-      <div class="text-2xl lg:text-3xl font-bold text-white mb-1">
-        {analytics.summary.totalClicks.toLocaleString()}
+      <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums mb-0.5">
+        {analytics.summary.totalViews.toLocaleString('fr-FR')}
       </div>
-      <p class="text-xs lg:text-sm text-gray-400">Total Clicks</p>
-    </Card>
+      <p class="text-xs text-gray-500 mb-3">Profile Views · 7d</p>
+      <svg class="w-full h-8 opacity-60" viewBox="0 0 80 24" preserveAspectRatio="none"
+           data-values={JSON.stringify(sparkViews)} data-color="#00ff9d"></svg>
+    </div>
+
+    <!-- Clicks -->
+    <div class="stat-card p-5 glass border border-white/10 rounded-2xl hover:border-neon-purple/30 transition-all duration-300">
+      <div class="flex items-start justify-between mb-3">
+        <div class="w-9 h-9 rounded-xl bg-neon-purple/10 border border-neon-purple/20 flex items-center justify-center">
+          <svg class="w-4 h-4 text-neon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/>
+          </svg>
+        </div>
+        <span class={`text-xs font-semibold px-2 py-0.5 rounded-lg
+          ${deltaClicks.neutral ? 'text-gray-500 bg-white/5' : deltaClicks.positive ? 'text-neon-green bg-neon-green/10' : 'text-red-400 bg-red-400/10'}`}>
+          {deltaClicks.text}
+        </span>
+      </div>
+      <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums mb-0.5">
+        {analytics.summary.totalClicks.toLocaleString('fr-FR')}
+      </div>
+      <p class="text-xs text-gray-500 mb-3">Total Clicks · 7d</p>
+      <svg class="w-full h-8 opacity-60" viewBox="0 0 80 24" preserveAspectRatio="none"
+           data-values={JSON.stringify(sparkClicks)} data-color="#bf00ff"></svg>
+    </div>
 
     <!-- Active Blocks -->
-    <Card padding="md" hover={true}>
-      <div class="flex items-center justify-between mb-3">
-        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-blue/20 to-neon-blue/10 border border-neon-blue/30 flex items-center justify-center">
-          <svg class="w-5 h-5 text-neon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="stat-card p-5 glass border border-white/10 rounded-2xl hover:border-neon-blue/30 transition-all duration-300">
+      <div class="flex items-start justify-between mb-3">
+        <div class="w-9 h-9 rounded-xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center">
+          <svg class="w-4 h-4 text-neon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
           </svg>
         </div>
+        <a href="/dashboard/blocks" class="text-xs text-gray-600 hover:text-neon-blue transition-colors">manage →</a>
       </div>
-      <div class="text-2xl lg:text-3xl font-bold text-white mb-1">
-        {analytics.summary.activeBlocks || blocks.length}
+      <!-- FIX: use activeBlockCount (null-coalesced, not ||) -->
+      <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums mb-0.5">
+        {activeBlockCount}
+        <span class="text-sm font-normal text-gray-600">/{maxBlocks === -1 ? '∞' : maxBlocks}</span>
       </div>
-      <p class="text-xs lg:text-sm text-gray-400">Active Blocks</p>
-    </Card>
+      <p class="text-xs text-gray-500 mb-3">Active Blocks</p>
+      <div class="h-1.5 bg-white/10 rounded-full overflow-hidden">
+        <div
+          class="h-full bg-neon-blue rounded-full transition-all"
+          style={`width: ${maxBlocks === -1 ? 40 : Math.min(100, Math.round((activeBlockCount / maxBlocks) * 100))}%`}
+        ></div>
+      </div>
+      <p class="text-xs text-gray-600 mt-1">
+        {maxBlocks === -1 ? 'Unlimited' : `${Math.max(0, maxBlocks - activeBlockCount)} remaining`}
+      </p>
+    </div>
 
     <!-- Click Rate -->
-    <Card padding="md" hover={true}>
-      <div class="flex items-center justify-between mb-3">
-        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-pink/20 to-neon-pink/10 border border-neon-pink/30 flex items-center justify-center">
-          <svg class="w-5 h-5 text-neon-pink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="stat-card p-5 glass border border-white/10 rounded-2xl hover:border-orange-400/30 transition-all duration-300">
+      <div class="flex items-start justify-between mb-3">
+        <div class="w-9 h-9 rounded-xl bg-orange-400/10 border border-orange-400/20 flex items-center justify-center">
+          <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
           </svg>
         </div>
+        <span class={`text-xs font-semibold px-2 py-0.5 rounded-lg
+          ${deltaRate.neutral ? 'text-gray-500 bg-white/5' : deltaRate.positive ? 'text-neon-green bg-neon-green/10' : 'text-red-400 bg-red-400/10'}`}>
+          {deltaRate.text}
+        </span>
       </div>
-      <div class="text-2xl lg:text-3xl font-bold text-white mb-1">
-        {analytics.summary.clickRate.toFixed(1)}%
+      <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums mb-0.5">
+        {analytics.summary.clickRate.toFixed(1)}<span class="text-lg">%</span>
       </div>
-      <p class="text-xs lg:text-sm text-gray-400">Click Rate</p>
-    </Card>
+      <p class="text-xs text-gray-500 mb-3">Click Rate · 7d</p>
+      <svg class="w-full h-8 opacity-60" viewBox="0 0 80 24" preserveAspectRatio="none"
+           data-values={JSON.stringify(sparkRate)} data-color="#fb923c"></svg>
+    </div>
+
   </div>
 
-  <!-- Charts & Quick Actions -->
-  <div class="grid lg:grid-cols-2 gap-6 lg:gap-8 mb-8">
-    <!-- Growth Chart -->
-    <Card title="Growth Overview" description="Last 7 days">
-      {chartLabels.length > 0 ? (
-        <canvas id="growth-chart" class="w-full" style="max-height: 300px;"></canvas>
-      ) : (
-        <div class="text-center py-12 text-gray-400">
-          Pas encore de données
+  <!-- ===== CHART + QUICK ACTIONS ===== -->
+  <div class="grid lg:grid-cols-3 gap-6 mb-6">
+
+    <div class="lg:col-span-2 glass border border-white/10 rounded-2xl p-5">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+        <div>
+          <h3 class="text-white font-semibold text-sm">Growth Overview</h3>
+          <p class="text-xs text-gray-500 mt-0.5">Views & clicks over time</p>
         </div>
-      )}
-    </Card>
-
-    <!-- Quick Actions -->
-    <Card title="Quick Actions" description="Common tasks">
-      <div class="grid grid-cols-2 gap-3">
-        <Button variant="secondary" href="/dashboard/blocks" class="flex-col h-24 space-y-2">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-          </svg>
-          <span class="text-sm">Add Block</span>
-        </Button>
-
-        <Button variant="secondary" href="/dashboard/appearance" class="flex-col h-24 space-y-2">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
-          </svg>
-          <span class="text-sm">Customize</span>
-        </Button>
-
-        <Button variant="secondary" href="/dashboard/analytics" class="flex-col h-24 space-y-2">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-          </svg>
-          <span class="text-sm">Analytics</span>
-        </Button>
-
-        <Button variant="secondary" href={`/${profile.username}`} target="_blank" class="flex-col h-24 space-y-2">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-          </svg>
-          <span class="text-sm">View Public</span>
-        </Button>
-      </div>
-    </Card>
-  </div>
-
-  <!-- Recent & Top Content -->
-  <div class="grid lg:grid-cols-2 gap-6 lg:gap-8">
-    <!-- Recent Blocks -->
-    <Card title="Recent Blocks" description="Your latest additions">
-      {blocks.length === 0 ? (
-        <div class="text-center py-8 text-gray-400">
-          <p>No blocks yet. <a href="/dashboard/blocks" class="text-neon-green hover:underline">Add your first block!</a></p>
-        </div>
-      ) : (
-        <div class="space-y-3">
-          {blocks
-            .sort((a, b) => new Date(b.created_at || '1970-01-01') - new Date(a.created_at || '1970-01-01'))
-            .slice(0, 5)
-            .map((block) => (
-              <div key={block.id} class="flex items-center justify-between p-3 glass rounded-xl border border-white/10 hover:border-neon-green/30 transition-all">
-                <div class="flex items-center space-x-3 flex-1 min-w-0">
-                  <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-neon-green/20 to-neon-green/10 border border-neon-green/30 flex items-center justify-center flex-shrink-0">
-                    <span class="text-sm">
-                      {block.type === 'link' ? '🔗' 
-                       : block.type === 'heading' ? '📝' 
-                       : block.type === 'image' ? '🖼️' 
-                       : block.type === 'video' ? '🎥' 
-                       : block.type === 'social' ? '🌐' 
-                       : '📌'}
-                    </span>
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <p class="text-sm font-semibold text-white truncate">
-                      {block.title || (block.config?.url ? block.config.url.slice(0, 30) + '...' : 'Untitled')}
-                    </p>
-                    <p class="text-xs text-gray-400 truncate">
-                      <Badge variant="default" size="sm" class="mr-1">{block.type}</Badge>
-                      {block.active ? 'Active' : 'Inactive'} • {block.created_at ? new Date(block.created_at).toLocaleDateString('fr-FR') : 'N/A'}
-                    </p>
-                  </div>
-                </div>
-                <Button variant="ghost" size="sm" href={`/dashboard/blocks/edit/${block.id}`}>
-                  Edit
-                </Button>
-              </div>
-            ))
-          }
-        </div>
-      )}
-    </Card>
-
-    <!-- Top Performing -->
-    <Card title="Top Performing" description="Most clicked blocks">
-      {analytics.topBlocks.length === 0 ? (
-        <div class="text-center py-8 text-gray-400">
-          <p>No analytics data yet</p>
-        </div>
-      ) : (
-        <div class="space-y-3">
-          {analytics.topBlocks.slice(0, 5).map((block, index) => (
-            <div key={block.id} class="flex items-center justify-between p-3 glass rounded-xl border border-white/10 hover:border-neon-purple/30 transition-all">
-              <div class="flex items-center space-x-3 flex-1 min-w-0">
-                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-neon-purple/20 to-neon-purple/10 border border-neon-purple/30 flex items-center justify-center flex-shrink-0 text-neon-purple font-bold text-sm">
-                  {index + 1}
-                </div>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-semibold text-white truncate">
-                    {block.title || 'Untitled'}
-                  </p>
-                  <p class="text-xs text-gray-400">
-                    {block.clicks || 0} clicks
-                  </p>
-                </div>
-              </div>
-              <div class="text-right">
-                <p class="text-lg font-bold text-neon-purple">{block.clicks || 0}</p>
-              </div>
-            </div>
+        <div class="flex items-center gap-1 p-1 glass rounded-xl border border-white/10 w-fit">
+          {[
+            { label: '7d',  days: 7,   free: true  },
+            { label: '30d', days: 30,  free: false },
+            { label: '90d', days: 90,  free: false },
+            { label: '1y',  days: 365, free: false },
+          ].map((p) => (
+            <button
+              class="period-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all text-gray-500"
+              data-days={p.days}
+              data-free={String(p.free)}
+            >
+              {p.label}
+              {!p.free && (
+                <svg class="w-3 h-3 text-neon-green/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                </svg>
+              )}
+            </button>
           ))}
         </div>
-      )}
-    </Card>
+      </div>
+      <div class="relative" style="height: 240px;">
+        {chartLabels.length > 0 ? (
+          <canvas id="growth-chart" class="w-full h-full"></canvas>
+        ) : (
+          <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+            <svg class="w-10 h-10 text-gray-700 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+            <p class="text-sm text-gray-500">No data yet</p>
+            <p class="text-xs text-gray-600 mt-1">Share your profile to start tracking views</p>
+          </div>
+        )}
+      </div>
+    </div>
+
+    <div class="glass border border-white/10 rounded-2xl p-5">
+      <h3 class="text-white font-semibold text-sm mb-1">Quick Actions</h3>
+      <p class="text-xs text-gray-500 mb-4">Shortcuts to common tasks</p>
+      <div class="grid grid-cols-2 gap-2">
+        {[
+          { href: '/dashboard/blocks',     icon: 'M12 4v16m8-8H4',                  label: 'Add Block',  color: 'text-neon-green',  bg: 'bg-neon-green/10  border-neon-green/20'  },
+          { href: '/dashboard/appearance', icon: 'M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01', label: 'Theme',      color: 'text-neon-purple', bg: 'bg-neon-purple/10 border-neon-purple/20' },
+          { href: '/dashboard/analytics',  icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', label: 'Analytics', color: 'text-neon-blue',   bg: 'bg-neon-blue/10   border-neon-blue/20'   },
+          { href: '/dashboard/settings',   icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z', label: 'Settings', color: 'text-orange-400', bg: 'bg-orange-400/10 border-orange-400/20' },
+        ].map(a => (
+          <a href={a.href} class={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border ${a.bg} hover:scale-[1.03] active:scale-[0.97] transition-all`}>
+            <svg class={`w-5 h-5 ${a.color}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={a.icon}/>
+            </svg>
+            <span class="text-xs font-medium text-gray-300">{a.label}</span>
+          </a>
+        ))}
+      </div>
+    </div>
+
   </div>
 
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- ===== RECENT BLOCKS + TOP PERFORMING + ACTIVITY ===== -->
+  <div class="grid lg:grid-cols-3 gap-6">
 
-  <script define:vars={{ chartLabels, chartViews, chartClicks }}>
-    window.addEventListener('load', function() {
-      if (typeof Chart === 'undefined') return;
-
-      if (!chartLabels || chartLabels.length === 0) return;
-
-      const ctx = document.getElementById('growth-chart');
-      if (!ctx) return;
-
-      new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: chartLabels,
-          datasets: [
-            {
-              label: 'Vues',
-              data: chartViews,
-              borderColor: '#00ff9d',
-              backgroundColor: 'rgba(0, 255, 157, 0.1)',
-              tension: 0.4,
-              fill: true,
-              borderWidth: 2,
-            },
-            {
-              label: 'Clics',
-              data: chartClicks,
-              borderColor: '#bf00ff',
-              backgroundColor: 'rgba(191, 0, 255, 0.1)',
-              tension: 0.4,
-              fill: true,
-              borderWidth: 2,
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { labels: { color: '#9ca3af' } }
-          },
-          scales: {
-            y: { beginAtZero: true, ticks: { color: '#9ca3af' } },
-            x: { ticks: { color: '#9ca3af' } }
+    <!-- Recent Blocks -->
+    <div class="glass border border-white/10 rounded-2xl p-5">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="text-white font-semibold text-sm">Recent Blocks</h3>
+          <p class="text-xs text-gray-500 mt-0.5">Latest additions</p>
+        </div>
+        <a href="/dashboard/blocks" class="text-xs text-gray-500 hover:text-neon-green transition-colors">See all →</a>
+      </div>
+      {blocks.length === 0 ? (
+        <div class="flex flex-col items-center justify-center py-10 text-center">
+          <p class="text-xs text-gray-500 mb-3">No blocks yet</p>
+          <a href="/dashboard/blocks" class="text-xs text-neon-green hover:underline">Add your first block →</a>
+        </div>
+      ) : (
+        <div class="space-y-2">
+          {[...blocks]
+            .sort((a: any, b: any) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())
+            .slice(0, 5)
+            .map((block: any) => {
+              const typeIcon: Record<string, string> = { link: '🔗', heading: '📝', image: '🖼️', video: '🎥', social: '🌐', spacer: '—' };
+              return (
+                <a href="/dashboard/blocks"
+                  class="flex items-center gap-3 p-3 rounded-xl border border-white/5 hover:border-neon-green/25 hover:bg-white/5 transition-all group">
+                  <div class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-sm shrink-0">
+                    {typeIcon[block.type] ?? '📌'}
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-xs font-medium text-white truncate">
+                      {block.title || block.config?.url?.slice(0, 28) || 'Untitled'}
+                    </p>
+                    <p class="text-xs text-gray-600 mt-0.5 flex items-center gap-1">
+                      <span class={`inline-block w-1.5 h-1.5 rounded-full ${block.active ? 'bg-neon-green' : 'bg-gray-600'}`}></span>
+                      {block.type} · {block.active ? 'Active' : 'Inactive'}
+                    </p>
+                  </div>
+                  <svg class="w-3.5 h-3.5 text-gray-600 group-hover:text-neon-green transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                  </svg>
+                </a>
+              );
+            })
           }
-        }
-      });
-    });
-  </script>
+        </div>
+      )}
+    </div>
+
+    <!-- Top Performing -->
+    <div class="glass border border-white/10 rounded-2xl p-5">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="text-white font-semibold text-sm">Top Performing</h3>
+          <p class="text-xs text-gray-500 mt-0.5">Most clicked blocks</p>
+        </div>
+        <a href="/dashboard/analytics" class="text-xs text-gray-500 hover:text-neon-purple transition-colors">Full report →</a>
+      </div>
+      {topBlocks.length === 0 ? (
+        <div class="flex flex-col items-center justify-center py-10 text-center">
+          <p class="text-xs text-gray-500">No clicks tracked yet</p>
+          <p class="text-xs text-gray-600 mt-1">Share your profile to collect data</p>
+        </div>
+      ) : (
+        <div class="space-y-2">
+          {topBlocks.slice(0, 5).map((block: any, i: number) => {
+            const maxClicks = safeNum(topBlocks[0]?.clicks, 1);
+            const clicks    = safeNum(block.clicks);
+            const pct = Math.round((clicks / maxClicks) * 100);
+            const medals = ['🥇', '🥈', '🥉'];
+            return (
+              <div class="p-3 rounded-xl border border-white/5 hover:border-neon-purple/25 transition-all">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-sm">{medals[i] ?? `#${i + 1}`}</span>
+                  <p class="text-xs font-medium text-white truncate flex-1">{block.title || 'Untitled'}</p>
+                  <span class="text-xs font-bold text-neon-purple tabular-nums">{clicks.toLocaleString('fr-FR')}</span>
+                </div>
+                <div class="h-1 bg-white/5 rounded-full overflow-hidden">
+                  <div class="h-full bg-neon-purple/60 rounded-full transition-all duration-700" style={`width: ${pct}%`}></div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+
+    <!-- Activity Feed -->
+    <div class="glass border border-white/10 rounded-2xl p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-white font-semibold text-sm">Activity Feed</h3>
+        <p class="text-xs text-gray-500">Recent events</p>
+      </div>
+      {activityFeed.length === 0 ? (
+        <div class="flex items-center justify-center py-10">
+          <p class="text-xs text-gray-500">No activity yet</p>
+        </div>
+      ) : (
+        <div class="relative">
+          <div class="absolute left-4 top-2 bottom-2 w-px bg-white/10"></div>
+          <div class="space-y-4 pl-10">
+            {activityFeed.map((event) => (
+              <div class="relative">
+                <!-- FIX: inline style instead of dynamic Tailwind class (gets purged) -->
+                <div
+                  class="absolute -left-6 top-0.5 w-2 h-2 rounded-full border-2 bg-gray-950"
+                  style={`border-color: ${event.dotColor}`}
+                ></div>
+                <p class="text-xs text-gray-300 leading-relaxed" set:html={event.text}></p>
+                <p class="text-xs text-gray-600 mt-0.5">{event.time}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+
+  </div>
+
+  <!-- ===== PAYWALL MODAL ===== -->
+  <div id="paywall-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div id="paywall-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+    <div class="relative glass border border-neon-green/20 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl">
+      <div class="w-14 h-14 rounded-2xl bg-neon-green/10 border border-neon-green/20 flex items-center justify-center mx-auto mb-4">
+        <svg class="w-7 h-7 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+        </svg>
+      </div>
+      <h3 class="text-white font-bold text-lg mb-2">Unlock Advanced Analytics</h3>
+      <p class="text-sm text-gray-400 mb-6 leading-relaxed">Access 30-day, 90-day, and yearly data to understand your long-term growth.</p>
+      <div class="space-y-2 mb-6 text-left">
+        {['30-day & 90-day history', 'Yearly trend analysis', 'Detailed block performance', 'CSV export'].map(f => (
+          <div class="flex items-center gap-2 text-sm text-gray-300">
+            <svg class="w-4 h-4 text-neon-green shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+            </svg>
+            {f}
+          </div>
+        ))}
+      </div>
+      <a href="/pricing" class="block w-full py-3 bg-neon-green text-black font-bold rounded-xl hover:bg-neon-green/90 active:scale-[0.98] transition-all text-sm mb-3">
+        Upgrade Plan →
+      </a>
+      <button id="paywall-close" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Maybe later</button>
+    </div>
+  </div>
+
 </DashboardLayout>
+
+<style>
+  .stat-card { transition: transform 0.2s ease; }
+  .stat-card:hover { transform: translateY(-2px); }
+  .period-btn.active { background: rgba(255,255,255,0.08); color: white; }
+  #paywall-modal.open { display: flex; }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<script>
+  const bridge = document.getElementById('server-data');
+  const { chartLabels, chartViews, chartClicks, isPaid } =
+    JSON.parse(bridge?.dataset.bridge ?? '{}');
+
+  // ==================== SPARKLINES ====================
+  function drawSparkline(svgEl, values, color) {
+    if (!svgEl || !values?.length) return;
+    const W = 80, H = 24, pad = 2;
+    const max = Math.max(...values, 1);
+    const min = Math.min(...values, 0);
+    const range = max - min || 1;
+    const pts = values.map((v, i) => {
+      const x = pad + (i / (values.length - 1)) * (W - pad * 2);
+      const y = H - pad - ((v - min) / range) * (H - pad * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    });
+    const first = pts[0], last = pts[pts.length - 1];
+    const area  = `${first.split(',')[0]},${H} ${pts.join(' ')} ${last.split(',')[0]},${H}`;
+    const gid   = color.replace('#', 'sg');
+    svgEl.innerHTML = `
+      <defs>
+        <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${color}" stop-opacity="0.3"/>
+          <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <polygon points="${area}" fill="url(#${gid})"/>
+      <polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    `;
+  }
+
+  requestAnimationFrame(() => {
+    document.querySelectorAll('svg[data-values]').forEach(svg => {
+      drawSparkline(svg, JSON.parse(svg.dataset.values ?? '[]'), svg.dataset.color ?? '#fff');
+    });
+  });
+
+  // ==================== CHART ====================
+  let chartInstance = null;
+
+  function buildChart(labels, views, clicks) {
+    const ctx = document.getElementById('growth-chart');
+    if (!ctx || typeof Chart === 'undefined') return;
+    chartInstance?.destroy();
+    chartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Views',  data: views,  borderColor: '#00ff9d', backgroundColor: 'rgba(0,255,157,0.08)',  tension: 0.4, fill: true, borderWidth: 2, pointRadius: 3, pointHoverRadius: 6, pointBackgroundColor: '#00ff9d' },
+          { label: 'Clicks', data: clicks, borderColor: '#bf00ff', backgroundColor: 'rgba(191,0,255,0.08)', tension: 0.4, fill: true, borderWidth: 2, pointRadius: 3, pointHoverRadius: 6, pointBackgroundColor: '#bf00ff' },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { labels: { color: '#6b7280', font: { size: 11 }, boxWidth: 10, usePointStyle: true } },
+          tooltip: {
+            backgroundColor: '#111', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+            titleColor: '#fff', bodyColor: '#9ca3af', padding: 10,
+            callbacks: { label: (c) => ` ${c.dataset.label}: ${c.parsed.y.toLocaleString('fr-FR')}` }
+          }
+        },
+        scales: {
+          y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#4b5563', font: { size: 10 }, maxTicksLimit: 5 }, border: { display: false } },
+          x: { grid: { display: false }, ticks: { color: '#4b5563', font: { size: 10 }, maxTicksLimit: 7 }, border: { display: false } },
+        }
+      }
+    });
+  }
+
+  const chartCanvas = document.getElementById('growth-chart');
+  if (chartCanvas && chartLabels?.length > 0) {
+    const obs = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) { buildChart(chartLabels, chartViews, chartClicks); obs.disconnect(); }
+    }, { threshold: 0.1 });
+    obs.observe(chartCanvas);
+  }
+
+  // ==================== PERIOD TABS ====================
+  document.querySelectorAll('.period-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const days = parseInt(btn.dataset.days);
+      const free = btn.dataset.free === 'true';
+      if (!free && !isPaid) { document.getElementById('paywall-modal')?.classList.add('open'); return; }
+      document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (days === 7) { buildChart(chartLabels, chartViews, chartClicks); return; }
+      fetch(`/api/analytics/summary?days=${days}`)
+        .then(r => r.ok ? r.json() : Promise.reject(r.status))
+        .then(data => {
+          const labels = (data.profileStats ?? []).map(s => new Date(s.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }));
+          const views  = (data.profileStats ?? []).map(s => s.views ?? 0);
+          const cmap   = new Map();
+          (data.blockStats ?? []).forEach(bs => cmap.set(bs.date, (cmap.get(bs.date) ?? 0) + (bs.clicks ?? 0)));
+          buildChart(labels, views, (data.profileStats ?? []).map(s => cmap.get(s.date) ?? 0));
+        })
+        .catch(() => {});
+    });
+  });
+  document.querySelector('.period-btn[data-days="7"]')?.classList.add('active');
+
+  // ==================== PAYWALL ====================
+  const modal = document.getElementById('paywall-modal');
+  document.getElementById('paywall-backdrop')?.addEventListener('click', () => modal?.classList.remove('open'));
+  document.getElementById('paywall-close')?.addEventListener('click',    () => modal?.classList.remove('open'));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') modal?.classList.remove('open'); });
+
+  // ==================== ONBOARDING ====================
+  const ONBOARDING_KEY  = 'onboarding_dismissed_v1';
+  const onboardingCard  = document.getElementById('onboarding-card');
+  if (localStorage.getItem(ONBOARDING_KEY) === '1') onboardingCard?.remove();
+  document.getElementById('dismiss-onboarding')?.addEventListener('click', () => {
+    onboardingCard?.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
+    setTimeout(() => onboardingCard?.remove(), 300);
+    localStorage.setItem(ONBOARDING_KEY, '1');
+  });
+</script>
