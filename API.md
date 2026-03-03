@@ -6,7 +6,7 @@ BioForge uses Supabase for backend operations. The API is divided into:
 1. **Authentication** - Supabase Auth
 2. **Database** - Supabase PostgREST
 3. **Storage** - Supabase Storage
-4. **Custom Endpoints** - Astro API routess
+4. **Custom Endpoints** - Astro API routes
 
 ## Base URLs
 
