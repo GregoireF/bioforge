@@ -459,7 +459,7 @@ const bridgeData = JSON.stringify({
             .sort((a: any, b: any) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())
             .slice(0, 5)
             .map((block: any) => {
-              const typeIcon: Record<string, string> = { link: '🔗', heading: '📝', image: '🖼️', video: '🎥', social: '🌐', spacer: '—' };
+              const typeIcon = { link: '🔗', heading: '📝', image: '🖼️', video: '🎥', social: '🌐', spacer: '—' } as const;
               return (
                 <a href="/dashboard/blocks"
                   class="flex items-center gap-3 p-3 rounded-xl border border-white/5 hover:border-neon-green/25 hover:bg-white/5 transition-all group">
