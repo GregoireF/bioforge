@@ -45,8 +45,9 @@ const safeProfileId = profile?.id?.trim() ?? '';
 // FIX: isPaid only true for explicitly paid plans — not when plan is undefined
 const isPaid = ['Pro', 'Business', 'Enterprise'].includes(profile?.plan ?? '');
 
+// Load 14 days to compute real delta (curr 7d vs prev 7d)
 const [analyticsResult, blocksResult] = await Promise.all([
-  safeProfileId ? getAnalyticsSummary(supabaseClient, safeProfileId, 7) : Promise.resolve({ success: false, data: null }),
+  safeProfileId ? getAnalyticsSummary(supabaseClient, safeProfileId, 14) : Promise.resolve({ success: false, data: null }),
   safeProfileId ? getBlocks(safeProfileId) : Promise.resolve({ success: false, data: [] }),
 ]);
 
@@ -70,32 +71,33 @@ const blockStats   = analytics.blockStats   ?? [];
 const topBlocks    = analytics.topBlocks    ?? [];
 
 // FIX: safe planLimits access with fallback
-const maxBlocks = planLimits?.max_blocks_total ?? -1;
+const maxBlocks = planLimits?.plan_limits?.max_blocks_total ?? -1;
 
-// Chart data (7d)
-const chartLabels = profileStats.map((s: any) =>
+// Chart: show only last 7 days visually, but delta uses all 14
+const chartLabels = profileStats.slice(-7).map((s: any) =>
   new Date(s.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })
 );
-const chartViews  = profileStats.map((s: any) => safeNum(s.views));
+const chartViews  = profileStats.slice(-7).map((s: any) => safeNum(s.views));
 const clicksByDate = new Map<string, number>();
 blockStats.forEach((bs: any) => {
   clicksByDate.set(bs.date, (clicksByDate.get(bs.date) ?? 0) + safeNum(bs.clicks));
 });
 const chartClicks = profileStats.map((s: any) => clicksByDate.get(s.date) ?? 0);
 
-const sparkViews  = chartViews.slice(-7);
-const sparkClicks = chartClicks.slice(-7);
+const sparkViews  = chartViews;  // already sliced to last 7
+const sparkClicks = chartClicks; // already sliced to last 7
 const sparkRate   = profileStats.map((s: any) => {
   const v = safeNum(s.views);
   const c = clicksByDate.get(s.date) ?? 0;
   return v > 0 ? Math.round((c / v) * 100 * 10) / 10 : 0;
 }).slice(-7);
 
+// Compare last 7 days vs previous 7 days (requires 14d of data)
 function calcDelta(arr: number[]): { text: string; positive: boolean; neutral: boolean } {
   if (arr.length < 2) return { text: '—', positive: false, neutral: true };
-  const half = Math.floor(arr.length / 2);
-  const prev = arr.slice(0, half).reduce((a, b) => a + b, 0);
-  const curr = arr.slice(half).reduce((a, b) => a + b, 0);
+  const mid  = Math.ceil(arr.length / 2);
+  const prev = arr.slice(0, mid).reduce((a, b) => a + b, 0);
+  const curr = arr.slice(mid).reduce((a, b) => a + b, 0);
   if (prev === 0) return curr > 0
     ? { text: '+∞%', positive: true,  neutral: false }
     : { text: '—',   positive: false, neutral: true  };
@@ -668,13 +670,24 @@ const bridgeData = JSON.stringify({
     });
   }
 
-  const chartCanvas = document.getElementById('growth-chart');
-  if (chartCanvas && chartLabels?.length > 0) {
+  // FIX: wait for Chart.js CDN to finish loading before calling buildChart
+  function initChart() {
+    const chartCanvas = document.getElementById('growth-chart');
+    if (!chartCanvas || !chartLabels?.length) return;
+    if (typeof Chart === 'undefined') {
+      // CDN not ready yet — retry after a tick
+      setTimeout(initChart, 100);
+      return;
+    }
     const obs = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting) { buildChart(chartLabels, chartViews, chartClicks); obs.disconnect(); }
     }, { threshold: 0.1 });
     obs.observe(chartCanvas);
   }
+
+  // Try immediately, then also on window load as fallback
+  initChart();
+  window.addEventListener('load', initChart, { once: true });
 
   // ==================== PERIOD TABS ====================
   document.querySelectorAll('.period-btn').forEach(btn => {
