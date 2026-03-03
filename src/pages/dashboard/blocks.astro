@@ -55,22 +55,26 @@ const topBlocks = analyticsResult.success ? (analyticsResult.data?.topBlocks ?? 
 const clicksMap = new Map<string, number>();
 topBlocks.forEach((b: any) => clicksMap.set(b.id, safeNum(b.clicks)));
 
-// Sanitise blocks for bridge
-const safeBridgeBlocks = blocks.map((b: any) => ({
-  id:         escapeHtml(b.id),
-  type:       escapeHtml(b.type),
-  title:      escapeHtml(b.title),
-  active:     Boolean(b.active),
-  position:   safeNum(b.position),
-  created_at: escapeHtml(b.created_at),
-  clicks:     clicksMap.get(b.id) ?? 0,
-  config: {
-    url:   escapeHtml(b.config?.url),
-    links: Array.isArray(b.config?.links)
-      ? b.config.links.map((l: any) => ({ url: escapeHtml(l?.url ?? l) }))
-      : [],
-  },
-}));
+// UUID guard — never let a non-UUID id reach the client
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const safeBridgeBlocks = blocks
+  .filter((b: any) => UUID_RE.test(String(b.id ?? '')))
+  .map((b: any) => ({
+    id:         String(b.id),          // already validated — no escapeHtml corruption
+    type:       escapeHtml(b.type),
+    title:      escapeHtml(b.title),
+    active:     Boolean(b.active),
+    position:   safeNum(b.position),
+    created_at: escapeHtml(b.created_at),
+    clicks:     clicksMap.get(b.id) ?? 0,
+    config: {
+      url:   escapeHtml(b.config?.url),
+      links: Array.isArray(b.config?.links)
+        ? b.config.links.map((l: any) => ({ url: escapeHtml(l?.url ?? l) }))
+        : [],
+    },
+  }));
 
 // Plan limits
 const blockCount  = blocks.length;
@@ -536,7 +540,11 @@ const BLOCK_TYPES = [
       ghostClass: 'sortable-ghost',
       dragClass: 'sortable-drag',
       onEnd: async () => {
-        const blockIds = Array.from(container.children).map(el => el.dataset.id).filter(Boolean);
+        const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const blockIds = Array.from(container.children)
+          .map(el => el.dataset.id)
+          .filter(id => id && UUID_RE.test(id));
+        if (blockIds.length === 0) return;
         try {
           const res = await fetch('/api/blocks/reorder', {
             method: 'POST',
