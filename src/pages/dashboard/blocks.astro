@@ -1,712 +1,877 @@
 ---
-// src/pages/dashboard/blocks.astro
+// src/pages/dashboard/blocks.astro — Blocks v2
+// Réécriture complète : UX 2026, search/filter, duplicate, stats inline, bulk actions
 
 import DashboardLayout from '@/layouts/DashboardLayout.astro';
-import Button from '@/components/ui/Button.astro';
-import Card from '@/components/ui/Card.astro';
 import Badge from '@/components/ui/Badge.astro';
-import Alert from '@/components/ui/Alert.astro';
-import Modal from '@/components/ui/Modal.astro';
 import PlanLimitIndicator from '@/components/features/PlanLimitIndicator.astro';
 import { withAuth } from '@/lib/auth/auth';
 import { getBlocks } from '@/lib/supabase/queries';
+import { getAnalyticsSummary } from '@/lib/db/queries.server';
+import { createServerClient } from '@supabase/ssr';
+import { parse } from 'cookie';
 
-interface Block {
-  id: string;
-  type: string;
-  title: string | null;
-  active: boolean;
-  config: Record<string, any>;
-  position?: number;
-  created_at?: string;
-  deleted_at?: string;
-}
-
-// ==================== AUTH & DATA ====================
-
+// ==================== AUTH ====================
 const authResult = await withAuth({
   cookies: Astro.cookies,
   request: Astro.request,
 });
-
 if (!authResult.success || !authResult.data) {
   return Astro.redirect(authResult.redirect || '/signin?error=auth_failed');
 }
-
 const { user, profile, planLimits } = authResult.data;
 
-// ==================== GET BLOCKS ====================
-
-const blocksResult = await getBlocks(profile.id);
-
-let blocks: Block[] = [];
-let blocksError: string | null = null;
-
-if (blocksResult.success) {
-  blocks = blocksResult.data ?? [];
-} else {
-  blocksError = blocksResult.error?.message ?? 'Erreur inconnue lors du chargement des blocks';
-  console.error('Échec chargement blocks:', blocksResult);
+// ==================== SANITIZATION ====================
+function escapeHtml(val: unknown): string {
+  return String(val ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+function safeNum(val: unknown): number {
+  const n = Number(val);
+  return isFinite(n) ? n : 0;
 }
 
-// Valeurs sécurisées avec fallback
-const activeBlocks = blocks.filter(block => !block.deleted_at);
+// ==================== DATA ====================
+const cookies = parse(Astro.request.headers.get('cookie') ?? '');
+const supabase = createServerClient(
+  import.meta.env.PUBLIC_SUPABASE_URL!,
+  import.meta.env.PUBLIC_SUPABASE_ANON_KEY!,
+  { cookies: { get: (k) => cookies[k], set: () => {}, remove: () => {} } }
+);
 
-const blockCount = activeBlocks.length;
-const blockLimit = planLimits?.max_blocks_total ?? 15; // fallback raisonnable
+const safeProfileId = profile?.id?.trim() ?? '';
+
+const [blocksResult, analyticsResult] = await Promise.all([
+  safeProfileId ? getBlocks(supabase, safeProfileId) : Promise.resolve({ success: false, data: [] }),
+  safeProfileId ? getAnalyticsSummary(supabase, safeProfileId, 7) : Promise.resolve({ success: false, data: null }),
+]);
+
+const rawBlocks = (blocksResult.success ? blocksResult.data : []) ?? [];
+const blocks    = rawBlocks.filter((b: any) => !b.deleted_at);
+const topBlocks = analyticsResult.success ? (analyticsResult.data?.topBlocks ?? []) : [];
+
+// Build clicks map
+const clicksMap = new Map<string, number>();
+topBlocks.forEach((b: any) => clicksMap.set(b.id, safeNum(b.clicks)));
+
+// Sanitise blocks for bridge
+const safeBridgeBlocks = blocks.map((b: any) => ({
+  id:         escapeHtml(b.id),
+  type:       escapeHtml(b.type),
+  title:      escapeHtml(b.title),
+  active:     Boolean(b.active),
+  position:   safeNum(b.position),
+  created_at: escapeHtml(b.created_at),
+  clicks:     clicksMap.get(b.id) ?? 0,
+  config: {
+    url:   escapeHtml(b.config?.url),
+    links: Array.isArray(b.config?.links)
+      ? b.config.links.map((l: any) => ({ url: escapeHtml(l?.url ?? l) }))
+      : [],
+  },
+}));
+
+// Plan limits
+const blockCount  = blocks.length;
+const blockLimit  = planLimits?.max_blocks_total ?? 15;
 const canAddBlock = blockLimit === -1 || blockCount < blockLimit;
-const isNearLimit =
-  blockLimit !== -1 &&
-  blockCount >= blockLimit * 0.8 &&
-  blockCount < blockLimit;
-const progressPercent =
-  blockLimit > 0 ? Math.min(100, Math.round((blockCount / blockLimit) * 100)) : 0;
+const isNearLimit = blockLimit !== -1 && blockCount >= blockLimit * 0.8 && blockCount < blockLimit;
+const blocksError = blocksResult.success ? null : (blocksResult.error?.message ?? 'Failed to load blocks');
+
+// Bridge
+const bridge = JSON.stringify({
+  blocks:     safeBridgeBlocks,
+  blockCount,
+  blockLimit,
+  canAddBlock,
+  profileId:  escapeHtml(safeProfileId),
+});
+
+// Block types config
+const BLOCK_TYPES = [
+  { type: 'link',    emoji: '🔗', label: 'Link',    desc: 'Clickable link',   color: 'neon-green'  },
+  { type: 'heading', emoji: '📝', label: 'Heading', desc: 'Section title',    color: 'neon-purple' },
+  { type: 'spacer',  emoji: '—',  label: 'Spacer',  desc: 'Add spacing',      color: 'neon-blue'   },
+  { type: 'image',   emoji: '🖼️', label: 'Image',   desc: 'Display image',    color: 'neon-pink'   },
+  { type: 'video',   emoji: '🎥', label: 'Video',   desc: 'Embed video',      color: 'neon-green'  },
+  { type: 'social',  emoji: '👥', label: 'Social',  desc: 'Social icons',     color: 'neon-purple' },
+];
 ---
 
 <DashboardLayout title="Blocks">
-  <!-- Header -->
+
+  <!-- Bridge -->
+  <div id="server-data" class="hidden" data-bridge={bridge}></div>
+
+  <!-- ===== HEADER ===== -->
   <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
     <div>
-      <h2 class="text-lg lg:text-xl font-semibold text-white mb-1">Manage Your Blocks</h2>
-      <p class="text-sm text-gray-400">Build your page with links, headings, images and more</p>
+      <p class="text-xs font-medium text-gray-500 uppercase tracking-widest mb-1">Content</p>
+      <h2 class="text-xl font-semibold text-white tracking-tight">Blocks</h2>
+      <p class="text-sm text-gray-400 mt-0.5">Build and manage your profile page</p>
     </div>
-    <Button 
-      variant={canAddBlock ? 'primary' : 'secondary'}
-      class="w-full sm:w-auto"
-      id="add-block-btn"
-    >
-      <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-      </svg>
-      {canAddBlock ? 'Add Block' : 'Upgrade to Add More'}
-    </Button>
+    <div class="flex items-center gap-2">
+      <!-- Bulk action bar (hidden by default) -->
+      <div id="bulk-bar" class="hidden items-center gap-2">
+        <span id="bulk-count" class="text-xs text-gray-400 font-medium px-2">0 selected</span>
+        <button id="bulk-toggle-btn"
+          class="flex items-center gap-1.5 px-3 py-2 glass border border-white/10 rounded-xl text-xs text-gray-300 hover:text-white hover:border-white/25 transition-all">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          Toggle
+        </button>
+        <button id="bulk-delete-btn"
+          class="flex items-center gap-1.5 px-3 py-2 glass border border-red-500/20 rounded-xl text-xs text-red-400 hover:border-red-500/40 hover:bg-red-500/5 transition-all">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+          </svg>
+          Delete
+        </button>
+        <button id="bulk-cancel-btn"
+          class="px-3 py-2 text-xs text-gray-500 hover:text-white transition-colors">
+          Cancel
+        </button>
+      </div>
+
+      <button id="add-block-btn"
+        class={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.98]
+          ${canAddBlock
+            ? 'bg-neon-green text-black hover:bg-neon-green/90'
+            : 'glass border border-white/10 text-gray-400 cursor-not-allowed opacity-60'
+          }`}
+        title="N"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        {canAddBlock ? 'Add Block' : 'Upgrade to Add More'}
+      </button>
+    </div>
   </div>
 
-  <PlanLimitIndicator 
-    current={blockCount}
-    limit={blockLimit}
-    feature="Blocks"
-    showUpgrade={true}
-  />
+  <!-- Plan indicator -->
+  <div class="mb-5">
+    <PlanLimitIndicator current={blockCount} limit={blockLimit} feature="Blocks" showUpgrade={true} />
+  </div>
 
-  <!-- Error Alert -->
-  {blocksError && (
-    <Alert variant="danger" title="Error loading blocks">
-      <p>{blocksError}</p>
-      <p class="text-sm mt-2">Please refresh the page. If the problem persists, contact support.</p>
-    </Alert>
-  )}
-
-  <!-- Approaching limit -->
+  <!-- Near / at limit alerts -->
   {isNearLimit && (
-    <Alert variant="warning" title="Approaching limit" class="mb-6">
-      <p>You're using {blockCount} of {blockLimit} blocks ({progressPercent}%).</p>
-      <a href="/pricing" class="text-yellow-400 hover:underline text-sm">
-        Upgrade to add more blocks
-      </a>
-    </Alert>
+    <div class="mb-5 flex items-center gap-3 p-4 glass border border-yellow-400/20 rounded-xl">
+      <svg class="w-4 h-4 text-yellow-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+      </svg>
+      <p class="text-sm text-yellow-300">Using {blockCount} of {blockLimit} blocks.
+        <a href="/pricing" class="underline ml-1">Upgrade for more →</a>
+      </p>
+    </div>
   )}
-
-  <!-- Limit reached (seulement si vraiment atteint) -->
   {!canAddBlock && blockLimit !== -1 && (
-    <Alert variant="danger" title="Block limit reached" class="mb-6">
-      <p>You've reached your limit of {blockLimit} blocks.</p>
-      <a href="/pricing" class="text-red-400 hover:underline text-sm">
-        Upgrade to add more blocks
-      </a>
-    </Alert>
+    <div class="mb-5 flex items-center gap-3 p-4 glass border border-red-500/20 rounded-xl">
+      <svg class="w-4 h-4 text-red-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+      </svg>
+      <p class="text-sm text-red-300">Block limit reached ({blockLimit}).
+        <a href="/pricing" class="underline ml-1">Upgrade →</a>
+      </p>
+    </div>
+  )}
+  {blocksError && (
+    <div class="mb-5 flex items-center gap-3 p-4 glass border border-red-500/20 rounded-xl">
+      <p class="text-sm text-red-300">{blocksError}</p>
+      <button onclick="location.reload()" class="ml-auto text-xs text-red-400 underline">Retry</button>
+    </div>
   )}
 
-  <!-- Blocks Container -->
+  <!-- ===== SEARCH + FILTER ===== -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-5" id="search-filter-bar">
+    <div class="relative flex-1">
+      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
+      </svg>
+      <input
+        type="text"
+        id="search-input"
+        placeholder="Search blocks…"
+        class="w-full pl-9 pr-4 py-2.5 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/40 focus:outline-none transition-colors"
+      />
+    </div>
+    <div class="flex items-center gap-2 overflow-x-auto pb-0.5">
+      <button class="filter-btn active shrink-0 px-3 py-2 rounded-xl text-xs font-medium transition-all" data-filter="all">All</button>
+      {BLOCK_TYPES.map(t => (
+        <button class="filter-btn shrink-0 px-3 py-2 rounded-xl text-xs font-medium transition-all capitalize" data-filter={t.type}>
+          {t.emoji} {t.label}
+        </button>
+      ))}
+    </div>
+  </div>
+
+  <!-- ===== BLOCKS LIST ===== -->
   <div id="blocks-container">
     {blocks.length === 0 ? (
       <!-- Empty State -->
-      <Card>
-        <div class="text-center py-12">
-          <div class="w-16 h-16 rounded-full bg-gradient-to-br from-neon-green/20 to-neon-blue/20 border border-neon-green/30 flex items-center justify-center mx-auto mb-6">
-            <svg class="w-8 h-8 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
-            </svg>
-          </div>
-          <h3 class="text-xl font-semibold text-white mb-2">No blocks yet</h3>
-          <p class="text-gray-400 mb-6">Start building your page by adding your first block</p>
-          {canAddBlock ? (
-            <Button variant="primary" id="empty-state-btn">
-              Add Your First Block
-            </Button>
-          ) : (
-            <Button variant="secondary" href="/pricing">
-              Upgrade to Add Blocks
-            </Button>
-          )}
+      <div id="empty-state" class="flex flex-col items-center justify-center py-20 text-center">
+        <div class="w-20 h-20 rounded-2xl bg-neon-green/10 border border-neon-green/20 flex items-center justify-center mx-auto mb-5">
+          <svg class="w-9 h-9 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+          </svg>
         </div>
-      </Card>
-    ) : (
-      <!-- Blocks List -->
-      <div class="space-y-4" id="sortable-blocks">
-        {blocks.map((block) => (
-          <div class="glass-strong rounded-2xl p-4 lg:p-6 border border-white/10 hover:border-neon-green/30 transition-all group cursor-move" data-id={block.id.trim()}>
-            <div class="flex items-center justify-between mb-3">
-              <div class="flex items-center space-x-3 lg:space-x-4 flex-1 min-w-0">
-                <button class="cursor-move text-gray-500 hover:text-white transition-colors touch-none">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/>
-                  </svg>
-                </button>
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center space-x-2 mb-1">
-                    <Badge variant="default" size="sm">{block.type}</Badge>
-                    {block.title ? (
-                      <h3 class="text-white font-semibold truncate">{block.title}</h3>
-                    ) : (
-                      <span class="text-gray-500 text-sm">No title</span>
-                    )}
-                  </div>
-                  <p class="text-sm text-gray-400 truncate">
-                    {block.active ? 'Active' : 'Inactive'}
-                  </p>
-                </div>
-              </div>
-              <div class="flex items-center space-x-2">
-                <label class="relative inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={block.active}
-                    class="sr-only peer block-toggle" 
-                    data-id={block.id}
-                  />
-                  <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-neon-green"></div>
-                </label>
-              </div>
-            </div>
-            <div class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button class="block-edit-btn px-3 lg:px-4 py-2 text-sm text-gray-400 hover:text-white glass border border-white/10 rounded-lg transition-colors" data-id={block.id}>
-                Edit
-              </button>
-              <button class="block-delete-btn px-3 lg:px-4 py-2 text-sm text-gray-400 hover:text-red-400 glass border border-white/10 rounded-lg transition-colors" data-id={block.id}>
-                Delete
-              </button>
-            </div>
-          </div>
-        ))}
+        <h3 class="text-lg font-semibold text-white mb-2">No blocks yet</h3>
+        <p class="text-sm text-gray-400 mb-6 max-w-xs">Start building your page by adding links, headings, images and more.</p>
+        {canAddBlock && (
+          <button id="empty-add-btn"
+            class="flex items-center gap-2 px-6 py-3 bg-neon-green text-black text-sm font-semibold rounded-xl hover:bg-neon-green/90 active:scale-[0.98] transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Add Your First Block
+          </button>
+        )}
+        <p class="text-xs text-gray-600 mt-4">Tip: press <kbd class="px-1.5 py-0.5 glass rounded text-gray-400 font-mono text-xs">N</kbd> to quickly add a block</p>
       </div>
+    ) : (
+      <div class="space-y-2" id="sortable-blocks"></div>
     )}
+    <!-- No results (search) -->
+    <div id="no-results" class="hidden flex-col items-center justify-center py-16 text-center">
+      <svg class="w-10 h-10 text-gray-700 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
+      </svg>
+      <p class="text-sm text-gray-500">No blocks match your search</p>
+      <button id="clear-search-btn" class="text-xs text-neon-green hover:underline mt-2">Clear filters</button>
+    </div>
   </div>
 
-  <!-- Block Type Selection Modal -->
-  <Modal id="type-modal" title="Choose Block Type" size="lg">
-    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-      <!-- Link Block -->
-      <button 
-        class="block-type-btn p-4 glass border border-white/10 rounded-xl hover:border-neon-green/50 transition-all group text-left"
-        data-type="link"
-      >
-        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-green/20 to-neon-green/10 border border-neon-green/30 flex items-center justify-center mb-3">
-          <span class="text-xl">🔗</span>
-        </div>
-        <h4 class="text-white font-semibold mb-1">Link</h4>
-        <p class="text-xs text-gray-400">Add a clickable link</p>
-      </button>
-
-      <!-- Heading Block -->
-      <button 
-        class="block-type-btn p-4 glass border border-white/10 rounded-xl hover:border-neon-purple/50 transition-all group text-left"
-        data-type="heading"
-      >
-        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-purple/20 to-neon-purple/10 border border-neon-purple/30 flex items-center justify-center mb-3">
-          <span class="text-xl">📝</span>
-        </div>
-        <h4 class="text-white font-semibold mb-1">Heading</h4>
-        <p class="text-xs text-gray-400">Section title</p>
-      </button>
-
-      <!-- Spacer Block -->
-      <button 
-        class="block-type-btn p-4 glass border border-white/10 rounded-xl hover:border-neon-blue/50 transition-all group text-left"
-        data-type="spacer"
-      >
-        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-blue/20 to-neon-blue/10 border border-neon-blue/30 flex items-center justify-center mb-3">
-          <span class="text-xl">—</span>
-        </div>
-        <h4 class="text-white font-semibold mb-1">Spacer</h4>
-        <p class="text-xs text-gray-400">Add spacing</p>
-      </button>
-
-      <!-- Image Block -->
-      <button 
-        class="block-type-btn p-4 glass border border-white/10 rounded-xl hover:border-neon-pink/50 transition-all group text-left"
-        data-type="image"
-      >
-        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-pink/20 to-neon-pink/10 border border-neon-pink/30 flex items-center justify-center mb-3">
-          <span class="text-xl">🖼️</span>
-        </div>
-        <h4 class="text-white font-semibold mb-1">Image</h4>
-        <p class="text-xs text-gray-400">Display image</p>
-      </button>
-
-      <!-- Video Block -->
-      <button 
-        class="block-type-btn p-4 glass border border-white/10 rounded-xl hover:border-neon-green/50 transition-all group text-left"
-        data-type="video"
-      >
-        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-green/20 to-neon-green/10 border border-neon-green/30 flex items-center justify-center mb-3">
-          <span class="text-xl">🎥</span>
-        </div>
-        <h4 class="text-white font-semibold mb-1">Video</h4>
-        <p class="text-xs text-gray-400">Embed video</p>
-      </button>
-
-      <!-- Social Block -->
-      <button 
-        class="block-type-btn p-4 glass border border-white/10 rounded-xl hover:border-neon-purple/50 transition-all group text-left"
-        data-type="social"
-      >
-        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-purple/20 to-neon-purple/10 border border-neon-purple/30 flex items-center justify-center mb-3">
-          <span class="text-xl">👥</span>
-        </div>
-        <h4 class="text-white font-semibold mb-1">Social</h4>
-        <p class="text-xs text-gray-400">Social icons</p>
-      </button>
-    </div>
-  </Modal>
-
-  <!-- Edit Block Modal -->
-  <Modal id="edit-modal" title="Edit Block" size="md">
-    <form id="block-form" class="space-y-4">
-      <input type="hidden" id="block-id" />
-      <input type="hidden" id="block-type" />
-      
-      <div id="form-fields"></div>
-
-      <div class="flex space-x-3">
-        <Button type="submit" variant="primary" class="flex-1" id="submit-btn">
-          <span id="submit-text">Save Block</span>
-        </Button>
-        <Button type="button" variant="ghost" class="px-6" id="cancel-btn">
-          Cancel
-        </Button>
+  <!-- ===== TYPE SELECTION MODAL ===== -->
+  <div id="type-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div id="type-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+    <div class="relative glass border border-white/10 rounded-2xl p-6 w-full max-w-lg shadow-2xl">
+      <div class="flex items-center justify-between mb-5">
+        <h3 class="text-white font-semibold">Choose Block Type</h3>
+        <button id="type-close" class="text-gray-500 hover:text-white transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
       </div>
-    </form>
-  </Modal>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {BLOCK_TYPES.map(t => (
+          <button
+            class="block-type-btn p-4 glass border border-white/10 rounded-xl hover:border-neon-green/40 hover:bg-white/5 active:scale-[0.97] transition-all text-left"
+            data-type={t.type}
+          >
+            <div class="text-2xl mb-2">{t.emoji}</div>
+            <h4 class="text-white text-sm font-semibold mb-0.5">{t.label}</h4>
+            <p class="text-xs text-gray-500">{t.desc}</p>
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-  <script>
-    import { toast } from '@/lib/utils/toast';
+  <!-- ===== EDIT MODAL ===== -->
+  <div id="edit-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div id="edit-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+    <div class="relative glass border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      <div class="flex items-center justify-between mb-5">
+        <h3 class="text-white font-semibold" id="modal-title">Add Block</h3>
+        <button id="edit-close" class="text-gray-500 hover:text-white transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <form id="block-form" class="space-y-4" novalidate>
+        <input type="hidden" id="block-id" />
+        <input type="hidden" id="block-type" />
+        <div id="form-fields" class="space-y-4"></div>
+        <div class="flex gap-3 pt-1">
+          <button type="submit" id="submit-btn"
+            class="flex-1 flex items-center justify-center gap-2 py-2.5 bg-neon-green text-black text-sm font-semibold rounded-xl hover:bg-neon-green/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span id="submit-text">Save Block</span>
+          </button>
+          <button type="button" id="cancel-btn"
+            class="px-5 py-2.5 glass border border-white/10 rounded-xl text-sm text-gray-300 hover:text-white transition-all">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-    // ==================== STATE ====================
-    let selectedType = null;
-    let editingId = null;
-    let blocks = [];
+</DashboardLayout>
 
-    // ==================== LOAD BLOCKS ====================
-    async function loadBlocks(forceRefresh = false) {
-      try {
-        const response = await fetch('/api/blocks', {
-          cache: forceRefresh ? 'no-store' : 'default',
-          credentials: 'include'
-        });
+<!-- ===== STYLES ===== -->
+<style>
+  .filter-btn {
+    color: rgb(107 114 128);
+    border: 1px solid transparent;
+    background: transparent;
+  }
+  .filter-btn:hover { color: white; background: rgba(255,255,255,0.05); }
+  .filter-btn.active { color: white; background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.15); }
 
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(errData.error || `Failed to load blocks (${response.status})`);
+  #type-modal.open,
+  #edit-modal.open { display: flex; }
+
+  .block-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+  .block-card.selected { border-color: rgba(0,255,157,0.4) !important; background: rgba(0,255,157,0.03); }
+  .block-card.sortable-ghost { opacity: 0.4; }
+  .block-card.sortable-drag  { box-shadow: 0 20px 60px rgba(0,0,0,0.5); transform: rotate(1deg); }
+</style>
+
+<!-- ===== SORTABLE ===== -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
+<!-- ===== SCRIPT ===== -->
+<script>
+  import { toast } from '@/lib/utils/toast';
+
+  // ==================== BRIDGE ====================
+  const raw = JSON.parse(document.getElementById('server-data')?.dataset.bridge ?? '{}');
+  let { blocks, blockCount, blockLimit, canAddBlock, profileId } = raw;
+
+  // ==================== STATE ====================
+  let selectedIds  = new Set();
+  let activeFilter = 'all';
+  let searchQuery  = '';
+  let isSaving     = false;
+  let sortable     = null;
+
+  // ==================== RENDER BLOCKS ====================
+  const BLOCK_EMOJI = { link: '🔗', heading: '📝', spacer: '—', image: '🖼️', video: '🎥', social: '👥' };
+
+  function isNew(createdAt) {
+    if (!createdAt) return false;
+    return Date.now() - new Date(createdAt).getTime() < 24 * 60 * 60 * 1000;
+  }
+
+  function getFiltered() {
+    return blocks.filter(b => {
+      const matchType   = activeFilter === 'all' || b.type === activeFilter;
+      const matchSearch = !searchQuery || b.title?.toLowerCase().includes(searchQuery) || b.type.includes(searchQuery);
+      return matchType && matchSearch;
+    });
+  }
+
+  function renderBlocks() {
+    const container = document.getElementById('sortable-blocks');
+    const noResults  = document.getElementById('no-results');
+    const emptyState = document.getElementById('empty-state');
+    if (!container) return;
+
+    const filtered = getFiltered();
+    const hasSearch = searchQuery || activeFilter !== 'all';
+
+    // Show/hide empty state vs no-results
+    if (blocks.length === 0) {
+      container.innerHTML = '';
+      emptyState?.classList.remove('hidden');
+      noResults?.classList.add('hidden');
+      return;
+    }
+    emptyState?.classList.add('hidden');
+
+    if (filtered.length === 0 && hasSearch) {
+      container.innerHTML = '';
+      noResults?.classList.remove('hidden');
+      return;
+    }
+    noResults?.classList.add('hidden');
+
+    container.innerHTML = filtered.map(block => {
+      const isSelected = selectedIds.has(block.id);
+      const clicks     = block.clicks ?? 0;
+      const newBadge   = isNew(block.created_at);
+
+      return `
+        <div
+          class="block-card group relative glass border border-white/10 rounded-2xl p-4 transition-all hover:border-white/20 ${isSelected ? 'selected' : ''}"
+          data-id="${block.id}"
+          data-type="${block.type}"
+        >
+          <!-- Select checkbox (shown on hover or when in bulk mode) -->
+          <div class="absolute top-4 left-4 z-10 bulk-checkbox ${selectedIds.size > 0 ? '' : 'opacity-0 group-hover:opacity-100'} transition-opacity">
+            <input type="checkbox" ${isSelected ? 'checked' : ''}
+              class="block-select w-4 h-4 rounded accent-neon-green cursor-pointer"
+              data-id="${block.id}"
+            />
+          </div>
+
+          <div class="flex items-center gap-4 pl-7">
+            <!-- Drag handle -->
+            <div class="drag-handle cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-400 transition-colors shrink-0 touch-none">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/>
+              </svg>
+            </div>
+
+            <!-- Type emoji -->
+            <div class="text-xl shrink-0">${BLOCK_EMOJI[block.type] ?? '📌'}</div>
+
+            <!-- Info -->
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap mb-0.5">
+                <span class="text-xs px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-400 font-medium capitalize">${block.type}</span>
+                ${block.title
+                  ? `<span class="text-sm font-semibold text-white truncate">${block.title}</span>`
+                  : `<span class="text-sm text-gray-600 italic">No title</span>`
+                }
+                ${newBadge ? `<span class="text-xs px-1.5 py-0.5 rounded-full bg-neon-green/15 text-neon-green font-medium border border-neon-green/25">New</span>` : ''}
+              </div>
+              <div class="flex items-center gap-3 text-xs text-gray-600">
+                <span class="${block.active ? 'text-neon-green' : 'text-gray-600'} flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full ${block.active ? 'bg-neon-green' : 'bg-gray-600'}"></span>
+                  ${block.active ? 'Active' : 'Inactive'}
+                </span>
+                ${clicks > 0 ? `
+                  <span class="flex items-center gap-1 text-neon-blue">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/>
+                    </svg>
+                    ${clicks.toLocaleString('fr-FR')} clicks
+                  </span>
+                ` : ''}
+              </div>
+            </div>
+
+            <!-- Toggle -->
+            <label class="relative inline-flex items-center cursor-pointer shrink-0">
+              <input type="checkbox" ${block.active ? 'checked' : ''}
+                class="sr-only peer block-toggle" data-id="${block.id}" />
+              <div class="w-10 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-neon-green transition-colors"></div>
+            </label>
+
+            <!-- Actions (hover) -->
+            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+              <button class="block-duplicate-btn p-2 glass rounded-lg border border-white/5 text-gray-500 hover:text-white hover:border-white/20 transition-all" data-id="${block.id}" title="Duplicate">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+              </button>
+              <button class="block-edit-btn p-2 glass rounded-lg border border-white/5 text-gray-500 hover:text-white hover:border-white/20 transition-all" data-id="${block.id}" title="Edit">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+              </button>
+              <button class="block-delete-btn p-2 glass rounded-lg border border-white/5 text-gray-500 hover:text-red-400 hover:border-red-500/20 transition-all" data-id="${block.id}" title="Delete">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    attachCardListeners();
+    initSortable();
+    updateBulkBar();
+  }
+
+  // ==================== CARD EVENT LISTENERS ====================
+  function attachCardListeners() {
+    // Toggle active
+    document.querySelectorAll('.block-toggle').forEach(toggle => {
+      toggle.addEventListener('change', async (e) => {
+        const id     = e.target.dataset.id;
+        const active = e.target.checked;
+        try {
+          const res = await fetch(`/api/blocks/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ active }),
+          });
+          if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+          const b = blocks.find(b => b.id === id);
+          if (b) b.active = active;
+          toast.success(active ? 'Block activated' : 'Block deactivated');
+        } catch (err) {
+          e.target.checked = !active;
+          toast.error(err instanceof Error ? err.message : 'Failed to update block');
         }
+      });
+    });
 
-        const data = await response.json();
-        // Supporte { data: [...], blocks: [...] } ou tableau direct
-        blocks = Array.isArray(data) ? data 
-               : data.data ?? data.blocks ?? [];
-        
-        console.log('[loadBlocks] Loaded', blocks.length, 'blocks →', blocks.map(b => b.id));
-        renderBlocks();
-      } catch (error) {
-        console.error('Error loading blocks:', error);
-        toast.error(error.message || 'Failed to load blocks');
+    // Select (bulk)
+    document.querySelectorAll('.block-select').forEach(cb => {
+      cb.addEventListener('change', (e) => {
+        const id = e.target.dataset.id;
+        e.target.checked ? selectedIds.add(id) : selectedIds.delete(id);
+        const card = document.querySelector(`.block-card[data-id="${id}"]`);
+        card?.classList.toggle('selected', e.target.checked);
+        updateBulkBar();
+      });
+    });
+
+    // Edit
+    document.querySelectorAll('.block-edit-btn').forEach(btn => {
+      btn.addEventListener('click', () => handleEditBlock(btn.dataset.id));
+    });
+
+    // Duplicate
+    document.querySelectorAll('.block-duplicate-btn').forEach(btn => {
+      btn.addEventListener('click', () => handleDuplicateBlock(btn.dataset.id));
+    });
+
+    // Delete
+    document.querySelectorAll('.block-delete-btn').forEach(btn => {
+      btn.addEventListener('click', () => handleDeleteBlock(btn.dataset.id));
+    });
+  }
+
+  // ==================== SORTABLE ====================
+  function initSortable() {
+    const container = document.getElementById('sortable-blocks');
+    if (!container) return;
+    sortable?.destroy();
+    sortable = new Sortable(container, {
+      animation: 200,
+      handle: '.drag-handle',
+      ghostClass: 'sortable-ghost',
+      dragClass: 'sortable-drag',
+      onEnd: async () => {
+        const blockIds = Array.from(container.children).map(el => el.dataset.id).filter(Boolean);
+        try {
+          const res = await fetch('/api/blocks/reorder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ blockIds }),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          // Update local order
+          const ordered = blockIds.map(id => blocks.find(b => b.id === id)).filter(Boolean);
+          blocks = ordered;
+          toast.success('Order saved');
+        } catch (err) {
+          toast.error('Failed to save order');
+          renderBlocks();
+        }
+      },
+    });
+  }
+
+  // ==================== BULK ACTIONS ====================
+  function updateBulkBar() {
+    const bar   = document.getElementById('bulk-bar');
+    const count = document.getElementById('bulk-count');
+    if (!bar || !count) return;
+    if (selectedIds.size > 0) {
+      bar.classList.remove('hidden');
+      bar.classList.add('flex');
+      count.textContent = `${selectedIds.size} selected`;
+    } else {
+      bar.classList.add('hidden');
+      bar.classList.remove('flex');
+    }
+  }
+
+  document.getElementById('bulk-cancel-btn')?.addEventListener('click', () => {
+    selectedIds.clear();
+    renderBlocks();
+  });
+
+  document.getElementById('bulk-toggle-btn')?.addEventListener('click', async () => {
+    const ids = [...selectedIds];
+    const currentlyActive = ids.every(id => blocks.find(b => b.id === id)?.active);
+    const newActive = !currentlyActive;
+    try {
+      await Promise.all(ids.map(id =>
+        fetch(`/api/blocks/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ active: newActive }),
+        })
+      ));
+      ids.forEach(id => { const b = blocks.find(b => b.id === id); if (b) b.active = newActive; });
+      selectedIds.clear();
+      renderBlocks();
+      toast.success(`${ids.length} block${ids.length > 1 ? 's' : ''} ${newActive ? 'activated' : 'deactivated'}`);
+    } catch { toast.error('Bulk toggle failed'); }
+  });
+
+  document.getElementById('bulk-delete-btn')?.addEventListener('click', async () => {
+    const ids = [...selectedIds];
+    if (!confirm(`Delete ${ids.length} block${ids.length > 1 ? 's' : ''}? This cannot be undone.`)) return;
+    try {
+      await Promise.all(ids.map(id => fetch(`/api/blocks/${id}`, { method: 'DELETE' })));
+      blocks = blocks.filter(b => !ids.includes(b.id));
+      selectedIds.clear();
+      renderBlocks();
+      toast.success(`${ids.length} block${ids.length > 1 ? 's' : ''} deleted`);
+    } catch { toast.error('Bulk delete failed'); }
+  });
+
+  // ==================== SEARCH & FILTER ====================
+  document.getElementById('search-input')?.addEventListener('input', (e) => {
+    searchQuery = e.target.value.toLowerCase().trim();
+    renderBlocks();
+  });
+
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeFilter = btn.dataset.filter;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b === btn));
+      renderBlocks();
+    });
+  });
+
+  document.getElementById('clear-search-btn')?.addEventListener('click', () => {
+    searchQuery  = '';
+    activeFilter = 'all';
+    const input  = document.getElementById('search-input');
+    if (input) input.value = '';
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === 'all'));
+    renderBlocks();
+  });
+
+  // ==================== MODALS ====================
+  function openModal(id) {
+    document.getElementById(id)?.classList.add('open');
+  }
+  function closeModal(id) {
+    document.getElementById(id)?.classList.remove('open');
+  }
+
+  document.getElementById('type-backdrop')?.addEventListener('click', () => closeModal('type-modal'));
+  document.getElementById('edit-backdrop')?.addEventListener('click', () => closeModal('edit-modal'));
+  document.getElementById('type-close')?.addEventListener('click',    () => closeModal('type-modal'));
+  document.getElementById('edit-close')?.addEventListener('click',    () => closeModal('edit-modal'));
+  document.getElementById('cancel-btn')?.addEventListener('click',    () => closeModal('edit-modal'));
+
+  document.getElementById('add-block-btn')?.addEventListener('click', () => {
+    if (!canAddBlock) { toast.error('Block limit reached. Upgrade your plan!'); return; }
+    openModal('type-modal');
+  });
+  document.getElementById('empty-add-btn')?.addEventListener('click', () => openModal('type-modal'));
+
+  // Type selection
+  document.querySelectorAll('.block-type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      closeModal('type-modal');
+      openEditModal(btn.dataset.type, null);
+    });
+  });
+
+  // ==================== FORM RENDERING ====================
+  const INPUT_CLASS = 'w-full px-4 py-3 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none focus:ring-1 focus:ring-neon-green/20 transition-colors';
+
+  function openEditModal(type, block = null) {
+    const title      = document.getElementById('modal-title');
+    const submitText = document.getElementById('submit-text');
+    const blockIdEl  = document.getElementById('block-id');
+    const blockTypeEl= document.getElementById('block-type');
+    const fields     = document.getElementById('form-fields');
+    if (!fields) return;
+
+    if (title) title.textContent     = block ? `Edit ${type}` : `Add ${type}`;
+    if (submitText) submitText.textContent = block ? 'Update Block' : 'Save Block';
+    if (blockIdEl)  blockIdEl.value  = block?.id ?? '';
+    if (blockTypeEl) blockTypeEl.value = type;
+
+    const val = (key) => block?.config?.[key] ?? '';
+    const titleVal = block?.title ?? '';
+
+    const fieldHtml = {
+      link: `
+        <div class="space-y-1.5">
+          <label class="text-sm font-medium text-gray-300">Title <span class="text-red-400">*</span></label>
+          <input type="text" id="field-title" value="${titleVal}" required maxlength="100" placeholder="My Instagram" class="${INPUT_CLASS}" />
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-sm font-medium text-gray-300">URL <span class="text-red-400">*</span></label>
+          <input type="url" id="field-url" value="${val('url')}" required placeholder="https://instagram.com/username" class="${INPUT_CLASS}" />
+        </div>`,
+      heading: `
+        <div class="space-y-1.5">
+          <label class="text-sm font-medium text-gray-300">Heading Text <span class="text-red-400">*</span></label>
+          <input type="text" id="field-title" value="${titleVal}" required maxlength="100" placeholder="My Social Links" class="${INPUT_CLASS}" />
+        </div>`,
+      spacer: `
+        <div class="py-4 text-center text-sm text-gray-500">No configuration needed for spacer blocks.</div>`,
+      image: `
+        <div class="space-y-1.5">
+          <label class="text-sm font-medium text-gray-300">Image URL <span class="text-red-400">*</span></label>
+          <input type="url" id="field-url" value="${val('url')}" required placeholder="https://example.com/image.jpg" class="${INPUT_CLASS}" />
+        </div>`,
+      video: `
+        <div class="space-y-1.5">
+          <label class="text-sm font-medium text-gray-300">Video URL <span class="text-red-400">*</span></label>
+          <input type="url" id="field-url" value="${val('url')}" required placeholder="https://youtube.com/watch?v=…" class="${INPUT_CLASS}" />
+          <p class="text-xs text-gray-600">Supports YouTube, Vimeo, TikTok</p>
+        </div>`,
+      social: `
+        <div class="space-y-1.5">
+          <label class="text-sm font-medium text-gray-300">Title <span class="text-gray-600 font-normal text-xs ml-1">Optional</span></label>
+          <input type="text" id="field-title" value="${titleVal}" maxlength="60" placeholder="Follow Me" class="${INPUT_CLASS}" />
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-sm font-medium text-gray-300">Social URLs <span class="text-red-400">*</span></label>
+          <textarea id="field-links" rows="3" required placeholder="https://twitter.com/user&#10;https://instagram.com/user" class="${INPUT_CLASS} resize-none">${block?.config?.links?.map(l => l.url || l).join('\n') ?? ''}</textarea>
+          <p class="text-xs text-gray-600">One URL per line</p>
+        </div>`,
+    };
+
+    fields.innerHTML = fieldHtml[type] ?? '';
+    openModal('edit-modal');
+    // Focus first input
+    setTimeout(() => fields.querySelector('input, textarea')?.focus(), 100);
+  }
+
+  // ==================== FORM SUBMIT ====================
+  document.getElementById('block-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (isSaving) return;
+
+    const type    = document.getElementById('block-type')?.value;
+    const blockId = document.getElementById('block-id')?.value ?? '';
+    const submitBtn = document.getElementById('submit-btn');
+    const submitText = document.getElementById('submit-text');
+
+    let title  = null;
+    let config = {};
+
+    // Client-side build + validate
+    const titleEl  = document.getElementById('field-title');
+    const urlEl    = document.getElementById('field-url');
+    const linksEl  = document.getElementById('field-links');
+
+    switch (type) {
+      case 'link':
+        title = titleEl?.value?.trim();
+        const url = urlEl?.value?.trim();
+        if (!title) { toast.error('Title is required'); return; }
+        if (!url || !url.startsWith('http')) { toast.error('Valid URL required'); return; }
+        config = { url };
+        break;
+      case 'heading':
+        title = titleEl?.value?.trim();
+        if (!title) { toast.error('Heading text is required'); return; }
+        break;
+      case 'spacer':
+        break;
+      case 'image':
+      case 'video': {
+        const u = urlEl?.value?.trim();
+        if (!u || !u.startsWith('http')) { toast.error('Valid URL required'); return; }
+        config = { url: u };
+        break;
+      }
+      case 'social': {
+        title = titleEl?.value?.trim() || null;
+        const raw = linksEl?.value?.trim() ?? '';
+        const links = raw.split('\n').map(u => u.trim()).filter(u => u.startsWith('http')).map(u => ({ url: u }));
+        if (!links.length) { toast.error('At least one valid URL required'); return; }
+        config = { links };
+        break;
       }
     }
 
-    // ==================== RENDER BLOCKS ====================
-    function renderBlocks() {
-      const container = document.getElementById('sortable-blocks');
-      if (!container) return;
+    isSaving = true;
+    submitBtn?.setAttribute('disabled', '');
+    if (submitText) submitText.textContent = blockId ? 'Updating…' : 'Saving…';
 
-      if (blocks.length === 0) {
-        container.innerHTML = '';
+    try {
+      const res = await fetch(blockId ? `/api/blocks/${blockId}` : '/api/blocks', {
+        method: blockId ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, title: title ?? null, config }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 403) toast.error('Block limit reached. Upgrade your plan!');
+        else throw new Error(data.error || `HTTP ${res.status}`);
         return;
       }
 
-      container.innerHTML = blocks.map(block => `
-        <div class="glass-strong rounded-2xl p-4 lg:p-6 border border-white/10 hover:border-neon-green/30 transition-all group cursor-move" data-id="${block.id}">
-          <div class="flex items-center justify-between mb-3">
-            <div class="flex items-center space-x-3 lg:space-x-4 flex-1 min-w-0">
-              <button class="cursor-move text-gray-500 hover:text-white transition-colors touch-none">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/>
-                </svg>
-              </button>
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center space-x-2 mb-1">
-                  <span class="text-xs px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-400">${block.type}</span>
-                  ${block.title ? `<h3 class="text-white font-semibold truncate">${block.title}</h3>` : '<span class="text-gray-500 text-sm">No title</span>'}
-                </div>
-                <p class="text-sm text-gray-400 truncate">${block.active ? 'Active' : 'Inactive'}</p>
-              </div>
-            </div>
-            <div class="flex items-center space-x-2">
-              <label class="relative inline-flex items-center cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  ${block.active ? 'checked' : ''} 
-                  class="sr-only peer block-toggle" 
-                  data-id="${block.id}"
-                />
-                <div class="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-neon-green"></div>
-              </label>
-            </div>
-          </div>
-          <div class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button class="block-edit-btn px-3 lg:px-4 py-2 text-sm text-gray-400 hover:text-white glass border border-white/10 rounded-lg transition-colors" data-id="${block.id}">
-              Edit
-            </button>
-            <button class="block-delete-btn px-3 lg:px-4 py-2 text-sm text-gray-400 hover:text-red-400 glass border border-white/10 rounded-lg transition-colors" data-id="${block.id}">
-              Delete
-            </button>
-          </div>
-        </div>
-      `).join('');
-
-      attachEventListeners();
-      initSortable();
-    }
-
-    // ==================== EVENT LISTENERS ====================
-    function attachEventListeners() {
-      // Toggle active
-      document.querySelectorAll('.block-toggle').forEach(toggle => {
-        toggle.addEventListener('change', async (e) => {
-          const id = e.target.dataset.id;
-          const active = e.target.checked;
-          
-          try {
-            const res = await fetch(`/api/blocks/${id}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ active })
-            });
-            
-            if (!res.ok) throw new Error((await res.json()).error || 'Update failed');
-            
-            toast.success('Block updated!');
-            await loadBlocks(true);
-          } catch (err) {
-            e.target.checked = !active;
-            toast.error(err.message || 'Failed to update block');
-          }
-        });
-      });
-
-      // Edit
-      document.querySelectorAll('.block-edit-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const id = btn.dataset.id;
-          if (id) handleEditBlock(id);
-        });
-      });
-
-      // Delete
-      document.querySelectorAll('.block-delete-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const id = btn.dataset.id;
-          if (id) handleDeleteBlock(id);
-        });
-      });
-    }
-
-    // ==================== SORTABLE ====================
-    function initSortable() {
-      const container = document.getElementById('sortable-blocks');
-      if (!container) return;
-
-      new Sortable(container, {
-        animation: 150,
-        handle: '.cursor-move',
-        onEnd: async function() {
-          const blockIds = Array.from(container.children).map(el => el.dataset.id);
-          
-          try {
-            const res = await fetch('/api/blocks/reorder', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ blockIds })
-            });
-            
-            if (!res.ok) throw new Error((await res.json()).error || 'Reorder failed');
-            
-            toast.success('Blocks reordered!');
-          } catch (err) {
-            toast.error(err.message || 'Failed to reorder');
-            await loadBlocks(true);
-          }
-        }
-      });
-    }
-
-    // ==================== MODALS ====================
-    function openModal(id) {
-      document.getElementById(id)?.classList.remove('hidden');
-      document.getElementById(id)?.classList.add('flex');
-    }
-
-    function closeModal(id) {
-      document.getElementById(id)?.classList.add('hidden');
-      document.getElementById(id)?.classList.remove('flex');
-    }
-
-    // Add block buttons
-    document.getElementById('add-block-btn')?.addEventListener('click', () => openModal('type-modal'));
-    document.getElementById('empty-state-btn')?.addEventListener('click', () => openModal('type-modal'));
-
-    // Type selection
-    document.querySelectorAll('.block-type-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        selectedType = btn.dataset.type;
-        editingId = null;
-        closeModal('type-modal');
-        renderForm(selectedType, null);
-        openModal('edit-modal');
-      });
-    });
-
-    document.getElementById('cancel-btn')?.addEventListener('click', () => closeModal('edit-modal'));
-
-    // ==================== FORM HANDLING ====================
-    function renderForm(type, block = null) {
-      const container = document.getElementById('form-fields');
-      const submitText = document.getElementById('submit-text');
-      if (submitText) submitText.textContent = block ? 'Update Block' : 'Add Block';
-
-      let html = '';
-
-      switch (type) {
-        case 'link':
-          html = `
-            <div>
-              <label class="block text-sm font-medium text-gray-300 mb-2">Title</label>
-              <input 
-                type="text" 
-                id="field-title" 
-                required 
-                value="${block?.title || ''}"
-                class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white placeholder-gray-500 focus:border-neon-green/50 focus:outline-none focus:ring-2 focus:ring-neon-green/20"
-                placeholder="Instagram"
-              />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-300 mb-2">URL</label>
-              <input 
-                type="url" 
-                id="field-url" 
-                required 
-                value="${block?.config?.url || ''}"
-                class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white placeholder-gray-500 focus:border-neon-green/50 focus:outline-none focus:ring-2 focus:ring-neon-green/20"
-                placeholder="https://instagram.com/username"
-              />
-            </div>
-          `;
-          break;
-
-        case 'heading':
-          html = `
-            <div>
-              <label class="block text-sm font-medium text-gray-300 mb-2">Heading Text</label>
-              <input 
-                type="text" 
-                id="field-title" 
-                required 
-                value="${block?.title || ''}"
-                class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white placeholder-gray-500 focus:border-neon-purple/50 focus:outline-none focus:ring-2 focus:ring-neon-purple/20"
-                placeholder="Social Media"
-              />
-            </div>
-          `;
-          break;
-
-        case 'spacer':
-          html = `
-            <div class="text-center py-4 text-gray-400">
-              <p>No configuration needed for spacer</p>
-            </div>
-          `;
-          break;
-
-        case 'image':
-          html = `
-            <div>
-              <label class="block text-sm font-medium text-gray-300 mb-2">Image URL</label>
-              <input 
-                type="url" 
-                id="field-url" 
-                required 
-                value="${block?.config?.url || ''}"
-                class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white placeholder-gray-500 focus:border-neon-pink/50 focus:outline-none focus:ring-2 focus:ring-neon-pink/20"
-                placeholder="https://example.com/image.jpg"
-              />
-            </div>
-          `;
-          break;
-
-        case 'video':
-          html = `
-            <div>
-              <label class="block text-sm font-medium text-gray-300 mb-2">Video URL</label>
-              <input 
-                type="url" 
-                id="field-url" 
-                required 
-                value="${block?.config?.url || ''}"
-                class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white placeholder-gray-500 focus:border-neon-green/50 focus:outline-none focus:ring-2 focus:ring-neon-green/20"
-                placeholder="https://youtube.com/watch?v=..."
-              />
-              <p class="text-xs text-gray-500 mt-1.5">Supports YouTube, Vimeo, TikTok</p>
-            </div>
-          `;
-          break;
-
-        case 'social':
-          html = `
-            <div>
-              <label class="block text-sm font-medium text-gray-300 mb-2">Title (Optional)</label>
-              <input 
-                type="text" 
-                id="field-title" 
-                value="${block?.title || ''}"
-                class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white placeholder-gray-500 focus:border-neon-purple/50 focus:outline-none focus:ring-2 focus:ring-neon-purple/20"
-                placeholder="Follow Me"
-              />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-300 mb-2">Social Links (comma-separated URLs)</label>
-              <textarea 
-                id="field-links" 
-                rows="3" 
-                required 
-                class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white placeholder-gray-500 focus:border-neon-purple/50 focus:outline-none focus:ring-2 focus:ring-neon-purple/20"
-                placeholder="https://twitter.com/user, https://instagram.com/user"
-              >${block?.config?.links?.map((l) => l.url || l).join(', ') || ''}</textarea>
-            </div>
-          `;
-          break;
+      if (blockId) {
+        // Update in local state
+        const idx = blocks.findIndex(b => b.id === blockId);
+        if (idx !== -1) blocks[idx] = { ...blocks[idx], title, config, ...data };
+      } else {
+        // Add new block to local state
+        blocks.push({ id: data.id, type, title, config, active: true, created_at: new Date().toISOString(), clicks: 0, ...data });
       }
 
-      if (container) container.innerHTML = html;
-
-      document.getElementById('block-type').value = type;
-      if (block) document.getElementById('block-id').value = block.id;
+      closeModal('edit-modal');
+      renderBlocks();
+      toast.success(blockId ? 'Block updated!' : 'Block added!');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to save block');
+    } finally {
+      isSaving = false;
+      submitBtn?.removeAttribute('disabled');
+      if (submitText) submitText.textContent = blockId ? 'Update Block' : 'Save Block';
     }
+  });
 
-    // Form submit
-    const blockForm = document.getElementById('block-form');
-    blockForm?.addEventListener('submit', async (e) => {
+  // ==================== EDIT ====================
+  function handleEditBlock(id) {
+    const block = blocks.find(b => b.id === id);
+    if (block) openEditModal(block.type, block);
+  }
+
+  // ==================== DUPLICATE ====================
+  async function handleDuplicateBlock(id) {
+    const block = blocks.find(b => b.id === id);
+    if (!block) return;
+    if (!canAddBlock) { toast.error('Block limit reached. Upgrade your plan!'); return; }
+    try {
+      const res = await fetch('/api/blocks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type:   block.type,
+          title:  block.title ? `${block.title} (copy)` : null,
+          config: block.config,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      blocks.push({ ...block, id: data.id, title: block.title ? `${block.title} (copy)` : null, created_at: new Date().toISOString(), clicks: 0 });
+      renderBlocks();
+      toast.success('Block duplicated!');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to duplicate block');
+    }
+  }
+
+  // ==================== DELETE ====================
+  async function handleDeleteBlock(id) {
+    if (!confirm('Delete this block? This cannot be undone.')) return;
+    try {
+      const res = await fetch(`/api/blocks/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      blocks = blocks.filter(b => b.id !== id);
+      selectedIds.delete(id);
+      renderBlocks();
+      toast.success('Block deleted');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete block');
+    }
+  }
+
+  // ==================== KEYBOARD SHORTCUTS ====================
+  document.addEventListener('keydown', (e) => {
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+    if (e.key === 'n' || e.key === 'N') {
       e.preventDefault();
-
-      const type = document.getElementById('block-type').value;
-      const blockId = document.getElementById('block-id')?.value || '';
-
-      let title = null;
-      let config = {};
-
-      switch (type) {
-        case 'link':
-          title = document.getElementById('field-title').value;
-          config = { url: document.getElementById('field-url').value };
-          break;
-
-        case 'heading':
-          title = document.getElementById('field-title').value;
-          config = {};
-          break;
-
-        case 'spacer':
-          config = {};
-          break;
-
-        case 'image':
-          config = { url: document.getElementById('field-url').value };
-          break;
-
-        case 'video':
-          config = { url: document.getElementById('field-url').value };
-          break;
-
-        case 'social':
-          title = document.getElementById('field-title').value || null;
-          const linksText = document.getElementById('field-links').value;
-          const links = linksText.split(',').map(url => ({ url: url.trim() })).filter(l => l.url);
-          config = { links };
-          break;
-      }
-
-      try {
-        const url = blockId ? `/api/blocks/${blockId}` : '/api/blocks';
-        const method = blockId ? 'PUT' : 'POST';
-
-        const response = await fetch(url, {
-          method,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type, title, config })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          if (response.status === 403 && /limit|BLOCK_LIMIT_REACHED/i.test(data.error || '')) {
-            toast.error('Limite de blocs atteinte. Upgradez votre plan !');
-          } else {
-            throw new Error(data.error || 'Échec de la sauvegarde');
-          }
-          return;
-        }
-
-        toast.success(blockId ? 'Bloc mis à jour !' : 'Bloc créé !');
-        closeModal('edit-modal');
-        blockForm.reset();
-        await loadBlocks(true);  // recharge forcé
-      } catch (err) {
-        toast.error(err.message || 'Erreur lors de la sauvegarde');
-      }
-    });
-
-    // ==================== EDIT & DELETE ====================
-    function handleEditBlock(id) {
-      const block = blocks.find(b => b.id === id);
-      if (!block) return;
-
-      editingId = id;
-      selectedType = block.type;
-      renderForm(block.type, block);
-      openModal('edit-modal');
+      if (canAddBlock) openModal('type-modal');
+      else toast.error('Block limit reached');
     }
-
-    async function handleDeleteBlock(id) {
-      if (!confirm('Are you sure you want to delete this block?')) return;
-
-      try {
-        const response = await fetch(`/api/blocks/${id}`, {
-          method: 'DELETE'
-        });
-        
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || 'Failed to delete block');
-        }
-        
-        toast.success('Block deleted!');
-        await loadBlocks(true);
-      } catch (error) {
-        toast.error(error.message || 'Failed to delete block');
-      }
+    if (e.key === 'Escape') {
+      closeModal('type-modal');
+      closeModal('edit-modal');
     }
+  });
 
-    // Initial load
-    loadBlocks();
-  </script>
-</DashboardLayout>
+  // ==================== INIT ====================
+  renderBlocks();
+</script>
