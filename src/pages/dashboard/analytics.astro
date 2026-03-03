@@ -54,7 +54,7 @@ let blocksResult;
 
 if (safeProfileId) {
   analyticsResult = await getAnalyticsSummary(supabaseClient, safeProfileId, days);
-  blocksResult = await getBlocks(supabaseClient, safeProfileId);
+  blocksResult = await getBlocks(safeProfileId);
 } else {
   analyticsResult = { success: false, error: new Error('No profile ID') };
   blocksResult = { success: false, error: new Error('No profile ID') };
