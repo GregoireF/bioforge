@@ -1,567 +1,798 @@
 ---
-// src/pages/dashboard/settings.astro - IMPROVED with more features
+// src/pages/dashboard/settings.astro — Settings v2
+// OAuth only (no password/email change) · Tabs · Avatar upload · Sessions · Delete typed confirm
 
 import DashboardLayout from '@/layouts/DashboardLayout.astro';
-import Button from '@/components/ui/Button.astro';
 import Card from '@/components/ui/Card.astro';
-import Input from '@/components/ui/Input.astro';
 import Badge from '@/components/ui/Badge.astro';
-import Alert from '@/components/ui/Alert.astro';
 import { withAuth } from '@/lib/auth/auth';
 
-// ==================== AUTH CHECK ====================
-
+// ==================== AUTH ====================
 const authResult = await withAuth({
   cookies: Astro.cookies,
   request: Astro.request,
 });
-
 if (!authResult.success || !authResult.data) {
   return Astro.redirect(authResult.redirect || '/signin?error=auth_failed');
 }
 
 const { user, profile, planLimits } = authResult.data;
+
+// ==================== SERVER-SIDE SANITIZATION ====================
+function escapeHtml(val: unknown): string {
+  return String(val ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+function safeInt(val: unknown, fallback = 0): number {
+  const n = Number(val);
+  return isFinite(n) ? n : fallback;
+}
+
+const sp = {
+  display_name: escapeHtml(profile.display_name),
+  username:     escapeHtml(profile.username),
+  bio:          escapeHtml(profile.bio),
+  avatar_url:   escapeHtml(profile.avatar_url),
+  plan:         escapeHtml(profile.plan ?? 'Free'),
+  is_active:    Boolean(profile.is_active),
+  created_at:   profile.created_at,
+  updated_at:   profile.updated_at,
+};
+const su = { email: escapeHtml(user.email), id: escapeHtml(user.id) };
+
+const totalBlocks  = safeInt(profile.blocks_count ?? 0);
+const totalViews   = safeInt(profile.total_views  ?? 0);
+const blocksLimit  = planLimits.max_blocks_total === -1 ? '∞' : String(planLimits.max_blocks_total);
+
+// Data bridge (no define:vars)
+const bridge = JSON.stringify({
+  username:    sp.username,
+  displayName: sp.display_name,
+  avatarUrl:   sp.avatar_url,
+  plan:        sp.plan,
+  totalBlocks,
+  totalViews,
+  blocksLimit,
+  profileUrl:  `https://bioforge.click/@${sp.username}`,
+});
 ---
 
 <DashboardLayout title="Settings">
-  <!-- Header -->
-  <div class="mb-6">
-    <h2 class="text-lg lg:text-xl font-semibold text-white mb-1">Settings</h2>
-    <p class="text-sm text-gray-400">Manage your account and preferences</p>
+
+  <!-- Data bridge -->
+  <div id="server-data" class="hidden" data-bridge={bridge}></div>
+
+  <!-- ===== HEADER ===== -->
+  <div class="mb-8">
+    <h2 class="text-xl font-semibold text-white mb-1 tracking-tight">Settings</h2>
+    <p class="text-sm text-gray-400">Manage your account, sessions and data</p>
   </div>
 
-  <!-- Profile Settings -->
-  <Card title="Profile Information" description="Update your public profile" class="mb-6">
-    <form id="profile-form" class="space-y-4">
-      <!-- Display Name -->
-      <div>
-        <label for="display_name" class="block text-sm font-medium text-gray-300 mb-2">
-          Display Name
-          <span class="text-red-400 ml-1">*</span>
-        </label>
-        <Input
-          type="text"
-          id="display_name"
-          name="display_name"
-          value={profile.display_name || ''}
-          placeholder="John Doe"
-          required
-        />
-      </div>
+  <!-- ===== TAB NAV ===== -->
+  <div class="flex items-center gap-1 mb-8 p-1 glass rounded-2xl border border-white/10 w-fit">
+    {[
+      { id: 'profile',  label: 'Profile',  d: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
+      { id: 'sessions', label: 'Sessions', d: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
+      { id: 'danger',   label: 'Danger',   d: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z' },
+    ].map(t => (
+      <button
+        class={`tab-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-gray-400
+          ${t.id === 'danger' ? 'hover:text-red-400' : 'hover:text-white'}`}
+        data-tab={t.id}
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={t.d}/>
+        </svg>
+        <span class="hidden sm:inline">{t.label}</span>
+      </button>
+    ))}
+  </div>
 
-      <!-- Username -->
-      <div>
-        <label for="username" class="block text-sm font-medium text-gray-300 mb-2">
-          Username
-          <span class="text-red-400 ml-1">*</span>
-          <span class="text-gray-500 text-xs ml-2">https://bioforge.click/@{profile.username}</span>
-        </label>
-        <div class="flex items-center space-x-2">
-          <Input
-            type="text"
-            id="username"
-            name="username"
-            value={profile.username}
-            placeholder="johndoe"
-            required
-            pattern="[a-z0-9_]+"
-            minlength="3"
-            maxlength="24"
-            class="flex-1"
-          />
-          <button
-            type="button"
-            id="check-username-btn"
-            class="px-4 py-3 glass border border-white/10 rounded-xl text-sm text-white hover:bg-white/5 transition-all"
-          >
-            Check
-          </button>
+  <!-- ═══════════════════ PANEL: PROFILE ═══════════════════ -->
+  <div id="panel-profile" class="tab-panel space-y-5">
+
+    <!-- STAT MINI-CARDS -->
+    <div class="grid grid-cols-3 gap-3">
+      {[
+        { label: 'Plan',        value: sp.plan,                              color: 'text-neon-green',  bg: 'bg-neon-green/10  border-neon-green/20',  icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' },
+        { label: 'Total Views', value: totalViews.toLocaleString('fr-FR'),   color: 'text-neon-blue',   bg: 'bg-neon-blue/10   border-neon-blue/20',   icon: 'M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z' },
+        { label: 'Blocks',      value: `${totalBlocks}/${blocksLimit}`,      color: 'text-neon-purple', bg: 'bg-neon-purple/10 border-neon-purple/20', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
+      ].map(c => (
+        <div class={`flex items-center gap-3 p-4 glass rounded-2xl border ${c.bg}`}>
+          <div class={`w-9 h-9 rounded-xl ${c.bg} flex items-center justify-center shrink-0`}>
+            <svg class={`w-4 h-4 ${c.color}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={c.icon}/>
+            </svg>
+          </div>
+          <div class="min-w-0">
+            <p class={`text-sm font-bold ${c.color} truncate`}>{c.value}</p>
+            <p class="text-xs text-gray-500 mt-0.5">{c.label}</p>
+          </div>
         </div>
-        <p class="text-xs text-gray-500 mt-1.5">
-          3-24 characters. Lowercase letters, numbers and underscores only.
-        </p>
-        <div id="username-feedback" class="mt-2 text-sm hidden"></div>
-      </div>
+      ))}
+    </div>
 
-      <!-- Bio -->
-      <div>
-        <label for="bio" class="block text-sm font-medium text-gray-300 mb-2">
-          Bio
-          <span class="text-gray-500 text-xs ml-2">Optional</span>
-        </label>
-        <textarea
-          id="bio"
-          name="bio"
-          rows="4"
-          maxlength="500"
-          class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white placeholder-gray-500 focus:border-neon-green/50 focus:outline-none focus:ring-2 focus:ring-neon-green/20 resize-none"
-          placeholder="Tell people about yourself..."
-        >{profile.bio || ''}</textarea>
-        <div class="flex items-center justify-between mt-1.5">
-          <p class="text-xs text-gray-500">
-            <span id="bio-count">0</span>/500 characters
-          </p>
-          <button
-            type="button"
-            id="bio-suggestions-btn"
-            class="text-xs text-neon-green hover:underline"
-          >
-            Need inspiration?
-          </button>
-        </div>
-      </div>
-
-      <!-- Avatar URL -->
-      <div>
-        <label for="avatar_url" class="block text-sm font-medium text-gray-300 mb-2">
-          Avatar URL
-          <span class="text-gray-500 text-xs ml-2">Optional</span>
-        </label>
-        <div class="flex items-center space-x-3">
-          {profile.avatar_url && (
-            <img 
+    <!-- AVATAR UPLOAD -->
+    <Card title="Avatar" description="Your profile picture">
+      <div class="flex flex-col sm:flex-row items-start gap-6">
+        <!-- Preview ring -->
+        <div class="relative group shrink-0">
+          <div class="w-24 h-24 rounded-full p-0.5 bg-gradient-to-br from-neon-green/50 to-neon-blue/50">
+            <img
               id="avatar-preview"
-              src={profile.avatar_url} 
-              alt="Avatar" 
-              class="w-12 h-12 rounded-full object-cover border-2 border-neon-green/30"
+              src={sp.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(sp.display_name || sp.username)}&background=0a0a0a&color=00ff9d&size=96`}
+              alt="Avatar"
+              class="w-full h-full rounded-full object-cover bg-gray-900"
             />
-          )}
-          <Input
-            type="url"
-            id="avatar_url"
-            name="avatar_url"
-            value={profile.avatar_url || ''}
-            placeholder="https://example.com/avatar.jpg"
-            class="flex-1"
+          </div>
+          <div id="avatar-overlay" class="absolute inset-0 rounded-full bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Upload zone + URL -->
+        <div class="flex-1 w-full space-y-4">
+          <div id="drop-zone" class="relative border-2 border-dashed border-white/15 rounded-xl p-6 text-center hover:border-neon-green/40 transition-all cursor-pointer group">
+            <input type="file" id="avatar-file" accept="image/jpeg,image/png,image/webp,image/gif" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+            <div class="pointer-events-none">
+              <svg class="w-7 h-7 text-gray-600 mx-auto mb-2 group-hover:text-neon-green/60 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+              <p class="text-sm text-gray-400">Drop image here or <span class="text-neon-green">browse</span></p>
+              <p class="text-xs text-gray-600 mt-1">JPG, PNG, WebP · max 2 MB</p>
+            </div>
+            <div id="upload-progress-wrap" class="hidden absolute bottom-0 inset-x-0 h-1 rounded-b-xl overflow-hidden bg-white/5">
+              <div id="upload-progress-bar" class="h-full bg-neon-green transition-all duration-300" style="width:0%"></div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <div class="h-px flex-1 bg-white/10"></div>
+            <span class="text-xs text-gray-600">or paste URL</span>
+            <div class="h-px flex-1 bg-white/10"></div>
+          </div>
+
+          <div class="flex gap-2">
+            <input
+              type="url"
+              id="avatar-url-input"
+              value={sp.avatar_url}
+              placeholder="https://example.com/avatar.jpg"
+              class="flex-1 px-3 py-2.5 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none transition-colors"
+            />
+            <button id="avatar-url-apply" class="px-4 py-2.5 glass border border-white/10 rounded-xl text-sm text-gray-300 hover:text-white hover:border-white/25 transition-all">
+              Apply
+            </button>
+          </div>
+          <p id="upload-status" class="text-xs text-gray-600 hidden"></p>
+        </div>
+      </div>
+    </Card>
+
+    <!-- PROFILE FORM -->
+    <Card title="Profile Information" description="Your public details">
+      <form id="profile-form" class="space-y-5" novalidate>
+
+        <div class="space-y-1.5">
+          <label for="display_name" class="text-sm font-medium text-gray-300">
+            Display Name <span class="text-red-400">*</span>
+          </label>
+          <input
+            type="text" id="display_name" name="display_name"
+            value={sp.display_name} placeholder="John Doe" maxlength="60" required
+            class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none focus:ring-1 focus:ring-neon-green/20 transition-colors"
           />
         </div>
-        <p class="text-xs text-gray-500 mt-1.5">
-          Paste a link to your profile picture. We recommend 400x400px minimum.
-        </p>
-      </div>
 
-      <!-- Email (readonly) -->
+        <div class="space-y-1.5">
+          <label for="username" class="text-sm font-medium text-gray-300">
+            Username <span class="text-red-400">*</span>
+            <span class="text-gray-600 font-normal ml-2 text-xs">bioforge.click/@{sp.username}</span>
+          </label>
+          <div class="flex gap-2">
+            <input
+              type="text" id="username" name="username"
+              value={sp.username} placeholder="johndoe"
+              pattern="[a-z0-9_]+" minlength="3" maxlength="24" required
+              class="flex-1 px-4 py-3 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none focus:ring-1 focus:ring-neon-green/20 transition-colors"
+            />
+            <button type="button" id="check-username-btn"
+              class="px-4 py-2.5 glass border border-white/10 rounded-xl text-sm text-gray-300 hover:text-white hover:border-white/25 transition-all whitespace-nowrap">
+              Check
+            </button>
+          </div>
+          <div id="username-feedback" class="hidden text-xs mt-1 px-1"></div>
+          <p class="text-xs text-gray-600">3–24 chars · lowercase, numbers, underscores</p>
+        </div>
+
+        <div class="space-y-1.5">
+          <div class="flex justify-between items-center">
+            <label for="bio" class="text-sm font-medium text-gray-300">Bio</label>
+            <div class="flex items-center gap-3">
+              <span class="text-xs text-gray-600"><span id="bio-count">0</span>/500</span>
+              <button type="button" id="bio-suggestions-btn" class="text-xs text-neon-green hover:underline">✦ Inspire me</button>
+            </div>
+          </div>
+          <textarea
+            id="bio" name="bio" rows="3" maxlength="500"
+            class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white placeholder-gray-600 text-sm focus:border-neon-green/50 focus:outline-none focus:ring-1 focus:ring-neon-green/20 resize-none transition-colors"
+            placeholder="Tell people about yourself..."
+          >{sp.bio}</textarea>
+        </div>
+
+        <!-- Email (OAuth readonly) -->
+        <div class="space-y-1.5">
+          <label class="text-sm font-medium text-gray-300">Email</label>
+          <div class="flex items-center gap-3 px-4 py-3 glass border border-white/5 rounded-xl opacity-50 cursor-not-allowed">
+            <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"/>
+            </svg>
+            <span class="text-sm text-gray-400">{su.email}</span>
+            <span class="ml-auto text-xs text-gray-600">via OAuth</span>
+          </div>
+          <p class="text-xs text-gray-600">Managed by your OAuth provider — cannot be changed here.</p>
+        </div>
+
+        <div class="flex items-center gap-3 pt-1">
+          <button type="submit" id="save-profile-btn"
+            class="flex items-center gap-2 px-6 py-2.5 bg-neon-green text-black text-sm font-semibold rounded-xl hover:bg-neon-green/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span id="save-profile-text">Save Changes</span>
+          </button>
+          <a href="/dashboard" class="px-4 py-2.5 text-sm text-gray-500 hover:text-white transition-colors">Cancel</a>
+        </div>
+      </form>
+    </Card>
+
+    <!-- PUBLIC PROFILE + SHARE + QR -->
+    <Card title="Public Profile" description="Share your page with the world">
+      <div class="grid sm:grid-cols-2 gap-6">
+
+        <!-- URL + Social + Export -->
+        <div class="space-y-4">
+          <div class="flex gap-2">
+            <input type="text" id="profile-url" readonly
+              value={`https://bioforge.click/@${sp.username}`}
+              class="flex-1 px-3 py-2.5 glass border border-white/10 rounded-xl text-gray-300 text-sm font-mono truncate focus:outline-none"
+            />
+            <button id="copy-url-btn" title="Copy" class="px-3 py-2.5 glass border border-white/10 rounded-xl text-gray-400 hover:text-white transition-all">
+              <svg id="copy-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+              </svg>
+            </button>
+            <a href={`/@${sp.username}`} target="_blank" class="px-3 py-2.5 glass border border-white/10 rounded-xl text-gray-400 hover:text-white transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+              </svg>
+            </a>
+          </div>
+
+          <div>
+            <p class="text-xs text-gray-600 mb-2">Share on</p>
+            <div class="grid grid-cols-4 gap-2">
+              {[
+                { id: 'share-x',        label: 'X',        fill: true,  d: 'M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z' },
+                { id: 'share-facebook', label: 'Facebook', fill: true,  d: 'M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z' },
+                { id: 'share-linkedin', label: 'LinkedIn', fill: true,  d: 'M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2zm2-6a2 2 0 100 4 2 2 0 000-4z' },
+                { id: 'share-whatsapp',label: 'WhatsApp', fill: false, d: 'M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347' },
+              ].map(s => (
+                <button id={s.id} title={s.label}
+                  class="flex flex-col items-center gap-1.5 p-3 glass rounded-xl border border-white/5 hover:border-white/15 hover:bg-white/5 transition-all text-gray-400 hover:text-white">
+                  <svg class="w-4 h-4" fill={s.fill ? 'currentColor' : 'none'} stroke={s.fill ? 'none' : 'currentColor'} stroke-width="2" viewBox="0 0 24 24">
+                    <path d={s.d}/>
+                  </svg>
+                  <span class="text-xs">{s.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div class="pt-1 border-t border-white/5">
+            <button id="export-data-btn"
+              class="flex items-center gap-2 w-full px-4 py-3 glass rounded-xl border border-white/10 text-sm text-gray-300 hover:text-white hover:border-white/25 transition-all">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+              </svg>
+              Export my data (JSON)
+              <span class="ml-auto text-xs text-gray-600">profile + blocks</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- QR Code -->
+        <div class="flex flex-col items-center gap-3">
+          <div class="p-4 bg-white rounded-2xl">
+            <canvas id="qr-canvas" width="140" height="140"></canvas>
+          </div>
+          <p class="text-xs text-gray-500 text-center">Scan to open your profile</p>
+          <button id="download-qr-btn"
+            class="flex items-center gap-2 px-4 py-2 glass rounded-xl border border-white/10 text-xs text-gray-300 hover:text-white transition-all">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+            Download QR
+          </button>
+        </div>
+      </div>
+    </Card>
+
+    <!-- ACCOUNT INFO -->
+    <Card title="Account Information" description="Details & status">
+      <div class="divide-y divide-white/5">
+        {[
+          { label: 'Email',         value: su.email,  badge: null },
+          { label: 'Auth Provider', value: 'OAuth',   badge: null },
+          { label: 'Account Status', value: null,     badge: { text: sp.is_active ? 'Active' : 'Inactive', variant: sp.is_active ? 'success' : 'default' } },
+          { label: 'Member Since',  value: new Date(sp.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }), badge: null },
+          { label: 'Last Updated',  value: new Date(sp.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),  badge: null },
+        ].map(row => (
+          <div class="flex items-center justify-between py-3">
+            <span class="text-sm text-gray-400">{row.label}</span>
+            {row.badge
+              ? <Badge variant={row.badge.variant} size="sm">{row.badge.text}</Badge>
+              : <span class="text-sm text-white">{row.value}</span>
+            }
+          </div>
+        ))}
+      </div>
+    </Card>
+
+    <!-- PREFERENCES -->
+    <Card title="Preferences" description="Notifications & visibility">
+      <div class="space-y-2">
+        {[
+          { id: 'email_notifications', label: 'Weekly analytics report',          desc: 'Receive a summary every Monday',        checked: true  },
+          { id: 'marketing_emails',    label: 'Tips & product updates',            desc: 'Growth tips and feature announcements', checked: false },
+          { id: 'profile_public',      label: 'Profile visible to search engines', desc: 'Allow indexing by Google, Bing…',       checked: true  },
+        ].map(opt => (
+          <label class="flex items-center justify-between p-3.5 glass rounded-xl cursor-pointer hover:bg-white/5 transition-colors border border-white/5">
+            <div>
+              <div class="text-sm text-white font-medium">{opt.label}</div>
+              <div class="text-xs text-gray-500 mt-0.5">{opt.desc}</div>
+            </div>
+            <input type="checkbox" id={opt.id} checked={opt.checked} class="pref-toggle shrink-0 ml-4" />
+          </label>
+        ))}
+      </div>
+    </Card>
+
+  </div>
+
+  <!-- ═══════════════════ PANEL: SESSIONS ═══════════════════ -->
+  <div id="panel-sessions" class="tab-panel hidden space-y-5">
+    <Card title="Active Sessions" description="Devices currently signed in to your account">
+      <div class="flex justify-end mb-4">
+        <button id="revoke-all-btn"
+          class="flex items-center gap-2 px-4 py-2 glass border border-red-500/20 rounded-xl text-sm text-red-400 hover:border-red-500/50 hover:bg-red-500/5 transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+          </svg>
+          Sign out all other devices
+        </button>
+      </div>
+      <div id="sessions-list" class="space-y-3">
+        {[0,1,2].map(() => (
+          <div class="flex items-center gap-4 p-4 glass rounded-xl border border-white/5 animate-pulse">
+            <div class="w-10 h-10 bg-white/5 rounded-xl shrink-0"></div>
+            <div class="flex-1 space-y-2">
+              <div class="h-3 bg-white/5 rounded w-2/5"></div>
+              <div class="h-2.5 bg-white/5 rounded w-1/3"></div>
+            </div>
+            <div class="w-16 h-7 bg-white/5 rounded-lg"></div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  </div>
+
+  <!-- ═══════════════════ PANEL: DANGER ═══════════════════ -->
+  <div id="panel-danger" class="tab-panel hidden space-y-5">
+
+    <!-- Export CTA -->
+    <div class="flex items-start justify-between p-5 glass border border-white/10 rounded-2xl">
       <div>
-        <label class="block text-sm font-medium text-gray-300 mb-2">
-          Email
-        </label>
-        <Input
-          type="email"
-          value={user.email}
-          readonly
-          class="opacity-50 cursor-not-allowed"
-        />
-        <p class="text-xs text-gray-500 mt-1.5">
-          Email cannot be changed here. Contact support if you need to update it.
+        <p class="text-sm font-medium text-white mb-0.5">Export your data first</p>
+        <p class="text-xs text-gray-500">Download a full backup before taking any irreversible action.</p>
+      </div>
+      <button id="export-data-btn-danger"
+        class="flex items-center gap-2 px-4 py-2.5 glass border border-white/15 rounded-xl text-sm text-gray-300 hover:text-white hover:border-white/30 transition-all shrink-0 ml-4">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+        </svg>
+        Export JSON
+      </button>
+    </div>
+
+    <!-- Delete account -->
+    <div class="p-5 glass border border-red-500/25 rounded-2xl space-y-5">
+      <div class="flex items-start gap-4">
+        <div class="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
+          <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+          </svg>
+        </div>
+        <div>
+          <h3 class="text-white font-semibold text-sm mb-1">Delete Account</h3>
+          <p class="text-xs text-gray-400 leading-relaxed">
+            Permanently deletes your profile, all blocks, analytics data, and any active subscription.
+            <strong class="text-white"> Cannot be undone.</strong>
+          </p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        {['Profile & username', 'All blocks & content', 'Analytics data', 'Subscription'].map(item => (
+          <div class="flex items-center gap-2 text-xs text-gray-500">
+            <svg class="w-3.5 h-3.5 text-red-400/70 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+            {item}
+          </div>
+        ))}
+      </div>
+
+      <!-- Typed confirmation (hidden until trigger) -->
+      <div id="delete-confirm-wrap" class="hidden space-y-3 p-4 bg-red-500/5 border border-red-500/20 rounded-xl">
+        <p class="text-xs text-gray-400">
+          Type <strong class="text-white font-mono">{sp.username}</strong> to confirm:
         </p>
-      </div>
-
-      <div class="flex items-center space-x-3 pt-2">
-        <Button type="submit" variant="primary" id="save-profile-btn" class="flex-1 sm:flex-none">
-          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-          </svg>
-          Save Changes
-        </Button>
-        <Button type="button" variant="ghost" href="/dashboard">
-          Cancel
-        </Button>
-      </div>
-    </form>
-  </Card>
-
-  <!-- Current Plan -->
-  <Card title="Current Plan" description="Your subscription details" class="mb-6">
-    <div class="flex items-center justify-between mb-4">
-      <div>
-        <div class="flex items-center space-x-2 mb-2">
-          <Badge variant={profile.plan === 'Free' ? 'default' : 'premium'} size="md">
-            {profile.plan}
-          </Badge>
-          {profile.plan === 'Free' && (
-            <span class="text-xs text-gray-500">Free forever</span>
-          )}
-        </div>
-        <p class="text-sm text-gray-400">
-          {planLimits.max_blocks_total === -1 ? 'Unlimited' : planLimits.max_blocks_total} blocks maximum
-        </p>
-      </div>
-      {profile.plan === 'Free' && (
-        <Button variant="secondary" href="/pricing">
-          <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-          </svg>
-          Upgrade Plan
-        </Button>
-      )}
-    </div>
-
-    <!-- Plan Features -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 pt-4 border-t border-white/10">
-      <div class="flex items-center space-x-2 text-sm text-gray-300">
-        <svg class="w-4 h-4 text-neon-green flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-        </svg>
-        <span>{planLimits.max_blocks_total === -1 ? 'Unlimited' : planLimits.max_blocks_total} blocks</span>
-      </div>
-      <div class="flex items-center space-x-2 text-sm text-gray-300">
-        <svg class="w-4 h-4 text-neon-green flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-        </svg>
-        <span>Basic analytics</span>
-      </div>
-      <div class="flex items-center space-x-2 text-sm text-gray-300">
-        <svg class="w-4 h-4 text-neon-green flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-        </svg>
-        <span>Custom themes</span>
-      </div>
-      <div class="flex items-center space-x-2 text-sm text-gray-300">
-        <svg class="w-4 h-4 text-neon-green flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-        </svg>
-        <span>Email support</span>
-      </div>
-    </div>
-  </Card>
-
-  <!-- Public Profile Link -->
-  <Card title="Public Profile" description="Share your page" class="mb-6">
-    <div class="space-y-3">
-      <div class="flex items-center space-x-3">
-        <Input
-          type="text"
-          value={`https://bioforge.click/@${profile.username}`}
-          readonly
-          id="profile-url"
-          class="flex-1"
+        <input
+          type="text" id="delete-confirm-input"
+          placeholder={sp.username} autocomplete="off"
+          class="w-full px-4 py-3 bg-black/40 border border-red-500/30 rounded-xl text-white text-sm font-mono placeholder-gray-600 focus:border-red-500/60 focus:outline-none transition-colors"
         />
-        <Button variant="secondary" id="copy-url-btn">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+        <button id="delete-confirm-btn" disabled
+          class="w-full flex items-center justify-center gap-2 py-3 bg-red-500/20 border border-red-500/30 text-red-300 text-sm font-semibold rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed enabled:hover:bg-red-500/30 enabled:active:scale-[0.98]">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
           </svg>
-        </Button>
-        <Button variant="secondary" href={`/@${profile.username}`} target="_blank">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-          </svg>
-        </Button>
-      </div>
-      
-      <!-- Social Share Buttons -->
-      <div class="flex items-center space-x-2 pt-2">
-        <span class="text-xs text-gray-500">Share on:</span>
-        <button 
-          id="share-twitter"
-          class="p-2 glass rounded-lg hover:bg-white/5 transition-all"
-          title="Share on Twitter"
-        >
-          <svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"/>
-          </svg>
-        </button>
-        <button 
-          id="share-facebook"
-          class="p-2 glass rounded-lg hover:bg-white/5 transition-all"
-          title="Share on Facebook"
-        >
-          <svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"/>
-          </svg>
-        </button>
-        <button 
-          id="share-linkedin"
-          class="p-2 glass rounded-lg hover:bg-white/5 transition-all"
-          title="Share on LinkedIn"
-        >
-          <svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z M4 6a2 2 0 100-4 2 2 0 000 4z"/>
-          </svg>
+          Permanently Delete My Account
         </button>
       </div>
-    </div>
-  </Card>
 
-  <!-- Account Status -->
-  <Card title="Account Information" description="Account details" class="mb-6">
-    <div class="space-y-3">
-      <div class="flex items-center justify-between py-2">
-        <span class="text-sm text-gray-400">Email</span>
-        <span class="text-sm text-white">{user.email}</span>
-      </div>
-      <div class="flex items-center justify-between py-2 border-t border-white/5">
-        <span class="text-sm text-gray-400">Account Status</span>
-        <Badge variant={profile.is_active ? 'success' : 'default'} size="sm">
-          {profile.is_active ? 'Active' : 'Inactive'}
-        </Badge>
-      </div>
-      <div class="flex items-center justify-between py-2 border-t border-white/5">
-        <span class="text-sm text-gray-400">Member Since</span>
-        <span class="text-sm text-white">
-          {new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-        </span>
-      </div>
-      <div class="flex items-center justify-between py-2 border-t border-white/5">
-        <span class="text-sm text-gray-400">Last Updated</span>
-        <span class="text-sm text-white">
-          {new Date(profile.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-        </span>
-      </div>
-    </div>
-  </Card>
-
-  <!-- Preferences -->
-  <Card title="Preferences" description="Customize your experience" class="mb-6">
-    <div class="space-y-4">
-      <label class="flex items-center justify-between p-3 glass rounded-lg cursor-pointer hover:bg-white/5 transition-all">
-        <div>
-          <div class="text-white font-medium">Email Notifications</div>
-          <div class="text-xs text-gray-400">Receive weekly analytics reports</div>
-        </div>
-        <input type="checkbox" id="email_notifications" class="toggle" checked />
-      </label>
-
-      <label class="flex items-center justify-between p-3 glass rounded-lg cursor-pointer hover:bg-white/5 transition-all">
-        <div>
-          <div class="text-white font-medium">Marketing Emails</div>
-          <div class="text-xs text-gray-400">Updates and tips to grow your audience</div>
-        </div>
-        <input type="checkbox" id="marketing_emails" class="toggle" />
-      </label>
-
-      <label class="flex items-center justify-between p-3 glass rounded-lg cursor-pointer hover:bg-white/5 transition-all">
-        <div>
-          <div class="text-white font-medium">Profile Public</div>
-          <div class="text-xs text-gray-400">Make your profile visible to search engines</div>
-        </div>
-        <input type="checkbox" id="profile_public" class="toggle" checked />
-      </label>
-    </div>
-  </Card>
-
-  <!-- Danger Zone -->
-  <Card title="Danger Zone" description="Irreversible actions" class="border-red-500/30">
-    <Alert variant="danger" title="Delete Account">
-      <p class="mb-4">Once you delete your account, there is no going back. This will permanently delete:</p>
-      <ul class="list-disc list-inside mb-4 text-sm space-y-1">
-        <li>Your profile and username</li>
-        <li>All your blocks and content</li>
-        <li>All your analytics data</li>
-        <li>Your subscription (if any)</li>
-      </ul>
-      <Button variant="danger" id="delete-account-btn">
-        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <button id="delete-account-trigger"
+        class="flex items-center gap-2 px-5 py-2.5 glass border border-red-500/30 rounded-xl text-sm text-red-400 font-medium hover:bg-red-500/10 hover:border-red-500/50 active:scale-[0.98] transition-all">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
         </svg>
-        Delete My Account
-      </Button>
-    </Alert>
-  </Card>
+        I want to delete my account
+      </button>
+    </div>
+  </div>
 
-  <script>
-    import { toast } from '@/lib/utils/toast';
-
-    // ==================== BIO COUNTER ====================
-    const bioTextarea = document.getElementById('bio') as HTMLTextAreaElement;
-    const bioCount = document.getElementById('bio-count');
-
-    function updateBioCount() {
-      if (bioTextarea && bioCount) {
-        bioCount.textContent = bioTextarea.value.length.toString();
-      }
-    }
-
-    bioTextarea?.addEventListener('input', updateBioCount);
-    updateBioCount();
-
-    // ==================== BIO SUGGESTIONS ====================
-    const bioSuggestionsBtn = document.getElementById('bio-suggestions-btn');
-    const suggestions = [
-      "✨ Creating magic on the internet",
-      "🚀 Building the future, one link at a time",
-      "💡 Sharing ideas that matter",
-      "🎨 Digital creator & storyteller",
-      "🌍 Making connections worldwide",
-      "📸 Capturing moments, sharing stories",
-      "🎯 Helping you reach your goals",
-      "💻 Tech enthusiast & problem solver"
-    ];
-
-    bioSuggestionsBtn?.addEventListener('click', () => {
-      const random = suggestions[Math.floor(Math.random() * suggestions.length)];
-      if (bioTextarea) {
-        bioTextarea.value = random;
-        updateBioCount();
-        toast.info('Bio suggestion added! Feel free to edit it.');
-      }
-    });
-
-    // ==================== AVATAR PREVIEW ====================
-    const avatarInput = document.getElementById('avatar_url') as HTMLInputElement;
-    const avatarPreview = document.getElementById('avatar-preview') as HTMLImageElement;
-
-    avatarInput?.addEventListener('input', () => {
-      const url = avatarInput.value;
-      if (url && avatarPreview) {
-        avatarPreview.src = url;
-        avatarPreview.onerror = () => {
-          toast.error('Invalid image URL');
-        };
-      }
-    });
-
-    // ==================== CHECK USERNAME ====================
-    const checkUsernameBtn = document.getElementById('check-username-btn');
-    const usernameInput = document.getElementById('username') as HTMLInputElement;
-    const usernameFeedback = document.getElementById('username-feedback');
-
-    checkUsernameBtn?.addEventListener('click', async () => {
-      const username = usernameInput?.value;
-      if (!username) {
-        toast.error('Please enter a username');
-        return;
-      }
-
-      // Validate format
-      if (!/^[a-z0-9_]{3,24}$/.test(username)) {
-        toast.error('Invalid username format');
-        return;
-      }
-
-      try {
-        // TODO: Add API endpoint to check username availability
-        toast.info('Checking username...');
-        // For now, just show success
-        setTimeout(() => {
-          toast.success('Username is available!');
-        }, 500);
-      } catch (error) {
-        toast.error('Failed to check username');
-      }
-    });
-
-    // ==================== PROFILE FORM ====================
-    const profileForm = document.getElementById('profile-form');
-
-    profileForm?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-
-      console.log('[FORM SUBMIT] Début');
-
-      const formData = new FormData(e.target as HTMLFormElement);
-      const data = {
-        display_name: formData.get('display_name') as string,
-        username: formData.get('username') as string,
-        bio: formData.get('bio') as string || null,
-        avatar_url: formData.get('avatar_url') as string || null,
-      };
-
-      console.log('[FORM DATA]', data);               // ← log ce qui est envoyé
-      console.log('[JSON envoyé]', JSON.stringify(data));
-
-      try {
-        const response = await fetch('/api/profile', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
-        });
-
-        console.log('[RESPONSE STATUS]', response.status);
-
-        const result = await response.json();
-        console.log('[RESPONSE BODY]', result);
-
-        if (!response.ok) {
-          throw new Error(result.error || 'Failed to update profile');
-        }
-
-        toast.success('Profile updated successfully!');
-        setTimeout(() => window.location.reload(), 1000);
-      } catch (error) {
-        console.error('[FETCH ERROR]', error);
-        toast.error(error instanceof Error ? error.message : 'Failed to update profile');
-      }
-    });
-
-    // ==================== COPY URL ====================
-    const copyUrlBtn = document.getElementById('copy-url-btn');
-    const profileUrl = document.getElementById('profile-url') as HTMLInputElement;
-
-    copyUrlBtn?.addEventListener('click', async () => {
-      if (profileUrl) {
-        try {
-          await navigator.clipboard.writeText(profileUrl.value);
-          toast.success('URL copied to clipboard!');
-        } catch (error) {
-          profileUrl.select();
-          document.execCommand('copy');
-          toast.success('URL copied!');
-        }
-      }
-    });
-
-    // ==================== SOCIAL SHARE ====================
-    const shareTwitter = document.getElementById('share-twitter');
-    const shareFacebook = document.getElementById('share-facebook');
-    const shareLinkedIn = document.getElementById('share-linkedin');
-
-    const profileUrlValue = profileUrl?.value || '';
-    const shareText = 'Check out my profile!';
-
-    shareTwitter?.addEventListener('click', () => {
-      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(profileUrlValue)}`, '_blank');
-    });
-
-    shareFacebook?.addEventListener('click', () => {
-      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(profileUrlValue)}`, '_blank');
-    });
-
-    shareLinkedIn?.addEventListener('click', () => {
-      window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(profileUrlValue)}`, '_blank');
-    });
-
-    // ==================== DELETE ACCOUNT ====================
-    const deleteBtn = document.getElementById('delete-account-btn');
-
-    deleteBtn?.addEventListener('click', async () => {
-      const confirmed = confirm(
-        'Are you sure you want to delete your account?\n\n' +
-        'This will permanently delete:\n' +
-        '- Your profile\n' +
-        '- All your blocks\n' +
-        '- All your analytics data\n\n' +
-        'This action CANNOT be undone!'
-      );
-
-      if (!confirmed) return;
-
-      const doubleConfirm = confirm(
-        'FINAL WARNING: This will permanently delete everything.\n\n' +
-        'Are you ABSOLUTELY sure?'
-      );
-
-      if (!doubleConfirm) return;
-
-      try {
-        const response = await fetch('/api/profile/delete', {
-          method: 'POST'
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(result.error || 'Failed to delete account');
-        }
-
-        toast.success('Account deleted. Goodbye!');
-        
-        // Redirect to home
-        setTimeout(() => {
-          window.location.href = '/';
-        }, 2000);
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Failed to delete account');
-      }
-    });
-  </script>
 </DashboardLayout>
+
+<!-- ===== STYLES ===== -->
+<style>
+  .tab-btn.active { background: rgba(255,255,255,0.08); color: white; }
+  .tab-btn[data-tab="danger"].active { background: rgba(239,68,68,0.1); color: rgb(248,113,113); }
+
+  .pref-toggle {
+    width: 2.5rem; height: 1.375rem; border-radius: 9999px;
+    appearance: none; -webkit-appearance: none;
+    background: rgba(255,255,255,0.1); cursor: pointer;
+    transition: background-color 0.2s; position: relative;
+  }
+  .pref-toggle::after {
+    content: ''; position: absolute;
+    width: 1rem; height: 1rem; border-radius: 50%;
+    background: white; top: 3px; left: 3px; transition: left 0.2s;
+  }
+  .pref-toggle:checked { background: rgba(0,255,157,0.7); }
+  .pref-toggle:checked::after { left: calc(100% - 1.25rem); }
+
+  #drop-zone.drag-over { border-color: rgba(0,255,157,0.6); background: rgba(0,255,157,0.04); }
+</style>
+
+<!-- ===== SCRIPT ===== -->
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+
+<script>
+  import { toast } from '@/lib/utils/toast';
+
+  // ==================== BRIDGE ====================
+  const bridge = JSON.parse(document.getElementById('server-data')?.dataset.bridge ?? '{}');
+  const { username, displayName, avatarUrl, plan, profileUrl } = bridge;
+
+  // ==================== TABS ====================
+  function activateTab(id) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('hidden', p.id !== `panel-${id}`));
+    if (id === 'sessions') loadSessions();
+  }
+  document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => activateTab(b.dataset.tab)));
+  activateTab('profile');
+
+  // ==================== AVATAR UPLOAD ====================
+  const avatarPreview  = document.getElementById('avatar-preview');
+  const dropZone       = document.getElementById('drop-zone');
+  const fileInput      = document.getElementById('avatar-file');
+  const progressWrap   = document.getElementById('upload-progress-wrap');
+  const progressBar    = document.getElementById('upload-progress-bar');
+  const uploadStatus   = document.getElementById('upload-status');
+
+  document.getElementById('avatar-overlay')?.addEventListener('click', () => fileInput?.click());
+  dropZone?.addEventListener('dragover',  (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone?.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone?.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('drag-over'); const f = e.dataTransfer?.files[0]; if(f) handleAvatarFile(f); });
+  fileInput?.addEventListener('change',  (e) => { const f = e.target.files?.[0]; if(f) handleAvatarFile(f); });
+
+  function handleAvatarFile(file) {
+    if (!['image/jpeg','image/png','image/webp','image/gif'].includes(file.type)) { toast.error('Unsupported format. Use JPG, PNG, WebP or GIF.'); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error('File too large. Max 2 MB.'); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => { if (avatarPreview) avatarPreview.src = e.target.result; };
+    reader.readAsDataURL(file);
+    uploadAvatar(file);
+  }
+
+  async function uploadAvatar(file) {
+    const fd = new FormData();
+    fd.append('avatar', file);
+    progressWrap?.classList.remove('hidden');
+    if (progressBar) progressBar.style.width = '0%';
+    if (uploadStatus) { uploadStatus.textContent = 'Uploading…'; uploadStatus.classList.remove('hidden'); }
+    let pct = 0;
+    const tick = setInterval(() => { pct = Math.min(pct + 10, 85); if (progressBar) progressBar.style.width = `${pct}%`; }, 80);
+    try {
+      const res = await fetch('/api/profile/avatar', { method: 'POST', body: fd });
+      clearInterval(tick);
+      if (progressBar) progressBar.style.width = '100%';
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `HTTP ${res.status}`); }
+      const data = await res.json();
+      if (avatarPreview && data.avatar_url) avatarPreview.src = data.avatar_url;
+      if (uploadStatus) uploadStatus.textContent = '✓ Avatar updated';
+      toast.success('Avatar updated!');
+    } catch (err) {
+      clearInterval(tick);
+      if (progressBar) progressBar.style.width = '0%';
+      if (uploadStatus) uploadStatus.textContent = '✗ Upload failed';
+      toast.error(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setTimeout(() => progressWrap?.classList.add('hidden'), 1500);
+    }
+  }
+
+  document.getElementById('avatar-url-apply')?.addEventListener('click', () => {
+    const url = document.getElementById('avatar-url-input')?.value?.trim();
+    if (!url) return;
+    try { new URL(url); } catch { toast.error('Invalid URL'); return; }
+    if (avatarPreview) { avatarPreview.src = url; avatarPreview.onerror = () => toast.error('Could not load image from that URL'); }
+    fetch('/api/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ avatar_url: url }) })
+      .then(r => r.ok ? toast.success('Avatar URL saved!') : toast.error('Failed to save avatar URL'));
+  });
+
+  // ==================== BIO COUNTER ====================
+  const bioTextarea = document.getElementById('bio');
+  const bioCount    = document.getElementById('bio-count');
+  function updateBioCount() { if (bioTextarea && bioCount) bioCount.textContent = bioTextarea.value.length; }
+  bioTextarea?.addEventListener('input', updateBioCount);
+  updateBioCount();
+
+  const suggestions = ['✨ Creating magic on the internet','🚀 Building the future, one link at a time','💡 Sharing ideas that matter','🎨 Digital creator & storyteller','🌍 Making connections worldwide','📸 Capturing moments, sharing stories','💻 Tech enthusiast & problem solver','🎯 Helping you reach your goals'];
+  document.getElementById('bio-suggestions-btn')?.addEventListener('click', () => {
+    const s = suggestions[Math.floor(Math.random() * suggestions.length)];
+    if (bioTextarea) { bioTextarea.value = s; updateBioCount(); }
+    toast.info('Suggestion applied!');
+  });
+
+  // ==================== USERNAME CHECK ====================
+  let checkTimer = null;
+  const usernameFeedback = document.getElementById('username-feedback');
+  function showFeedback(msg, ok) {
+    if (!usernameFeedback) return;
+    usernameFeedback.textContent = msg;
+    usernameFeedback.className = `text-xs mt-1 px-1 ${ok ? 'text-neon-green' : 'text-red-400'}`;
+    usernameFeedback.classList.remove('hidden');
+  }
+  document.getElementById('check-username-btn')?.addEventListener('click', checkUsername);
+  document.getElementById('username')?.addEventListener('input', () => { clearTimeout(checkTimer); checkTimer = setTimeout(checkUsername, 600); });
+  async function checkUsername() {
+    const val = document.getElementById('username')?.value?.trim() ?? '';
+    if (!val) return;
+    if (!/^[a-z0-9_]{3,24}$/.test(val)) { showFeedback('3–24 chars · lowercase, numbers, underscores only', false); return; }
+    if (val === username) { showFeedback('✓ This is your current username', true); return; }
+    try {
+      const r = await fetch(`/api/profile/check-username?username=${encodeURIComponent(val)}`);
+      const d = await r.json();
+      showFeedback(d.available ? '✓ Available!' : '✗ Already taken', d.available);
+    } catch { showFeedback('Could not check availability', false); }
+  }
+
+  // ==================== PROFILE SAVE ====================
+  let lastSave = 0;
+  document.getElementById('profile-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (Date.now() - lastSave < 2000) { toast.error('Please wait before saving again'); return; }
+    const btn = document.getElementById('save-profile-btn');
+    const txt = document.getElementById('save-profile-text');
+    btn?.setAttribute('disabled', '');
+    if (txt) txt.textContent = 'Saving…';
+    const fd   = new FormData(e.target);
+    const data = {
+      display_name: String(fd.get('display_name') ?? '').trim().slice(0, 60),
+      username:     String(fd.get('username')     ?? '').trim().toLowerCase().slice(0, 24),
+      bio:          String(fd.get('bio')          ?? '').trim().slice(0, 500) || null,
+    };
+    if (!data.display_name) { toast.error('Display name required'); btn?.removeAttribute('disabled'); if(txt) txt.textContent='Save Changes'; return; }
+    if (!/^[a-z0-9_]{3,24}$/.test(data.username)) { toast.error('Invalid username format'); btn?.removeAttribute('disabled'); if(txt) txt.textContent='Save Changes'; return; }
+    try {
+      const res = await fetch('/api/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(result.error || `HTTP ${res.status}`);
+      lastSave = Date.now();
+      toast.success('Profile updated!');
+      setTimeout(() => location.reload(), 900);
+    } catch (err) { toast.error(err instanceof Error ? err.message : 'Failed to save profile'); }
+    finally { btn?.removeAttribute('disabled'); if (txt) txt.textContent = 'Save Changes'; }
+  });
+
+  // ==================== COPY URL ====================
+  document.getElementById('copy-url-btn')?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(profileUrl);
+      const icon = document.getElementById('copy-icon');
+      if (icon) icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>`;
+      setTimeout(() => { if (icon) icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>`; }, 2000);
+      toast.success('Link copied!');
+    } catch { toast.error('Copy failed'); }
+  });
+
+  // ==================== SOCIAL SHARE ====================
+  const shareText = 'Check out my profile on BioForge!';
+  ({
+    'share-x':        () => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(profileUrl)}`, '_blank'),
+    'share-facebook': () => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(profileUrl)}`, '_blank'),
+    'share-linkedin': () => window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(profileUrl)}`, '_blank'),
+    'share-whatsapp': () => window.open(`https://wa.me/?text=${encodeURIComponent(`${shareText} ${profileUrl}`)}`, '_blank'),
+  } as Record<string, () => void>);
+
+  // Fix: iterate properly
+  const shareHandlers = {
+    'share-x':        () => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(profileUrl)}`, '_blank'),
+    'share-facebook': () => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(profileUrl)}`, '_blank'),
+    'share-linkedin': () => window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(profileUrl)}`, '_blank'),
+    'share-whatsapp': () => window.open(`https://wa.me/?text=${encodeURIComponent(`${shareText} ${profileUrl}`)}`, '_blank'),
+  };
+  Object.entries(shareHandlers).forEach(([id, fn]) => document.getElementById(id)?.addEventListener('click', fn));
+
+  // ==================== QR CODE ====================
+  function generateQR() {
+    const canvas = document.getElementById('qr-canvas');
+    if (!canvas || typeof QRCode === 'undefined') return;
+    QRCode.toCanvas(canvas, profileUrl, { width: 140, margin: 1, color: { dark: '#000000', light: '#ffffff' } });
+  }
+  if (typeof QRCode !== 'undefined') generateQR();
+  else window.addEventListener('load', generateQR);
+
+  document.getElementById('download-qr-btn')?.addEventListener('click', () => {
+    const canvas = document.getElementById('qr-canvas');
+    if (!canvas) return;
+    const a = document.createElement('a');
+    a.download = `qr-${username}.png`;
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+    toast.success('QR code downloaded!');
+  });
+
+  // ==================== EXPORT DATA ====================
+  async function exportData() {
+    try {
+      const res = await fetch('/api/profile/export');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = `bioforge-export-${username}-${Date.now()}.json`;
+      a.click(); URL.revokeObjectURL(url);
+      toast.success('Data exported!');
+    } catch (err) { toast.error(err instanceof Error ? err.message : 'Export failed'); }
+  }
+  document.getElementById('export-data-btn')?.addEventListener('click', exportData);
+  document.getElementById('export-data-btn-danger')?.addEventListener('click', exportData);
+
+  // ==================== SESSIONS ====================
+  const DEVICE_ICONS = {
+    mobile:  'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z',
+    tablet:  'M12 18h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z',
+    desktop: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+  };
+
+  async function loadSessions() {
+    const list = document.getElementById('sessions-list');
+    if (!list) return;
+    try {
+      const res = await fetch('/api/sessions');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const sessions = await res.json();
+      if (!sessions.length) { list.innerHTML = '<p class="text-xs text-gray-500 text-center py-6">No sessions found</p>'; return; }
+      list.innerHTML = sessions.map((s, i) => {
+        const isCurrent = i === 0;
+        const iconPath  = DEVICE_ICONS[s.device_type ?? 'desktop'] ?? DEVICE_ICONS.desktop;
+        const browser   = String(s.browser ?? 'Unknown').replace(/[<>"]/g, '');
+        const os        = String(s.os ?? '').replace(/[<>"]/g, '');
+        const ip        = String(s.ip ?? '—').replace(/[<>"]/g, '');
+        const lastSeen  = s.last_seen ? new Date(s.last_seen).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+        const sid       = String(s.id ?? '').replace(/[<>"]/g, '');
+        return `<div class="flex items-center gap-4 p-4 glass rounded-xl border ${isCurrent ? 'border-neon-green/25' : 'border-white/5'}">
+          <div class="w-10 h-10 rounded-xl ${isCurrent ? 'bg-neon-green/10 border border-neon-green/20' : 'bg-white/5 border border-white/10'} flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5 ${isCurrent ? 'text-neon-green' : 'text-gray-500'}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${iconPath}"/></svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-0.5">
+              <p class="text-sm font-medium text-white truncate">${browser}${os ? ` · ${os}` : ''}</p>
+              ${isCurrent ? '<span class="text-xs text-neon-green bg-neon-green/10 px-2 py-0.5 rounded-full shrink-0">Current</span>' : ''}
+            </div>
+            <p class="text-xs text-gray-500">IP: ${ip} · Last active: ${lastSeen}</p>
+          </div>
+          ${!isCurrent ? `<button class="revoke-btn px-3 py-1.5 glass border border-red-500/20 rounded-lg text-xs text-red-400 hover:border-red-500/50 hover:bg-red-500/5 transition-all shrink-0" data-id="${sid}">Revoke</button>` : ''}
+        </div>`;
+      }).join('');
+
+      list.querySelectorAll('.revoke-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.dataset.id;
+          try {
+            const r = await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            btn.closest('.flex.items-center.gap-4')?.remove();
+            toast.success('Session revoked');
+          } catch { toast.error('Failed to revoke session'); }
+        });
+      });
+    } catch (err) {
+      list.innerHTML = '<p class="text-xs text-red-400 text-center py-6">Failed to load sessions</p>';
+    }
+  }
+
+  document.getElementById('revoke-all-btn')?.addEventListener('click', async () => {
+    if (!confirm('Sign out all other devices?')) return;
+    try {
+      const r = await fetch('/api/sessions', { method: 'DELETE' });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      toast.success('All other sessions revoked');
+      loadSessions();
+    } catch { toast.error('Failed to revoke sessions'); }
+  });
+
+  // ==================== DELETE ACCOUNT ====================
+  const deleteWrap  = document.getElementById('delete-confirm-wrap');
+  const deleteInput = document.getElementById('delete-confirm-input');
+  const deleteBtn   = document.getElementById('delete-confirm-btn');
+
+  document.getElementById('delete-account-trigger')?.addEventListener('click', () => {
+    deleteWrap?.classList.remove('hidden');
+    deleteWrap?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+
+  deleteInput?.addEventListener('input', () => {
+    const match = deleteInput.value === username;
+    deleteBtn?.toggleAttribute('disabled', !match);
+    deleteInput.classList.toggle('border-neon-green/50', match);
+    deleteInput.classList.toggle('border-red-500/30',    !match);
+  });
+
+  deleteBtn?.addEventListener('click', async () => {
+    if (deleteInput?.value !== username) return;
+    deleteBtn.setAttribute('disabled', '');
+    deleteBtn.textContent = 'Deleting…';
+    try {
+      const r = await fetch('/api/profile/delete', { method: 'POST' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+      toast.success('Account deleted. Goodbye!');
+      setTimeout(() => { window.location.href = '/'; }, 2000);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete account');
+      deleteBtn?.removeAttribute('disabled');
+      if (deleteBtn) deleteBtn.textContent = 'Permanently Delete My Account';
+    }
+  });
+</script>
