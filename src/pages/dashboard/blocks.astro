@@ -43,7 +43,7 @@ const supabase = createServerClient(
 const safeProfileId = profile?.id?.trim() ?? '';
 
 const [blocksResult, analyticsResult] = await Promise.all([
-  safeProfileId ? getBlocks(supabase, safeProfileId) : Promise.resolve({ success: false, data: [] }),
+  safeProfileId ? getBlocks(safeProfileId) : Promise.resolve({ success: false, data: [] }),
   safeProfileId ? getAnalyticsSummary(supabase, safeProfileId, 7) : Promise.resolve({ success: false, data: null }),
 ]);
 
