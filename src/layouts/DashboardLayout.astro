@@ -1,5 +1,5 @@
 ---
-// src/layouts/DashboardLayout.astro — version finale corrigée (toggle icon fluide + icônes visibles)
+// src/layouts/DashboardLayout.astro — version STABLE (pas d'Internal Server Error)
 import CommandPalette from '@/components/features/CommandPalette.astro'
 import OnboardingTour from '@/components/features/OnboardingTour.astro';
 import UpgradeModal from '@/components/features/UpgradeModal.astro';
@@ -120,14 +120,14 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
         </a>
         <button
           id="sidebar-toggle"
-          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={initialCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           class="p-2 rounded-lg hover:bg-white/10 transition pointer-events-auto z-10 relative"
         >
           <!-- Icône collapse (chevron left) – visible quand expanded -->
           <svg 
             class:list={[
               "w-5 h-5 absolute inset-0 m-auto transition-opacity duration-200",
-              isCollapsed ? "opacity-0" : "opacity-100"
+              initialCollapsed ? "opacity-0" : "opacity-100"
             ]}
             fill="none" 
             viewBox="0 0 24 24" 
@@ -140,7 +140,7 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
           <svg 
             class:list={[
               "w-5 h-5 absolute inset-0 m-auto transition-opacity duration-200",
-              isCollapsed ? "opacity-100" : "opacity-0"
+              initialCollapsed ? "opacity-100" : "opacity-0"
             ]}
             fill="none" 
             viewBox="0 0 24 24" 
