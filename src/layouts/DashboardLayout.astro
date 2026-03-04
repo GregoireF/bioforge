@@ -1,15 +1,12 @@
 ---
-// src/layouts/DashboardLayout.astro — v6.9 — corrigé, propre et complet
-import { Image } from 'astro:assets';
-import { withAuth } from '@/lib/auth/auth';
-
-import SidebarNav from '@/components/dashboard/SidebarNav.astro';
-import UserMenu from '@/components/dashboard/UserMenu.astro';
-
-import CommandPalette from '@/components/features/CommandPalette.astro';
+// src/layouts/DashboardLayout.astro — version stabilisée après debug
+import CommandPalette from '@/components/features/CommandPalette.astro'
 import OnboardingTour from '@/components/features/OnboardingTour.astro';
 import UpgradeModal from '@/components/features/UpgradeModal.astro';
-
+import { Image } from 'astro:assets';
+import { withAuth } from '@/lib/auth/auth';
+import SidebarNav from '@/components/dashboard/SidebarNav.astro';
+import UserMenu from '@/components/dashboard/UserMenu.astro';
 import { NAV_MAIN, NAV_SECONDARY } from '@/data/nav-dashboard';
 
 const { title } = Astro.props;
@@ -113,7 +110,7 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
 
         <div class="mt-8 pt-4 border-t border-white/10">
           <p class:list={["px-3 mb-2 text-xs uppercase tracking-wider text-gray-500 font-semibold", initialCollapsed && "sr-only"]}>Account</p>
-          <SidebarNav 
+          <SidebarNav
             items={NAV_SECONDARY}
             collapsed={initialCollapsed}
             currentPath={currentPath}
