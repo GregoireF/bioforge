@@ -316,7 +316,6 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
 <style is:global>
   #sidebar {
   transition: width 0.3s ease-in-out;
-  overflow: hidden; /* évite que le contenu déborde pendant la transition */
 }
 
 #sidebar > * {
