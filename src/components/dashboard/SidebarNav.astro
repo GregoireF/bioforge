@@ -1,0 +1,51 @@
+---
+// src/components/dashboard/SidebarNav.astro
+import type { NavItem } from '@/data/nav-dashboard';
+
+interface Props { 
+    items: NavItem[]; 
+    collapsed: boolean; 
+    path: string; 
+}
+
+const { items, collapsed, path } = Astro.props;
+
+const isActive = (href: string, exact?: boolean) =>
+  exact ? path === href : path.startsWith(href);
+---
+
+<nav aria-label="Primary navigation" class="space-y-1">
+  {items.map(item => {
+    if (item.disabled) return null;
+    const active = isActive(item.href, item.exact);
+    return (
+      <a
+        href={item.href}
+        aria-current={active ? 'page' : undefined}
+        aria-disabled={item.disabled}
+        class:list={[
+          "group relative flex items-center rounded-xl font-medium text-sm transition-all duration-200 ease-out",
+          collapsed ? "justify-center px-4 py-3" : "gap-3 px-3 py-2.5",
+          active
+            ? "text-neon-green before:absolute before:left-0 before:inset-y-0 before:w-1 before:bg-gradient-to-b before:from-neon-green before:to-emerald-400 before:rounded-r-lg before:shadow-[0_0_12px] before:shadow-neon-green/40"
+            : "text-gray-400 hover:text-white hover:bg-white/6 hover:scale-[1.02]",
+        ]}
+        title={collapsed ? item.label : undefined}
+      >
+        <svg aria-hidden="true" class:list={["shrink-0", collapsed ? "w-6 h-6" : "w-5 h-5"]} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width={active ? "2.2" : "1.9"} d={item.icon} />
+        </svg>
+        {!collapsed && (
+          <>
+            <span class="truncate">{item.label}</span>
+            {item.badge && (
+              <span class="ml-auto px-1.5 py-0.5 text-xs rounded-full bg-gradient-to-r from-neon-green/20 to-emerald-500/20 text-neon-green border border-neon-green/30 animate-pulse-slow">
+                {item.badge.toUpperCase()}
+              </span>
+            )}
+          </>
+        )}
+      </a>
+    );
+  })}
+</nav>

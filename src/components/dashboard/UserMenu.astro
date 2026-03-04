@@ -1,0 +1,54 @@
+---
+// src/components/dashboard/UserMenu.astro
+interface Props {
+  avatarUrl?: string;
+  displayName: string;
+  initials: string;
+  plan: string;
+  planColor: string;
+  collapsed?: boolean;
+  mobile?: boolean;
+}
+
+const { avatarUrl, displayName, initials, plan, planColor, collapsed = false, mobile = false } = Astro.props;
+const menuId = mobile ? 'mobile-user-menu' : 'sidebar-user-menu';
+---
+
+<div class="relative">
+  <button
+    id={mobile ? 'mobile-user-btn' : 'sidebar-user-btn'}
+    aria-expanded="false"
+    aria-haspopup="true"
+    aria-controls={menuId}
+    class:list={["flex items-center transition hover:bg-white/5 rounded-xl", collapsed && !mobile ? "p-2" : "gap-3 p-2.5 w-full"]}
+  >
+    <div class="relative">
+      {avatarUrl ? (
+        <img src={avatarUrl} alt="" class="w-9 h-9 rounded-full object-cover border border-white/20" referrerpolicy="no-referrer" loading="lazy" />
+      ) : (
+        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-neon-green to-neon-blue flex-center text-sm font-bold text-black">
+          {initials}
+        </div>
+      )}
+      <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-neon-green rounded-full border-2 border-dark-900"></span>
+    </div>
+
+    {!collapsed && (
+      <div class="flex-1 min-w-0 text-left">
+        <p class="text-sm font-semibold truncate">{displayName}</p>
+        <span class:list={["text-xs px-2 py-0.5 rounded-full border font-medium", planColor, plan === 'Free' && "animate-pulse"]}>
+          {plan}
+        </span>
+      </div>
+    )}
+
+    {!collapsed && <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>}
+  </button>
+
+  <div id={menuId} class="hidden absolute right-0 mt-2 w-56 glass-strong border border-white/10 rounded-xl shadow-2xl z-50 p-1.5" role="menu">
+    <a href="/dashboard/settings" role="menuitem" class="flex gap-3 px-4 py-2.5 text-sm hover:bg-white/8 rounded-lg transition">Settings</a>
+    {plan !== 'Pro' && <a href="/upgrade" role="menuitem" class="flex gap-3 px-4 py-2.5 text-sm text-neon-green hover:bg-neon-green/10 rounded-lg transition">Upgrade to Pro</a>}
+    <div class="my-1 border-t border-white/10"></div>
+    <a href="/api/auth/signout" role="menuitem" class="flex gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition">Sign Out</a>
+  </div>
+</div>
