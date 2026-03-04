@@ -248,60 +248,63 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
   <UpgradeModal client:visible />
 
   <script is:inline>
-    // Sidebar toggle
-    const sidebar = document.getElementById('sidebar');
-    const toggleBtn = document.getElementById('sidebar-toggle');
+  // Sidebar toggle
+  const sidebar = document.getElementById('sidebar');
+  const toggleBtn = document.getElementById('sidebar-toggle');
 
-    let isCollapsed = sidebar?.classList.contains('lg:w-16') ?? false;
+  let isCollapsed = sidebar?.classList.contains('lg:w-16') ?? false;
 
-    toggleBtn?.addEventListener('click', () => {
-      isCollapsed = !isCollapsed;
-      sidebar?.classList.toggle('lg:w-16', isCollapsed);
-      sidebar?.classList.toggle('lg:w-64 xl:w-72', !isCollapsed);
+  toggleBtn?.addEventListener('click', () => {
+    isCollapsed = !isCollapsed;
 
-      document.cookie = `sidebar-collapsed=${isCollapsed}; path=/; max-age=31536000; samesite=lax`;
-      localStorage.setItem('sidebar-collapsed', isCollapsed.toString());
+    // Corrige le toggle multi-classes
+    sidebar?.classList.toggle('lg:w-16', isCollapsed);
+    sidebar?.classList.toggle('lg:w-64', !isCollapsed);
+    sidebar?.classList.toggle('xl:w-72', !isCollapsed);
 
-      toggleBtn.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
-    });
+    document.cookie = `sidebar-collapsed=${isCollapsed}; path=/; max-age=31536000; samesite=lax`;
+    localStorage.setItem('sidebar-collapsed', isCollapsed.toString());
 
-    // Mobile drawer
-    const menu = document.getElementById('mobile-menu');
-    document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
-      menu?.classList.remove('hidden');
-      document.body.style.overflow = 'hidden';
-    });
+    toggleBtn.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
+  });
 
-    const closeDrawer = () => {
-      menu?.classList.add('hidden');
-      document.body.style.overflow = '';
-    };
+  // Mobile drawer
+  const menu = document.getElementById('mobile-menu');
+  document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
+    menu?.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  });
 
-    document.getElementById('mobile-close')?.addEventListener('click', closeDrawer);
-    document.getElementById('mobile-backdrop')?.addEventListener('click', closeDrawer);
+  const closeDrawer = () => {
+    menu?.classList.add('hidden');
+    document.body.style.overflow = '';
+  };
 
-    // Command palette
-    document.getElementById('command-palette-trigger')?.addEventListener('click', () => {
+  document.getElementById('mobile-close')?.addEventListener('click', closeDrawer);
+  document.getElementById('mobile-backdrop')?.addEventListener('click', closeDrawer);
+
+  // Command palette
+  document.getElementById('command-palette-trigger')?.addEventListener('click', () => {
+    window.openCommandPalette?.();
+  });
+
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
       window.openCommandPalette?.();
-    });
-
-    document.addEventListener('keydown', e => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        window.openCommandPalette?.();
-      }
-    });
-
-    // AdSense push
-    if ({showAds}) {
-      setTimeout(() => {
-        try {
-          (window.adsbygoogle = window.adsbygoogle || []).push({});
-        } catch (e) {
-          console.warn('AdSense push failed', e);
-        }
-      }, 800);
     }
-  </script>
+  });
+
+  // AdSense push
+  if (showAds) {  // ← corrigé ici (sans accolades inutiles)
+    setTimeout(() => {
+      try {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+      } catch (e) {
+        console.warn('AdSense push failed', e);
+      }
+    }, 800);
+  }
+</script>
 </body>
 </html>
