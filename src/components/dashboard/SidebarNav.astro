@@ -1,46 +1,66 @@
 ---
-// src/components/dashboard/SidebarNav.astro
-import type { NavItem } from '@/data/nav-dashboard';   // ou le chemin que tu utilises
+// src/components/dashboard/SidebarNav.astro — corrigé, sans erreur key
+import type { NavItem } from '@/data/nav-dashboard';
 
 interface Props {
   items: NavItem[];
   collapsed: boolean;
-  currentPath: string;    // ← AJOUTE CETTE LIGNE ICI
+  currentPath: string;
 }
 
-const { items, collapsed, currentPath } = Astro.props;
+const { items = [], collapsed = false, currentPath = '' } = Astro.props;
 
-function isActive(href: string, exact?: boolean) {
+function isActive(href: string, exact?: boolean): boolean {
+  if (!href) return false;
   return exact ? currentPath === href : currentPath.startsWith(href);
 }
 ---
 
 <nav aria-label="Navigation principale" class="space-y-1">
-  {items.map(item => {
-    const active = isActive(item.href, item.exact);
-    return (
+  {items.length === 0 ? (
+    <p class="px-3 py-2 text-xs text-gray-500 italic">
+      Aucune navigation disponible
+    </p>
+  ) : (
+    items.map(item => (
       <a
         href={item.href}
-        aria-current={active ? 'page' : undefined}
+        aria-current={isActive(item.href, item.exact) ? 'page' : undefined}
         class:list={[
           "group relative flex items-center rounded-xl text-sm font-medium transition-all duration-200",
           collapsed ? "justify-center px-4 py-3" : "gap-3 px-3 py-2.5",
-          active
+          isActive(item.href, item.exact)
             ? "text-neon-green before:absolute before:left-0 before:inset-y-0 before:w-1 before:bg-neon-green before:rounded-r before:shadow-[0_0_10px_#10b98180]"
-            : "text-gray-400 hover:text-white hover:bg-white/6 hover:scale-102"
+            : "text-gray-400 hover:text-white hover:bg-white/6 hover:scale-[1.02]"
         ]}
         title={collapsed ? item.label : undefined}
       >
-        <svg aria-hidden="true" class:list={[collapsed ? "w-6 h-6" : "w-5 h-5"]} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width={active ? "2.2" : "1.8"} d={item.icon} />
+        <svg
+          aria-hidden="true"
+          class:list={[collapsed ? "w-6 h-6" : "w-5 h-5"]}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width={isActive(item.href, item.exact) ? "2.2" : "1.8"}
+            d={item.icon ?? 'M0 0h24v24H0z'}
+          />
         </svg>
+
         {!collapsed && (
           <>
-            <span class="truncate flex-1">{item.label}</span>
-            {item.badge && <span class="ml-auto text-xs px-2 py-0.5 rounded-full bg-neon-green/20 text-neon-green border border-neon-green/30">{item.badge}</span>}
+            <span class="truncate flex-1">{item.label || 'Item sans label'}</span>
+            {item.badge && (
+              <span class="ml-auto text-xs px-2 py-0.5 rounded-full bg-neon-green/20 text-neon-green border border-neon-green/30">
+                {item.badge}
+              </span>
+            )}
           </>
         )}
       </a>
-    );
-  })}
+    ))
+  )}
 </nav>
