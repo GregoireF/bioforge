@@ -4,6 +4,7 @@ import CommandPalette from '@/components/features/CommandPalette.astro'
 import OnboardingTour from '@/components/features/OnboardingTour.astro';
 import UpgradeModal from '@/components/features/UpgradeModal.astro';
 import { Image } from 'astro:assets';
+import '@/styles/global.css';
 import { withAuth } from '@/lib/auth/auth';
 import SidebarNav from '@/components/dashboard/SidebarNav.astro';
 import UserMenu from '@/components/dashboard/UserMenu.astro';
@@ -185,7 +186,6 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
             plan={plan}
             planColor={planColor}
             mobile={true}
-            class="lg:hidden"
           />
         </div>
       </header>
