@@ -1,11 +1,15 @@
 ---
-import CommandPalette from '@/components/features/CommandPalette.astro'
-import OnboardingTour from '@/components/features/OnboardingTour.astro';
-import UpgradeModal from '@/components/features/UpgradeModal.astro';
+// src/layouts/DashboardLayout.astro — v6.9 — corrigé, propre et complet
 import { Image } from 'astro:assets';
 import { withAuth } from '@/lib/auth/auth';
+
 import SidebarNav from '@/components/dashboard/SidebarNav.astro';
 import UserMenu from '@/components/dashboard/UserMenu.astro';
+
+import CommandPalette from '@/components/features/CommandPalette.astro';
+import OnboardingTour from '@/components/features/OnboardingTour.astro';
+import UpgradeModal from '@/components/features/UpgradeModal.astro';
+
 import { NAV_MAIN, NAV_SECONDARY } from '@/data/nav-dashboard';
 
 const { title } = Astro.props;
@@ -106,9 +110,14 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
 
       <div class="flex-1 px-3 py-6 overflow-y-auto">
         <SidebarNav items={NAV_MAIN} collapsed={initialCollapsed} currentPath={currentPath} />
+
         <div class="mt-8 pt-4 border-t border-white/10">
           <p class:list={["px-3 mb-2 text-xs uppercase tracking-wider text-gray-500 font-semibold", initialCollapsed && "sr-only"]}>Account</p>
-          <SidebarNav items={NAV_SECONDARY collapsed={initialCollapsed} currentPath={currentPath} />
+          <SidebarNav 
+            items={NAV_SECONDARY}
+            collapsed={initialCollapsed}
+            currentPath={currentPath}
+          />
         </div>
       </div>
 
@@ -139,7 +148,7 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
       </div>
     </aside>
 
-    <!-- Main content -->
+    <!-- Main content area -->
     <div class="flex-1 flex flex-col min-w-0">
 
       <!-- Topbar -->
@@ -191,7 +200,7 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
     </div>
   </div>
 
-  <!-- Mobile Drawer (version améliorée) -->
+  <!-- Mobile Drawer -->
   <div id="mobile-menu" class="hidden fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-labelledby="mobile-menu-title">
     <div id="mobile-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
     <div class="absolute inset-y-0 left-0 w-72 glass-strong border-r border-white/10 flex flex-col overflow-hidden">
@@ -210,11 +219,11 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
 
       <div class="flex-1 px-4 py-6 overflow-y-auto">
         <p class="px-3 mb-3 text-xs uppercase tracking-wider text-gray-500 font-semibold">Main</p>
-        <SidebarNav items={MAIN_NAV} collapsed={false} currentPath={currentPath} />
+        <SidebarNav items={NAV_MAIN} collapsed={false} currentPath={currentPath} />
 
         <div class="mt-8 pt-4 border-t border-white/10">
           <p class="px-3 mb-3 text-xs uppercase tracking-wider text-gray-500 font-semibold">Account</p>
-          <SidebarNav items={SECONDARY_NAV} collapsed={false} currentPath={currentPath} />
+          <SidebarNav items={NAV_SECONDARY} collapsed={false} currentPath={currentPath} />
         </div>
       </div>
 
@@ -242,7 +251,7 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
   <UpgradeModal client:visible />
 
   <script is:inline>
-    // ── Sidebar toggle ────────────────────────────────────────────────────────
+    // Sidebar toggle
     const sidebar = document.getElementById('sidebar');
     const toggleBtn = document.getElementById('sidebar-toggle');
 
@@ -259,7 +268,7 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
       toggleBtn.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
     });
 
-    // ── Mobile drawer ─────────────────────────────────────────────────────────
+    // Mobile drawer
     const menu = document.getElementById('mobile-menu');
     document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
       menu?.classList.remove('hidden');
@@ -274,7 +283,7 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
     document.getElementById('mobile-close')?.addEventListener('click', closeDrawer);
     document.getElementById('mobile-backdrop')?.addEventListener('click', closeDrawer);
 
-    // ── Command palette ───────────────────────────────────────────────────────
+    // Command palette
     document.getElementById('command-palette-trigger')?.addEventListener('click', () => {
       window.openCommandPalette?.();
     });
@@ -286,7 +295,7 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
       }
     });
 
-    // ── AdSense push (si ads affichées) ───────────────────────────────────────
+    // AdSense push
     if ({showAds}) {
       setTimeout(() => {
         try {
