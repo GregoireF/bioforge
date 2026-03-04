@@ -248,27 +248,33 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
   <UpgradeModal client:visible />
 
   <script is:inline>
-  // Sidebar toggle
+  // Sidebar toggle – version fluide et sans glitch
   const sidebar = document.getElementById('sidebar');
   const toggleBtn = document.getElementById('sidebar-toggle');
 
+  // État initial synchronisé avec le SSR
   let isCollapsed = sidebar?.classList.contains('lg:w-16') ?? false;
 
   toggleBtn?.addEventListener('click', () => {
     isCollapsed = !isCollapsed;
 
-    // Corrige le toggle multi-classes
+    // Applique les classes une par une (évite l'erreur "space in token")
     sidebar?.classList.toggle('lg:w-16', isCollapsed);
     sidebar?.classList.toggle('lg:w-64', !isCollapsed);
     sidebar?.classList.toggle('xl:w-72', !isCollapsed);
 
+    // Optionnel : force un reflow pour que la transition s'applique bien
+    sidebar?.offsetHeight;
+
+    // Sauvegarde
     document.cookie = `sidebar-collapsed=${isCollapsed}; path=/; max-age=31536000; samesite=lax`;
     localStorage.setItem('sidebar-collapsed', isCollapsed.toString());
 
+    // Accessibilité
     toggleBtn.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
   });
 
-  // Mobile drawer
+  // Mobile drawer (inchangé)
   const menu = document.getElementById('mobile-menu');
   document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
     menu?.classList.remove('hidden');
@@ -283,7 +289,7 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
   document.getElementById('mobile-close')?.addEventListener('click', closeDrawer);
   document.getElementById('mobile-backdrop')?.addEventListener('click', closeDrawer);
 
-  // Command palette
+  // Command palette (inchangé)
   document.getElementById('command-palette-trigger')?.addEventListener('click', () => {
     window.openCommandPalette?.();
   });
@@ -295,8 +301,8 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
     }
   });
 
-  // AdSense push
-  if (showAds) {  // ← corrigé ici (sans accolades inutiles)
+  // AdSense push (corrigé : showAds sans accolades inutiles)
+  if (showAds) {
     setTimeout(() => {
       try {
         (window.adsbygoogle = window.adsbygoogle || []).push({});
@@ -306,5 +312,21 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
     }, 800);
   }
 </script>
+
+<style is:global>
+  #sidebar {
+  transition: width 0.3s ease-in-out;
+  overflow: hidden; /* évite que le contenu déborde pendant la transition */
+}
+
+#sidebar > * {
+  transition: opacity 0.2s ease 0.1s, transform 0.2s ease 0.1s;
+}
+
+#sidebar.lg\:w-16 > * {
+  opacity: 0;
+  transform: translateX(-10px);
+}
+</style>
 </body>
 </html>
