@@ -1,5 +1,5 @@
 ---
-// src/layouts/DashboardLayout.astro — version stabilisée après debug
+// src/layouts/DashboardLayout.astro — version stabilisée & fluide (2026-ready)
 import CommandPalette from '@/components/features/CommandPalette.astro'
 import OnboardingTour from '@/components/features/OnboardingTour.astro';
 import UpgradeModal from '@/components/features/UpgradeModal.astro';
@@ -70,6 +70,22 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
       outline-offset: 2px;
       border-radius: 6px;
     }
+
+    /* Transition fluide pour sidebar collapsible */
+    #sidebar {
+      transition: width 0.3s ease-in-out;
+      overflow: hidden;
+    }
+
+    #sidebar > * {
+      transition: opacity 0.2s ease 0.1s, transform 0.2s ease 0.1s;
+    }
+
+    #sidebar.lg\:w-16 > * {
+      opacity: 0;
+      transform: translateX(-10px);
+      pointer-events: none;
+    }
   </style>
 </head>
 <body class="bg-dark-900 text-white min-h-screen">
@@ -85,7 +101,7 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
     <aside
       id="sidebar"
       class:list={[
-        "hidden lg:flex lg:flex-col lg:border-r lg:border-white/10 lg:glass-strong lg:transition-all lg:duration-300",
+        "hidden lg:flex lg:flex-col lg:border-r lg:border-white/10 lg:glass-strong lg:transition-all lg:duration-300 lg:ease-in-out lg:overflow-hidden",
         initialCollapsed ? "lg:w-16 xl:w-20" : "lg:w-64 xl:w-72"
       ]}
       aria-label="Primary navigation sidebar"
@@ -248,84 +264,65 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
   <UpgradeModal client:visible />
 
   <script is:inline>
-  // Sidebar toggle – version fluide et sans glitch
-  const sidebar = document.getElementById('sidebar');
-  const toggleBtn = document.getElementById('sidebar-toggle');
+    // Sidebar toggle – fluide et sans glitch
+    const sidebar = document.getElementById('sidebar');
+    const toggleBtn = document.getElementById('sidebar-toggle');
 
-  // État initial synchronisé avec le SSR
-  let isCollapsed = sidebar?.classList.contains('lg:w-16') ?? false;
+    let isCollapsed = sidebar?.classList.contains('lg:w-16') ?? false;
 
-  toggleBtn?.addEventListener('click', () => {
-    isCollapsed = !isCollapsed;
+    toggleBtn?.addEventListener('click', () => {
+      isCollapsed = !isCollapsed;
 
-    // Applique les classes une par une (évite l'erreur "space in token")
-    sidebar?.classList.toggle('lg:w-16', isCollapsed);
-    sidebar?.classList.toggle('lg:w-64', !isCollapsed);
-    sidebar?.classList.toggle('xl:w-72', !isCollapsed);
+      sidebar?.classList.toggle('lg:w-16', isCollapsed);
+      sidebar?.classList.toggle('lg:w-64', !isCollapsed);
+      sidebar?.classList.toggle('xl:w-72', !isCollapsed);
 
-    // Optionnel : force un reflow pour que la transition s'applique bien
-    sidebar?.offsetHeight;
+      // Force reflow pour transition fluide
+      void sidebar?.offsetWidth;
 
-    // Sauvegarde
-    document.cookie = `sidebar-collapsed=${isCollapsed}; path=/; max-age=31536000; samesite=lax`;
-    localStorage.setItem('sidebar-collapsed', isCollapsed.toString());
+      document.cookie = `sidebar-collapsed=${isCollapsed}; path=/; max-age=31536000; samesite=lax`;
+      localStorage.setItem('sidebar-collapsed', isCollapsed.toString());
 
-    // Accessibilité
-    toggleBtn.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
-  });
+      toggleBtn.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
+    });
 
-  // Mobile drawer (inchangé)
-  const menu = document.getElementById('mobile-menu');
-  document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
-    menu?.classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
-  });
+    // Mobile drawer
+    const menu = document.getElementById('mobile-menu');
+    document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
+      menu?.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    });
 
-  const closeDrawer = () => {
-    menu?.classList.add('hidden');
-    document.body.style.overflow = '';
-  };
+    const closeDrawer = () => {
+      menu?.classList.add('hidden');
+      document.body.style.overflow = '';
+    };
 
-  document.getElementById('mobile-close')?.addEventListener('click', closeDrawer);
-  document.getElementById('mobile-backdrop')?.addEventListener('click', closeDrawer);
+    document.getElementById('mobile-close')?.addEventListener('click', closeDrawer);
+    document.getElementById('mobile-backdrop')?.addEventListener('click', closeDrawer);
 
-  // Command palette (inchangé)
-  document.getElementById('command-palette-trigger')?.addEventListener('click', () => {
-    window.openCommandPalette?.();
-  });
-
-  document.addEventListener('keydown', e => {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-      e.preventDefault();
+    // Command palette
+    document.getElementById('command-palette-trigger')?.addEventListener('click', () => {
       window.openCommandPalette?.();
-    }
-  });
+    });
 
-  // AdSense push (corrigé : showAds sans accolades inutiles)
-  if (showAds) {
-    setTimeout(() => {
-      try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
-      } catch (e) {
-        console.warn('AdSense push failed', e);
+    document.addEventListener('keydown', e => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        window.openCommandPalette?.();
       }
-    }, 800);
-  }
-</script>
+    });
 
-<style is:global>
-  #sidebar {
-  transition: width 0.3s ease-in-out;
-}
-
-#sidebar > * {
-  transition: opacity 0.2s ease 0.1s, transform 0.2s ease 0.1s;
-}
-
-#sidebar.lg\:w-16 > * {
-  opacity: 0;
-  transform: translateX(-10px);
-}
-</style>
+    // AdSense push
+    if (showAds) {
+      setTimeout(() => {
+        try {
+          (window.adsbygoogle = window.adsbygoogle || []).push({});
+        } catch (e) {
+          console.warn('AdSense push failed', e);
+        }
+      }, 800);
+    }
+  </script>
 </body>
 </html>
