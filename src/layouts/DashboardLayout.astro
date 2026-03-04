@@ -120,25 +120,33 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
         </a>
         <button
           id="sidebar-toggle"
-          aria-label={initialCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           class="p-2 rounded-lg hover:bg-white/10 transition pointer-events-auto z-10 relative"
         >
+          <!-- Icône collapse (chevron left) – visible quand expanded -->
           <svg 
-            class="w-5 h-5 transition-transform duration-200" 
+            class:list={[
+              "w-5 h-5 absolute inset-0 m-auto transition-opacity duration-200",
+              isCollapsed ? "opacity-0" : "opacity-100"
+            ]}
             fill="none" 
             viewBox="0 0 24 24" 
             stroke="currentColor"
           >
-            <!-- Icône dynamique : chevron left (collapse) ou right (expand) -->
-            <path 
-              stroke-linecap="round" 
-              stroke-linejoin="round" 
-              stroke-width="2" 
-              d={initialCollapsed 
-                ? "M13 5l7 7-7 7M5 5l7 7-7 7"   // expand
-                : "M11 19l-7-7 7-7m-7 7h14"     // collapse
-              }
-            />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m-7 7h14" />
+          </svg>
+
+          <!-- Icône expand (double chevron right) – visible quand collapsed -->
+          <svg 
+            class:list={[
+              "w-5 h-5 absolute inset-0 m-auto transition-opacity duration-200",
+              isCollapsed ? "opacity-100" : "opacity-0"
+            ]}
+            fill="none" 
+            viewBox="0 0 24 24" 
+            stroke="currentColor"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
           </svg>
         </button>
       </div>
@@ -287,11 +295,20 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
   <UpgradeModal client:visible />
 
   <script is:inline>
-    // Sidebar toggle – icône change correctement à chaque clic
+    // Sidebar toggle – icône fluide avec fondu (deux SVG)
     const sidebar = document.getElementById('sidebar');
     const toggleBtn = document.getElementById('sidebar-toggle');
 
     let isCollapsed = sidebar?.classList.contains('lg:w-16') ?? false;
+
+    // Synchro initiale au chargement (si cookie changé manuellement)
+    const savedCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+    if (savedCollapsed !== isCollapsed && sidebar) {
+      isCollapsed = savedCollapsed;
+      sidebar.classList.toggle('lg:w-16', isCollapsed);
+      sidebar.classList.toggle('lg:w-64', !isCollapsed);
+      sidebar.classList.toggle('xl:w-72', !isCollapsed);
+    }
 
     toggleBtn?.addEventListener('click', () => {
       isCollapsed = !isCollapsed;
@@ -300,21 +317,12 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
       sidebar?.classList.toggle('lg:w-64', !isCollapsed);
       sidebar?.classList.toggle('xl:w-72', !isCollapsed);
 
-      void sidebar?.offsetWidth; // force reflow pour transition fluide
+      void sidebar?.offsetWidth; // force reflow pour transition
 
       document.cookie = `sidebar-collapsed=${isCollapsed}; path=/; max-age=31536000; samesite=lax`;
       localStorage.setItem('sidebar-collapsed', isCollapsed.toString());
 
-      // Mise à jour dynamique de l'icône toggle
       toggleBtn.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
-
-      const path = toggleBtn.querySelector('path');
-      if (path) {
-        path.setAttribute('d', isCollapsed 
-          ? "M13 5l7 7-7 7M5 5l7 7-7 7"   // double chevron right = expand
-          : "M11 19l-7-7 7-7m-7 7h14"     // double chevron left = collapse
-        );
-      }
     });
 
     // Mobile drawer
