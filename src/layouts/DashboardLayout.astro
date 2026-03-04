@@ -1,5 +1,5 @@
 ---
-// src/layouts/DashboardLayout.astro — version stabilisée & fluide (2026-ready)
+// src/layouts/DashboardLayout.astro — version finale (icônes visibles en collapsed)
 import CommandPalette from '@/components/features/CommandPalette.astro'
 import OnboardingTour from '@/components/features/OnboardingTour.astro';
 import UpgradeModal from '@/components/features/UpgradeModal.astro';
@@ -71,20 +71,27 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
       border-radius: 6px;
     }
 
-    /* Transition fluide pour sidebar collapsible */
+    /* Sidebar collapsible fluide */
     #sidebar {
       transition: width 0.3s ease-in-out;
       overflow: hidden;
     }
 
-    #sidebar > * {
-      transition: opacity 0.2s ease 0.1s, transform 0.2s ease 0.1s;
+    /* Icônes, boutons et liens TOUJOURS visibles et cliquables */
+    #sidebar svg,
+    #sidebar button,
+    #sidebar a,
+    #sidebar [role="button"],
+    #sidebar [role="menuitem"] {
+      opacity: 1 !important;
+      pointer-events: auto !important;
+      transform: none !important;
     }
 
-    #sidebar.lg\:w-16 > * {
-      opacity: 0;
-      transform: translateX(-10px);
-      pointer-events: none;
+    /* Hover subtil sur icônes en mode collapsed */
+    #sidebar.lg\:w-16 a:hover svg {
+      transform: scale(1.15);
+      transition: transform 0.15s ease;
     }
   </style>
 </head>
@@ -97,7 +104,7 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
 
   <div class="flex min-h-screen">
 
-    <!-- Sidebar Desktop (collapsible) -->
+    <!-- Sidebar Desktop (collapsible – icônes visibles) -->
     <aside
       id="sidebar"
       class:list={[
@@ -114,7 +121,7 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
         <button
           id="sidebar-toggle"
           aria-label={initialCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          class="p-2 rounded-lg hover:bg-white/10 transition"
+          class="p-2 rounded-lg hover:bg-white/10 transition pointer-events-auto z-10 relative"
         >
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={initialCollapsed ? "M13 5l7 7-7 7M5 5l7 7-7 7" : "M11 19l-7-7 7-7m-7 7h14"} />
@@ -201,6 +208,7 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
             initials={initials}
             plan={plan}
             planColor={planColor}
+            collapsed={false}
             mobile={true}
             class="lg:hidden"
           />
@@ -264,65 +272,65 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
   <OnboardingTour client:visible />
   <UpgradeModal client:visible />
 
-<script is:inline>
-  // Sidebar toggle – fluide et sans glitch
-  const sidebar = document.getElementById('sidebar');
-  const toggleBtn = document.getElementById('sidebar-toggle');
+  <script is:inline>
+    // Sidebar toggle – fluide et sans glitch
+    const sidebar = document.getElementById('sidebar');
+    const toggleBtn = document.getElementById('sidebar-toggle');
 
-  let isCollapsed = sidebar?.classList.contains('lg:w-16') ?? false;
+    let isCollapsed = sidebar?.classList.contains('lg:w-16') ?? false;
 
-  toggleBtn?.addEventListener('click', () => {
-    isCollapsed = !isCollapsed;
+    toggleBtn?.addEventListener('click', () => {
+      isCollapsed = !isCollapsed;
 
-    sidebar?.classList.toggle('lg:w-16', isCollapsed);
-    sidebar?.classList.toggle('lg:w-64', !isCollapsed);
-    sidebar?.classList.toggle('xl:w-72', !isCollapsed);
+      sidebar?.classList.toggle('lg:w-16', isCollapsed);
+      sidebar?.classList.toggle('lg:w-64', !isCollapsed);
+      sidebar?.classList.toggle('xl:w-72', !isCollapsed);
 
-    void sidebar?.offsetWidth; // force reflow pour transition
+      void sidebar?.offsetWidth; // force reflow pour transition
 
-    document.cookie = `sidebar-collapsed=${isCollapsed}; path=/; max-age=31536000; samesite=lax`;
-    localStorage.setItem('sidebar-collapsed', isCollapsed.toString());
+      document.cookie = `sidebar-collapsed=${isCollapsed}; path=/; max-age=31536000; samesite=lax`;
+      localStorage.setItem('sidebar-collapsed', isCollapsed.toString());
 
-    toggleBtn.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
-  });
+      toggleBtn.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
+    });
 
-  // Mobile drawer
-  const menu = document.getElementById('mobile-menu');
-  document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
-    menu?.classList.remove('hidden');
-    document.body.style.overflow = 'hidden';
-  });
+    // Mobile drawer
+    const menu = document.getElementById('mobile-menu');
+    document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
+      menu?.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    });
 
-  const closeDrawer = () => {
-    menu?.classList.add('hidden');
-    document.body.style.overflow = '';
-  };
+    const closeDrawer = () => {
+      menu?.classList.add('hidden');
+      document.body.style.overflow = '';
+    };
 
-  document.getElementById('mobile-close')?.addEventListener('click', closeDrawer);
-  document.getElementById('mobile-backdrop')?.addEventListener('click', closeDrawer);
+    document.getElementById('mobile-close')?.addEventListener('click', closeDrawer);
+    document.getElementById('mobile-backdrop')?.addEventListener('click', closeDrawer);
 
-  // Command palette
-  document.getElementById('command-palette-trigger')?.addEventListener('click', () => {
-    window.openCommandPalette?.();
-  });
-
-  document.addEventListener('keydown', e => {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-      e.preventDefault();
+    // Command palette
+    document.getElementById('command-palette-trigger')?.addEventListener('click', () => {
       window.openCommandPalette?.();
-    }
-  });
+    });
 
-  // AdSense push – CORRIGÉ : utilisation de {showAds} pour injecter la variable Astro
-  if ({showAds}) {
-    setTimeout(() => {
-      try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
-      } catch (e) {
-        console.warn('AdSense push failed', e);
+    document.addEventListener('keydown', e => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        window.openCommandPalette?.();
       }
-    }, 800);
-  }
-</script>
+    });
+
+    // AdSense push
+    if ({showAds}) {
+      setTimeout(() => {
+        try {
+          (window.adsbygoogle = window.adsbygoogle || []).push({});
+        } catch (e) {
+          console.warn('AdSense push failed', e);
+        }
+      }, 800);
+    }
+  </script>
 </body>
 </html>

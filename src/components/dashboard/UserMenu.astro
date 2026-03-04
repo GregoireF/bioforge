@@ -1,5 +1,5 @@
 ---
-// src/components/dashboard/UserMenu.astro
+// src/components/dashboard/UserMenu.astro — corrigé pour collapsed + cliquable
 interface Props {
   avatarUrl?: string | null;
   displayName: string;
@@ -8,25 +8,45 @@ interface Props {
   planColor: string;
   collapsed?: boolean;
   mobile?: boolean;
+  class?: string;
 }
 
-const { avatarUrl, displayName, initials, plan, planColor, collapsed = false, mobile = false } = Astro.props;
+const { 
+  avatarUrl, 
+  displayName, 
+  initials, 
+  plan, 
+  planColor, 
+  collapsed = false, 
+  mobile = false,
+  class: customClass = ''
+} = Astro.props;
+
 const menuId = mobile ? 'mobile-user-menu' : 'sidebar-user-menu';
 ---
 
-<div class="relative">
+<div class:list={["relative", customClass]}>
   <button
     id={mobile ? 'mobile-user-btn' : 'sidebar-user-btn'}
     aria-expanded="false"
     aria-haspopup="true"
     aria-controls={menuId}
-    class:list={["flex items-center transition hover:bg-white/5 rounded-xl", collapsed && !mobile ? "p-2" : "gap-3 p-2.5 w-full"]}
+    class:list={[
+      "flex items-center transition hover:bg-white/5 rounded-xl pointer-events-auto z-10 relative",  // ← toujours cliquable
+      collapsed && !mobile ? "p-2 justify-center" : "gap-3 p-2.5 w-full"
+    ]}
   >
-    <div class="relative">
+    <div class="relative shrink-0">
       {avatarUrl ? (
-        <img src={avatarUrl} alt="" class="w-9 h-9 rounded-full object-cover border border-white/20" referrerpolicy="no-referrer" loading="lazy" />
+        <img 
+          src={avatarUrl} 
+          alt={displayName} 
+          class="w-9 h-9 rounded-full object-cover border border-white/20" 
+          referrerpolicy="no-referrer" 
+          loading="lazy" 
+        />
       ) : (
-        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-neon-green to-neon-blue flex-center text-sm font-bold text-black">
+        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-neon-green to-neon-blue flex items-center justify-center text-sm font-bold text-black">
           {initials}
         </div>
       )}
@@ -42,13 +62,54 @@ const menuId = mobile ? 'mobile-user-menu' : 'sidebar-user-menu';
       </div>
     )}
 
-    {!collapsed && <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>}
+    {!collapsed && (
+      <svg class="w-4 h-4 text-gray-500 group-hover:text-gray-300 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+      </svg>
+    )}
   </button>
 
-  <div id={menuId} class="hidden absolute right-0 mt-2 w-56 glass-strong border border-white/10 rounded-xl shadow-2xl z-50 p-1.5" role="menu">
-    <a href="/dashboard/settings" role="menuitem" class="flex gap-3 px-4 py-2.5 text-sm hover:bg-white/8 rounded-lg transition">Settings</a>
-    {plan !== 'Pro' && <a href="/upgrade" role="menuitem" class="flex gap-3 px-4 py-2.5 text-sm text-neon-green hover:bg-neon-green/10 rounded-lg transition">Upgrade to Pro</a>}
+  <div 
+    id={menuId}
+    class="hidden absolute right-0 mt-2 w-56 glass-strong border border-white/10 rounded-xl shadow-2xl z-50 p-1.5 overflow-hidden"
+    role="menu"
+    aria-labelledby={mobile ? 'mobile-user-btn' : 'sidebar-user-btn'}
+  >
+    <a 
+      href="/dashboard/settings" 
+      role="menuitem" 
+      class="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-white/8 rounded-lg transition"
+    >
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+      </svg>
+      Settings
+    </a>
+
+    {plan !== 'Pro' && (
+      <a 
+        href="/upgrade" 
+        role="menuitem" 
+        class="flex items-center gap-3 px-4 py-2.5 text-sm text-neon-green hover:bg-neon-green/10 rounded-lg transition"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+        Upgrade to Pro
+      </a>
+    )}
+
     <div class="my-1 border-t border-white/10"></div>
-    <a href="/api/auth/signout" role="menuitem" class="flex gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition">Sign Out</a>
+
+    <a 
+      href="/api/auth/signout" 
+      role="menuitem" 
+      class="flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition"
+    >
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+      </svg>
+      Sign Out
+    </a>
   </div>
 </div>
