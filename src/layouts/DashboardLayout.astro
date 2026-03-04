@@ -264,66 +264,65 @@ const initialCollapsed = Astro.cookies.get('sidebar-collapsed')?.value === 'true
   <OnboardingTour client:visible />
   <UpgradeModal client:visible />
 
-  <script is:inline>
-    // Sidebar toggle – fluide et sans glitch
-    const sidebar = document.getElementById('sidebar');
-    const toggleBtn = document.getElementById('sidebar-toggle');
+<script is:inline>
+  // Sidebar toggle – fluide et sans glitch
+  const sidebar = document.getElementById('sidebar');
+  const toggleBtn = document.getElementById('sidebar-toggle');
 
-    let isCollapsed = sidebar?.classList.contains('lg:w-16') ?? false;
+  let isCollapsed = sidebar?.classList.contains('lg:w-16') ?? false;
 
-    toggleBtn?.addEventListener('click', () => {
-      isCollapsed = !isCollapsed;
+  toggleBtn?.addEventListener('click', () => {
+    isCollapsed = !isCollapsed;
 
-      sidebar?.classList.toggle('lg:w-16', isCollapsed);
-      sidebar?.classList.toggle('lg:w-64', !isCollapsed);
-      sidebar?.classList.toggle('xl:w-72', !isCollapsed);
+    sidebar?.classList.toggle('lg:w-16', isCollapsed);
+    sidebar?.classList.toggle('lg:w-64', !isCollapsed);
+    sidebar?.classList.toggle('xl:w-72', !isCollapsed);
 
-      // Force reflow pour transition fluide
-      void sidebar?.offsetWidth;
+    void sidebar?.offsetWidth; // force reflow pour transition
 
-      document.cookie = `sidebar-collapsed=${isCollapsed}; path=/; max-age=31536000; samesite=lax`;
-      localStorage.setItem('sidebar-collapsed', isCollapsed.toString());
+    document.cookie = `sidebar-collapsed=${isCollapsed}; path=/; max-age=31536000; samesite=lax`;
+    localStorage.setItem('sidebar-collapsed', isCollapsed.toString());
 
-      toggleBtn.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
-    });
+    toggleBtn.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
+  });
 
-    // Mobile drawer
-    const menu = document.getElementById('mobile-menu');
-    document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
-      menu?.classList.remove('hidden');
-      document.body.style.overflow = 'hidden';
-    });
+  // Mobile drawer
+  const menu = document.getElementById('mobile-menu');
+  document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
+    menu?.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  });
 
-    const closeDrawer = () => {
-      menu?.classList.add('hidden');
-      document.body.style.overflow = '';
-    };
+  const closeDrawer = () => {
+    menu?.classList.add('hidden');
+    document.body.style.overflow = '';
+  };
 
-    document.getElementById('mobile-close')?.addEventListener('click', closeDrawer);
-    document.getElementById('mobile-backdrop')?.addEventListener('click', closeDrawer);
+  document.getElementById('mobile-close')?.addEventListener('click', closeDrawer);
+  document.getElementById('mobile-backdrop')?.addEventListener('click', closeDrawer);
 
-    // Command palette
-    document.getElementById('command-palette-trigger')?.addEventListener('click', () => {
+  // Command palette
+  document.getElementById('command-palette-trigger')?.addEventListener('click', () => {
+    window.openCommandPalette?.();
+  });
+
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
       window.openCommandPalette?.();
-    });
-
-    document.addEventListener('keydown', e => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        window.openCommandPalette?.();
-      }
-    });
-
-    // AdSense push
-    if (showAds) {
-      setTimeout(() => {
-        try {
-          (window.adsbygoogle = window.adsbygoogle || []).push({});
-        } catch (e) {
-          console.warn('AdSense push failed', e);
-        }
-      }, 800);
     }
-  </script>
+  });
+
+  // AdSense push – CORRIGÉ : utilisation de {showAds} pour injecter la variable Astro
+  if ({showAds}) {
+    setTimeout(() => {
+      try {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+      } catch (e) {
+        console.warn('AdSense push failed', e);
+      }
+    }, 800);
+  }
+</script>
 </body>
 </html>
