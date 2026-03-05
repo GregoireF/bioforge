@@ -32,7 +32,7 @@ try {
 const PAID_PLANS   = ['Pro', 'Business', 'Enterprise'];
 const plan         = profile?.plan ?? 'Free';
 const isPaid       = PAID_PLANS.includes(plan);
-const isBasicOrFree = !isPaid; // Carbon Ads shown for Free + Basic
+const isBasicOrFree = !isPaid;
 const showAds      = isBasicOrFree;
 
 const PLAN_COLORS: Record<string, string> = {
@@ -49,8 +49,15 @@ const avatarUrl   = profile?.avatar_url ?? null;
 const displayName = profile?.display_name || profile?.username || 'User';
 const initials    = displayName.slice(0, 2).toUpperCase();
 
+// ── AI Chatbot — context passé au script client ────────────────────────────────
+const chatContext = JSON.stringify({
+  username:    profile?.username    ?? '',
+  displayName: profile?.display_name ?? profile?.username ?? 'User',
+  plan,
+  isPaid,
+});
+
 // ── Navigation items ───────────────────────────────────────────────────────────
-// Single source of truth — rendered in both sidebar & mobile nav
 const NAV_MAIN = [
   {
     href:  '/dashboard',
@@ -117,9 +124,7 @@ function navClass(href: string, exact: boolean): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{title} — BioForge</title>
   <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-  <!-- Google AdSense verification -->
   <meta name="google-adsense-account" content="ca-pub-2203788383686517" />
-  <!-- AdSense script (chargé uniquement si showAds) -->
   {showAds && (
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2203788383686517" crossorigin="anonymous"></script>
   )}
@@ -164,7 +169,7 @@ function navClass(href: string, exact: boolean): string {
       </div>
     </nav>
 
-    <!-- AdSense (Free / Basic only) — collapses if ad blocked or not filled -->
+    <!-- AdSense (Free / Basic only) -->
     {showAds && (
       <div class="px-3 pb-3" id="adsense-sidebar-wrap" style="display:none;">
         <div class="relative p-3 glass border border-white/8 rounded-xl overflow-hidden">
@@ -188,7 +193,6 @@ function navClass(href: string, exact: boolean): string {
     <!-- User profile footer -->
     <div class="px-3 pb-4 pt-2 border-t border-white/10 shrink-0">
       <div class="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-all cursor-pointer group" id="sidebar-user-btn">
-        <!-- Avatar -->
         <div class="relative shrink-0">
           {avatarUrl ? (
             <img src={avatarUrl} alt={displayName}
@@ -200,20 +204,17 @@ function navClass(href: string, exact: boolean): string {
           )}
           <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-neon-green rounded-full border-2 border-dark-900"></span>
         </div>
-        <!-- Name + plan -->
         <div class="flex-1 min-w-0">
           <p class="text-xs font-semibold text-white truncate">{displayName}</p>
           <span class={`inline-flex items-center text-xs px-1.5 py-0 rounded-full border font-medium ${planColor}`}>
             {plan}
           </span>
         </div>
-        <!-- Chevron -->
         <svg class="w-3.5 h-3.5 text-gray-600 group-hover:text-gray-400 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
         </svg>
       </div>
 
-      <!-- User dropdown -->
       <div id="sidebar-user-menu" class="hidden mt-1 p-1 glass-strong border border-white/10 rounded-xl shadow-2xl">
         <a href="/dashboard/settings"
           class="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white rounded-lg transition-all">
@@ -250,7 +251,6 @@ function navClass(href: string, exact: boolean): string {
     <!-- Top Bar -->
     <header class="h-14 lg:h-16 glass-strong border-b border-white/10 flex items-center justify-between px-4 lg:px-6 shrink-0 gap-3">
 
-      <!-- Mobile: hamburger + logo -->
       <div class="flex items-center gap-3 lg:hidden">
         <button id="mobile-menu-btn" class="p-2 rounded-lg hover:bg-white/5 transition-colors">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -260,7 +260,6 @@ function navClass(href: string, exact: boolean): string {
         <span class="text-sm font-semibold text-white">{title}</span>
       </div>
 
-      <!-- Desktop: breadcrumb -->
       <div class="hidden lg:flex items-center gap-2 text-sm">
         <span class="text-gray-600">Dashboard</span>
         {currentPath !== '/dashboard' && (
@@ -273,10 +272,8 @@ function navClass(href: string, exact: boolean): string {
         )}
       </div>
 
-      <!-- Right side -->
       <div class="flex items-center gap-2">
 
-        <!-- Command palette trigger (desktop) -->
         <button id="command-palette-trigger"
           class="hidden lg:flex items-center gap-2 px-3 py-1.5 glass border border-white/10 rounded-lg hover:border-white/20 transition-all text-sm text-gray-500 hover:text-gray-300">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -286,7 +283,6 @@ function navClass(href: string, exact: boolean): string {
           <kbd class="hidden xl:inline px-1.5 py-0.5 text-xs bg-white/5 rounded border border-white/10 font-mono">⌘K</kbd>
         </button>
 
-        <!-- View profile shortcut -->
         {profile?.username && (
           <a href={`/@${profile.username}`} target="_blank"
             class="hidden lg:flex items-center gap-1.5 px-3 py-1.5 glass border border-white/10 rounded-lg hover:border-white/20 transition-all text-xs text-gray-400 hover:text-white">
@@ -297,7 +293,6 @@ function navClass(href: string, exact: boolean): string {
           </a>
         )}
 
-        <!-- Upgrade CTA (Free/Basic only, desktop) -->
         {!isPaid && (
           <a href="/dashboard/#"
             class="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-neon-green/10 border border-neon-green/25 rounded-lg text-xs font-semibold text-neon-green hover:bg-neon-green/20 transition-all">
@@ -308,7 +303,6 @@ function navClass(href: string, exact: boolean): string {
           </a>
         )}
 
-        <!-- User menu (topbar, mobile) -->
         <div class="relative lg:hidden">
           <button id="topbar-user-btn" class="p-1.5 rounded-full hover:bg-white/5 transition-colors">
             {avatarUrl ? (
@@ -343,7 +337,6 @@ function navClass(href: string, exact: boolean): string {
   <div id="mobile-menu-backdrop" class="absolute inset-0 bg-black/75 backdrop-blur-sm"></div>
   <div class="absolute inset-y-0 left-0 w-64 glass-strong border-r border-white/10 flex flex-col">
 
-    <!-- Header -->
     <div class="flex items-center justify-between h-14 px-4 border-b border-white/10 shrink-0">
       <div class="flex items-center gap-2">
         <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-neon-green to-neon-blue flex items-center justify-center">
@@ -358,7 +351,6 @@ function navClass(href: string, exact: boolean): string {
       </button>
     </div>
 
-    <!-- Nav -->
     <nav class="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
       <p class="px-3 mb-2 text-xs font-semibold text-gray-600 uppercase tracking-widest">Main</p>
       {NAV_MAIN.map(item => (
@@ -382,7 +374,6 @@ function navClass(href: string, exact: boolean): string {
       </div>
     </nav>
 
-    <!-- Mobile ads — collapses if not filled -->
     {showAds && (
       <div class="px-3 pb-2" id="adsense-mobile-wrap" style="display:none;">
         <div class="p-3 glass border border-white/8 rounded-xl">
@@ -400,7 +391,6 @@ function navClass(href: string, exact: boolean): string {
       </div>
     )}
 
-    <!-- User footer -->
     <div class="px-3 py-4 border-t border-white/10 shrink-0">
       <div class="flex items-center gap-3">
         {avatarUrl ? (
@@ -438,7 +428,6 @@ function navClass(href: string, exact: boolean): string {
       </a>
     );
   })}
-  <!-- More button → opens drawer -->
   <button id="mobile-more-btn"
     class="flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-xl text-gray-500 hover:text-gray-300 transition-all">
     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -456,11 +445,178 @@ function navClass(href: string, exact: boolean): string {
 <!-- Toast -->
 <div id="toast-container" class="fixed bottom-20 right-4 lg:bottom-4 z-[9999] space-y-2"></div>
 
+<!-- ===== AI CHATBOT ===== -->
+
+<!-- Bouton flottant -->
+<button id="chat-trigger"
+  class="fixed bottom-20 right-5 lg:bottom-6 lg:right-6 z-[8000] w-13 h-13 w-[52px] h-[52px] rounded-2xl
+         flex items-center justify-center shadow-2xl transition-all duration-200
+         hover:scale-110 active:scale-95"
+  style="background: linear-gradient(135deg,#7c3aed,#4f46e5); box-shadow: 0 8px 32px rgba(124,58,237,0.45);"
+  aria-label="Assistant BioForge">
+  <svg id="chat-icon-closed" class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+  </svg>
+  <svg id="chat-icon-open" class="w-5 h-5 text-white hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+  </svg>
+  <!-- Pulse (disparaît après 1er clic) -->
+  <span id="chat-pulse" class="absolute inset-0 rounded-2xl animate-ping opacity-25 pointer-events-none"
+    style="background:#7c3aed;"></span>
+</button>
+
+<!-- Panel -->
+<div id="chat-panel"
+  class="fixed z-[7999] w-[360px] max-w-[calc(100vw-1.5rem)] rounded-3xl shadow-2xl flex flex-col
+         transition-all duration-300 origin-bottom-right
+         opacity-0 scale-95 pointer-events-none"
+  style="bottom:5.5rem; right:1.25rem; height:520px;
+         background:#0d0d10; border:1px solid rgba(255,255,255,0.07);">
+
+  <!-- Header -->
+  <div class="flex items-center gap-3 px-4 py-3 border-b shrink-0"
+    style="border-color:rgba(255,255,255,0.06);">
+    <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+      style="background:linear-gradient(135deg,#7c3aed,#4f46e5);">
+      <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+      </svg>
+    </div>
+    <div class="flex-1 min-w-0">
+      <p class="text-sm font-semibold text-white">Assistant BioForge</p>
+      <div class="flex items-center gap-1.5 mt-0.5">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400" style="animation: pulse 2s infinite;"></span>
+        <p class="text-xs" style="color:rgba(255,255,255,0.35);">IA · toujours disponible</p>
+      </div>
+    </div>
+    <button id="chat-clear"
+      class="p-1.5 rounded-lg hover:bg-white/6 transition-colors"
+      style="color:rgba(255,255,255,0.3);"
+      title="Effacer la conversation">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Messages -->
+  <div id="chat-messages" class="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+    <!-- Message de bienvenue initial -->
+    <div class="flex gap-2.5 items-start chat-msg">
+      <div class="w-6 h-6 rounded-lg shrink-0 mt-0.5 flex items-center justify-center"
+        style="background:linear-gradient(135deg,#7c3aed,#4f46e5);">
+        <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+        </svg>
+      </div>
+      <div class="rounded-2xl rounded-tl-md px-3.5 py-2.5 text-sm leading-relaxed"
+        style="background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.82); max-width:85%;">
+        Salut ! Je suis ton assistant BioForge 👋<br/>
+        Pose-moi n'importe quelle question sur ta page, tes analytics ou tes blocks.
+      </div>
+    </div>
+  </div>
+
+  <!-- Suggestions rapides -->
+  <div id="chat-suggestions" class="px-3 pb-2 flex gap-2 overflow-x-auto shrink-0"
+    style="scrollbar-width:none;">
+    <button class="chat-sugg shrink-0 text-xs px-3 py-1.5 rounded-full border transition-all whitespace-nowrap"
+      style="border-color:rgba(255,255,255,0.1); color:rgba(255,255,255,0.5);"
+      data-prompt="Comment avoir plus de clics sur ma page BioForge ?">
+      💡 Optimiser ma page
+    </button>
+    <button class="chat-sugg shrink-0 text-xs px-3 py-1.5 rounded-full border transition-all whitespace-nowrap"
+      style="border-color:rgba(255,255,255,0.1); color:rgba(255,255,255,0.5);"
+      data-prompt="Explique-moi comment fonctionnent les analytics BioForge">
+      📊 Analytics
+    </button>
+    <button class="chat-sugg shrink-0 text-xs px-3 py-1.5 rounded-full border transition-all whitespace-nowrap"
+      style="border-color:rgba(255,255,255,0.1); color:rgba(255,255,255,0.5);"
+      data-prompt="Quels blocks me conseilles-tu pour un créateur gaming ?">
+      🎮 Idées blocks
+    </button>
+    <button class="chat-sugg shrink-0 text-xs px-3 py-1.5 rounded-full border transition-all whitespace-nowrap"
+      style="border-color:rgba(255,255,255,0.1); color:rgba(255,255,255,0.5);"
+      data-prompt="Quelle est la différence entre les plans Free et Pro ?">
+      ⭐ Plans
+    </button>
+  </div>
+
+  <!-- Zone de saisie -->
+  <div class="px-3 pb-3 shrink-0">
+    <div class="flex items-end gap-2 rounded-2xl px-3 py-2.5"
+      style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);">
+      <textarea id="chat-input" rows="1"
+        placeholder="Pose ta question…"
+        class="flex-1 bg-transparent text-sm text-white resize-none outline-none leading-relaxed"
+        style="max-height:100px; color-scheme:dark;"></textarea>
+      <button id="chat-send"
+        class="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 disabled:opacity-40"
+        style="background:linear-gradient(135deg,#7c3aed,#4f46e5);"
+        aria-label="Envoyer">
+        <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+</div>
+
 <style>
-  /* AdSense — contenu minimum pour éviter le layout shift */
+  /* AdSense */
   .adsbygoogle { min-height: 100px; background: transparent; }
-  /* Safe area for mobile bottom nav */
   .safe-area-pb { padding-bottom: env(safe-area-inset-bottom, 0); }
+
+  /* Chatbot panel */
+  #chat-panel.open {
+    opacity: 1 !important;
+    scale: 1 !important;
+    pointer-events: auto !important;
+  }
+
+  /* Messages */
+  .chat-msg {
+    animation: chat-in 0.18s ease both;
+  }
+  @keyframes chat-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Scrollbar messages */
+  #chat-messages {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.08) transparent;
+  }
+  #chat-messages::-webkit-scrollbar { width: 3px; }
+  #chat-messages::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.08);
+    border-radius: 9px;
+  }
+
+  /* Suggestions */
+  #chat-suggestions { scrollbar-width: none; }
+  #chat-suggestions::-webkit-scrollbar { display: none; }
+  .chat-sugg:hover {
+    background: rgba(124,58,237,0.15) !important;
+    border-color: rgba(124,58,237,0.4) !important;
+    color: rgba(255,255,255,0.9) !important;
+  }
+
+  /* Typing dots */
+  .chat-dot {
+    animation: dot-bounce 1.2s infinite ease-in-out;
+  }
+  .chat-dot:nth-child(2) { animation-delay: 0.2s; }
+  .chat-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes dot-bounce {
+    0%, 80%, 100% { transform: translateY(0);    opacity: 0.35; }
+    40%            { transform: translateY(-5px); opacity: 1; }
+  }
 </style>
 
 <script>
@@ -479,23 +635,20 @@ function navClass(href: string, exact: boolean): string {
   // ── Sidebar user dropdown ────────────────────────────────────────────────────
   const sidebarUserBtn  = document.getElementById('sidebar-user-btn');
   const sidebarUserMenu = document.getElementById('sidebar-user-menu');
-
   sidebarUserBtn?.addEventListener('click', (e) => {
     e.stopPropagation();
     sidebarUserMenu?.classList.toggle('hidden');
   });
 
-  // ── Topbar user dropdown (mobile) ────────────────────────────────────────────
+  // ── Topbar user dropdown ─────────────────────────────────────────────────────
   const topbarUserBtn  = document.getElementById('topbar-user-btn');
   const topbarUserMenu = document.getElementById('topbar-user-menu');
-
   topbarUserBtn?.addEventListener('click', (e) => {
     e.stopPropagation();
     topbarUserMenu?.classList.toggle('hidden');
     sidebarUserMenu?.classList.add('hidden');
   });
 
-  // Close all dropdowns on outside click
   document.addEventListener('click', () => {
     sidebarUserMenu?.classList.add('hidden');
     topbarUserMenu?.classList.add('hidden');
@@ -505,13 +658,194 @@ function navClass(href: string, exact: boolean): string {
   document.getElementById('command-palette-trigger')?.addEventListener('click', () => {
     window.openCommandPalette?.();
   });
-
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
       e.preventDefault();
       window.openCommandPalette?.();
     }
   });
+</script>
+
+<script define:vars={{ chatContext }}>
+(function () {
+
+  // ── Éléments DOM ─────────────────────────────────────────────────────────────
+  const ctx      = JSON.parse(chatContext);
+  const trigger  = document.getElementById('chat-trigger');
+  const panel    = document.getElementById('chat-panel');
+  const iconOff  = document.getElementById('chat-icon-closed');
+  const iconOn   = document.getElementById('chat-icon-open');
+  const pulse    = document.getElementById('chat-pulse');
+  const msgBox   = document.getElementById('chat-messages');
+  const input    = document.getElementById('chat-input');
+  const sendBtn  = document.getElementById('chat-send');
+  const clearBtn = document.getElementById('chat-clear');
+  const suggsEl  = document.getElementById('chat-suggestions');
+
+  let open      = false;
+  let loading   = false;
+  let history   = [];    // messages envoyés à l'API
+
+  // ── Helpers DOM ───────────────────────────────────────────────────────────────
+  const botAvatar = `
+    <div class="w-6 h-6 rounded-lg shrink-0 mt-0.5 flex items-center justify-center"
+      style="background:linear-gradient(135deg,#7c3aed,#4f46e5);">
+      <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+      </svg>
+    </div>`;
+
+  function scrollBottom() {
+    if (msgBox) msgBox.scrollTop = msgBox.scrollHeight;
+  }
+
+  function addBotMsg(text) {
+    const wrap = document.createElement('div');
+    wrap.className = 'flex gap-2.5 items-start chat-msg';
+    wrap.innerHTML = `${botAvatar}
+      <div class="rounded-2xl rounded-tl-md px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap"
+        style="background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.82); max-width:85%;"
+      >${text.replace(/</g, '&lt;')}</div>`;
+    msgBox?.appendChild(wrap);
+    scrollBottom();
+  }
+
+  function addUserMsg(text) {
+    const wrap = document.createElement('div');
+    wrap.className = 'flex justify-end chat-msg';
+    wrap.innerHTML = `
+      <div class="rounded-2xl rounded-tr-md px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap"
+        style="background:linear-gradient(135deg,#7c3aed,#4f46e5); color:#fff; max-width:85%;"
+      >${text.replace(/</g, '&lt;')}</div>`;
+    msgBox?.appendChild(wrap);
+    scrollBottom();
+  }
+
+  function addTyping() {
+    const wrap = document.createElement('div');
+    wrap.id = 'chat-typing';
+    wrap.className = 'flex gap-2.5 items-start chat-msg';
+    wrap.innerHTML = `${botAvatar}
+      <div class="rounded-2xl rounded-tl-md px-4 py-3" style="background:rgba(255,255,255,0.05);">
+        <div class="flex gap-1.5 items-center h-4">
+          <span class="chat-dot w-1.5 h-1.5 rounded-full" style="background:rgba(255,255,255,0.5);"></span>
+          <span class="chat-dot w-1.5 h-1.5 rounded-full" style="background:rgba(255,255,255,0.5);"></span>
+          <span class="chat-dot w-1.5 h-1.5 rounded-full" style="background:rgba(255,255,255,0.5);"></span>
+        </div>
+      </div>`;
+    msgBox?.appendChild(wrap);
+    scrollBottom();
+  }
+
+  function removeTyping() {
+    document.getElementById('chat-typing')?.remove();
+  }
+
+  // ── Open / Close ──────────────────────────────────────────────────────────────
+  function openChat() {
+    open = true;
+    panel?.classList.add('open');
+    iconOff?.classList.add('hidden');
+    iconOn?.classList.remove('hidden');
+    pulse?.remove();          // Stoppe le ring d'attention
+    input?.focus();
+    scrollBottom();
+  }
+
+  function closeChat() {
+    open = false;
+    panel?.classList.remove('open');
+    iconOff?.classList.remove('hidden');
+    iconOn?.classList.add('hidden');
+  }
+
+  trigger?.addEventListener('click', () => open ? closeChat() : openChat());
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && open) closeChat(); });
+
+  // ── Envoi message ─────────────────────────────────────────────────────────────
+  async function send(text) {
+    text = text.trim();
+    if (!text || loading) return;
+
+    // Cache les suggestions dès le 1er envoi
+    if (suggsEl) suggsEl.style.display = 'none';
+
+    loading = true;
+    if (sendBtn) sendBtn.disabled = true;
+
+    addUserMsg(text);
+    history.push({ role: 'user', content: text });
+    if (input) { input.value = ''; input.style.height = 'auto'; }
+
+    addTyping();
+
+    try {
+      const res = await fetch('/api/chat', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ messages: history.slice(-12), context: ctx }),
+      });
+
+      removeTyping();
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data  = await res.json();
+      const reply = data.content?.[0]?.text
+        ?? "Désolé, je n'ai pas pu répondre. Réessaie dans un instant !";
+
+      addBotMsg(reply);
+      history.push({ role: 'assistant', content: reply });
+
+    } catch (err) {
+      removeTyping();
+      addBotMsg("Une erreur s'est produite 🙏 Vérifie ta connexion et réessaie.");
+      console.error('[BioForge Chat]', err);
+    }
+
+    loading = false;
+    if (sendBtn) sendBtn.disabled = false;
+  }
+
+  // ── Listeners ─────────────────────────────────────────────────────────────────
+  sendBtn?.addEventListener('click', () => send(input?.value ?? ''));
+
+  input?.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input.value); }
+  });
+
+  // Auto-resize textarea
+  input?.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 100) + 'px';
+  });
+
+  // Suggestions rapides
+  document.querySelectorAll('.chat-sugg').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!open) openChat();
+      send(btn.dataset.prompt ?? '');
+    });
+  });
+
+  // Effacer conversation
+  clearBtn?.addEventListener('click', () => {
+    history = [];
+    if (msgBox) {
+      msgBox.innerHTML = `
+        <div class="flex gap-2.5 items-start chat-msg">
+          ${botAvatar}
+          <div class="rounded-2xl rounded-tl-md px-3.5 py-2.5 text-sm leading-relaxed"
+            style="background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.82); max-width:85%;">
+            Conversation réinitialisée 🔄 Comment puis-je t'aider ?
+          </div>
+        </div>`;
+    }
+    if (suggsEl) suggsEl.style.display = '';
+  });
+
+})();
 </script>
 
 <script>
@@ -523,9 +857,7 @@ function navClass(href: string, exact: boolean): string {
       if (w < 50) return;
       try {
         (window.adsbygoogle = window.adsbygoogle || []).push({});
-        // Show wrapper only after push succeeds (ad may still be blocked)
         if (wrap) {
-          // MutationObserver: reveal wrapper only if AdSense fills the ins
           var obs = new MutationObserver(function() {
             if (ins.getAttribute('data-adsbygoogle-status') === 'done' && ins.offsetHeight > 10) {
               wrap.style.display = '';
@@ -533,7 +865,6 @@ function navClass(href: string, exact: boolean): string {
             }
           });
           obs.observe(ins, { attributes: true, childList: true, subtree: true });
-          // Fallback: hide after 4s if still empty
           setTimeout(function() {
             if (ins.offsetHeight <= 10) { wrap.style.display = 'none'; }
             obs.disconnect();
