@@ -1,0 +1,512 @@
+---
+// src/pages/dashboard/roadmap.astro
+import DashboardLayout from '@/layouts/DashboardLayout.astro';
+import { withAuth } from '@/lib/auth/auth';
+import roadmapData from '@/data/roadmap.json';
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+let profile: any = null;
+try {
+  const auth = await withAuth({ cookies: Astro.cookies, request: Astro.request });
+  if (auth.success && auth.data) profile = auth.data.profile;
+} catch {}
+
+if (!profile) return Astro.redirect('/login');
+
+// ── Upvotes de l'user (Supabase) ──────────────────────────────────────────────
+let userVotes: string[] = [];
+try {
+  const { createClient } = await import('@supabase/supabase-js');
+  const supabase = createClient(
+    import.meta.env.PUBLIC_SUPABASE_URL,
+    import.meta.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+  const { data } = await supabase
+    .from('roadmap_votes')
+    .select('item_id')
+    .eq('user_id', profile.id);
+  userVotes = (data ?? []).map((r: any) => r.item_id);
+} catch {}
+
+// ── Données enrichies ─────────────────────────────────────────────────────────
+const STATUSES = [
+  { key: 'planned',     label: 'Planifié',  color: '#6b7280', dot: '#6b7280' },
+  { key: 'in_progress', label: 'En cours',  color: '#f59e0b', dot: '#f59e0b' },
+  { key: 'done',        label: 'Terminé',   color: '#39ff8f', dot: '#39ff8f' },
+] as const;
+
+const CATEGORIES: Record<string, string> = {
+  Pro:        '#818cf8',
+  Analytics:  '#38bdf8',
+  Blocks:     '#f472b6',
+  Appearance: '#fb923c',
+  Features:   '#39ff8f',
+  Platform:   '#a78bfa',
+};
+
+const items = (roadmapData as any[]).map(item => ({
+  ...item,
+  hasVoted: userVotes.includes(item.id),
+}));
+
+const clientCtx = JSON.stringify({
+  items: items.map(i => ({ id: i.id, votes: i.votes, hasVoted: i.hasVoted })),
+});
+---
+
+<DashboardLayout title="Roadmap">
+
+  <div class="rp">
+
+    <!-- En-tête -->
+    <div class="rp-header">
+      <div>
+        <h1 class="rp-title">Roadmap BioForge</h1>
+        <p class="rp-sub">Vote pour les features qui comptent pour toi · Soumets tes idées</p>
+      </div>
+      <button id="suggest-btn" class="btn-suggest">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Suggérer une idée
+      </button>
+    </div>
+
+    <!-- Légende catégories -->
+    <div class="rp-legend">
+      {Object.entries(CATEGORIES).map(([cat, color]) => (
+        <span class="leg-chip" style={`color:${color}; background:${color}18; border-color:${color}30;`}>{cat}</span>
+      ))}
+    </div>
+
+    <!-- Kanban -->
+    <div class="kanban">
+      {STATUSES.map(col => {
+        const colItems = items
+          .filter(i => i.status === col.key)
+          .sort((a, b) => b.votes - a.votes);
+        return (
+          <div class="kol">
+
+            <!-- Header colonne -->
+            <div class="kol-head">
+              <div class="kol-title-row">
+                <span class="kol-dot" style={`background:${col.dot};`}></span>
+                <span class="kol-title">{col.label}</span>
+                <span class="kol-count">{colItems.length}</span>
+              </div>
+              <div class="kol-track">
+                <div class="kol-fill" style={`background:${col.color}; width:${Math.min(100, colItems.length*14)}%;`}></div>
+              </div>
+            </div>
+
+            <!-- Cards -->
+            <div class="kol-cards">
+              {colItems.map(item => {
+                const catColor = CATEGORIES[item.category] ?? '#6b7280';
+                const isDone = item.status === 'done';
+                return (
+                  <div class="card" data-id={item.id}>
+                    <div class="card-top">
+                      <div class="card-chips">
+                        <span class="cat-chip" style={`color:${catColor}; background:${catColor}18; border-color:${catColor}30;`}>{item.category}</span>
+                        {item.priority === 'high' && <span class="high-chip">🔥 Haute</span>}
+                      </div>
+                      {isDone ? (
+                        <div class="done-icon">
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#39ff8f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 6L9 17l-5-5"/>
+                          </svg>
+                        </div>
+                      ) : (
+                        <button
+                          class={`vote-btn${item.hasVoted ? ' voted' : ''}`}
+                          data-id={item.id}
+                          aria-label="Voter">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                            <path d="M12 19V5M5 12l7-7 7 7"/>
+                          </svg>
+                          <span class="vote-n" data-id={item.id}>{item.votes}</span>
+                        </button>
+                      )}
+                    </div>
+                    <h3 class="card-title">{item.title}</h3>
+                    <p class="card-desc">{item.description}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+          </div>
+        );
+      })}
+    </div>
+
+  </div>
+
+  <!-- Modal suggestion -->
+  <div id="suggest-modal" class="modal-bg" role="dialog" aria-modal="true" aria-labelledby="modal-heading">
+    <div class="modal">
+      <div class="modal-head">
+        <h2 id="modal-heading" class="modal-heading">Suggérer une idée</h2>
+        <button id="modal-close" class="modal-x" aria-label="Fermer">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <label class="field">
+          <span class="field-label">Titre <span style="color:#ff6b6b">*</span></span>
+          <input id="sug-title" type="text" maxlength="80"
+            placeholder="Ex : Block pour les tweets épinglés…" class="field-input" />
+        </label>
+        <label class="field">
+          <span class="field-label">Description <span class="field-opt">(optionnel)</span></span>
+          <textarea id="sug-desc" maxlength="400" rows="3"
+            placeholder="Cas d'usage, pourquoi c'est utile…" class="field-input field-ta"></textarea>
+          <span class="field-chars"><span id="desc-count">0</span>/400</span>
+        </label>
+        <label class="field">
+          <span class="field-label">Catégorie</span>
+          <select id="sug-cat" class="field-input field-sel">
+            <option value="">— Choisir —</option>
+            {Object.keys(CATEGORIES).map(c => <option value={c}>{c}</option>)}
+            <option value="Autre">Autre</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="modal-foot">
+        <p id="sug-err" class="sug-err" aria-live="polite"></p>
+        <button id="modal-cancel" class="btn-cancel">Annuler</button>
+        <button id="sug-submit" class="btn-send">
+          <span id="sug-lbl">Envoyer</span>
+          <svg id="sug-spin" class="spin-icon hidden" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+</DashboardLayout>
+
+<style>
+  /* ── Page ── */
+  .rp { display:flex; flex-direction:column; gap:1.5rem; min-height:100%; }
+  .rp-header { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+  .rp-title  { font-size:1.375rem; font-weight:700; color:#fff; letter-spacing:-0.02em; margin-bottom:0.2rem; }
+  .rp-sub    { font-size:0.8125rem; color:rgba(255,255,255,0.4); }
+
+  .btn-suggest {
+    display:inline-flex; align-items:center; gap:0.45rem;
+    padding:0.5rem 1rem; border-radius:0.75rem;
+    background:rgba(57,255,143,0.09); color:#39ff8f;
+    border:1px solid rgba(57,255,143,0.22);
+    font-size:0.8rem; font-weight:600; cursor:pointer;
+    white-space:nowrap; transition:all 0.15s;
+  }
+  .btn-suggest:hover { background:rgba(57,255,143,0.16); transform:translateY(-1px); }
+
+  /* ── Légende ── */
+  .rp-legend { display:flex; flex-wrap:wrap; gap:0.4rem; }
+  .leg-chip {
+    font-size:0.68rem; font-weight:600; padding:0.18rem 0.55rem;
+    border-radius:99px; border:1px solid; letter-spacing:0.02em;
+  }
+
+  /* ── Kanban ── */
+  .kanban { display:grid; grid-template-columns:repeat(3,1fr); gap:1.25rem; align-items:start; }
+  @media (max-width:860px) { .kanban { grid-template-columns:1fr; } }
+
+  .kol { display:flex; flex-direction:column; gap:0.75rem; }
+
+  .kol-head  { margin-bottom:0.125rem; }
+  .kol-title-row { display:flex; align-items:center; gap:0.4rem; margin-bottom:0.45rem; }
+  .kol-dot   { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+  .kol-title { font-size:0.7rem; font-weight:700; color:#fff; text-transform:uppercase; letter-spacing:0.09em; }
+  .kol-count {
+    font-size:0.65rem; color:rgba(255,255,255,0.3);
+    background:rgba(255,255,255,0.06); border-radius:99px; padding:0.1rem 0.4rem;
+  }
+  .kol-track { height:2.5px; border-radius:99px; background:rgba(255,255,255,0.06); overflow:hidden; }
+  .kol-fill  { height:100%; border-radius:99px; transition:width 0.6s cubic-bezier(.4,0,.2,1); }
+
+  /* ── Card ── */
+  .card {
+    background:rgba(255,255,255,0.03);
+    border:1px solid rgba(255,255,255,0.07);
+    border-radius:0.875rem; padding:0.875rem;
+    transition:all 0.15s;
+  }
+  .card:hover {
+    background:rgba(255,255,255,0.05);
+    border-color:rgba(255,255,255,0.11);
+    transform:translateY(-2px);
+    box-shadow:0 8px 32px rgba(0,0,0,0.2);
+  }
+
+  .card-top { display:flex; align-items:flex-start; justify-content:space-between; gap:0.5rem; margin-bottom:0.6rem; }
+  .card-chips { display:flex; flex-wrap:wrap; gap:0.3rem; }
+  .cat-chip {
+    font-size:0.62rem; font-weight:600; padding:0.14rem 0.45rem;
+    border-radius:99px; border:1px solid;
+  }
+  .high-chip {
+    font-size:0.62rem; font-weight:500; padding:0.14rem 0.45rem;
+    border-radius:99px;
+    background:rgba(245,158,11,0.1); color:#f59e0b;
+    border:1px solid rgba(245,158,11,0.2);
+  }
+
+  /* Upvote button */
+  .vote-btn {
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+    padding:0.3rem 0.45rem; min-width:2.25rem;
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.09);
+    border-radius:0.5rem;
+    color:rgba(255,255,255,0.4);
+    font-size:0.68rem; font-weight:700;
+    cursor:pointer; transition:all 0.15s; flex-shrink:0;
+  }
+  .vote-btn:hover {
+    background:rgba(57,255,143,0.07); border-color:rgba(57,255,143,0.25); color:#39ff8f;
+    transform:translateY(-1px);
+  }
+  .vote-btn.voted {
+    background:rgba(57,255,143,0.11); border-color:rgba(57,255,143,0.35); color:#39ff8f;
+  }
+  .vote-btn.voted:hover {
+    background:rgba(255,107,107,0.07); border-color:rgba(255,107,107,0.3); color:#ff6b6b;
+  }
+  .vote-btn.busy { opacity:0.4; pointer-events:none; }
+  @keyframes vote-bump {
+    0%,100% { transform:scale(1) translateY(0); }
+    50%     { transform:scale(1.22) translateY(-3px); }
+  }
+  .vote-btn.bump { animation:vote-bump 0.3s cubic-bezier(.34,1.56,.64,1); }
+
+  /* Done icon */
+  .done-icon {
+    width:2rem; height:2rem; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(57,255,143,0.08); border:1px solid rgba(57,255,143,0.2);
+    border-radius:0.5rem;
+  }
+
+  .card-title { font-size:0.875rem; font-weight:600; color:#fff; margin-bottom:0.35rem; line-height:1.4; }
+  .card-desc  { font-size:0.75rem; color:rgba(255,255,255,0.42); line-height:1.6; }
+
+  /* ── Modal ── */
+  .modal-bg {
+    display:none; position:fixed; inset:0; z-index:9000;
+    background:rgba(0,0,0,0.72); backdrop-filter:blur(8px);
+    align-items:center; justify-content:center; padding:1rem;
+  }
+  .modal-bg.open { display:flex; }
+
+  .modal {
+    background:#0f1114; border:1px solid rgba(255,255,255,0.09);
+    border-radius:1.375rem; width:100%; max-width:460px;
+    box-shadow:0 24px 80px rgba(0,0,0,0.5);
+    animation:modal-in 0.22s cubic-bezier(.34,1.2,.64,1);
+  }
+  @keyframes modal-in {
+    from { opacity:0; transform:scale(0.95) translateY(8px); }
+    to   { opacity:1; transform:scale(1) translateY(0); }
+  }
+
+  .modal-head {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:1.125rem 1.375rem 0.875rem;
+    border-bottom:1px solid rgba(255,255,255,0.07);
+  }
+  .modal-heading { font-size:0.9375rem; font-weight:700; color:#fff; }
+  .modal-x {
+    padding:0.3rem; background:transparent; border:none;
+    color:rgba(255,255,255,0.4); border-radius:0.5rem; cursor:pointer; transition:all 0.15s;
+  }
+  .modal-x:hover { background:rgba(255,255,255,0.06); color:#fff; }
+
+  .modal-body { padding:1.125rem 1.375rem; display:flex; flex-direction:column; gap:0.875rem; }
+  .field { display:flex; flex-direction:column; gap:0.3rem; }
+  .field-label { font-size:0.775rem; font-weight:600; color:rgba(255,255,255,0.6); }
+  .field-opt   { font-weight:400; color:rgba(255,255,255,0.3); }
+  .field-input {
+    background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.09);
+    border-radius:0.625rem; padding:0.575rem 0.8rem;
+    font-size:0.875rem; color:#fff; font-family:inherit;
+    outline:none; width:100%; transition:border-color 0.15s;
+  }
+  .field-input::placeholder { color:rgba(255,255,255,0.22); }
+  .field-input:focus { border-color:rgba(57,255,143,0.4); }
+  .field-ta  { resize:vertical; min-height:76px; }
+  .field-sel { cursor:pointer; }
+  .field-sel option { background:#1a1f24; color:#fff; }
+  .field-chars { font-size:0.68rem; color:rgba(255,255,255,0.22); text-align:right; }
+
+  .modal-foot {
+    padding:0.875rem 1.375rem 1.125rem;
+    border-top:1px solid rgba(255,255,255,0.07);
+    display:flex; align-items:center; gap:0.625rem;
+  }
+  .sug-err { flex:1; font-size:0.72rem; color:#ff6b6b; min-height:1rem; }
+
+  .btn-cancel {
+    padding:0.45rem 0.875rem; background:transparent;
+    border:1px solid rgba(255,255,255,0.1); border-radius:0.5rem;
+    color:rgba(255,255,255,0.45); font-size:0.8rem; font-weight:500;
+    cursor:pointer; transition:all 0.15s;
+  }
+  .btn-cancel:hover { border-color:rgba(255,255,255,0.2); color:#fff; }
+
+  .btn-send {
+    display:inline-flex; align-items:center; gap:0.4rem;
+    padding:0.45rem 1rem; background:#39ff8f; color:#050c08;
+    border:none; border-radius:0.5rem;
+    font-size:0.8rem; font-weight:700; cursor:pointer; transition:all 0.15s;
+  }
+  .btn-send:hover { background:#b4ff6e; transform:translateY(-1px); }
+  .btn-send:disabled { opacity:0.5; pointer-events:none; }
+
+  .spin-icon { animation:spin 0.7s linear infinite; }
+  .spin-icon.hidden { display:none; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* Toast */
+  .toast {
+    position:fixed; bottom:5rem; right:1.5rem; z-index:9999;
+    padding:0.625rem 1.125rem; border-radius:0.75rem;
+    font-size:0.8rem; font-weight:600;
+    box-shadow:0 8px 32px rgba(0,0,0,0.35);
+    animation:toast-in 0.2s ease both; pointer-events:none;
+  }
+  .toast.ok  { background:rgba(57,255,143,0.14); color:#39ff8f; border:1px solid rgba(57,255,143,0.28); }
+  .toast.err { background:rgba(255,107,107,0.14); color:#ff6b6b; border:1px solid rgba(255,107,107,0.28); }
+  @keyframes toast-in {
+    from { opacity:0; transform:translateY(6px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+</style>
+
+<script define:vars={{ clientCtx }}>
+(function () {
+
+  const ctx = JSON.parse(clientCtx);
+  const voteMap = {};
+  ctx.items.forEach(i => { voteMap[i.id] = { votes: i.votes, hasVoted: i.hasVoted }; });
+
+  // ── Toast ──────────────────────────────────────────────────────────────────
+  function showToast(msg, type = 'ok') {
+    const el = Object.assign(document.createElement('div'), {
+      className: `toast ${type}`, textContent: msg,
+    });
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+  }
+
+  // ── Votes ──────────────────────────────────────────────────────────────────
+  document.querySelectorAll('.vote-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const state = voteMap[id];
+      if (!id || !state || btn.classList.contains('busy')) return;
+
+      btn.classList.add('busy');
+
+      try {
+        const res = await fetch('/api/roadmap/vote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemId: id, action: state.hasVoted ? 'unvote' : 'vote' }),
+        });
+        if (!res.ok) throw new Error();
+
+        state.votes   += state.hasVoted ? -1 : 1;
+        state.hasVoted = !state.hasVoted;
+
+        document.querySelectorAll(`.vote-n[data-id="${id}"]`).forEach(el => {
+          el.textContent = state.votes;
+        });
+        document.querySelectorAll(`.vote-btn[data-id="${id}"]`).forEach(el => {
+          el.classList.toggle('voted', state.hasVoted);
+          el.classList.add('bump');
+          setTimeout(() => el.classList.remove('bump'), 350);
+        });
+
+      } catch {
+        showToast('Erreur lors du vote. Réessaie.', 'err');
+      }
+
+      btn.classList.remove('busy');
+    });
+  });
+
+  // ── Modal suggestion ───────────────────────────────────────────────────────
+  const modal   = document.getElementById('suggest-modal');
+  const titleIn = document.getElementById('sug-title');
+  const descIn  = document.getElementById('sug-desc');
+  const catIn   = document.getElementById('sug-cat');
+  const errEl   = document.getElementById('sug-err');
+  const lblEl   = document.getElementById('sug-lbl');
+  const spinEl  = document.getElementById('sug-spin');
+  const subBtn  = document.getElementById('sug-submit');
+  const cntEl   = document.getElementById('desc-count');
+
+  const openModal = () => { modal?.classList.add('open'); titleIn?.focus(); };
+  const closeModal = () => {
+    modal?.classList.remove('open');
+    [titleIn, descIn].forEach(el => { if (el) el.value = ''; });
+    if (catIn)  catIn.value  = '';
+    if (errEl)  errEl.textContent = '';
+    if (cntEl)  cntEl.textContent = '0';
+  };
+
+  document.getElementById('suggest-btn')?.addEventListener('click', openModal);
+  document.getElementById('modal-close')?.addEventListener('click', closeModal);
+  document.getElementById('modal-cancel')?.addEventListener('click', closeModal);
+  modal?.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+  descIn?.addEventListener('input', () => {
+    if (cntEl) cntEl.textContent = descIn.value.length;
+  });
+
+  subBtn?.addEventListener('click', async () => {
+    const title = titleIn?.value.trim() ?? '';
+    if (!title) {
+      if (errEl) errEl.textContent = 'Le titre est requis.';
+      titleIn?.focus(); return;
+    }
+
+    if (lblEl) lblEl.textContent = 'Envoi…';
+    spinEl?.classList.remove('hidden');
+    if (subBtn) subBtn.disabled = true;
+
+    try {
+      const res = await fetch('/api/roadmap/suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          description: descIn?.value.trim() ?? '',
+          category:    catIn?.value ?? '',
+        }),
+      });
+      if (!res.ok) throw new Error();
+      closeModal();
+      showToast('Suggestion envoyée, merci ! 🎉');
+    } catch {
+      if (errEl) errEl.textContent = "Erreur lors de l'envoi. Réessaie.";
+    }
+
+    if (lblEl) lblEl.textContent = 'Envoyer';
+    spinEl?.classList.add('hidden');
+    if (subBtn) subBtn.disabled = false;
+  });
+
+})();
+</script>

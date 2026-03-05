@@ -1,0 +1,74 @@
+[
+  {
+    "id": "custom-domain",
+    "title": "Domaine personnalisé",
+    "description": "Utilise ton propre domaine (ex: links.moi.com) à la place de bioforge.click/@username.",
+    "status": "in_progress",
+    "category": "Pro",
+    "votes": 142,
+    "priority": "high"
+  },
+  {
+    "id": "analytics-v2",
+    "title": "Analytics avancés v2",
+    "description": "Graphiques de rétention, heatmap des clics, suivi par pays et device, comparaison de périodes.",
+    "status": "in_progress",
+    "category": "Analytics",
+    "votes": 98,
+    "priority": "high"
+  },
+  {
+    "id": "block-countdown",
+    "title": "Block Countdown",
+    "description": "Un bloc compte à rebours pour tes lancements, streams ou events. Avec redirection auto à expiration.",
+    "status": "planned",
+    "category": "Blocks",
+    "votes": 74,
+    "priority": "medium"
+  },
+  {
+    "id": "block-music",
+    "title": "Block Musique / Spotify",
+    "description": "Affiche ton morceau ou playlist Spotify directement sur ta page avec lecteur intégré.",
+    "status": "planned",
+    "category": "Blocks",
+    "votes": 67,
+    "priority": "medium"
+  },
+  {
+    "id": "email-capture",
+    "title": "Block Capture Email",
+    "description": "Collecte des emails directement depuis ta page BioForge. Export CSV + intégration Mailchimp.",
+    "status": "planned",
+    "category": "Blocks",
+    "votes": 55,
+    "priority": "medium"
+  },
+  {
+    "id": "theme-marketplace",
+    "title": "Marketplace de thèmes",
+    "description": "Crée et partage tes propres thèmes. Explore les thèmes de la communauté. Thèmes premium à venir.",
+    "status": "planned",
+    "category": "Appearance",
+    "votes": 49,
+    "priority": "low"
+  },
+  {
+    "id": "block-scheduling",
+    "title": "Planification des blocks",
+    "description": "Active ou désactive automatiquement tes links selon une plage horaire. Parfait pour les événements.",
+    "status": "planned",
+    "category": "Blocks",
+    "votes": 41,
+    "priority": "low"
+  },
+  {
+    "id": "qr-export",
+    "title": "Export QR Code haute résolution",
+    "description": "Télécharge ton QR code en PNG/SVG haute résolution avec personnalisation de couleur et logo.",
+    "status": "done",
+    "category": "Features",
+    "votes": 36,
+    "priority": "low"
+  }
+]
