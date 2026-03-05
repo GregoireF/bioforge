@@ -49,10 +49,10 @@ STYLE DE RÉPONSE :
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': import.meta.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
+        'anthropic-version': '2025-10-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-latest',
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 600,
         system: systemPrompt,
         messages: messages.slice(-10), // Max 10 derniers messages pour le contexte
