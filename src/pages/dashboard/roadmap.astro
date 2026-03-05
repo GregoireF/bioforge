@@ -424,7 +424,7 @@ const clientCtx = JSON.stringify({
       btn.classList.add('busy');
 
       try {
-        const res = await fetch('/api/roadmap-vote', {
+        const res = await fetch('/api/roadmap/vote', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ itemId: id, action: state.hasVoted ? 'unvote' : 'vote' }),
@@ -493,7 +493,7 @@ const clientCtx = JSON.stringify({
     if (subBtn) subBtn.disabled = true;
 
     try {
-      const res = await fetch('/api/roadmap-suggest', {
+      const res = await fetch('/api/roadmap/suggest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

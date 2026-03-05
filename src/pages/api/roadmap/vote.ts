@@ -1,3 +1,4 @@
+// src/pages/api/roadmap-vote.ts
 import type { APIRoute } from 'astro';
 import { createClient } from '@supabase/supabase-js';
 import { withAuth } from '@/lib/auth/auth';
@@ -25,14 +26,14 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     return new Response(JSON.stringify({ error: 'Invalid body' }), { status: 400 });
   }
 
-  // ── Supabase ──────────────────────────────────────────────────────────────
   const supabase = createClient(
     import.meta.env.PUBLIC_SUPABASE_URL,
     import.meta.env.SUPABASE_SERVICE_ROLE_KEY
   );
 
+  // ── Vote / Unvote ─────────────────────────────────────────────────────────
+  // Le trigger _sync_roadmap_vote_count() gère vote_count automatiquement
   if (action === 'vote') {
-    // Upsert — idempotent si déjà voté
     const { error } = await supabase
       .from('roadmap_votes')
       .upsert(
@@ -49,5 +50,16 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 
-  return new Response(JSON.stringify({ ok: true }), { status: 200 });
+  // ── Retourne le vote_count réel depuis la DB ───────────────────────────────
+  // Le client l'utilise pour rester en sync (évite la dérive optimiste)
+  const { data } = await supabase
+    .from('roadmap_items')
+    .select('vote_count')
+    .eq('id', itemId)
+    .single();
+
+  return new Response(
+    JSON.stringify({ ok: true, vote_count: data?.vote_count ?? null }),
+    { status: 200 }
+  );
 };

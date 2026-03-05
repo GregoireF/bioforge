@@ -37,7 +37,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   const { count } = await supabase
     .from('roadmap_suggestions')
     .select('*', { count: 'exact', head: true })
-    .eq('user_id', profile.id)
+    .eq('profile_id', profile.id)
     .gte('created_at', since);
 
   if ((count ?? 0) >= 3) {
@@ -51,7 +51,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   const { error } = await supabase
     .from('roadmap_suggestions')
     .insert({
-      user_id:     profile.id,
+      profile_id:  profile.id,
       username:    profile.username ?? null,
       title,
       description: description || null,
