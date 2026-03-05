@@ -19,6 +19,31 @@ const blocks = blocksResult.success ? blocksResult.data : [];
 // ==================== VIEW COUNT ====================
 incrementProfileView(username).catch(console.error);
 
+// ==================== GROUP CONSECUTIVE SOCIAL BLOCKS ====================
+// Fusionne les blocks social consécutifs en un seul pour affichage inline
+function groupBlocks(rawBlocks: any[]): any[] {
+  const result: any[] = [];
+  let i = 0;
+  while (i < rawBlocks.length) {
+    const block = rawBlocks[i];
+    if (block.type === 'social') {
+      // Collect all consecutive social blocks
+      const mergedLinks: any[] = [];
+      while (i < rawBlocks.length && rawBlocks[i].type === 'social') {
+        const links = Array.isArray(rawBlocks[i].config?.links) ? rawBlocks[i].config.links : [];
+        mergedLinks.push(...links);
+        i++;
+      }
+      result.push({ ...block, _merged: true, config: { ...block.config, links: mergedLinks } });
+    } else {
+      result.push(block);
+      i++;
+    }
+  }
+  return result;
+}
+const groupedBlocks = groupBlocks(blocks);
+
 // ==================== SANITIZATION ====================
 function sanitizeHex(val: unknown, fallback: string): string {
   return typeof val === 'string' && /^#[0-9A-Fa-f]{6}$/.test(val) ? val : fallback;
@@ -250,7 +275,7 @@ function getSocialIconPath(url?: string): string {
         </div>
       ) : (
         <div class="space-y-3 mb-12">
-          {blocks.map((block: any, index: number) => {
+          {groupedBlocks.map((block: any, index: number) => {
             const animDelay = `animation-delay: ${Math.min(index * 80, 400)}ms;`;
 
             // ── HEADING ──
@@ -386,7 +411,7 @@ function getSocialIconPath(url?: string): string {
               const links = Array.isArray(block.config?.links) ? block.config.links : [];
               if (!links.length) return null;
               return (
-                <div class={`flex items-center justify-center gap-3 py-2 flex-nowrap scrollbar-none ${theme.animations ? 'animate-fade-in-up' : ''}`} style={animDelay}>
+                <div class={`flex items-center justify-center gap-3 py-2 overflow-x-auto flex-nowrap scrollbar-none ${theme.animations ? 'animate-fade-in-up' : ''}`} style={animDelay}>
                   {links.map((link: any) => {
                     const url = typeof link === 'string' ? link : link?.url;
                     if (!url) return null;
