@@ -52,7 +52,7 @@ STYLE DE RÉPONSE :
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-latest',
         max_tokens: 600,
         system: systemPrompt,
         messages: messages.slice(-10), // Max 10 derniers messages pour le contexte
