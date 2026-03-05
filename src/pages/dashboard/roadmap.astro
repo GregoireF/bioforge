@@ -505,11 +505,18 @@ const clientCtx = JSON.stringify({
           category:    catIn?.value ?? '',
         }),
       });
-      if (!res.ok) throw new Error();
-      closeModal();
-      showToast('Suggestion envoyée, merci ! 🎉');
+
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        // Affiche le message d'erreur exact renvoyé par l'API (rate limit, etc.)
+        if (errEl) errEl.textContent = json.error ?? "Erreur lors de l'envoi. Réessaie.";
+      } else {
+        closeModal();
+        showToast('Suggestion envoyée, merci ! 🎉');
+      }
     } catch {
-      if (errEl) errEl.textContent = "Erreur lors de l'envoi. Réessaie.";
+      if (errEl) errEl.textContent = "Erreur réseau. Vérifie ta connexion.";
     }
 
     if (lblEl) lblEl.textContent = 'Envoyer';

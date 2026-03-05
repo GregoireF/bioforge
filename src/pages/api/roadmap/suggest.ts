@@ -16,29 +16,40 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   }
 
   // ── Body ──────────────────────────────────────────────────────────────────
-  let title: string, description: string, category: string;
+  // Parsing séparé de la validation pour donner un message clair
+  let body: any;
   try {
-    const body = await request.json();
-    title       = (body.title       ?? '').trim().slice(0, 80);
-    description = (body.description ?? '').trim().slice(0, 400);
-    category    = (body.category    ?? '').trim().slice(0, 50);
-    if (!title) throw new Error('title required');
+    body = await request.json();
   } catch {
-    return new Response(JSON.stringify({ error: 'Invalid body' }), { status: 400 });
+    return new Response(JSON.stringify({ error: 'JSON invalide' }), { status: 400 });
   }
 
-  // ── Rate limit simple : max 3 suggestions par user par 24h ────────────────
+  const title       = (body.title       ?? '').trim().slice(0, 80);
+  const description = (body.description ?? '').trim().slice(0, 400);
+  const category    = (body.category    ?? '').trim().slice(0, 50);
+
+  if (!title) {
+    return new Response(JSON.stringify({ error: 'Le titre est requis.' }), { status: 400 });
+  }
+
+  // ── Supabase service_role (bypass RLS pour pouvoir lire + insérer) ────────
   const supabase = createClient(
     import.meta.env.PUBLIC_SUPABASE_URL,
     import.meta.env.SUPABASE_SERVICE_ROLE_KEY
   );
 
+  // ── Rate limit : max 3 suggestions par 24h ────────────────────────────────
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { count } = await supabase
+  const { count, error: countError } = await supabase
     .from('roadmap_suggestions')
     .select('*', { count: 'exact', head: true })
     .eq('profile_id', profile.id)
     .gte('created_at', since);
+
+  if (countError) {
+    console.error('[roadmap-suggest] count error:', countError.message);
+    return new Response(JSON.stringify({ error: 'Erreur serveur' }), { status: 500 });
+  }
 
   if ((count ?? 0) >= 3) {
     return new Response(
@@ -48,7 +59,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   }
 
   // ── Insert ────────────────────────────────────────────────────────────────
-  const { error } = await supabase
+  const { error: insertError } = await supabase
     .from('roadmap_suggestions')
     .insert({
       profile_id:  profile.id,
@@ -56,11 +67,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       title,
       description: description || null,
       category:    category    || null,
-      status:      'pending',   // pending | reviewed | added | rejected
+      status:      'pending',
     });
 
-  if (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+  if (insertError) {
+    console.error('[roadmap-suggest] insert error:', insertError.message);
+    return new Response(JSON.stringify({ error: insertError.message }), { status: 500 });
   }
 
   return new Response(JSON.stringify({ ok: true }), { status: 201 });
