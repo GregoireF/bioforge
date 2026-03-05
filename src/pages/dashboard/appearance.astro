@@ -1,7 +1,4 @@
 ---
-// src/pages/dashboard/appearance.astro — Appearance/Theme Page v2
-// Réécriture complète : UX 2026, perf, sécurité, nouvelles features
-
 import DashboardLayout from '@/layouts/DashboardLayout.astro';
 import Button from '@/components/ui/Button.astro';
 import Card from '@/components/ui/Card.astro';
@@ -33,7 +30,7 @@ const DEFAULT_THEME = {
   text_color: '#ffffff',
   button_style: 'filled' as const,
   border_radius: 14,
-  font_family: 'Inter' as const,
+  font_family: 'Exo 2' as const,
   block_shadow: true,
   animations: true,
   glass_intensity: 12,
@@ -56,7 +53,7 @@ function sanitizeEnum<T extends string>(value: unknown, allowed: readonly T[], f
 }
 
 // Sanitize font name server-side (allowlist)
-const ALLOWED_FONTS = ['Inter', 'Poppins', 'Roboto', 'Montserrat', 'Open Sans', 'Lato', 'Space Grotesk', 'DM Sans', 'Geist', 'Figtree'];
+const ALLOWED_FONTS = ['Exo 2', 'Orbitron', 'Rajdhani', 'Bebas Neue', 'Audiowide', 'Russo One', 'Space Grotesk', 'DM Sans', 'Quicksand', 'Figtree'];
 function sanitizeFont(value: string, fallback: string): string {
   return ALLOWED_FONTS.includes(value) ? value : fallback;
 }
@@ -327,7 +324,7 @@ const profileJson = JSON.stringify({
       <!-- TYPOGRAPHY -->
       <Card title="Typography" description="Choose your font">
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {['Inter', 'Poppins', 'Roboto', 'Montserrat', 'Open Sans', 'Lato', 'Geist', 'Figtree'].map(font => (
+          {['Exo 2', 'Orbitron', 'Rajdhani', 'Bebas Neue', 'Audiowide', 'Russo One', 'Quicksand', 'Figtree'].map(font => (
             <button
               class="font-btn py-3 px-2 glass border-2 border-white/10 rounded-xl text-sm text-white hover:border-neon-green/40 transition-all truncate"
               data-font={font}
@@ -378,7 +375,7 @@ const profileJson = JSON.stringify({
           </svg>
           Reset
         </Button>
-        <Button variant="secondary" href={`/${profile.username}`} target="_blank" title="Open live profile">
+        <Button variant="secondary" href={`/@${profile.username}`} target="_blank" title="Open live profile">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
           </svg>
@@ -487,7 +484,7 @@ const profileJson = JSON.stringify({
   // ==================== CONSTANTS ====================
   const HISTORY_KEY = 'theme_history_v1';
   const MAX_HISTORY = 5;
-  const ALLOWED_FONTS = ['Inter', 'Poppins', 'Roboto', 'Montserrat', 'Open Sans', 'Lato', 'Space Grotesk', 'DM Sans', 'Geist', 'Figtree'];
+  const ALLOWED_FONTS = ['Exo 2', 'Orbitron', 'Rajdhani', 'Bebas Neue', 'Audiowide', 'Russo One', 'Space Grotesk', 'DM Sans', 'Quicksand', 'Figtree'];
 
   // ==================== STATE ====================
   let currentTheme = JSON.parse(themeJson);
@@ -925,7 +922,7 @@ const profileJson = JSON.stringify({
       text_color: '#ffffff',
       button_style: 'filled',
       border_radius: 12,
-      font_family: 'Inter',
+      font_family: 'Exo 2',
       background_style: 'solid',
       gradient_color_2: '#1a1a2e',
       gradient_angle: 135,
@@ -971,7 +968,7 @@ const profileJson = JSON.stringify({
           background_style: ['solid','gradient','blur'].includes(raw.background_style) ? raw.background_style : 'solid',
           button_style:     ['filled','outline','shadow'].includes(raw.button_style) ? raw.button_style : 'filled',
           border_radius:    sanitizeInt(raw.border_radius, 0, 32, 12),
-          font_family:      sanitizeFont(raw.font_family) || 'Inter',
+          font_family:      sanitizeFont(raw.font_family) || 'Exo 2',
           block_shadow:     typeof raw.block_shadow === 'boolean' ? raw.block_shadow : true,
           animations:       typeof raw.animations === 'boolean' ? raw.animations : true,
         };
