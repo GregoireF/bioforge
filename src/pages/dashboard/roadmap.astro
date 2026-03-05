@@ -2,7 +2,7 @@
 // src/pages/dashboard/roadmap.astro
 import DashboardLayout from '@/layouts/DashboardLayout.astro';
 import { withAuth } from '@/lib/auth/auth';
-import roadmapData from '@/data/roadmap.json';
+import { createClient } from '@supabase/supabase-js';
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 let profile: any = null;
@@ -13,20 +13,26 @@ try {
 
 if (!profile) return Astro.redirect('/login');
 
-// ── Upvotes de l'user (Supabase) ──────────────────────────────────────────────
-let userVotes: string[] = [];
-try {
-  const { createClient } = await import('@supabase/supabase-js');
-  const supabase = createClient(
-    import.meta.env.PUBLIC_SUPABASE_URL,
-    import.meta.env.SUPABASE_SERVICE_ROLE_KEY
-  );
-  const { data } = await supabase
+// ── Supabase — items + votes en parallèle ─────────────────────────────────────
+const supabase = createClient(
+  import.meta.env.PUBLIC_SUPABASE_URL,
+  import.meta.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+const [itemsRes, votesRes] = await Promise.all([
+  supabase
+    .from('roadmap_items')
+    .select('id, title, description, status, category, priority, vote_count')
+    .eq('visible', true)
+    .order('vote_count', { ascending: false }),
+  supabase
     .from('roadmap_votes')
     .select('item_id')
-    .eq('user_id', profile.id);
-  userVotes = (data ?? []).map((r: any) => r.item_id);
-} catch {}
+    .eq('profile_id', profile.id),
+]);
+
+const roadmapData: any[] = itemsRes.data ?? [];
+const userVotes: string[] = (votesRes.data ?? []).map((r: any) => r.item_id);
 
 // ── Données enrichies ─────────────────────────────────────────────────────────
 const STATUSES = [
@@ -418,7 +424,7 @@ const clientCtx = JSON.stringify({
       btn.classList.add('busy');
 
       try {
-        const res = await fetch('/api/roadmap/vote', {
+        const res = await fetch('/api/roadmap-vote', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ itemId: id, action: state.hasVoted ? 'unvote' : 'vote' }),
@@ -487,7 +493,7 @@ const clientCtx = JSON.stringify({
     if (subBtn) subBtn.disabled = true;
 
     try {
-      const res = await fetch('/api/roadmap/suggest', {
+      const res = await fetch('/api/roadmap-suggest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
