@@ -386,7 +386,7 @@ function getSocialIconPath(url?: string): string {
               const links = Array.isArray(block.config?.links) ? block.config.links : [];
               if (!links.length) return null;
               return (
-                <div class={`flex items-center justify-center flex-wrap gap-3 py-2 ${theme.animations ? 'animate-fade-in-up' : ''}`} style={animDelay}>
+                <div class={`flex items-center justify-center gap-3 py-2 overflow-x-auto ${theme.animations ? 'animate-fade-in-up' : ''}`} style={animDelay}>
                   {links.map((link: any) => {
                     const url = typeof link === 'string' ? link : link?.url;
                     if (!url) return null;
@@ -409,8 +409,21 @@ function getSocialIconPath(url?: string): string {
         </div>
       )}
 
+      <!-- SHARE PROFILE BUTTON -->
+      <div class="flex justify-center mb-4 -mt-2">
+        <button id="share-profile-btn"
+          class="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all hover:scale-105 active:scale-95"
+          style={`background: ${tc}10; border: 1px solid ${tc}15; color: ${tc}; opacity: 0.7;`}
+          aria-label="Partager ce profil">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+          </svg>
+          Partager ce profil
+        </button>
+      </div>
+
       <!-- FOOTER -->
-      <footer class="text-center pb-8">
+      <footer class="text-center pb-8 mt-6">
         <a href="/" class="inline-flex items-center gap-2 text-sm font-medium transition-all hover:opacity-80"
           style={`color: ${pc};`}>
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -433,122 +446,173 @@ function getSocialIconPath(url?: string): string {
     </div>
   )}
 
-  <!-- ===== SHARE MODAL ===== -->
+  <!-- ===== SHARE MODAL (style Linktree) ===== -->
   <div id="share-modal"
-    class="fixed inset-0 z-[9999] hidden items-center justify-center p-4"
-    role="dialog" aria-modal="true" aria-labelledby="modal-title-text">
+    class="fixed inset-0 z-[9999] hidden items-end sm:items-center justify-center"
+    role="dialog" aria-modal="true">
 
-    <div id="share-backdrop" class="absolute inset-0 bg-black/75 backdrop-blur-lg"></div>
+    <div id="share-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-md"></div>
 
     <div id="share-inner"
-      class="relative w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl transition-all duration-300 scale-95 opacity-0"
-      style={`background: ${bg}F2; border: 1px solid ${tc}18; backdrop-filter: blur(24px);`}>
+      class="relative w-full sm:max-w-sm sm:mx-4 sm:rounded-3xl rounded-t-3xl overflow-hidden shadow-2xl
+             transition-all duration-300 translate-y-4 opacity-0"
+      style="background: #111113; border: 1px solid rgba(255,255,255,0.08);">
 
-      <!-- Close -->
-      <button id="share-close"
-        class="absolute top-4 right-4 z-10 p-2 rounded-full bg-black/30 hover:bg-black/50 transition text-white"
-        aria-label="Fermer">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-        </svg>
-      </button>
-
-      <div class="px-6 pt-14 pb-7">
-
-        <!-- Preview du block partagé -->
-        <div class="text-center mb-6">
-          <div class="inline-flex p-1.5 rounded-2xl mb-4" style={`background: ${tc}08; border: 1px solid ${tc}12;`}>
-            <div class="w-20 h-20 rounded-xl overflow-hidden border-2 border-white/10">
-              <img id="modal-icon-img" src="" alt="" class="hidden w-full h-full object-cover" />
-              <div id="modal-icon-fallback"
-                class="w-full h-full flex items-center justify-center text-3xl font-bold"
-                style={`background: linear-gradient(135deg, ${pc}, ${pc}99); color: ${bg};`}></div>
-            </div>
-          </div>
-          <h2 id="modal-title-text" class="text-xl font-bold mb-1 truncate px-4" style={`color: ${tc};`}></h2>
-          <p id="modal-url-text" class="text-xs font-mono opacity-50 break-all px-4" style={`color: ${tc};`}></p>
-        </div>
-
-        <!-- QR Code (pre-generated server-side, mis à jour côté client si différent) -->
-        <div class="text-center mb-6">
-          <p class="text-xs uppercase tracking-widest opacity-50 mb-3 font-semibold" style={`color: ${tc};`}>
-            Scanner pour ouvrir
-          </p>
-          <div class="inline-block p-3 rounded-2xl border" style={`background: ${tc}05; border-color: ${tc}10;`}>
-            <img id="modal-qr" src={qrDataUrl} alt="QR Code" class="w-28 h-28 mx-auto rounded-lg" />
-          </div>
-        </div>
-
-        <!-- Copy row -->
-        <button id="copy-btn"
-          class="w-full flex items-center gap-3 px-4 py-3 rounded-xl mb-5 transition-all active:scale-[0.98] text-left"
-          style={`background: ${tc}08; border: 1px solid ${tc}12;`}>
-          <svg class="w-4 h-4 opacity-60 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={`color: ${tc};`}>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+      <!-- Header -->
+      <div class="flex items-center justify-between px-5 pt-5 pb-3">
+        <h3 id="modal-mode-label" class="text-sm font-semibold text-white/70"></h3>
+        <button id="share-close"
+          class="p-1.5 rounded-full hover:bg-white/10 transition text-white/60 hover:text-white"
+          aria-label="Fermer">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
           </svg>
-          <span class="flex-1 text-sm font-mono truncate" id="copy-url-display" style={`color: ${tc}; opacity: 0.7;`}></span>
-          <span id="copy-btn-label" class="text-xs font-bold shrink-0 px-2.5 py-1 rounded-lg transition-all"
-            style={`background: ${pc}; color: ${bg};`}>
-            Copier
-          </span>
         </button>
+      </div>
 
-        <!-- Réseaux sociaux -->
-        <div class="grid grid-cols-4 gap-3 mb-6">
-          <!-- X / Twitter -->
-          <a id="shr-x" href="#" target="_blank" rel="noopener noreferrer"
-            class="flex flex-col items-center gap-2 group">
-            <div class="w-13 h-13 w-12 h-12 rounded-2xl flex items-center justify-center transition group-hover:scale-110 bg-black border border-white/10">
+      <!-- Preview card — mode LINK -->
+      <div id="modal-preview-link" class="hidden mx-4 mb-4 rounded-2xl overflow-hidden"
+        style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);">
+        <div class="flex items-center gap-4 p-4">
+          <div class="shrink-0 w-14 h-14 rounded-xl overflow-hidden border border-white/10 flex items-center justify-center"
+            style={`background: linear-gradient(135deg, ${pc}33, ${pc}11);`}>
+            <img id="modal-link-icon" src="" alt="" class="hidden w-full h-full object-cover rounded-xl" />
+            <span id="modal-link-fallback" class="text-2xl font-bold" style={`color: ${pc};`}></span>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p id="modal-link-title" class="text-white font-bold text-base truncate"></p>
+            <p id="modal-link-url" class="text-white/40 text-xs font-mono truncate mt-0.5"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preview card — mode PROFIL -->
+      <div id="modal-preview-profile" class="hidden mx-4 mb-4 rounded-2xl overflow-hidden"
+        style={`background: linear-gradient(135deg, ${pc}22, ${pc}08); border: 1px solid ${pc}25;`}>
+        <div class="flex items-center gap-4 p-5">
+          {profile.avatar_url
+            ? <img src={profile.avatar_url} alt="" class="w-14 h-14 rounded-full object-cover border-2 shrink-0" style={`border-color: ${pc}60;`} />
+            : <div class="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold shrink-0"
+                style={`background: linear-gradient(135deg, ${pc}, ${pc}80); color: ${bg};`}>
+                {(profile.display_name || profile.username || '?').charAt(0).toUpperCase()}
+              </div>
+          }
+          <div class="flex-1 min-w-0">
+            <p class="text-white font-bold text-base truncate">{profile.display_name || profile.username}</p>
+            <p class="text-white/50 text-xs font-mono truncate">bioforge.click/@{profile.username}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Social share row (scrollable) -->
+      <div class="px-4 mb-4">
+        <div class="flex items-center gap-3 overflow-x-auto pb-1 scrollbar-none">
+
+          <button id="copy-btn" class="flex flex-col items-center gap-1.5 shrink-0 group">
+            <div class="w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110 group-active:scale-95"
+              style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.12);">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.1-1.1m-.757-4.9a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+              </svg>
+            </div>
+            <span id="copy-btn-label" class="text-xs text-white/50 whitespace-nowrap">Copier</span>
+          </button>
+
+          <a id="shr-x" href="#" target="_blank" rel="noopener noreferrer" class="flex flex-col items-center gap-1.5 shrink-0 group">
+            <div class="w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110 group-active:scale-95 bg-black border border-white/10">
               <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.763l7.737-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
               </svg>
             </div>
-            <span class="text-xs" style={`color: ${tc}; opacity: 0.5;`}>X</span>
+            <span class="text-xs text-white/50 whitespace-nowrap">X</span>
           </a>
 
-          <!-- WhatsApp -->
-          <a id="shr-wa" href="#" target="_blank" rel="noopener noreferrer"
-            class="flex flex-col items-center gap-2 group">
-            <div class="w-12 h-12 rounded-2xl flex items-center justify-center transition group-hover:scale-110 bg-[#25D366]">
+          <a id="shr-fb" href="#" target="_blank" rel="noopener noreferrer" class="flex flex-col items-center gap-1.5 shrink-0 group">
+            <div class="w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110 group-active:scale-95 bg-[#1877F2]">
+              <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+              </svg>
+            </div>
+            <span class="text-xs text-white/50 whitespace-nowrap">Facebook</span>
+          </a>
+
+          <a id="shr-wa" href="#" target="_blank" rel="noopener noreferrer" class="flex flex-col items-center gap-1.5 shrink-0 group">
+            <div class="w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110 group-active:scale-95 bg-[#25D366]">
               <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
               </svg>
             </div>
-            <span class="text-xs" style={`color: ${tc}; opacity: 0.5;`}>WhatsApp</span>
+            <span class="text-xs text-white/50 whitespace-nowrap">WhatsApp</span>
           </a>
 
-          <!-- Telegram -->
-          <a id="shr-tg" href="#" target="_blank" rel="noopener noreferrer"
-            class="flex flex-col items-center gap-2 group">
-            <div class="w-12 h-12 rounded-2xl flex items-center justify-center transition group-hover:scale-110 bg-[#2AABEE]">
+          <a id="shr-tg" href="#" target="_blank" rel="noopener noreferrer" class="flex flex-col items-center gap-1.5 shrink-0 group">
+            <div class="w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110 group-active:scale-95 bg-[#2AABEE]">
               <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+                <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
               </svg>
             </div>
-            <span class="text-xs" style={`color: ${tc}; opacity: 0.5;`}>Telegram</span>
+            <span class="text-xs text-white/50 whitespace-nowrap">Telegram</span>
           </a>
 
-          <!-- Native share / More -->
-          <button id="shr-native"
-            class="flex flex-col items-center gap-2 group">
-            <div class="w-12 h-12 rounded-2xl flex items-center justify-center transition group-hover:scale-110"
-              style={`background: ${tc}10; border: 1px solid ${tc}15;`}>
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={`color: ${tc};`}>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+          <a id="shr-li" href="#" target="_blank" rel="noopener noreferrer" class="flex flex-col items-center gap-1.5 shrink-0 group">
+            <div class="w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110 group-active:scale-95 bg-[#0A66C2]">
+              <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
               </svg>
             </div>
-            <span id="shr-native-label" class="text-xs" style={`color: ${tc}; opacity: 0.5;`}>Plus</span>
+            <span class="text-xs text-white/50 whitespace-nowrap">LinkedIn</span>
+          </a>
+
+          <button id="shr-native" class="flex flex-col items-center gap-1.5 shrink-0 group">
+            <div class="w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:scale-110 group-active:scale-95"
+              style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.12);">
+              <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01"/>
+              </svg>
+            </div>
+            <span id="shr-native-label" class="text-xs text-white/50 whitespace-nowrap">Plus</span>
           </button>
-        </div>
 
-        <!-- Footer modal -->
-        <div class="text-center text-xs border-t pt-4 flex items-center justify-center gap-3" style={`color: ${tc}; opacity: 0.4; border-color: ${tc}15;`}>
-          <span>Powered by BioForge</span>
-          <span>•</span>
-          <button id="report-btn" class="hover:opacity-70 transition-opacity underline">Signaler</button>
         </div>
-
       </div>
+
+      <!-- QR Code accordion -->
+      <div class="mx-4 mb-4 rounded-2xl overflow-hidden"
+        style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);">
+        <button id="qr-toggle"
+          class="w-full flex items-center justify-between px-4 py-3 text-sm text-white/50 hover:text-white/80 transition-colors">
+          <span class="flex items-center gap-2 font-medium">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
+            </svg>
+            Scanner le QR code
+          </span>
+          <svg id="qr-chevron" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+        <div id="qr-panel" class="hidden pb-4 flex justify-center">
+          <img id="modal-qr" src="" alt="QR Code" class="w-32 h-32 rounded-xl" />
+        </div>
+      </div>
+
+      <!-- CTA BioForge -->
+      <div class="mx-4 mb-5 rounded-2xl p-4 text-center"
+        style={`background: ${pc}12; border: 1px solid ${pc}20;`}>
+        <p class="text-white/50 text-xs mb-3">Créez votre propre page de liens</p>
+        <a href="/"
+          class="block w-full py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90 active:scale-[0.98]"
+          style={`background: ${pc}; color: ${bg};`}>
+          Créer mon BioForge gratuit
+        </a>
+      </div>
+
+      <div class="px-4 pb-5 flex items-center justify-center gap-3 text-xs text-white/25">
+        <span>Powered by BioForge</span>
+        <span>•</span>
+        <button id="report-btn" class="hover:text-white/50 transition-colors underline">Signaler</button>
+      </div>
+
     </div>
   </div>
 
@@ -562,6 +626,9 @@ function getSocialIconPath(url?: string): string {
     #share-modal.open   { display: flex; }
 
     .dot-dropdown button:hover { background: rgba(255,255,255,0.06); }
+    .scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
+    .scrollbar-none::-webkit-scrollbar { display: none; }
+    #share-modal.open { display: flex; }
   </style>
 
   <!-- ===== SCRIPT ===== -->
@@ -629,72 +696,94 @@ function getSocialIconPath(url?: string): string {
     // ── Share modal ──────────────────────────────────────────────────────────
     const shareModal = document.getElementById('share-modal');
     const shareInner = document.getElementById('share-inner');
+    let currentShareUrl = '';
 
-    function openShareModal(title = '', url = '', iconUrl = '') {
-      const label  = title  || profileName || 'Lien';
-      const target = url    || profileUrl;
+    function openShareModal(title, url, iconUrl, isProfile = false) {
+      const label  = title || profileName || 'Lien';
+      const target = url   || profileUrl;
+      currentShareUrl = target;
 
-      // Icon
-      const img      = document.getElementById('modal-icon-img');
-      const fallback = document.getElementById('modal-icon-fallback');
-      if (iconUrl && img && fallback) {
-        img.src = iconUrl;
-        img.classList.remove('hidden');
-        fallback.classList.add('hidden');
-      } else if (img && fallback) {
-        img.classList.add('hidden');
-        fallback.classList.remove('hidden');
-        fallback.textContent = (label.charAt(0) || '?').toUpperCase();
+      // Mode label
+      const modeEl = document.getElementById('modal-mode-label');
+      if (modeEl) modeEl.textContent = isProfile ? 'Partager le profil' : 'Partager le lien';
+
+      // Toggle preview cards
+      const linkPreview    = document.getElementById('modal-preview-link');
+      const profilePreview = document.getElementById('modal-preview-profile');
+      if (isProfile) {
+        linkPreview?.classList.add('hidden');
+        profilePreview?.classList.remove('hidden');
+      } else {
+        profilePreview?.classList.add('hidden');
+        linkPreview?.classList.remove('hidden');
+        // Fill link preview
+        const iconImg  = document.getElementById('modal-link-icon');
+        const iconFb   = document.getElementById('modal-link-fallback');
+        const titleEl  = document.getElementById('modal-link-title');
+        const urlEl    = document.getElementById('modal-link-url');
+        if (titleEl) titleEl.textContent = label;
+        if (urlEl)   urlEl.textContent   = target;
+        if (iconImg && iconFb) {
+          if (iconUrl) {
+            iconImg.src = iconUrl;
+            iconImg.classList.remove('hidden');
+            iconFb.classList.add('hidden');
+          } else {
+            iconImg.classList.add('hidden');
+            iconFb.classList.remove('hidden');
+            iconFb.textContent = (label.charAt(0) || '?').toUpperCase();
+          }
+        }
       }
 
-      // Title + URL
-      const titleEl = document.getElementById('modal-title-text');
-      const urlEl   = document.getElementById('modal-url-text');
-      const copyEl  = document.getElementById('copy-url-display');
-      if (titleEl) titleEl.textContent = label;
-      if (urlEl)   urlEl.textContent   = target;
-      if (copyEl)  copyEl.textContent  = target;
-
-      // QR — utilise le QR du profil si c'est le même URL, sinon met à jour
+      // QR code (lazy — hidden by default behind toggle)
       const qrImg = document.getElementById('modal-qr');
       if (qrImg) {
-        if (target !== profileUrl) {
-          // URL différente d'un block → re-génère via API (seul cas acceptable)
-          qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&color=${pc.replace('#','')}&bgcolor=00000000&data=${encodeURIComponent(target)}`;
+        const bgHex = bg.replace('#','');
+        const fgHex = pc.replace('#','');
+        if (target === profileUrl) {
+          qrImg.src = qrDataUrl; // pré-généré côté serveur, instantané
         } else {
-          qrImg.src = qrDataUrl; // QR pré-généré côté serveur, instantané
+          qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&color=${fgHex}&bgcolor=${bgHex}&data=${encodeURIComponent(target)}`;
         }
       }
 
-      // Réseaux sociaux
+      // Social links
       const enc = encodeURIComponent(target);
       const msg = encodeURIComponent(`${label} — ${target}`);
-      document.getElementById('shr-x')?.setAttribute('href', `https://x.com/intent/tweet?text=${msg}`);
+      document.getElementById('shr-x')?.setAttribute('href',  `https://x.com/intent/tweet?text=${msg}`);
+      document.getElementById('shr-fb')?.setAttribute('href', `https://www.facebook.com/sharer/sharer.php?u=${enc}`);
       document.getElementById('shr-wa')?.setAttribute('href', `https://wa.me/?text=${msg}`);
       document.getElementById('shr-tg')?.setAttribute('href', `https://t.me/share/url?url=${enc}&text=${encodeURIComponent(label)}`);
+      document.getElementById('shr-li')?.setAttribute('href', `https://www.linkedin.com/sharing/share-offsite/?url=${enc}`);
 
       // Native share
-      document.getElementById('shr-native').onclick = async () => {
-        if (navigator.share) {
-          try { await navigator.share({ title: label, url: target }); return; } catch {}
-        }
-        // Fallback → copie
-        await navigator.clipboard.writeText(target).catch(() => {});
-        const lbl = document.getElementById('shr-native-label');
-        if (lbl) { lbl.textContent = 'Copié !'; setTimeout(() => lbl.textContent = 'Plus', 2000); }
-      };
+      const nativeBtn = document.getElementById('shr-native');
+      const nativeLbl = document.getElementById('shr-native-label');
+      if (nativeBtn) {
+        nativeBtn.onclick = async () => {
+          if (navigator.share) {
+            try { await navigator.share({ title: label, url: target }); return; } catch {}
+          }
+          await navigator.clipboard.writeText(target).catch(() => {});
+          if (nativeLbl) { nativeLbl.textContent = 'Copié !'; setTimeout(() => nativeLbl.textContent = 'Plus', 2000); }
+        };
+      }
 
-      // Open
+      // Open modal
       shareModal?.classList.add('open');
       requestAnimationFrame(() => {
-        shareInner?.classList.remove('scale-95', 'opacity-0');
-        shareInner?.classList.add('scale-100', 'opacity-100');
+        shareInner?.classList.remove('translate-y-4', 'opacity-0');
+        shareInner?.classList.add('translate-y-0', 'opacity-100');
       });
     }
 
     function closeShareModal() {
-      shareInner?.classList.remove('scale-100', 'opacity-100');
-      shareInner?.classList.add('scale-95', 'opacity-0');
+      shareInner?.classList.remove('translate-y-0', 'opacity-100');
+      shareInner?.classList.add('translate-y-4', 'opacity-0');
+      // Collapse QR panel
+      document.getElementById('qr-panel')?.classList.add('hidden');
+      document.getElementById('qr-chevron')?.classList.remove('rotate-180');
       setTimeout(() => shareModal?.classList.remove('open'), 280);
     }
 
@@ -702,18 +791,30 @@ function getSocialIconPath(url?: string): string {
     document.getElementById('share-close')?.addEventListener('click',    closeShareModal);
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeShareModal(); });
 
-    // ── Copy button dans la modal ────────────────────────────────────────────
+    // QR toggle accordion
+    document.getElementById('qr-toggle')?.addEventListener('click', () => {
+      const panel   = document.getElementById('qr-panel');
+      const chevron = document.getElementById('qr-chevron');
+      panel?.classList.toggle('hidden');
+      chevron?.classList.toggle('rotate-180');
+    });
+
+    // Copy button
     document.getElementById('copy-btn')?.addEventListener('click', async () => {
-      const url = document.getElementById('copy-url-display')?.textContent?.trim();
-      if (!url) return;
-      await navigator.clipboard.writeText(url).catch(() => {});
+      if (!currentShareUrl) return;
+      await navigator.clipboard.writeText(currentShareUrl).catch(() => {});
       const lbl = document.getElementById('copy-btn-label');
       if (lbl) { lbl.textContent = 'Copié ✓'; setTimeout(() => lbl.textContent = 'Copier', 2000); }
     });
 
-    // ── Report ───────────────────────────────────────────────────────────────
+    // Share profile button
+    document.getElementById('share-profile-btn')?.addEventListener('click', () => {
+      openShareModal(profileName, profileUrl, '', true);
+    });
+
+    // Report
     document.getElementById('report-btn')?.addEventListener('click', () => {
-      window.open(`/report?url=${encodeURIComponent(profileUrl)}`, '_blank');
+      window.open(`/report?url=${encodeURIComponent(currentShareUrl || profileUrl)}`, '_blank');
     });
 
     // ── Analytics ────────────────────────────────────────────────────────────
