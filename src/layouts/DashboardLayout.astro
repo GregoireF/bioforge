@@ -781,7 +781,7 @@ function navClass(href: string, exact: boolean): string {
     addTyping();
 
     try {
-      const res = await fetch('/api/chat', {
+      const res = await fetch('/api/chatbot/chat', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ messages: history.slice(-12), context: ctx }),
