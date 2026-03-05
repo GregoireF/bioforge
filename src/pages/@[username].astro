@@ -233,7 +233,7 @@ function getSocialIconPath(url?: string): string {
               return (
                 <div
                   class={`group relative ${theme.animations ? 'animate-fade-in-up' : ''}`}
-                  style={animDelay}>
+                  style={`${animDelay};`}>
                   <a
                     href={url}
                     target="_blank"
@@ -260,7 +260,7 @@ function getSocialIconPath(url?: string): string {
                       w-8 h-8 rounded-full flex items-center justify-center
                       opacity-0 group-hover:opacity-100 transition-all
                       hover:scale-110 active:scale-95`}
-                    style={`background: ${bg}CC; border: 1px solid ${tc}20; color: ${tc};`}
+                    style={`background: ${bg}CC; z-index: -1; border: 1px solid ${tc}20; color: ${tc};`}
                     data-id={String(block.id)}
                     data-title={String(block.title || '')}
                     data-url={url}
@@ -275,7 +275,7 @@ function getSocialIconPath(url?: string): string {
 
                   <div
                     class="dot-dropdown hidden absolute right-4 top-full mt-1 w-44 rounded-xl shadow-2xl z-30 py-1 overflow-hidden"
-                    style={`background: ${bg}F0; border: 1px solid ${tc}15; backdrop-filter: blur(12px);`}
+                    style={`background: ${bg}F0; z-index: -1; border: 1px solid ${tc}15; backdrop-filter: blur(12px);`}
                     data-id={String(block.id)}>
                     <button
                       class="dot-copy-btn w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm font-medium transition-colors text-left"
@@ -312,7 +312,7 @@ function getSocialIconPath(url?: string): string {
                   src={imgUrl}
                   alt={block.title || 'Image'}
                   class={`w-full object-cover ${theme.animations ? 'hover:scale-[1.02]' : ''} transition-transform`}
-                  style={`border-radius: ${br}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''}`}
+                  style={`border-radius: ${br}px; z-index: -1; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''}`}
                   loading="lazy"
                 />
               );
@@ -357,7 +357,7 @@ function getSocialIconPath(url?: string): string {
               return (
                 <div
                   class={`flex items-center justify-center flex-wrap gap-3 py-2 ${theme.animations ? 'animate-fade-in-up' : ''}`}
-                  style={animDelay}>
+                  style={`z-index: -1; ${animDelay}`}>
                   {links.map((link: any) => {
                     const url = typeof link === 'string' ? link : link?.url;
                     if (!url) return null;
