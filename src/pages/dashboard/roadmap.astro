@@ -56,7 +56,7 @@ const items = (roadmapData as any[]).map(item => ({
 }));
 
 const clientCtx = JSON.stringify({
-  items: items.map(i => ({ id: i.id, votes: i.votes, hasVoted: i.hasVoted })),
+  items: items.map(i => ({ id: i.id, votes: i.vote_count, hasVoted: i.hasVoted })),
 });
 ---
 
@@ -90,7 +90,7 @@ const clientCtx = JSON.stringify({
       {STATUSES.map(col => {
         const colItems = items
           .filter(i => i.status === col.key)
-          .sort((a, b) => b.votes - a.votes);
+          .sort((a, b) => b.vote_count - a.vote_count);
         return (
           <div class="kol">
 
@@ -132,7 +132,7 @@ const clientCtx = JSON.stringify({
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
                             <path d="M12 19V5M5 12l7-7 7 7"/>
                           </svg>
-                          <span class="vote-n" data-id={item.id}>{item.votes}</span>
+                          <span class="vote-n" data-id={item.id}>{item.vote_count}</span>
                         </button>
                       )}
                     </div>
@@ -403,7 +403,7 @@ const clientCtx = JSON.stringify({
 
   const ctx = JSON.parse(clientCtx);
   const voteMap = {};
-  ctx.items.forEach(i => { voteMap[i.id] = { votes: i.votes, hasVoted: i.hasVoted }; });
+  ctx.items.forEach(i => { voteMap[i.id] = { votes: i.vote_count, hasVoted: i.hasVoted }; });
 
   // ── Toast ──────────────────────────────────────────────────────────────────
   function showToast(msg, type = 'ok') {
@@ -431,8 +431,11 @@ const clientCtx = JSON.stringify({
         });
         if (!res.ok) throw new Error();
 
-        state.votes   += state.hasVoted ? -1 : 1;
+        const json = await res.json();
+        // Utilise le vote_count réel renvoyé par la DB (pas de dérive optimiste)
         state.hasVoted = !state.hasVoted;
+        if (json.vote_count !== null) state.votes = json.vote_count;
+        else state.votes += state.hasVoted ? 1 : -1;
 
         document.querySelectorAll(`.vote-n[data-id="${id}"]`).forEach(el => {
           el.textContent = state.votes;
