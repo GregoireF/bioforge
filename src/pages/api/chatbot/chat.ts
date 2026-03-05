@@ -1,9 +1,9 @@
 import type { APIRoute } from 'astro';
 
 export const POST: APIRoute = async ({ request }) => {
-  // 1. Vérification basique de la clé API (évite des 500 inutiles)
-  if (!import.meta.env.ANTHROPIC_API_KEY?.trim()) {
-    console.error('ANTHROPIC_API_KEY manquante ou vide dans les variables d’environnement');
+  // 1. Vérification de la clé Groq (remplace ANTHROPIC par GROQ)
+  if (!import.meta.env.GROQ_API_KEY?.trim()) {
+    console.error('GROQ_API_KEY manquante ou vide dans les variables d’environnement');
     return new Response(
       JSON.stringify({ error: 'Configuration serveur invalide' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
@@ -21,7 +21,7 @@ export const POST: APIRoute = async ({ request }) => {
       );
     }
 
-    // ── Prompt système contextuel ─────────────────────────────────────────────
+    // ── Prompt système contextuel (inchangé) ──────────────────────────────────
     const systemPrompt = `Tu es l'assistant IA intégré au dashboard BioForge, une plateforme de bio-links (similaire à Linktree) pour créateurs de contenu.
 
 CONTEXTE UTILISATEUR :
@@ -55,52 +55,53 @@ STYLE DE RÉPONSE :
 - Propose des actions concrètes et actionnables
 - Si la question dépasse BioForge, réponds quand même avec bienveillance`;
 
-    // ── Appel API Anthropic (mars 2026) ───────────────────────────────────────
+    // ── Appel Groq API (OpenAI-compatible) ────────────────────────────────────
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45_000); // 45s max
+    const timeoutId = setTimeout(() => controller.abort(), 30_000); // 30s max – Groq est très rapide
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': import.meta.env.ANTHROPIC_API_KEY.trim(),
-        'anthropic-version': '2023-06-01', // Version stable et toujours acceptée en 2026
+        'Authorization': `Bearer ${import.meta.env.GROQ_API_KEY.trim()}`,
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6', // Sweet spot perf/prix/vitesse en mars 2026
-        // Alternatives si besoin :
-        // 'claude-haiku-4-5'     → plus rapide et moins cher
-        // 'claude-opus-4-6'      → le plus puissant (plus cher)
+        model: 'llama-3.3-70b-versatile', // Très bon équilibre qualité/vitesse en mars 2026 (gratuit tier)
+        // Alternatives gratuites populaires sur Groq :
+        // 'llama-3.1-70b-versatile'   → excellent raisonnement
+        // 'llama-3.1-8b-instant'      → ultra-rapide, moins cher en tokens
+        // 'mixtral-8x7b-32768'        → bon multilingual
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...messages.slice(-10), // garde les 10 derniers pour le contexte
+        ],
         max_tokens: 600,
-        temperature: 0.7, // Ajouté : réponses plus naturelles et créatives
-        system: systemPrompt,
-        messages: messages.slice(-10), // Limite le contexte (économise tokens)
+        temperature: 0.7,
       }),
       signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
 
-    if (!response.ok) {
+    if (!groqResponse.ok) {
       let errorDetail = 'Erreur inconnue';
       try {
-        const errBody = await response.json();
+        const errBody = await groqResponse.json();
         errorDetail = JSON.stringify(errBody);
       } catch {
-        errorDetail = await response.text().catch(() => '(pas de body)');
+        errorDetail = await groqResponse.text().catch(() => '(pas de body)');
       }
 
       console.error(
-        'Anthropic error:',
-        response.status,
-        response.statusText,
+        'Groq error:',
+        groqResponse.status,
+        groqResponse.statusText,
         'Detail:', errorDetail,
-        'Model utilisé:', 'claude-sonnet-4-6'
+        'Model utilisé:', 'llama-3.3-70b-versatile'
       );
 
-      // En dev, on renvoie plus d'infos au frontend pour debug
       const debugInfo = import.meta.env.DEV
-        ? { debug: { status: response.status, anthropicDetail: errorDetail.slice(0, 400) } }
+        ? { debug: { status: groqResponse.status, groqDetail: errorDetail.slice(0, 400) } }
         : {};
 
       return new Response(
@@ -109,20 +110,28 @@ STYLE DE RÉPONSE :
           ...debugInfo,
         }),
         {
-          status: 502,
+          status: groqResponse.status >= 500 ? 502 : groqResponse.status, // propage 429 si rate limit par ex.
           headers: { 'Content-Type': 'application/json' },
         }
       );
     }
 
-    const data = await response.json();
+    const data = await groqResponse.json();
 
-    // Optionnel : on peut cleaner un peu la réponse si besoin
-    // Mais ici on forward directement (format Messages API standard)
-    return new Response(JSON.stringify(data), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    // Format de réponse compatible avec ton frontend (qui attend du style Anthropic)
+    // Groq renvoie { choices: [{ message: { content: "..." } }] }
+    const replyContent = data.choices?.[0]?.message?.content ?? '';
+
+    return new Response(
+      JSON.stringify({
+        content: [{ text: replyContent }], // simule format Anthropic Messages
+        // ou directement { reply: replyContent } si tu préfères simplifier le front plus tard
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
 
   } catch (err: any) {
     console.error('Chat endpoint error:', err?.message || err);
@@ -130,7 +139,7 @@ STYLE DE RÉPONSE :
     const status = err?.name === 'AbortError' ? 504 : 500;
     const message =
       err?.name === 'AbortError'
-        ? 'Délai d’attente dépassé (assistant trop lent)'
+        ? 'Délai d’attente dépassé'
         : 'Erreur interne';
 
     return new Response(
