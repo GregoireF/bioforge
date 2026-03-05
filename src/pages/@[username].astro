@@ -257,14 +257,18 @@ function getSocialIconPath(url?: string): string {
         )}
         <h1 class="text-2xl lg:text-3xl font-bold mb-2 tracking-tight inline-flex items-center justify-center gap-2 flex-wrap" style={`color: ${tc};`}>
           <span>{profile.display_name || `@${profile.username}`}</span>
-          {profile.is_verified && (
+          {(profile as any).is_verified === true && (
             <span
-              class="verified-badge inline-flex items-center justify-center w-6 h-6 lg:w-7 lg:h-7 rounded-full shrink-0"
-              style={`background: ${pc}; box-shadow: 0 0 12px ${pc}80;`}
+              class="verified-badge inline-flex items-center justify-center shrink-0"
               title="Compte vérifié BioForge"
               aria-label="Compte vérifié">
-              <svg class="w-3.5 h-3.5 lg:w-4 lg:h-4" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 6L9 17l-5-5"/>
+              <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Étoile/bouclier background avec couleur primaire -->
+                <path d="M13 2L15.5 5.5H19.5L21 9.5L24 12L21 14.5L19.5 18.5H15.5L13 22L10.5 18.5H6.5L5 14.5L2 12L5 9.5L6.5 5.5H10.5L13 2Z"
+                  fill={pc} style={`filter: drop-shadow(0 0 6px ${pc}90);`}/>
+                <!-- Checkmark blanc épais -->
+                <path d="M9 13l2.5 2.5L17 10"
+                  stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </span>
           )}
