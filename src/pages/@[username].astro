@@ -258,19 +258,12 @@ function getSocialIconPath(url?: string): string {
         <h1 class="text-2xl lg:text-3xl font-bold mb-2 tracking-tight inline-flex items-center justify-center gap-2 flex-wrap" style={`color: ${tc};`}>
           <span>{profile.display_name || `@${profile.username}`}</span>
           {(profile as any).is_verified === true && (
-            <span
-              class="verified-badge inline-flex items-center justify-center shrink-0"
-              title="Compte vérifié BioForge"
-              aria-label="Compte vérifié">
-              <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <!-- Étoile/bouclier background avec couleur primaire -->
-                <path d="M13 2L15.5 5.5H19.5L21 9.5L24 12L21 14.5L19.5 18.5H15.5L13 22L10.5 18.5H6.5L5 14.5L2 12L5 9.5L6.5 5.5H10.5L13 2Z"
-                  fill={pc} style={`filter: drop-shadow(0 0 6px ${pc}90);`}/>
-                <!-- Checkmark blanc épais -->
-                <path d="M9 13l2.5 2.5L17 10"
-                  stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </span>
+            <svg class="verified-badge shrink-0" width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Compte vérifié">
+              <!-- Cercle plein couleur primaire -->
+              <circle cx="14" cy="14" r="13" fill={pc}/>
+              <!-- Checkmark blanc — stroke épais bien visible -->
+              <path d="M8.5 14.5l3.5 3.5 7.5-8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
           )}
         </h1>
         {profile.display_name && (
@@ -671,7 +664,7 @@ function getSocialIconPath(url?: string): string {
       60%  { transform: scale(1.2) rotate(3deg); }
       100% { transform: scale(1) rotate(0deg); opacity: 1; }
     }
-    .verified-badge { animation: badge-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both; }
+    .verified-badge { animation: badge-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both; filter: drop-shadow(0 0 8px var(--pc, #00ff9d)); }
     .scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
     .scrollbar-none::-webkit-scrollbar { display: none; }
     #share-modal.open { display: flex; }
