@@ -411,7 +411,7 @@ function getSocialIconPath(url?: string): string {
               const links = Array.isArray(block.config?.links) ? block.config.links : [];
               if (!links.length) return null;
               return (
-                <div class={`flex items-center justify-center gap-3 py-2 overflow-x-auto flex-nowrap scrollbar-none ${theme.animations ? 'animate-fade-in-up' : ''}`} style={animDelay}>
+                <div class={`flex items-center justify-center gap-3 py-2 flex-nowrap scrollbar-none ${theme.animations ? 'animate-fade-in-up' : ''}`} style={animDelay}>
                   {links.map((link: any) => {
                     const url = typeof link === 'string' ? link : link?.url;
                     if (!url) return null;
