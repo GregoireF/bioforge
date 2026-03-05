@@ -10,7 +10,7 @@ BioForge is a premium link-in-bio platform specifically designed for streamers a
 - ⚡ **Lightning Fast** - Built with Astro SSR for optimal performance
 - 🎯 **SEO Optimized** - Full OpenGraph and meta tag support
 - 🔒 **Secure** - Row-Level Security with Supabase
-- 📱 **Mobile First** - Fully responsive design
+- 📱 **Mobile First** - Fully responsive designs
 - 🚀 **Production Ready** - Scalable architecture ready for SaaS
 
 ## 🛠 Tech Stack
