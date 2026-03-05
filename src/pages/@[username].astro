@@ -27,7 +27,7 @@ function sanitizeInt(val: unknown, min: number, max: number, fallback: number): 
   const n = parseInt(String(val));
   return isFinite(n) && n >= min && n <= max ? n : fallback;
 }
-const ALLOWED_FONTS = ['Inter','Poppins','Roboto','Montserrat','Open Sans','Lato','Space Grotesk','DM Sans','Geist','Figtree'];
+const ALLOWED_FONTS = ['Inter','Poppins','Roboto','Montserrat','Open Sans','Lato','Space Grotesk','DM Sans','Geist','Figtree','Afacad'];
 
 // ==================== THEME ====================
 const DEFAULT_THEME = {
@@ -37,7 +37,7 @@ const DEFAULT_THEME = {
   text_color:       '#ffffff',
   button_style:     'filled',
   border_radius:    12,
-  font_family:      'Inter',
+  font_family:      'Inter',  // fallback sûr
   background_style: 'solid',
   gradient_color_2: '#1a1a2e',
   gradient_angle:   135,
@@ -123,7 +123,7 @@ const bridge = JSON.stringify({
     })),
 });
 
-// Social icon paths (remis en entier)
+// Social icon paths
 const SOCIAL_ICONS: Record<string, string> = {
   twitter:   'M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.763l7.737-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z',
   instagram: 'M7 1C3.1 1 1 3.1 1 7v10c0 3.9 2.1 6 6 6h10c3.9 0 6-2.1 6-6V7c0-3.9-2.1-6-6-6H7zm8 3a1 1 0 110 2 1 1 0 010-2zm-3 3a5 5 0 110 10 5 5 0 010-10zm0 2a3 3 0 100 6 3 3 0 000-6z',
@@ -387,7 +387,7 @@ try {
           </div>
         </div>
 
-        <!-- SOCIAL BUTTONS (entièrement remis) -->
+        <!-- SOCIAL BUTTONS -->
         <div class="grid grid-cols-4 gap-4 mb-8">
           <button id="copy-btn" class="flex flex-col items-center gap-2 group">
             <div class="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center transition group-hover:bg-white/20">
@@ -460,7 +460,7 @@ try {
     .animate-fade-in-up { animation: fade-in-up 0.45s ease both; }
   </style>
 
-  <!-- SCRIPT -->
+  <!-- SCRIPT CORRIGÉ -->
   <script type="module">
     document.addEventListener('astro:page-load', () => {
       const bridgeData = JSON.parse(document.getElementById('page-data')?.dataset.bridge || '{}');
