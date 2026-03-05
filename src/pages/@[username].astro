@@ -288,18 +288,17 @@ function getSocialIconPath(url?: string): string {
                     </span>
                   </a>
 
-                  <!-- 3-dot button — toujours visible sur mobile, hover sur desktop -->
+                  <!-- 3-dot button — toujours visible -->
                   <button
-                    class="block-dot-btn absolute top-1/2 -translate-y-1/2 right-3 z-20
+                    class="block-dot-btn absolute top-1/2 -translate-y-1/2 right-2 z-20
                       w-9 h-9 rounded-full flex items-center justify-center
-                      opacity-0 group-hover:opacity-100 sm:opacity-0
                       transition-all hover:scale-110 active:scale-95"
-                    style={`background: ${bg}DD; border: 1px solid ${tc}25; color: ${tc};`}
+                    style={`background: ${bg}CC; border: 1px solid ${tc}30; color: ${tc};`}
                     data-id={String(block.id)}
                     data-title={String(block.title || '')}
                     data-url={url}
                     data-icon={iconUrl || ''}
-                    aria-label="Options de partage">
+                    aria-label="Options">
                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                       <circle cx="12" cy="5" r="2"/>
                       <circle cx="12" cy="12" r="2"/>
@@ -307,12 +306,9 @@ function getSocialIconPath(url?: string): string {
                     </svg>
                   </button>
 
-                  <!--
-                    DROPDOWN — rendu en position FIXED via JS pour éviter tout clipping.
-                    Le markup est ici pour les data-attrs, mais le positionnement est géré en JS.
-                  -->
+                  <!-- DROPDOWN — absolute par rapport au parent relative -->
                   <div
-                    class="dot-dropdown hidden fixed z-[9998] w-52 rounded-2xl shadow-2xl py-2 overflow-hidden"
+                    class="dot-dropdown hidden absolute right-0 top-full mt-2 z-50 w-52 rounded-2xl shadow-2xl py-2 overflow-hidden"
                     style={`background: ${bg}F5; border: 1px solid ${tc}18; backdrop-filter: blur(16px);`}
                     data-id={String(block.id)}>
 
@@ -565,11 +561,6 @@ function getSocialIconPath(url?: string): string {
     .animate-fade-in-up { animation: fade-in-up 0.45s ease both; }
     #share-modal.open   { display: flex; }
 
-    /* Mobile : 3-dot toujours visible */
-    @media (max-width: 639px) {
-      .block-dot-btn { opacity: 0.7 !important; }
-    }
-
     .dot-dropdown button:hover { background: rgba(255,255,255,0.06); }
   </style>
 
@@ -583,29 +574,9 @@ function getSocialIconPath(url?: string): string {
 
     const { profileUrl, profileName, primaryColor: pc, bgColor: bg, textColor: tc, qrDataUrl } = JSON.parse(bridgeJson);
 
-    // ── Dropdown 3-dot : position FIXED pour éviter le clipping ────────────
-    let activeDropdown = null;
-
-    function positionDropdown(dropdown, btn) {
-      const rect = btn.getBoundingClientRect();
-      const ddW  = 208; // w-52
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const showAbove  = spaceBelow < 120 && rect.top > 120;
-
-      dropdown.style.position = 'fixed';
-      dropdown.style.right    = `${window.innerWidth - rect.right}px`;
-      if (showAbove) {
-        dropdown.style.bottom = `${window.innerHeight - rect.top + 8}px`;
-        dropdown.style.top    = 'auto';
-      } else {
-        dropdown.style.top    = `${rect.bottom + 8}px`;
-        dropdown.style.bottom = 'auto';
-      }
-    }
-
+    // ── Dropdown 3-dot ───────────────────────────────────────────────────────
     function closeAllDropdowns() {
       document.querySelectorAll('.dot-dropdown').forEach(d => d.classList.add('hidden'));
-      activeDropdown = null;
     }
 
     document.addEventListener('click', closeAllDropdowns);
@@ -617,15 +588,9 @@ function getSocialIconPath(url?: string): string {
         const id = btn.dataset.id;
         const dropdown = document.querySelector(`.dot-dropdown[data-id="${id}"]`);
         if (!dropdown) return;
-
         const isOpen = !dropdown.classList.contains('hidden');
         closeAllDropdowns();
-
-        if (!isOpen) {
-          positionDropdown(dropdown, btn);
-          dropdown.classList.remove('hidden');
-          activeDropdown = dropdown;
-        }
+        if (!isOpen) dropdown.classList.remove('hidden');
       });
     });
 
