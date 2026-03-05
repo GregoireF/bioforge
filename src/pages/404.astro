@@ -1,0 +1,432 @@
+---
+// src/pages/404.astro — BioForge
+---
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>404 — Lien introuvable · BioForge</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- Grain overlay -->
+  <div class="grain"></div>
+
+  <!-- Particules flottantes -->
+  <canvas id="particles"></canvas>
+
+  <!-- Contenu principal -->
+  <main>
+
+    <!-- Logo -->
+    <a href="/" class="logo">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M13 10V3L4 14h7v7l9-11h-7z" stroke="#39ff8f" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>BioForge</span>
+    </a>
+
+    <!-- Chaîne brisée -->
+    <div class="chain-wrap" aria-hidden="true">
+      <svg class="chain" width="120" height="60" viewBox="0 0 120 60">
+        <!-- Maillon gauche -->
+        <g class="link-left">
+          <rect x="4" y="18" width="44" height="24" rx="12"
+            fill="none" stroke="#39ff8f" stroke-width="3"/>
+          <rect x="14" y="26" width="24" height="8" rx="4"
+            fill="#39ff8f" opacity="0.15"/>
+        </g>
+        <!-- Brisure -->
+        <line x1="52" y1="22" x2="56" y2="38" stroke="#39ff8f" stroke-width="2"
+          stroke-linecap="round" opacity="0.5"/>
+        <line x1="64" y1="22" x2="68" y2="38" stroke="#39ff8f" stroke-width="2"
+          stroke-linecap="round" opacity="0.5"/>
+        <!-- Maillon droit -->
+        <g class="link-right">
+          <rect x="72" y="18" width="44" height="24" rx="12"
+            fill="none" stroke="#39ff8f" stroke-width="3" opacity="0.4"/>
+          <rect x="82" y="26" width="24" height="8" rx="4"
+            fill="#39ff8f" opacity="0.06"/>
+        </g>
+        <!-- Étincelles -->
+        <circle class="spark s1" cx="60" cy="30" r="2" fill="#39ff8f"/>
+        <circle class="spark s2" cx="58" cy="24" r="1.5" fill="#39ff8f"/>
+        <circle class="spark s3" cx="64" cy="36" r="1" fill="#b4ff6e"/>
+      </svg>
+    </div>
+
+    <!-- 404 Glitch -->
+    <div class="four-wrap" aria-hidden="true">
+      <div class="four" data-text="404">404</div>
+    </div>
+
+    <!-- Texte -->
+    <div class="copy">
+      <h1>Lien introuvable</h1>
+      <p>
+        Cette page n'existe pas ou a été déplacée.<br/>
+        Vérifie l'URL ou retourne là où tu étais.
+      </p>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions">
+      <a href="/" class="btn-primary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Retour à l'accueil
+      </a>
+      <a href="/dashboard" class="btn-ghost">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Mon dashboard
+      </a>
+    </div>
+
+    <!-- URL actuelle -->
+    <p class="url-hint" id="url-hint"></p>
+
+  </main>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #080a0c;
+    --neon:    #39ff8f;
+    --neon2:   #b4ff6e;
+    --dim:     #1a1f24;
+    --border:  rgba(57,255,143,0.12);
+    --text:    #e8f0eb;
+    --muted:   rgba(232,240,235,0.45);
+    --font-display: 'Syne', sans-serif;
+    --font-mono:    'DM Mono', monospace;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    overflow: hidden;
+  }
+
+  /* ── Grain ── */
+  .grain {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+    opacity: 0.035;
+    animation: grain-shift 0.5s steps(1) infinite;
+  }
+  @keyframes grain-shift {
+    0%  { transform: translate(0,0); }
+    20% { transform: translate(-2px, 1px); }
+    40% { transform: translate(2px, -1px); }
+    60% { transform: translate(-1px, 2px); }
+    80% { transform: translate(1px, -2px); }
+    100%{ transform: translate(0,0); }
+  }
+
+  /* ── Canvas ── */
+  #particles {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  }
+
+  /* ── Layout ── */
+  main {
+    position: relative; z-index: 2;
+    height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 0;
+    padding: 2rem;
+    text-align: center;
+  }
+
+  /* ── Logo ── */
+  .logo {
+    position: fixed; top: 1.5rem; left: 2rem;
+    display: flex; align-items: center; gap: 0.5rem;
+    text-decoration: none;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 1rem;
+    color: var(--text);
+    opacity: 0;
+    animation: fade-up 0.6s ease 0.1s both;
+  }
+  .logo:hover { color: var(--neon); transition: color 0.2s; }
+
+  /* ── Chain ── */
+  .chain-wrap {
+    margin-bottom: 2rem;
+    opacity: 0;
+    animation: fade-up 0.6s ease 0.2s both;
+  }
+  .link-left  { animation: link-shake-l 3s ease-in-out infinite; }
+  .link-right { animation: link-shake-r 3s ease-in-out infinite; }
+  @keyframes link-shake-l {
+    0%,100% { transform: translate(0,0) rotate(0deg); }
+    30%     { transform: translate(-3px, 1px) rotate(-2deg); }
+    60%     { transform: translate(-1px,-1px) rotate(-1deg); }
+  }
+  @keyframes link-shake-r {
+    0%,100% { transform: translate(0,0) rotate(0deg); }
+    30%     { transform: translate(3px, -1px) rotate(2deg); }
+    60%     { transform: translate(1px,1px) rotate(1deg); }
+  }
+  .spark { animation: spark-float 2s ease-in-out infinite; }
+  .s1 { animation-delay: 0s; }
+  .s2 { animation-delay: 0.3s; }
+  .s3 { animation-delay: 0.6s; }
+  @keyframes spark-float {
+    0%,100% { opacity: 1; transform: translate(0,0) scale(1); }
+    50%     { opacity: 0; transform: translate(0,-8px) scale(0.3); }
+  }
+
+  /* ── 404 glitch ── */
+  .four-wrap {
+    position: relative;
+    margin-bottom: 1.5rem;
+    opacity: 0;
+    animation: fade-up 0.6s ease 0.3s both;
+  }
+  .four {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: clamp(6rem, 18vw, 11rem);
+    line-height: 1;
+    color: transparent;
+    -webkit-text-stroke: 2px var(--neon);
+    letter-spacing: -0.04em;
+    position: relative;
+    animation: glitch-main 4s steps(1) infinite;
+    filter: drop-shadow(0 0 40px rgba(57,255,143,0.25));
+  }
+  /* Glitch pseudo-layers */
+  .four::before,
+  .four::after {
+    content: attr(data-text);
+    position: absolute;
+    inset: 0;
+    color: transparent;
+    -webkit-text-stroke: 2px var(--neon);
+  }
+  .four::before {
+    left: 3px; top: -2px;
+    -webkit-text-stroke: 2px #ff3c6e;
+    clip-path: polygon(0 20%, 100% 20%, 100% 40%, 0 40%);
+    animation: glitch-before 4s steps(1) infinite;
+  }
+  .four::after {
+    left: -3px; top: 2px;
+    -webkit-text-stroke: 2px #00d4ff;
+    clip-path: polygon(0 60%, 100% 60%, 100% 80%, 0 80%);
+    animation: glitch-after 4s steps(1) infinite;
+  }
+  @keyframes glitch-main {
+    0%,90%,100% { transform: translate(0,0); }
+    92%         { transform: translate(2px,0); }
+    94%         { transform: translate(-2px,0); }
+    96%         { transform: translate(1px,1px); }
+    98%         { transform: translate(-1px,-1px); }
+  }
+  @keyframes glitch-before {
+    0%,88%,100% { opacity: 0; transform: translate(0,0); }
+    90%         { opacity: 1; transform: translate(3px,-2px); }
+    92%         { opacity: 0; }
+    94%         { opacity: 1; transform: translate(-3px,2px); clip-path: polygon(0 30%,100% 30%,100% 55%,0 55%); }
+    96%         { opacity: 0; }
+  }
+  @keyframes glitch-after {
+    0%,88%,100% { opacity: 0; transform: translate(0,0); }
+    91%         { opacity: 1; transform: translate(-3px,2px); }
+    93%         { opacity: 0; }
+    95%         { opacity: 1; transform: translate(3px,-2px); clip-path: polygon(0 65%,100% 65%,100% 85%,0 85%); }
+    97%         { opacity: 0; }
+  }
+
+  /* Scanlines sur le 404 */
+  .four-wrap::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 3px,
+      rgba(0,0,0,0.15) 3px,
+      rgba(0,0,0,0.15) 4px
+    );
+    pointer-events: none;
+  }
+
+  /* ── Copy ── */
+  .copy {
+    margin-bottom: 2rem;
+    opacity: 0;
+    animation: fade-up 0.6s ease 0.45s both;
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(1.1rem, 3vw, 1.4rem);
+    color: var(--text);
+    margin-bottom: 0.75rem;
+    letter-spacing: -0.02em;
+  }
+  p {
+    font-size: 0.875rem;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  /* ── Actions ── */
+  .actions {
+    display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center;
+    margin-bottom: 2rem;
+    opacity: 0;
+    animation: fade-up 0.6s ease 0.55s both;
+  }
+  .btn-primary, .btn-ghost {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.625rem 1.25rem;
+    border-radius: 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.2s;
+    cursor: pointer;
+  }
+  .btn-primary {
+    background: var(--neon);
+    color: #050805;
+    border: 1px solid var(--neon);
+    box-shadow: 0 0 20px rgba(57,255,143,0.3);
+  }
+  .btn-primary:hover {
+    background: var(--neon2);
+    box-shadow: 0 0 32px rgba(57,255,143,0.5);
+    transform: translateY(-1px);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .btn-ghost:hover {
+    border-color: var(--border);
+    color: var(--neon);
+    background: rgba(57,255,143,0.04);
+    transform: translateY(-1px);
+  }
+
+  /* ── URL hint ── */
+  .url-hint {
+    font-size: 0.7rem;
+    color: rgba(255,255,255,0.18);
+    letter-spacing: 0.02em;
+    opacity: 0;
+    animation: fade-up 0.6s ease 0.65s both;
+    max-width: 40ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ── Entrées ── */
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 480px) {
+    main { padding: 1.25rem; }
+    .logo { top: 1rem; left: 1.25rem; }
+    .actions { flex-direction: column; width: 100%; max-width: 280px; }
+    .btn-primary, .btn-ghost { justify-content: center; }
+  }
+</style>
+
+<script>
+  // Affiche l'URL actuelle
+  const hint = document.getElementById('url-hint');
+  if (hint) hint.textContent = window.location.pathname;
+
+  // ── Particules ──────────────────────────────────────────────────────────────
+  const canvas = document.getElementById('particles') as HTMLCanvasElement;
+  const ctx    = canvas.getContext('2d')!;
+
+  let W = 0, H = 0;
+  const resize = () => {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  };
+  resize();
+  window.addEventListener('resize', resize);
+
+  interface Particle {
+    x: number; y: number;
+    vx: number; vy: number;
+    r: number; a: number; da: number;
+  }
+
+  const NEON = '57,255,143';
+  const N    = 55;
+  const particles: Particle[] = Array.from({ length: N }, () => ({
+    x:  Math.random() * window.innerWidth,
+    y:  Math.random() * window.innerHeight,
+    vx: (Math.random() - 0.5) * 0.35,
+    vy: (Math.random() - 0.5) * 0.35,
+    r:  Math.random() * 1.6 + 0.4,
+    a:  Math.random(),
+    da: (Math.random() - 0.5) * 0.006,
+  }));
+
+  function tick() {
+    ctx.clearRect(0, 0, W, H);
+    for (const p of particles) {
+      p.x  = (p.x + p.vx + W) % W;
+      p.y  = (p.y + p.vy + H) % H;
+      p.a  = Math.max(0.05, Math.min(0.55, p.a + p.da));
+      if (p.a >= 0.55 || p.a <= 0.05) p.da *= -1;
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${NEON},${p.a})`;
+      ctx.fill();
+    }
+    // Connexions entre particules proches
+    for (let i = 0; i < N; i++) {
+      for (let j = i + 1; j < N; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const d  = Math.sqrt(dx*dx + dy*dy);
+        if (d < 120) {
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.strokeStyle = `rgba(${NEON},${0.07 * (1 - d/120)})`;
+          ctx.lineWidth   = 0.5;
+          ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+  tick();
+</script>
+
+</body>
+</html>
