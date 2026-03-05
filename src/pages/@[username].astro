@@ -37,7 +37,7 @@ const DEFAULT_THEME = {
   text_color:       '#ffffff',
   button_style:     'filled',
   border_radius:    12,
-  font_family:      'Inter',  // fallback sûr
+  font_family:      'Inter',
   background_style: 'solid',
   gradient_color_2: '#1a1a2e',
   gradient_angle:   135,
@@ -61,11 +61,11 @@ if (profile.theme) {
       font_family:      ALLOWED_FONTS.includes(raw.font_family) ? raw.font_family : DEFAULT_THEME.font_family,
       border_radius:    sanitizeInt(raw.border_radius,  0, 32,  DEFAULT_THEME.border_radius),
       gradient_angle:   sanitizeInt(raw.gradient_angle, 0, 360, DEFAULT_THEME.gradient_angle),
-      gradient_type:    ['linear','radial'].includes(raw.gradient_type)       ? raw.gradient_type    : 'linear',
+      gradient_type:    ['linear','radial'].includes(raw.gradient_type)            ? raw.gradient_type    : 'linear',
       background_style: ['solid','gradient','blur'].includes(raw.background_style) ? raw.background_style : 'solid',
-      button_style:     ['filled','outline','shadow'].includes(raw.button_style)   ? raw.button_style    : 'filled',
-      block_shadow:     typeof raw.block_shadow === 'boolean' ? raw.block_shadow : true,
-      animations:       typeof raw.animations   === 'boolean' ? raw.animations   : true,
+      button_style:     ['filled','outline','shadow'].includes(raw.button_style)   ? raw.button_style     : 'filled',
+      block_shadow:     typeof raw.block_shadow === 'boolean' ? raw.block_shadow   : true,
+      animations:       typeof raw.animations   === 'boolean' ? raw.animations     : true,
     };
   } catch { /* keep defaults */ }
 }
@@ -76,7 +76,6 @@ const pc = theme.primary_color;
 const bg = theme.background_color;
 const tc = theme.text_color;
 
-// Background
 let computedBg: string;
 if (theme.background_style === 'gradient') {
   computedBg = theme.gradient_type === 'radial'
@@ -86,7 +85,6 @@ if (theme.background_style === 'gradient') {
   computedBg = `background-color: ${bg};`;
 }
 
-// Button style
 const btnBase = `border-radius: ${br}px; font-family: '${theme.font_family}', sans-serif;`;
 let btnStyle: string;
 if (theme.button_style === 'outline') {
@@ -97,33 +95,43 @@ if (theme.button_style === 'outline') {
   btnStyle = `${btnBase} background: ${pc}; border: none; color: ${bg};${theme.block_shadow ? ` box-shadow: 0 8px 24px ${pc}40;` : ''}`;
 }
 
-// Social icon button style
 const socialBtnStyle = `background-color: ${pc}; color: ${bg}; border-radius: 50%;${theme.block_shadow ? ` box-shadow: 0 4px 16px ${pc}60;` : ''}`;
 
-// Google Fonts URL
+// ==================== SEO DATA ====================
+const profileUrl    = `https://bioforge.click/@${profile.username}`;
+const pageTitle     = profile.display_name
+  ? `${profile.display_name} (@${profile.username}) — BioForge`
+  : `@${profile.username} — BioForge`;
+const pageDesc      = profile.bio
+  ? `${profile.bio} — Retrouvez tous les liens de ${profile.display_name || profile.username} sur BioForge.`
+  : `Retrouvez tous les liens de ${profile.display_name || profile.username} sur BioForge.`;
+const ogImage       = profile.avatar_url || `https://bioforge.click/og-default.png`;
+
+// ==================== GOOGLE FONTS ====================
 const fontParam = encodeURIComponent(theme.font_family);
-const fontUrl = `https://fonts.googleapis.com/css2?family=${fontParam}:wght@400;500;600;700&display=swap`;
+const fontUrl   = `https://fonts.googleapis.com/css2?family=${fontParam}:wght@400;500;600;700&display=swap`;
 
-// Profile URL
-const profileUrl = `https://bioforge.click/@${profile.username}`;
+// ==================== QR CODE (server-side, primary color) ====================
+let qrDataUrl = '';
+try {
+  qrDataUrl = await QRCode.toDataURL(profileUrl, {
+    width: 256, margin: 2,
+    color: { dark: pc, light: '#00000000' },
+    errorCorrectionLevel: 'H',
+  });
+} catch {}
 
-// Bridge for client script
+// ==================== BRIDGE ====================
 const bridge = JSON.stringify({
   profileUrl,
   profileName: String(profile.display_name || profile.username || ''),
   primaryColor: pc,
   bgColor: bg,
-  blocks: blocks
-    .filter((b: any) => b.type === 'link' && b.config?.url)
-    .map((b: any) => ({
-      id:       String(b.id ?? ''),
-      title:    String(b.title ?? ''),
-      url:      String(b.config?.url ?? ''),
-      icon_url: String(b.config?.icon_url ?? ''),
-    })),
+  textColor: tc,
+  qrDataUrl,
 });
 
-// Social icon paths
+// ==================== SOCIAL ICONS ====================
 const SOCIAL_ICONS: Record<string, string> = {
   twitter:   'M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.763l7.737-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z',
   instagram: 'M7 1C3.1 1 1 3.1 1 7v10c0 3.9 2.1 6 6 6h10c3.9 0 6-2.1 6-6V7c0-3.9-2.1-6-6-6H7zm8 3a1 1 0 110 2 1 1 0 010-2zm-3 3a5 5 0 110 10 5 5 0 010-10zm0 2a3 3 0 100 6 3 3 0 000-6z',
@@ -142,43 +150,69 @@ function getSocialIconPath(url?: string): string {
   if (u.includes('twitter.com') || u.includes('x.com')) return SOCIAL_ICONS.twitter;
   if (u.includes('instagram.com')) return SOCIAL_ICONS.instagram;
   if (u.includes('facebook.com')) return SOCIAL_ICONS.facebook;
-  if (u.includes('youtube.com')) return SOCIAL_ICONS.youtube;
+  if (u.includes('youtube.com'))  return SOCIAL_ICONS.youtube;
   if (u.includes('linkedin.com')) return SOCIAL_ICONS.linkedin;
-  if (u.includes('github.com')) return SOCIAL_ICONS.github;
-  if (u.includes('tiktok.com')) return SOCIAL_ICONS.tiktok;
-  if (u.includes('twitch.tv')) return SOCIAL_ICONS.twitch;
-  if (u.includes('discord')) return SOCIAL_ICONS.discord;
+  if (u.includes('github.com'))   return SOCIAL_ICONS.github;
+  if (u.includes('tiktok.com'))   return SOCIAL_ICONS.tiktok;
+  if (u.includes('twitch.tv'))    return SOCIAL_ICONS.twitch;
+  if (u.includes('discord'))      return SOCIAL_ICONS.discord;
   return 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71';
-}
-
-// ==================== GENERATE QR CODE SERVER-SIDE ====================
-let qrDataUrl = '';
-try {
-  qrDataUrl = await QRCode.toDataURL(profileUrl, {
-    width: 256,
-    margin: 2,
-    color: { dark: pc, light: '#00000000' },
-    errorCorrectionLevel: 'H'
-  });
-} catch (err) {
-  console.error('QR generation failed:', err);
 }
 ---
 
-<BaseLayout title={profile.display_name || profile.username}>
+<BaseLayout title={pageTitle}>
 
+  <!-- ===== SEO HEAD ===== -->
+  <meta name="description" content={pageDesc} slot="head" />
+  <link rel="canonical" href={profileUrl} slot="head" />
+
+  <!-- Open Graph -->
+  <meta property="og:type"        content="profile"        slot="head" />
+  <meta property="og:url"         content={profileUrl}     slot="head" />
+  <meta property="og:title"       content={pageTitle}      slot="head" />
+  <meta property="og:description" content={pageDesc}       slot="head" />
+  <meta property="og:image"       content={ogImage}        slot="head" />
+  <meta property="og:image:width"  content="400"           slot="head" />
+  <meta property="og:image:height" content="400"           slot="head" />
+  <meta property="og:site_name"   content="BioForge"       slot="head" />
+  {profile.username && <meta property="profile:username" content={profile.username} slot="head" />}
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card"        content="summary"       slot="head" />
+  <meta name="twitter:title"       content={pageTitle}     slot="head" />
+  <meta name="twitter:description" content={pageDesc}      slot="head" />
+  <meta name="twitter:image"       content={ogImage}       slot="head" />
+
+  <!-- JSON-LD Person schema -->
+  <script type="application/ld+json" slot="head" set:html={JSON.stringify({
+    "@context":   "https://schema.org",
+    "@type":      "Person",
+    "name":       profile.display_name || profile.username,
+    "url":        profileUrl,
+    "image":      profile.avatar_url || null,
+    "description":profile.bio || null,
+    "sameAs":     blocks
+      .filter((b: any) => b.type === 'social' && Array.isArray(b.config?.links))
+      .flatMap((b: any) => b.config.links.map((l: any) => typeof l === 'string' ? l : l?.url))
+      .filter(Boolean),
+  })} />
+
+  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href={fontUrl} />
 
+  <!-- Bridge -->
   <div id="page-data" class="hidden" data-bridge={bridge}></div>
 
+  <!-- Blur overlay -->
   {theme.background_style === 'blur' && (
     <div class="fixed inset-0 z-0 pointer-events-none"
       style={`background-color: ${bg}CC; backdrop-filter: blur(60px); -webkit-backdrop-filter: blur(60px);`}>
     </div>
   )}
 
+  <!-- ===== PAGE ===== -->
   <div class="min-h-screen flex flex-col items-center justify-start px-4 py-16 relative z-10"
     style={`${computedBg} font-family: '${theme.font_family}', system-ui, sans-serif; color: ${tc};`}>
 
@@ -187,7 +221,8 @@ try {
       <!-- HEADER -->
       <header class="text-center mb-10 animate-fade-in-up">
         {profile.avatar_url ? (
-          <img src={profile.avatar_url} alt="" class="w-24 h-24 lg:w-28 lg:h-28 rounded-full mx-auto mb-5 object-cover"
+          <img src={profile.avatar_url} alt={`Photo de profil de ${profile.display_name || profile.username}`}
+            class="w-24 h-24 lg:w-28 lg:h-28 rounded-full mx-auto mb-5 object-cover"
             style={`border: 3px solid ${pc}; box-shadow: 0 0 40px ${pc}50;`} loading="eager" />
         ) : (
           <div class="w-24 h-24 lg:w-28 lg:h-28 rounded-full mx-auto mb-5 flex items-center justify-center text-4xl font-bold"
@@ -195,12 +230,17 @@ try {
             {(profile.display_name || profile.username || '?').charAt(0).toUpperCase()}
           </div>
         )}
-
         <h1 class="text-2xl lg:text-3xl font-bold mb-2 tracking-tight" style={`color: ${tc};`}>
           {profile.display_name || `@${profile.username}`}
         </h1>
-        {profile.display_name && <p class="text-sm mb-3 font-mono" style={`color: ${tc}; opacity: 0.45;`}>@{profile.username}</p>}
-        {profile.bio && <p class="text-sm lg:text-base leading-relaxed max-w-sm mx-auto" style={`color: ${tc}; opacity: 0.75;`}>{profile.bio}</p>}
+        {profile.display_name && (
+          <p class="text-sm mb-3 font-mono" style={`color: ${tc}; opacity: 0.45;`}>@{profile.username}</p>
+        )}
+        {profile.bio && (
+          <p class="text-sm lg:text-base leading-relaxed max-w-sm mx-auto" style={`color: ${tc}; opacity: 0.75;`}>
+            {profile.bio}
+          </p>
+        )}
       </header>
 
       <!-- BLOCKS -->
@@ -213,25 +253,29 @@ try {
           {blocks.map((block: any, index: number) => {
             const animDelay = `animation-delay: ${Math.min(index * 80, 400)}ms;`;
 
-            if (block.type === 'heading') {
-              return (
-                <div class={`text-lg lg:text-xl font-bold text-center py-2 ${theme.animations ? 'animate-fade-in-up' : ''}`}
-                  style={`color: ${tc}; ${animDelay}; z-index: -1;`}>
-                  {block.title || 'Heading'}
-                </div>
-              );
-            }
+            // ── HEADING ──
+            if (block.type === 'heading') return (
+              <div class={`text-lg lg:text-xl font-bold text-center py-2 ${theme.animations ? 'animate-fade-in-up' : ''}`}
+                style={`color: ${tc}; ${animDelay}`}>
+                {block.title || 'Heading'}
+              </div>
+            );
 
+            // ── SPACER ──
             if (block.type === 'spacer') return <div class="h-6"></div>;
 
+            // ── LINK ──
             if (block.type === 'link') {
-              const url = block.config?.url || '#';
+              const url     = block.config?.url || '#';
               const iconUrl = block.config?.icon_url || null;
               const hasIcon = Boolean(iconUrl);
 
               return (
                 <div class={`group relative ${theme.animations ? 'animate-fade-in-up' : ''}`} style={animDelay}>
-                  <a href={url} target="_blank" rel="noopener noreferrer" data-block-id={block.id}
+
+                  <!-- Link button -->
+                  <a href={url} target="_blank" rel="noopener noreferrer"
+                    data-block-id={block.id}
                     class={`flex items-center w-full py-4 px-5 font-semibold transition-all ${theme.animations ? 'hover:scale-[1.02] active:scale-[0.98]' : ''}`}
                     style={btnStyle}>
                     {hasIcon && (
@@ -244,9 +288,18 @@ try {
                     </span>
                   </a>
 
-                  <button class="block-dot-btn absolute top-1/2 -translate-y-1/2 right-5 z-30 w-9 h-9 rounded-full flex items-center justify-center opacity-80 hover:opacity-100 transition-all hover:scale-110 active:scale-95"
-                    style={`background: ${bg}CC; border: 1px solid ${tc}20; color: ${tc};`}
-                    data-id={String(block.id)} data-title={String(block.title || '')} data-url={url} data-icon={iconUrl || ''}>
+                  <!-- 3-dot button — toujours visible sur mobile, hover sur desktop -->
+                  <button
+                    class="block-dot-btn absolute top-1/2 -translate-y-1/2 right-3 z-20
+                      w-9 h-9 rounded-full flex items-center justify-center
+                      opacity-0 group-hover:opacity-100 sm:opacity-0
+                      transition-all hover:scale-110 active:scale-95"
+                    style={`background: ${bg}DD; border: 1px solid ${tc}25; color: ${tc};`}
+                    data-id={String(block.id)}
+                    data-title={String(block.title || '')}
+                    data-url={url}
+                    data-icon={iconUrl || ''}
+                    aria-label="Options de partage">
                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                       <circle cx="12" cy="5" r="2"/>
                       <circle cx="12" cy="12" r="2"/>
@@ -254,38 +307,60 @@ try {
                     </svg>
                   </button>
 
-                  <div class="dot-dropdown hidden absolute right-3 top-full mt-2 w-56 rounded-xl shadow-2xl z-50 py-2 overflow-visible"
-                    style={`background: ${bg}F0; border: 1px solid ${tc}15; backdrop-filter: blur(12px);`} data-id={String(block.id)}>
-                    <div class="absolute -top-2 right-5 w-4 h-4 rotate-45 bg-inherit border-l border-t border-[${tc}15]"></div>
+                  <!--
+                    DROPDOWN — rendu en position FIXED via JS pour éviter tout clipping.
+                    Le markup est ici pour les data-attrs, mais le positionnement est géré en JS.
+                  -->
+                  <div
+                    class="dot-dropdown hidden fixed z-[9998] w-52 rounded-2xl shadow-2xl py-2 overflow-hidden"
+                    style={`background: ${bg}F5; border: 1px solid ${tc}18; backdrop-filter: blur(16px);`}
+                    data-id={String(block.id)}>
 
-                    <button class="dot-copy-btn w-full flex items-center gap-3 px-5 py-3.5 text-sm font-medium transition-colors hover:bg-white/10 text-left" data-url={url} style={`color: ${tc};`}>
-                      <svg class="w-5 h-5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <button
+                      class="dot-copy-btn w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:bg-white/8 text-left"
+                      style={`color: ${tc};`}
+                      data-url={url}>
+                      <svg class="w-5 h-5 opacity-60 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                       </svg>
                       Copier le lien
                     </button>
-                    <button class="dot-share-btn w-full flex items-center gap-3 px-5 py-3.5 text-sm font-medium transition-colors hover:bg-white/10 text-left" data-id={String(block.id)} data-title={String(block.title || '')} data-url={url} data-icon={iconUrl || ''} style={`color: ${tc};`}>
-                      <svg class="w-5 h-5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+
+                    <button
+                      class="dot-share-btn w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:bg-white/8 text-left"
+                      style={`color: ${tc};`}
+                      data-id={String(block.id)}
+                      data-title={String(block.title || '')}
+                      data-url={url}
+                      data-icon={iconUrl || ''}>
+                      <svg class="w-5 h-5 opacity-60 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
                       </svg>
                       Partager le lien
                     </button>
+
                   </div>
                 </div>
               );
             }
 
+            // ── IMAGE ──
             if (block.type === 'image') {
               const imgUrl = block.config?.url;
               const imgLink = block.config?.link;
               if (!imgUrl) return null;
               const img = (
-                <img src={imgUrl} alt={block.title || 'Image'} class={`w-full object-cover ${theme.animations ? 'hover:scale-[1.02]' : ''} transition-transform`}
-                  style={`border-radius: ${br}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''}`} loading="lazy" />
+                <img src={imgUrl} alt={block.title || 'Image'}
+                  class={`w-full object-cover ${theme.animations ? 'hover:scale-[1.02]' : ''} transition-transform`}
+                  style={`border-radius: ${br}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''}`}
+                  loading="lazy" />
               );
-              return imgLink ? <a href={imgLink} target="_blank" rel="noopener noreferrer" style={animDelay}>{img}</a> : <div style={animDelay}>{img}</div>;
+              return imgLink
+                ? <a href={imgLink} target="_blank" rel="noopener noreferrer" style={animDelay}>{img}</a>
+                : <div style={animDelay}>{img}</div>;
             }
 
+            // ── VIDEO ──
             if (block.type === 'video') {
               const videoUrl = block.config?.url;
               if (!videoUrl) return null;
@@ -301,12 +376,16 @@ try {
                 if (id) embedUrl = `https://www.tiktok.com/embed/v2/${id}`;
               }
               return (
-                <div class={`relative w-full overflow-hidden ${theme.animations ? 'animate-fade-in-up' : ''}`} style={`padding-bottom: 56.25%; border-radius: ${br}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''} ${animDelay}`}>
-                  <iframe src={embedUrl} class="absolute inset-0 w-full h-full" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style={`border-radius: ${br}px;`}></iframe>
+                <div class={`relative w-full overflow-hidden ${theme.animations ? 'animate-fade-in-up' : ''}`}
+                  style={`padding-bottom: 56.25%; border-radius: ${br}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''} ${animDelay}`}>
+                  <iframe src={embedUrl} class="absolute inset-0 w-full h-full" frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowfullscreen style={`border-radius: ${br}px;`}></iframe>
                 </div>
               );
             }
 
+            // ── SOCIAL ──
             if (block.type === 'social') {
               const links = Array.isArray(block.config?.links) ? block.config.links : [];
               if (!links.length) return null;
@@ -334,247 +413,355 @@ try {
         </div>
       )}
 
+      <!-- FOOTER -->
       <footer class="text-center pb-8">
-        <a href="/" class="inline-flex items-center gap-2 text-sm font-medium transition-all hover:opacity-80" style={`color: ${pc};`}>
+        <a href="/" class="inline-flex items-center gap-2 text-sm font-medium transition-all hover:opacity-80"
+          style={`color: ${pc};`}>
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
           </svg>
-          Create your BioForge
+          Créer mon BioForge
         </a>
       </footer>
+
     </div>
   </div>
 
-  <!-- QR CODE FIXED -->
+  <!-- ===== QR CODE FIXE ===== -->
   {qrDataUrl && (
-    <div class="fixed bottom-6 right-6 z-50">
-      <div class="p-3 rounded-2xl backdrop-blur-xl shadow-2xl border border-white/10"
-           style={`background-color: ${bg}CC; border-color: ${pc}30;`}>
-        <img src={qrDataUrl} alt="Scan to visit profile" class="w-24 h-24 rounded-xl" />
+    <div class="fixed bottom-6 right-6 z-50 group">
+      <div class="p-3 rounded-2xl shadow-2xl border transition-all group-hover:scale-105"
+        style={`background: ${bg}CC; border-color: ${pc}30; backdrop-filter: blur(12px);`}>
+        <img src={qrDataUrl} alt={`QR code du profil de ${profile.username}`} class="w-24 h-24 rounded-xl" />
       </div>
     </div>
   )}
 
-  <!-- SHARE MODAL -->
-  <div id="share-modal" class="fixed inset-0 z-[9999] hidden items-center justify-center p-4" role="dialog" aria-modal="true">
-    <div id="share-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-lg"></div>
+  <!-- ===== SHARE MODAL ===== -->
+  <div id="share-modal"
+    class="fixed inset-0 z-[9999] hidden items-center justify-center p-4"
+    role="dialog" aria-modal="true" aria-labelledby="modal-title-text">
 
-    <div class="relative w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl scale-95 opacity-0 transition-all duration-300"
-      style={`background: ${bg}f2; border: 1px solid ${tc}20; backdrop-filter: blur(24px);`}>
+    <div id="share-backdrop" class="absolute inset-0 bg-black/75 backdrop-blur-lg"></div>
 
-      <button id="share-close" class="absolute top-4 right-4 z-10 p-2 rounded-full bg-black/40 hover:bg-black/60 transition text-white" aria-label="Fermer">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div id="share-inner"
+      class="relative w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl transition-all duration-300 scale-95 opacity-0"
+      style={`background: ${bg}F2; border: 1px solid ${tc}18; backdrop-filter: blur(24px);`}>
+
+      <!-- Close -->
+      <button id="share-close"
+        class="absolute top-4 right-4 z-10 p-2 rounded-full bg-black/30 hover:bg-black/50 transition text-white"
+        aria-label="Fermer">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
         </svg>
       </button>
 
-      <div class="p-8 pt-16 pb-6">
-        <div class="text-center mb-8">
-          <div class="inline-block p-1.5 rounded-2xl bg-gradient-to-br from-white/10 to-white/5 mb-4 shadow-xl">
-            <div class="w-24 h-24 rounded-xl overflow-hidden border-4 border-white/20 shadow-inner">
-              <img id="modal-icon-img" src="" class="hidden w-full h-full object-cover" alt="" />
-              <div id="modal-icon-fallback" class="w-full h-full flex items-center justify-center text-5xl font-bold" style={`background: linear-gradient(to bottom right, ${pc}, ${pc}cc); color: white;`}></div>
+      <div class="px-6 pt-14 pb-7">
+
+        <!-- Preview du block partagé -->
+        <div class="text-center mb-6">
+          <div class="inline-flex p-1.5 rounded-2xl mb-4" style={`background: ${tc}08; border: 1px solid ${tc}12;`}>
+            <div class="w-20 h-20 rounded-xl overflow-hidden border-2 border-white/10">
+              <img id="modal-icon-img" src="" alt="" class="hidden w-full h-full object-cover" />
+              <div id="modal-icon-fallback"
+                class="w-full h-full flex items-center justify-center text-3xl font-bold"
+                style={`background: linear-gradient(135deg, ${pc}, ${pc}99); color: ${bg};`}></div>
             </div>
           </div>
-          <h2 id="modal-title" class="text-2xl font-bold mb-2" style={`color: ${tc};`}></h2>
-          <p id="modal-url" class="text-sm font-mono opacity-70 break-all" style={`color: ${tc};`}></p>
+          <h2 id="modal-title-text" class="text-xl font-bold mb-1 truncate px-4" style={`color: ${tc};`}></h2>
+          <p id="modal-url-text" class="text-xs font-mono opacity-50 break-all px-4" style={`color: ${tc};`}></p>
         </div>
 
-        <div class="text-center mb-8">
-          <p class="text-xs uppercase tracking-wider opacity-60 mb-4" style={`color: ${tc};`}>Scanner pour ouvrir</p>
-          <div class="inline-block p-4 bg-white/10 rounded-2xl border border-white/10 shadow-inner">
-            <img id="modal-qr" src="" alt="QR Code" class="w-32 h-32 mx-auto" />
+        <!-- QR Code (pre-generated server-side, mis à jour côté client si différent) -->
+        <div class="text-center mb-6">
+          <p class="text-xs uppercase tracking-widest opacity-50 mb-3 font-semibold" style={`color: ${tc};`}>
+            Scanner pour ouvrir
+          </p>
+          <div class="inline-block p-3 rounded-2xl border" style={`background: ${tc}05; border-color: ${tc}10;`}>
+            <img id="modal-qr" src={qrDataUrl} alt="QR Code" class="w-28 h-28 mx-auto rounded-lg" />
           </div>
         </div>
 
-        <!-- SOCIAL BUTTONS -->
-        <div class="grid grid-cols-4 gap-4 mb-8">
-          <button id="copy-btn" class="flex flex-col items-center gap-2 group">
-            <div class="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center transition group-hover:bg-white/20">
-              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={`color: ${tc};`}>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+        <!-- Copy row -->
+        <button id="copy-btn"
+          class="w-full flex items-center gap-3 px-4 py-3 rounded-xl mb-5 transition-all active:scale-[0.98] text-left"
+          style={`background: ${tc}08; border: 1px solid ${tc}12;`}>
+          <svg class="w-4 h-4 opacity-60 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={`color: ${tc};`}>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+          </svg>
+          <span class="flex-1 text-sm font-mono truncate" id="copy-url-display" style={`color: ${tc}; opacity: 0.7;`}></span>
+          <span id="copy-btn-label" class="text-xs font-bold shrink-0 px-2.5 py-1 rounded-lg transition-all"
+            style={`background: ${pc}; color: ${bg};`}>
+            Copier
+          </span>
+        </button>
+
+        <!-- Réseaux sociaux -->
+        <div class="grid grid-cols-4 gap-3 mb-6">
+          <!-- X / Twitter -->
+          <a id="shr-x" href="#" target="_blank" rel="noopener noreferrer"
+            class="flex flex-col items-center gap-2 group">
+            <div class="w-13 h-13 w-12 h-12 rounded-2xl flex items-center justify-center transition group-hover:scale-110 bg-black border border-white/10">
+              <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.763l7.737-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
               </svg>
             </div>
-            <span class="text-xs opacity-70" style={`color: ${tc};`}>Copy link</span>
+            <span class="text-xs" style={`color: ${tc}; opacity: 0.5;`}>X</span>
+          </a>
+
+          <!-- WhatsApp -->
+          <a id="shr-wa" href="#" target="_blank" rel="noopener noreferrer"
+            class="flex flex-col items-center gap-2 group">
+            <div class="w-12 h-12 rounded-2xl flex items-center justify-center transition group-hover:scale-110 bg-[#25D366]">
+              <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+              </svg>
+            </div>
+            <span class="text-xs" style={`color: ${tc}; opacity: 0.5;`}>WhatsApp</span>
+          </a>
+
+          <!-- Telegram -->
+          <a id="shr-tg" href="#" target="_blank" rel="noopener noreferrer"
+            class="flex flex-col items-center gap-2 group">
+            <div class="w-12 h-12 rounded-2xl flex items-center justify-center transition group-hover:scale-110 bg-[#2AABEE]">
+              <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+              </svg>
+            </div>
+            <span class="text-xs" style={`color: ${tc}; opacity: 0.5;`}>Telegram</span>
+          </a>
+
+          <!-- Native share / More -->
+          <button id="shr-native"
+            class="flex flex-col items-center gap-2 group">
+            <div class="w-12 h-12 rounded-2xl flex items-center justify-center transition group-hover:scale-110"
+              style={`background: ${tc}10; border: 1px solid ${tc}15;`}>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={`color: ${tc};`}>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+              </svg>
+            </div>
+            <span id="shr-native-label" class="text-xs" style={`color: ${tc}; opacity: 0.5;`}>Plus</span>
           </button>
-
-          <a id="shr-x" href="#" target="_blank" class="flex flex-col items-center gap-2 group">
-            <div class="w-14 h-14 rounded-2xl bg-black flex items-center justify-center transition group-hover:scale-105">
-              <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231z"/>
-              </svg>
-            </div>
-            <span class="text-xs opacity-70" style={`color: ${tc};`}>X</span>
-          </a>
-
-          <a id="shr-ig" href="#" target="_blank" class="flex flex-col items-center gap-2 group">
-            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#feda75] via-[#fd1d1d] to-[#405de6] flex items-center justify-center transition group-hover:scale-105">
-              <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.228.228 2.695.072 7.053.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.156 4.358 2.623 6.825 6.981 6.981C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.358-.156 6.825-2.623 6.981-6.981.058-1.28.072-1.689.072-4.948 0-3.259-.014-3.667-.072-4.947-.156-4.358-2.623-6.825-6.981-6.981C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zm0 10.162a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 11-2.88 0 1.44 1.44 0 012.88 0z"/>
-              </svg>
-            </div>
-            <span class="text-xs opacity-70" style={`color: ${tc};`}>Instagram</span>
-          </a>
-
-          <a id="shr-wa" href="#" target="_blank" class="flex flex-col items-center gap-2 group">
-            <div class="w-14 h-14 rounded-2xl bg-[#25D366] flex items-center justify-center transition group-hover:scale-105">
-              <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.198-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606..."/>
-              </svg>
-            </div>
-            <span class="text-xs opacity-70" style={`color: ${tc};`}>WhatsApp</span>
-          </a>
-
-          <a id="shr-ms" href="#" target="_blank" class="flex flex-col items-center gap-2 group">
-            <div class="w-14 h-14 rounded-2xl bg-[#00AEEF] flex items-center justify-center transition group-hover:scale-105">
-              <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C6.477 2 2 6.477 2 12c0 3.165 1.185 6.058 3.128 8.25L3 22l2.25-2.128C7.942 21.815 10.835 23 14 23c5.523 0 10-4.477 10-10S17.523 2 12 2zm1.5 14.5l-4-4 1.5-1.5 2.5 2.5 5.5-5.5 1.5 1.5-7 7z"/>
-              </svg>
-            </div>
-            <span class="text-xs opacity-70" style={`color: ${tc};`}>Messenger</span>
-          </a>
-
-          <a id="shr-sc" href="#" target="_blank" class="flex flex-col items-center gap-2 group">
-            <div class="w-14 h-14 rounded-2xl bg-[#FFFC00] flex items-center justify-center transition group-hover:scale-105">
-              <svg class="w-6 h-6 text-black" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12.206.793c2.09 0 6.86.143 9.305 2.588 2.445 2.445 2.588 7.215 2.588 9.305v.628c0 2.09-.143 6.86-2.588 9.305-2.445 2.445-7.215 2.588-9.305 2.588h-.628c-2.09 0-6.86-.143-9.305-2.588C.143 19.569 0 14.799 0 12.709v-.628c0-2.09.143-6.86 2.588-9.305C5.033.936 10.103.793 12.193.793h.013zm-.103 3.96c-4.84 0-8.28 1.96-8.28 4.62 0 2.66 3.44 4.62 8.28 4.62s8.28-1.96 8.28-4.62c0-2.66-3.44-4.62-8.28-4.62z"/>
-              </svg>
-            </div>
-            <span class="text-xs opacity-70" style={`color: ${tc};`}>Snapchat</span>
-          </a>
         </div>
 
-        <div class="text-center text-xs opacity-60 pt-4 border-t border-white/10">
-          Powered by BioForge • <button class="underline hover:opacity-100">Report link</button>
+        <!-- Footer modal -->
+        <div class="text-center text-xs border-t pt-4 flex items-center justify-center gap-3" style={`color: ${tc}; opacity: 0.4; border-color: ${tc}15;`}>
+          <span>Powered by BioForge</span>
+          <span>•</span>
+          <button id="report-btn" class="hover:opacity-70 transition-opacity underline">Signaler</button>
         </div>
+
       </div>
     </div>
   </div>
 
-  <!-- ANIMATIONS -->
+  <!-- ===== STYLES ===== -->
   <style>
     @keyframes fade-in-up {
       from { opacity: 0; transform: translateY(16px); }
       to   { opacity: 1; transform: translateY(0); }
     }
     .animate-fade-in-up { animation: fade-in-up 0.45s ease both; }
+    #share-modal.open   { display: flex; }
+
+    /* Mobile : 3-dot toujours visible */
+    @media (max-width: 639px) {
+      .block-dot-btn { opacity: 0.7 !important; }
+    }
+
+    .dot-dropdown button:hover { background: rgba(255,255,255,0.06); }
   </style>
 
-  <!-- SCRIPT CORRIGÉ -->
-  <script type="module">
-    document.addEventListener('astro:page-load', () => {
-      const bridgeData = JSON.parse(document.getElementById('page-data')?.dataset.bridge || '{}');
-      const { profileUrl = '', profileName = '', primaryColor: pc = '#00ff9d' } = bridgeData;
+  <!-- ===== SCRIPT ===== -->
+  <!--
+    BUG CORRIGÉ : Ne jamais wrapper dans astro:page-load sauf si View Transitions
+    est activé dans astro.config. Les scripts type="module" sont déjà différés.
+    On utilise DOMContentLoaded en fallback universel.
+  -->
+  <script type="module" define:vars={{ bridgeJson: bridge }}>
 
-      const QR_API = 'https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=';
+    const { profileUrl, profileName, primaryColor: pc, bgColor: bg, textColor: tc, qrDataUrl } = JSON.parse(bridgeJson);
 
-      function openShareModal(title = '', url = '', iconUrl = '') {
-        const label = title || profileName || 'Lien';
-        const target = url || profileUrl;
+    // ── Dropdown 3-dot : position FIXED pour éviter le clipping ────────────
+    let activeDropdown = null;
 
-        const img = document.getElementById('modal-icon-img');
-        const fallback = document.getElementById('modal-icon-fallback');
-        if (img && fallback) {
-          if (iconUrl) {
-            img.src = iconUrl;
-            img.classList.remove('hidden');
-            fallback.classList.add('hidden');
-          } else {
-            img.classList.add('hidden');
-            fallback.classList.remove('hidden');
-            fallback.textContent = label.charAt(0).toUpperCase() || '?';
-            fallback.style.background = `linear-gradient(to bottom right, ${pc}, ${pc}cc)`;
-          }
+    function positionDropdown(dropdown, btn) {
+      const rect = btn.getBoundingClientRect();
+      const ddW  = 208; // w-52
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const showAbove  = spaceBelow < 120 && rect.top > 120;
+
+      dropdown.style.position = 'fixed';
+      dropdown.style.right    = `${window.innerWidth - rect.right}px`;
+      if (showAbove) {
+        dropdown.style.bottom = `${window.innerHeight - rect.top + 8}px`;
+        dropdown.style.top    = 'auto';
+      } else {
+        dropdown.style.top    = `${rect.bottom + 8}px`;
+        dropdown.style.bottom = 'auto';
+      }
+    }
+
+    function closeAllDropdowns() {
+      document.querySelectorAll('.dot-dropdown').forEach(d => d.classList.add('hidden'));
+      activeDropdown = null;
+    }
+
+    document.addEventListener('click', closeAllDropdowns);
+    document.addEventListener('scroll', closeAllDropdowns, { passive: true });
+
+    document.querySelectorAll('.block-dot-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const id = btn.dataset.id;
+        const dropdown = document.querySelector(`.dot-dropdown[data-id="${id}"]`);
+        if (!dropdown) return;
+
+        const isOpen = !dropdown.classList.contains('hidden');
+        closeAllDropdowns();
+
+        if (!isOpen) {
+          positionDropdown(dropdown, btn);
+          dropdown.classList.remove('hidden');
+          activeDropdown = dropdown;
         }
-
-        document.getElementById('modal-title')?.textContent = label;
-        document.getElementById('modal-url')?.textContent = target;
-        document.getElementById('modal-qr')?.setAttribute('src', QR_API + encodeURIComponent(target));
-
-        const encUrl = encodeURIComponent(target);
-        const encMsg = encodeURIComponent(`${label} — ${target}`);
-
-        const social = {
-          'shr-x':  `https://x.com/intent/tweet?text=${encMsg}&url=${encUrl}`,
-          'shr-ig': 'https://www.instagram.com/',
-          'shr-wa': `https://wa.me/?text=${encMsg}`,
-          'shr-ms': `fb-messenger://share?link=${encUrl}`,
-          'shr-sc': `https://www.snapchat.com/scan?attachmentUrl=${encUrl}`
-        };
-
-        Object.entries(social).forEach(([id, href]) => {
-          document.getElementById(id)?.setAttribute('href', href);
-        });
-
-        const modal = document.getElementById('share-modal');
-        if (modal) {
-          modal.classList.remove('hidden');
-          setTimeout(() => {
-            const inner = modal.querySelector('.relative');
-            if (inner) {
-              inner.classList.remove('scale-95', 'opacity-0');
-              inner.classList.add('scale-100', 'opacity-100');
-            }
-          }, 10);
-        }
-      }
-
-      function closeModal() {
-        const modal = document.getElementById('share-modal');
-        if (!modal) return;
-        const inner = modal.querySelector('.relative');
-        if (inner) inner.classList.add('scale-95', 'opacity-0');
-        setTimeout(() => modal.classList.add('hidden'), 300);
-      }
-
-      document.getElementById('share-backdrop')?.addEventListener('click', closeModal);
-      document.getElementById('share-close')?.addEventListener('click', closeModal);
-      document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
-
-      // Dropdown 3 points
-      document.addEventListener('click', () => {
-        document.querySelectorAll('.dot-dropdown').forEach(d => d.classList.add('hidden'));
-      });
-
-      function attachDotListeners() {
-        document.querySelectorAll('.block-dot-btn:not([data-listener-attached])').forEach(btn => {
-          btn.dataset.listenerAttached = 'true';
-          btn.addEventListener('click', e => {
-            e.stopPropagation();
-            document.querySelectorAll('.dot-dropdown').forEach(d => d.classList.add('hidden'));
-            const id = btn.dataset.id;
-            if (id) document.querySelector(`.dot-dropdown[data-id="${id}"]`)?.classList.toggle('hidden');
-          });
-        });
-      }
-
-      attachDotListeners();
-
-      const observer = new MutationObserver(attachDotListeners);
-      observer.observe(document.body, { childList: true, subtree: true });
-
-      document.querySelectorAll('.dot-copy-btn').forEach(btn => {
-        btn.addEventListener('click', async e => {
-          e.stopPropagation();
-          const url = btn.dataset.url;
-          if (!url) return;
-          await navigator.clipboard.writeText(url);
-          const span = btn.querySelector('span') || btn;
-          const orig = span.textContent || 'Copier le lien';
-          span.textContent = 'Copié !';
-          setTimeout(() => span.textContent = orig, 2000);
-          document.querySelectorAll('.dot-dropdown').forEach(d => d.classList.add('hidden'));
-        });
-      });
-
-      document.querySelectorAll('.dot-share-btn').forEach(btn => {
-        btn.addEventListener('click', e => {
-          e.stopPropagation();
-          document.querySelectorAll('.dot-dropdown').forEach(d => d.classList.add('hidden'));
-          openShareModal(btn.dataset.title, btn.dataset.url, btn.dataset.icon);
-        });
       });
     });
+
+    // ── Copy from dropdown ───────────────────────────────────────────────────
+    document.querySelectorAll('.dot-copy-btn').forEach(btn => {
+      btn.addEventListener('click', async e => {
+        e.stopPropagation();
+        const url = btn.dataset.url;
+        if (!url) return;
+        try {
+          await navigator.clipboard.writeText(url);
+          const span = btn.querySelector('span') ?? btn;
+          const orig = span.textContent;
+          span.textContent = 'Copié ✓';
+          setTimeout(() => { span.textContent = orig; }, 2000);
+        } catch {}
+        closeAllDropdowns();
+      });
+    });
+
+    // ── Share from dropdown ──────────────────────────────────────────────────
+    document.querySelectorAll('.dot-share-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        closeAllDropdowns();
+        openShareModal(btn.dataset.title, btn.dataset.url, btn.dataset.icon);
+      });
+    });
+
+    // ── Share modal ──────────────────────────────────────────────────────────
+    const shareModal = document.getElementById('share-modal');
+    const shareInner = document.getElementById('share-inner');
+
+    function openShareModal(title = '', url = '', iconUrl = '') {
+      const label  = title  || profileName || 'Lien';
+      const target = url    || profileUrl;
+
+      // Icon
+      const img      = document.getElementById('modal-icon-img');
+      const fallback = document.getElementById('modal-icon-fallback');
+      if (iconUrl && img && fallback) {
+        img.src = iconUrl;
+        img.classList.remove('hidden');
+        fallback.classList.add('hidden');
+      } else if (img && fallback) {
+        img.classList.add('hidden');
+        fallback.classList.remove('hidden');
+        fallback.textContent = (label.charAt(0) || '?').toUpperCase();
+      }
+
+      // Title + URL
+      const titleEl = document.getElementById('modal-title-text');
+      const urlEl   = document.getElementById('modal-url-text');
+      const copyEl  = document.getElementById('copy-url-display');
+      if (titleEl) titleEl.textContent = label;
+      if (urlEl)   urlEl.textContent   = target;
+      if (copyEl)  copyEl.textContent  = target;
+
+      // QR — utilise le QR du profil si c'est le même URL, sinon met à jour
+      const qrImg = document.getElementById('modal-qr');
+      if (qrImg) {
+        if (target !== profileUrl) {
+          // URL différente d'un block → re-génère via API (seul cas acceptable)
+          qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&color=${pc.replace('#','')}&bgcolor=00000000&data=${encodeURIComponent(target)}`;
+        } else {
+          qrImg.src = qrDataUrl; // QR pré-généré côté serveur, instantané
+        }
+      }
+
+      // Réseaux sociaux
+      const enc = encodeURIComponent(target);
+      const msg = encodeURIComponent(`${label} — ${target}`);
+      document.getElementById('shr-x')?.setAttribute('href', `https://x.com/intent/tweet?text=${msg}`);
+      document.getElementById('shr-wa')?.setAttribute('href', `https://wa.me/?text=${msg}`);
+      document.getElementById('shr-tg')?.setAttribute('href', `https://t.me/share/url?url=${enc}&text=${encodeURIComponent(label)}`);
+
+      // Native share
+      document.getElementById('shr-native').onclick = async () => {
+        if (navigator.share) {
+          try { await navigator.share({ title: label, url: target }); return; } catch {}
+        }
+        // Fallback → copie
+        await navigator.clipboard.writeText(target).catch(() => {});
+        const lbl = document.getElementById('shr-native-label');
+        if (lbl) { lbl.textContent = 'Copié !'; setTimeout(() => lbl.textContent = 'Plus', 2000); }
+      };
+
+      // Open
+      shareModal?.classList.add('open');
+      requestAnimationFrame(() => {
+        shareInner?.classList.remove('scale-95', 'opacity-0');
+        shareInner?.classList.add('scale-100', 'opacity-100');
+      });
+    }
+
+    function closeShareModal() {
+      shareInner?.classList.remove('scale-100', 'opacity-100');
+      shareInner?.classList.add('scale-95', 'opacity-0');
+      setTimeout(() => shareModal?.classList.remove('open'), 280);
+    }
+
+    document.getElementById('share-backdrop')?.addEventListener('click', closeShareModal);
+    document.getElementById('share-close')?.addEventListener('click',    closeShareModal);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeShareModal(); });
+
+    // ── Copy button dans la modal ────────────────────────────────────────────
+    document.getElementById('copy-btn')?.addEventListener('click', async () => {
+      const url = document.getElementById('copy-url-display')?.textContent?.trim();
+      if (!url) return;
+      await navigator.clipboard.writeText(url).catch(() => {});
+      const lbl = document.getElementById('copy-btn-label');
+      if (lbl) { lbl.textContent = 'Copié ✓'; setTimeout(() => lbl.textContent = 'Copier', 2000); }
+    });
+
+    // ── Report ───────────────────────────────────────────────────────────────
+    document.getElementById('report-btn')?.addEventListener('click', () => {
+      window.open(`/report?url=${encodeURIComponent(profileUrl)}`, '_blank');
+    });
+
+    // ── Analytics ────────────────────────────────────────────────────────────
+    let clickCooldown = false;
+    document.querySelectorAll('[data-block-id]').forEach(el => {
+      el.addEventListener('click', async () => {
+        if (clickCooldown) return;
+        clickCooldown = true;
+        setTimeout(() => { clickCooldown = false; }, 1000);
+        const blockId = el.getAttribute('data-block-id');
+        if (!blockId) return;
+        fetch('/api/analytics/click', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-csrf-token': 'dev-bypass' },
+          body: JSON.stringify({ block_id: blockId }),
+        }).catch(() => {});
+      });
+    });
+
   </script>
 
 </BaseLayout>
