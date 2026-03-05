@@ -1,9 +1,8 @@
 ---
-// src/pages/dashboard/blocks.astro — Blocks v2
-// Réécriture complète : UX 2026, search/filter, duplicate, stats inline, bulk actions
+// src/pages/dashboard/blocks.astro — Blocks v3
+// Nouveautés : icon_url cercle sur les links, quick-add URL, détection plateforme auto, 3-dot menu
 
 import DashboardLayout from '@/layouts/DashboardLayout.astro';
-import Badge from '@/components/ui/Badge.astro';
 import PlanLimitIndicator from '@/components/features/PlanLimitIndicator.astro';
 import { withAuth } from '@/lib/auth/auth';
 import { getBlocks } from '@/lib/supabase/queries';
@@ -11,33 +10,29 @@ import { getAnalyticsSummary } from '@/lib/db/queries.server';
 import { createServerClient } from '@supabase/ssr';
 import { parse } from 'cookie';
 
-// ==================== AUTH ====================
-const authResult = await withAuth({
-  cookies: Astro.cookies,
-  request: Astro.request,
-});
+// ── Auth ──────────────────────────────────────────────────────────────────────
+const authResult = await withAuth({ cookies: Astro.cookies, request: Astro.request });
 if (!authResult.success || !authResult.data) {
   return Astro.redirect(authResult.redirect || '/signin?error=auth_failed');
 }
 const { user, profile, planLimits } = authResult.data;
 
-// ==================== SANITIZATION ====================
+// ── Sanitization ──────────────────────────────────────────────────────────────
 function escapeHtml(val: unknown): string {
   return String(val ?? '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 }
 function safeNum(val: unknown): number {
-  const n = Number(val);
-  return isFinite(n) ? n : 0;
+  const n = Number(val); return isFinite(n) ? n : 0;
 }
 
-// ==================== DATA ====================
+// ── Data ──────────────────────────────────────────────────────────────────────
 const cookies = parse(Astro.request.headers.get('cookie') ?? '');
 const supabase = createServerClient(
   import.meta.env.PUBLIC_SUPABASE_URL!,
   import.meta.env.PUBLIC_SUPABASE_ANON_KEY!,
-  { cookies: { get: (k) => cookies[k], set: () => {}, remove: () => {} } }
+  { cookies: { get: k => cookies[k], set: () => {}, remove: () => {} } }
 );
 
 const safeProfileId = profile?.id?.trim() ?? '';
@@ -51,17 +46,15 @@ const rawBlocks = (blocksResult.success ? blocksResult.data : []) ?? [];
 const blocks    = rawBlocks.filter((b: any) => !b.deleted_at);
 const topBlocks = analyticsResult.success ? (analyticsResult.data?.topBlocks ?? []) : [];
 
-// Build clicks map
 const clicksMap = new Map<string, number>();
 topBlocks.forEach((b: any) => clicksMap.set(b.id, safeNum(b.clicks)));
 
-// UUID guard — never let a non-UUID id reach the client
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const safeBridgeBlocks = blocks
   .filter((b: any) => UUID_RE.test(String(b.id ?? '')))
   .map((b: any) => ({
-    id:         String(b.id),          // already validated — no escapeHtml corruption
+    id:         String(b.id),
     type:       escapeHtml(b.type),
     title:      escapeHtml(b.title),
     active:     Boolean(b.active),
@@ -69,21 +62,21 @@ const safeBridgeBlocks = blocks
     created_at: escapeHtml(b.created_at),
     clicks:     clicksMap.get(b.id) ?? 0,
     config: {
-      url:   escapeHtml(b.config?.url),
+      url:      escapeHtml(b.config?.url),
+      icon_url: escapeHtml(b.config?.icon_url),
       links: Array.isArray(b.config?.links)
         ? b.config.links.map((l: any) => ({ url: escapeHtml(l?.url ?? l) }))
         : [],
     },
   }));
 
-// Plan limits
+// ── Plan limits ───────────────────────────────────────────────────────────────
 const blockCount  = blocks.length;
 const blockLimit  = planLimits?.max_blocks_total ?? 15;
 const canAddBlock = blockLimit === -1 || blockCount < blockLimit;
 const isNearLimit = blockLimit !== -1 && blockCount >= blockLimit * 0.8 && blockCount < blockLimit;
 const blocksError = blocksResult.success ? null : (blocksResult.error?.message ?? 'Failed to load blocks');
 
-// Bridge
 const bridge = JSON.stringify({
   blocks:     safeBridgeBlocks,
   blockCount,
@@ -92,20 +85,18 @@ const bridge = JSON.stringify({
   profileId:  escapeHtml(safeProfileId),
 });
 
-// Block types config
 const BLOCK_TYPES = [
-  { type: 'link',    emoji: '🔗', label: 'Link',    desc: 'Clickable link',   color: 'neon-green'  },
-  { type: 'heading', emoji: '📝', label: 'Heading', desc: 'Section title',    color: 'neon-purple' },
-  { type: 'spacer',  emoji: '—',  label: 'Spacer',  desc: 'Add spacing',      color: 'neon-blue'   },
-  { type: 'image',   emoji: '🖼️', label: 'Image',   desc: 'Display image',    color: 'neon-pink'   },
-  { type: 'video',   emoji: '🎥', label: 'Video',   desc: 'Embed video',      color: 'neon-green'  },
-  { type: 'social',  emoji: '👥', label: 'Social',  desc: 'Social icons',     color: 'neon-purple' },
+  { type: 'link',    emoji: '🔗', label: 'Link',    desc: 'Clickable link'  },
+  { type: 'heading', emoji: '📝', label: 'Heading', desc: 'Section title'   },
+  { type: 'spacer',  emoji: '—',  label: 'Spacer',  desc: 'Add spacing'     },
+  { type: 'image',   emoji: '🖼️', label: 'Image',   desc: 'Display image'   },
+  { type: 'video',   emoji: '🎥', label: 'Video',   desc: 'Embed video'     },
+  { type: 'social',  emoji: '👥', label: 'Social',  desc: 'Social icons'    },
 ];
 ---
 
 <DashboardLayout title="Blocks">
 
-  <!-- Bridge -->
   <div id="server-data" class="hidden" data-bridge={bridge}></div>
 
   <!-- ===== HEADER ===== -->
@@ -116,14 +107,11 @@ const BLOCK_TYPES = [
       <p class="text-sm text-gray-400 mt-0.5">Build and manage your profile page</p>
     </div>
     <div class="flex items-center gap-2">
-      <!-- Bulk action bar (hidden by default) -->
+      <!-- Bulk bar -->
       <div id="bulk-bar" class="hidden items-center gap-2">
         <span id="bulk-count" class="text-xs text-gray-400 font-medium px-2">0 selected</span>
         <button id="bulk-toggle-btn"
-          class="flex items-center gap-1.5 px-3 py-2 glass border border-white/10 rounded-xl text-xs text-gray-300 hover:text-white hover:border-white/25 transition-all">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
+          class="px-3 py-2 glass border border-white/10 rounded-xl text-xs text-gray-300 hover:text-white hover:border-white/25 transition-all">
           Toggle
         </button>
         <button id="bulk-delete-btn"
@@ -133,20 +121,13 @@ const BLOCK_TYPES = [
           </svg>
           Delete
         </button>
-        <button id="bulk-cancel-btn"
-          class="px-3 py-2 text-xs text-gray-500 hover:text-white transition-colors">
-          Cancel
-        </button>
+        <button id="bulk-cancel-btn" class="px-3 py-2 text-xs text-gray-500 hover:text-white transition-colors">Cancel</button>
       </div>
 
       <button id="add-block-btn"
         class={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.98]
-          ${canAddBlock
-            ? 'bg-neon-green text-black hover:bg-neon-green/90'
-            : 'glass border border-white/10 text-gray-400 cursor-not-allowed opacity-60'
-          }`}
-        title="N"
-      >
+          ${canAddBlock ? 'bg-neon-green text-black hover:bg-neon-green/90' : 'glass border border-white/10 text-gray-400 cursor-not-allowed opacity-60'}`}
+        title="N">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
         </svg>
@@ -160,7 +141,7 @@ const BLOCK_TYPES = [
     <PlanLimitIndicator current={blockCount} limit={blockLimit} feature="Blocks" showUpgrade={true} />
   </div>
 
-  <!-- Near / at limit alerts -->
+  <!-- Alerts -->
   {isNearLimit && (
     <div class="mb-5 flex items-center gap-3 p-4 glass border border-yellow-400/20 rounded-xl">
       <svg class="w-4 h-4 text-yellow-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -173,9 +154,6 @@ const BLOCK_TYPES = [
   )}
   {!canAddBlock && blockLimit !== -1 && (
     <div class="mb-5 flex items-center gap-3 p-4 glass border border-red-500/20 rounded-xl">
-      <svg class="w-4 h-4 text-red-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
-      </svg>
       <p class="text-sm text-red-300">Block limit reached ({blockLimit}).
         <a href="/pricing" class="underline ml-1">Upgrade →</a>
       </p>
@@ -188,23 +166,49 @@ const BLOCK_TYPES = [
     </div>
   )}
 
+  <!-- ===== QUICK-ADD URL BAR ===== -->
+  <div class="mb-5">
+    <div id="quick-add-bar"
+      class="flex items-center gap-3 px-4 py-3 glass border border-white/10 rounded-xl focus-within:border-neon-green/40 transition-colors">
+      <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+      </svg>
+      <input
+        type="url"
+        id="quick-add-input"
+        placeholder="Paste a URL to add a link instantly…"
+        class="flex-1 bg-transparent text-white text-sm placeholder-gray-600 focus:outline-none min-w-0"
+      />
+      <!-- Detected platform badge + actions (hidden by default) -->
+      <div id="quick-detect-zone" class="hidden items-center gap-2 shrink-0">
+        <span id="quick-plat-icon" class="text-lg leading-none"></span>
+        <span id="quick-plat-label" class="text-xs font-semibold text-neon-green whitespace-nowrap"></span>
+        <button id="quick-add-confirm"
+          class="px-3 py-1.5 bg-neon-green text-black text-xs font-bold rounded-lg hover:bg-neon-green/90 active:scale-95 transition-all">
+          Add
+        </button>
+        <button id="quick-add-cancel" class="text-gray-600 hover:text-gray-300 transition-colors p-0.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== SEARCH + FILTER ===== -->
-  <div class="flex flex-col sm:flex-row gap-3 mb-5" id="search-filter-bar">
+  <div class="flex flex-col sm:flex-row gap-3 mb-5">
     <div class="relative flex-1">
       <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
       </svg>
-      <input
-        type="text"
-        id="search-input"
-        placeholder="Search blocks…"
-        class="w-full pl-9 pr-4 py-2.5 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/40 focus:outline-none transition-colors"
-      />
+      <input type="text" id="search-input" placeholder="Search blocks…"
+        class="w-full pl-9 pr-4 py-2.5 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/40 focus:outline-none transition-colors" />
     </div>
     <div class="flex items-center gap-2 overflow-x-auto pb-0.5">
       <button class="filter-btn active shrink-0 px-3 py-2 rounded-xl text-xs font-medium transition-all" data-filter="all">All</button>
       {BLOCK_TYPES.map(t => (
-        <button class="filter-btn shrink-0 px-3 py-2 rounded-xl text-xs font-medium transition-all capitalize" data-filter={t.type}>
+        <button class="filter-btn shrink-0 px-3 py-2 rounded-xl text-xs font-medium transition-all" data-filter={t.type}>
           {t.emoji} {t.label}
         </button>
       ))}
@@ -214,7 +218,6 @@ const BLOCK_TYPES = [
   <!-- ===== BLOCKS LIST ===== -->
   <div id="blocks-container">
     {blocks.length === 0 ? (
-      <!-- Empty State -->
       <div id="empty-state" class="flex flex-col items-center justify-center py-20 text-center">
         <div class="w-20 h-20 rounded-2xl bg-neon-green/10 border border-neon-green/20 flex items-center justify-center mx-auto mb-5">
           <svg class="w-9 h-9 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -222,7 +225,7 @@ const BLOCK_TYPES = [
           </svg>
         </div>
         <h3 class="text-lg font-semibold text-white mb-2">No blocks yet</h3>
-        <p class="text-sm text-gray-400 mb-6 max-w-xs">Start building your page by adding links, headings, images and more.</p>
+        <p class="text-sm text-gray-400 mb-6 max-w-xs">Paste a URL above or click Add Block to get started.</p>
         {canAddBlock && (
           <button id="empty-add-btn"
             class="flex items-center gap-2 px-6 py-3 bg-neon-green text-black text-sm font-semibold rounded-xl hover:bg-neon-green/90 active:scale-[0.98] transition-all">
@@ -232,18 +235,14 @@ const BLOCK_TYPES = [
             Add Your First Block
           </button>
         )}
-        <p class="text-xs text-gray-600 mt-4">Tip: press <kbd class="px-1.5 py-0.5 glass rounded text-gray-400 font-mono text-xs">N</kbd> to quickly add a block</p>
+        <p class="text-xs text-gray-600 mt-4">Tip: press <kbd class="px-1.5 py-0.5 glass rounded text-gray-400 font-mono text-xs">N</kbd> to add a block</p>
       </div>
     ) : (
       <div class="space-y-2" id="sortable-blocks"></div>
     )}
-    <!-- No results (search) -->
     <div id="no-results" class="hidden flex-col items-center justify-center py-16 text-center">
-      <svg class="w-10 h-10 text-gray-700 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
-      </svg>
-      <p class="text-sm text-gray-500">No blocks match your search</p>
-      <button id="clear-search-btn" class="text-xs text-neon-green hover:underline mt-2">Clear filters</button>
+      <p class="text-sm text-gray-500 mb-2">No blocks match your search</p>
+      <button id="clear-search-btn" class="text-xs text-neon-green hover:underline">Clear filters</button>
     </div>
   </div>
 
@@ -252,19 +251,27 @@ const BLOCK_TYPES = [
     <div id="type-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
     <div class="relative glass border border-white/10 rounded-2xl p-6 w-full max-w-lg shadow-2xl">
       <div class="flex items-center justify-between mb-5">
-        <h3 class="text-white font-semibold">Choose Block Type</h3>
+        <h3 class="text-white font-semibold">Add Block</h3>
         <button id="type-close" class="text-gray-500 hover:text-white transition-colors">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
           </svg>
         </button>
       </div>
+
+      <!-- Platform shortcuts -->
+      <div id="platform-suggestions" class="mb-5">
+        <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-3">Popular platforms</p>
+        <div class="grid grid-cols-4 gap-2" id="platform-grid"></div>
+        <div class="my-4 border-t border-white/10"></div>
+      </div>
+
+      <!-- Block types -->
+      <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-3">Block types</p>
       <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {BLOCK_TYPES.map(t => (
-          <button
-            class="block-type-btn p-4 glass border border-white/10 rounded-xl hover:border-neon-green/40 hover:bg-white/5 active:scale-[0.97] transition-all text-left"
-            data-type={t.type}
-          >
+          <button class="block-type-btn p-4 glass border border-white/10 rounded-xl hover:border-neon-green/40 hover:bg-white/5 active:scale-[0.97] transition-all text-left"
+            data-type={t.type}>
             <div class="text-2xl mb-2">{t.emoji}</div>
             <h4 class="text-white text-sm font-semibold mb-0.5">{t.label}</h4>
             <p class="text-xs text-gray-500">{t.desc}</p>
@@ -309,69 +316,98 @@ const BLOCK_TYPES = [
 
 </DashboardLayout>
 
-<!-- ===== STYLES ===== -->
 <style>
-  .filter-btn {
-    color: rgb(107 114 128);
-    border: 1px solid transparent;
-    background: transparent;
-  }
+  .filter-btn { color: rgb(107 114 128); border: 1px solid transparent; background: transparent; }
   .filter-btn:hover { color: white; background: rgba(255,255,255,0.05); }
   .filter-btn.active { color: white; background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.15); }
 
-  #type-modal.open,
-  #edit-modal.open { display: flex; }
+  #type-modal.open, #edit-modal.open { display: flex; }
 
   .block-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
   .block-card.selected { border-color: rgba(0,255,157,0.4) !important; background: rgba(0,255,157,0.03); }
   .block-card.sortable-ghost { opacity: 0.4; }
   .block-card.sortable-drag  { box-shadow: 0 20px 60px rgba(0,0,0,0.5); transform: rotate(1deg); }
+
+  .block-menu-dropdown {
+    backdrop-filter: blur(16px);
+    background: rgba(12, 12, 18, 0.96);
+  }
 </style>
 
-<!-- ===== SORTABLE ===== -->
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 
-<!-- ===== SCRIPT ===== -->
 <script>
   import { toast } from '@/lib/utils/toast';
 
-  // ==================== BRIDGE ====================
+  // ── Bridge ────────────────────────────────────────────────────────────────
   const raw = JSON.parse(document.getElementById('server-data')?.dataset.bridge ?? '{}');
   let { blocks, blockCount, blockLimit, canAddBlock, profileId } = raw;
 
-  // ==================== STATE ====================
-  let selectedIds  = new Set();
+  // ── State ─────────────────────────────────────────────────────────────────
+  let selectedIds: Set<string> = new Set();
   let activeFilter = 'all';
   let searchQuery  = '';
   let isSaving     = false;
-  let sortable     = null;
+  let sortable: any = null;
 
-  // ==================== RENDER BLOCKS ====================
-  const BLOCK_EMOJI = { link: '🔗', heading: '📝', spacer: '—', image: '🖼️', video: '🎥', social: '👥' };
+  // ── Platform registry ─────────────────────────────────────────────────────
+  const PLATFORMS = [
+    { id: 'twitch',    label: 'Twitch',    icon: '🟣', match: ['twitch.tv'],                     defaultIcon: 'https://assets.twitch.tv/assets/favicon.ico' },
+    { id: 'youtube',   label: 'YouTube',   icon: '🔴', match: ['youtube.com', 'youtu.be'],        defaultIcon: 'https://www.youtube.com/favicon.ico' },
+    { id: 'tiktok',    label: 'TikTok',    icon: '⬛', match: ['tiktok.com'],                     defaultIcon: 'https://www.tiktok.com/favicon.ico' },
+    { id: 'instagram', label: 'Instagram', icon: '📸', match: ['instagram.com'],                  defaultIcon: 'https://www.instagram.com/favicon.ico' },
+    { id: 'twitter',   label: 'X',         icon: '🐦', match: ['twitter.com', 'x.com'],           defaultIcon: 'https://abs.twimg.com/favicons/twitter.3.ico' },
+    { id: 'discord',   label: 'Discord',   icon: '💬', match: ['discord.com', 'discord.gg'],      defaultIcon: 'https://discord.com/favicon.ico' },
+    { id: 'kick',      label: 'Kick',      icon: '🟢', match: ['kick.com'],                       defaultIcon: 'https://kick.com/favicon.ico' },
+    { id: 'spotify',   label: 'Spotify',   icon: '🎵', match: ['spotify.com', 'open.spotify.com'],defaultIcon: 'https://open.spotify.com/favicon.ico' },
+    { id: 'github',    label: 'GitHub',    icon: '🐙', match: ['github.com'],                     defaultIcon: 'https://github.com/favicon.ico' },
+    { id: 'linkedin',  label: 'LinkedIn',  icon: '💼', match: ['linkedin.com'],                   defaultIcon: 'https://www.linkedin.com/favicon.ico' },
+    { id: 'patreon',   label: 'Patreon',   icon: '🎁', match: ['patreon.com'],                    defaultIcon: 'https://c5.patreon.com/external/favicon/favicon.ico' },
+    { id: 'snapchat',  label: 'Snapchat',  icon: '👻', match: ['snapchat.com'],                   defaultIcon: 'https://www.snapchat.com/favicon.ico' },
+  ];
 
-  function isNew(createdAt) {
-    if (!createdAt) return false;
-    return Date.now() - new Date(createdAt).getTime() < 24 * 60 * 60 * 1000;
+  function detectPlatform(url: string) {
+    try {
+      const lower = url.toLowerCase();
+      return PLATFORMS.find(p => p.match.some(m => lower.includes(m))) ?? null;
+    } catch { return null; }
+  }
+
+  function getDefaultTitle(url: string, platform: any): string {
+    if (!platform) return '';
+    try {
+      const parts = new URL(url).pathname.split('/').filter(Boolean);
+      return parts[0] ? `${platform.label} — @${parts[0]}` : platform.label;
+    } catch { return platform.label; }
+  }
+
+  // ── Block emoji map ───────────────────────────────────────────────────────
+  const BLOCK_EMOJI: Record<string, string> = {
+    link: '🔗', heading: '📝', spacer: '—', image: '🖼️', video: '🎥', social: '👥'
+  };
+
+  function isNew(createdAt: string): boolean {
+    return !!createdAt && Date.now() - new Date(createdAt).getTime() < 86_400_000;
   }
 
   function getFiltered() {
-    return blocks.filter(b => {
+    return blocks.filter((b: any) => {
       const matchType   = activeFilter === 'all' || b.type === activeFilter;
       const matchSearch = !searchQuery || b.title?.toLowerCase().includes(searchQuery) || b.type.includes(searchQuery);
       return matchType && matchSearch;
     });
   }
 
+  // ── Render blocks ─────────────────────────────────────────────────────────
   function renderBlocks() {
-    const container = document.getElementById('sortable-blocks');
+    const container  = document.getElementById('sortable-blocks');
     const noResults  = document.getElementById('no-results');
     const emptyState = document.getElementById('empty-state');
     if (!container) return;
 
-    const filtered = getFiltered();
+    const filtered  = getFiltered();
     const hasSearch = searchQuery || activeFilter !== 'all';
 
-    // Show/hide empty state vs no-results
     if (blocks.length === 0) {
       container.innerHTML = '';
       emptyState?.classList.remove('hidden');
@@ -387,26 +423,34 @@ const BLOCK_TYPES = [
     }
     noResults?.classList.add('hidden');
 
-    container.innerHTML = filtered.map(block => {
+    container.innerHTML = filtered.map((block: any) => {
       const isSelected = selectedIds.has(block.id);
       const clicks     = block.clicks ?? 0;
       const newBadge   = isNew(block.created_at);
+      const iconUrl    = block.config?.icon_url || '';
+      const platform   = block.type === 'link' ? detectPlatform(block.config?.url || '') : null;
+
+      // Decide what to show in the icon slot
+      const iconHtml = iconUrl
+        ? `<div class="shrink-0 w-9 h-9 rounded-full overflow-hidden border border-white/10 bg-white/5">
+             <img src="${iconUrl}" class="w-full h-full object-cover" loading="lazy" onerror="this.parentElement.innerHTML='<span class=\'flex items-center justify-center w-full h-full text-base\'>${BLOCK_EMOJI[block.type] ?? '📌'}</span>'" />
+           </div>`
+        : platform
+          ? `<div class="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-lg bg-white/5 border border-white/10">${platform.icon}</div>`
+          : `<div class="shrink-0 w-9 h-9 flex items-center justify-center text-xl">${BLOCK_EMOJI[block.type] ?? '📌'}</div>`;
 
       return `
-        <div
-          class="block-card group relative glass border border-white/10 rounded-2xl p-4 transition-all hover:border-white/20 ${isSelected ? 'selected' : ''}"
-          data-id="${block.id}"
-          data-type="${block.type}"
-        >
-          <!-- Select checkbox (shown on hover or when in bulk mode) -->
-          <div class="absolute top-4 left-4 z-10 bulk-checkbox ${selectedIds.size > 0 ? '' : 'opacity-0 group-hover:opacity-100'} transition-opacity">
+        <div class="block-card group relative glass border border-white/10 rounded-2xl p-4 transition-all hover:border-white/20 ${isSelected ? 'selected' : ''}"
+          data-id="${block.id}" data-type="${block.type}">
+
+          <!-- Checkbox -->
+          <div class="absolute top-4 left-4 z-10 ${selectedIds.size > 0 ? '' : 'opacity-0 group-hover:opacity-100'} transition-opacity">
             <input type="checkbox" ${isSelected ? 'checked' : ''}
-              class="block-select w-4 h-4 rounded accent-neon-green cursor-pointer"
-              data-id="${block.id}"
-            />
+              class="block-select w-4 h-4 rounded accent-neon-green cursor-pointer" data-id="${block.id}" />
           </div>
 
-          <div class="flex items-center gap-4 pl-7">
+          <div class="flex items-center gap-3 pl-7">
+
             <!-- Drag handle -->
             <div class="drag-handle cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-400 transition-colors shrink-0 touch-none">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -414,20 +458,20 @@ const BLOCK_TYPES = [
               </svg>
             </div>
 
-            <!-- Type emoji -->
-            <div class="text-xl shrink-0">${BLOCK_EMOJI[block.type] ?? '📌'}</div>
+            <!-- Icon (circle) -->
+            ${iconHtml}
 
             <!-- Info -->
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap mb-0.5">
                 <span class="text-xs px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-400 font-medium capitalize">${block.type}</span>
                 ${block.title
-                  ? `<span class="text-sm font-semibold text-white truncate">${block.title}</span>`
-                  : `<span class="text-sm text-gray-600 italic">No title</span>`
-                }
+                  ? `<span class="text-sm font-semibold text-white truncate max-w-[160px]">${block.title}</span>`
+                  : `<span class="text-sm text-gray-600 italic">No title</span>`}
                 ${newBadge ? `<span class="text-xs px-1.5 py-0.5 rounded-full bg-neon-green/15 text-neon-green font-medium border border-neon-green/25">New</span>` : ''}
+                ${platform ? `<span class="text-xs px-1.5 py-0.5 rounded-full bg-white/5 text-gray-500 border border-white/10">${platform.label}</span>` : ''}
               </div>
-              <div class="flex items-center gap-3 text-xs text-gray-600">
+              <div class="flex items-center gap-3 text-xs">
                 <span class="${block.active ? 'text-neon-green' : 'text-gray-600'} flex items-center gap-1">
                   <span class="w-1.5 h-1.5 rounded-full ${block.active ? 'bg-neon-green' : 'bg-gray-600'}"></span>
                   ${block.active ? 'Active' : 'Inactive'}
@@ -438,8 +482,7 @@ const BLOCK_TYPES = [
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/>
                     </svg>
                     ${clicks.toLocaleString('fr-FR')} clicks
-                  </span>
-                ` : ''}
+                  </span>` : ''}
               </div>
             </div>
 
@@ -450,24 +493,42 @@ const BLOCK_TYPES = [
               <div class="w-10 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-neon-green transition-colors"></div>
             </label>
 
-            <!-- Actions (hover) -->
-            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-              <button class="block-duplicate-btn p-2 glass rounded-lg border border-white/5 text-gray-500 hover:text-white hover:border-white/20 transition-all" data-id="${block.id}" title="Duplicate">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+            <!-- 3-dot menu -->
+            <div class="relative shrink-0">
+              <button
+                class="block-menu-btn opacity-0 group-hover:opacity-100 transition-opacity p-2 glass rounded-lg border border-white/5 text-gray-500 hover:text-white hover:border-white/20 transition-all"
+                data-id="${block.id}" aria-label="Options">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <circle cx="12" cy="5" r="1.5"/>
+                  <circle cx="12" cy="12" r="1.5"/>
+                  <circle cx="12" cy="19" r="1.5"/>
                 </svg>
               </button>
-              <button class="block-edit-btn p-2 glass rounded-lg border border-white/5 text-gray-500 hover:text-white hover:border-white/20 transition-all" data-id="${block.id}" title="Edit">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                </svg>
-              </button>
-              <button class="block-delete-btn p-2 glass rounded-lg border border-white/5 text-gray-500 hover:text-red-400 hover:border-red-500/20 transition-all" data-id="${block.id}" title="Delete">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                </svg>
-              </button>
+              <div
+                class="block-menu-dropdown hidden absolute right-0 top-full mt-1 w-40 rounded-xl shadow-2xl z-30 py-1 border border-white/10 overflow-hidden"
+                data-id="${block.id}">
+                <button class="block-edit-btn w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors text-left" data-id="${block.id}">
+                  <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                  </svg>
+                  Edit
+                </button>
+                <button class="block-duplicate-btn w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors text-left" data-id="${block.id}">
+                  <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                  </svg>
+                  Duplicate
+                </button>
+                <div class="my-1 border-t border-white/10"></div>
+                <button class="block-delete-btn w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-400 hover:bg-red-500/5 transition-colors text-left" data-id="${block.id}">
+                  <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                  Delete
+                </button>
+              </div>
             </div>
+
           </div>
         </div>
       `;
@@ -478,63 +539,76 @@ const BLOCK_TYPES = [
     updateBulkBar();
   }
 
-  // ==================== CARD EVENT LISTENERS ====================
+  // ── Close dropdowns on outside click ─────────────────────────────────────
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.block-menu-dropdown').forEach(d => d.classList.add('hidden'));
+  });
+
+  // ── Card listeners ────────────────────────────────────────────────────────
   function attachCardListeners() {
     // Toggle active
     document.querySelectorAll('.block-toggle').forEach(toggle => {
-      toggle.addEventListener('change', async (e) => {
-        const id     = e.target.dataset.id;
+      toggle.addEventListener('change', async (e: any) => {
+        const id = e.target.dataset.id;
         const active = e.target.checked;
         try {
           const res = await fetch(`/api/blocks/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ active }),
           });
-          if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
-          const b = blocks.find(b => b.id === id);
+          if (!res.ok) throw new Error();
+          const b = blocks.find((b: any) => b.id === id);
           if (b) b.active = active;
           toast.success(active ? 'Block activated' : 'Block deactivated');
-        } catch (err) {
+        } catch {
           e.target.checked = !active;
-          toast.error(err instanceof Error ? err.message : 'Failed to update block');
+          toast.error('Failed to update block');
         }
       });
     });
 
     // Select (bulk)
     document.querySelectorAll('.block-select').forEach(cb => {
-      cb.addEventListener('change', (e) => {
+      cb.addEventListener('change', (e: any) => {
         const id = e.target.dataset.id;
         e.target.checked ? selectedIds.add(id) : selectedIds.delete(id);
-        const card = document.querySelector(`.block-card[data-id="${id}"]`);
-        card?.classList.toggle('selected', e.target.checked);
+        document.querySelector(`.block-card[data-id="${id}"]`)?.classList.toggle('selected', e.target.checked);
         updateBulkBar();
+      });
+    });
+
+    // 3-dot toggle
+    document.querySelectorAll('.block-menu-btn').forEach(btn => {
+      btn.addEventListener('click', (e: any) => {
+        e.stopPropagation();
+        document.querySelectorAll('.block-menu-dropdown').forEach(d => d.classList.add('hidden'));
+        const id = (btn as HTMLElement).dataset.id;
+        document.querySelector(`.block-menu-dropdown[data-id="${id}"]`)?.classList.toggle('hidden');
       });
     });
 
     // Edit
     document.querySelectorAll('.block-edit-btn').forEach(btn => {
-      btn.addEventListener('click', () => handleEditBlock(btn.dataset.id));
+      btn.addEventListener('click', () => handleEditBlock((btn as HTMLElement).dataset.id!));
     });
 
     // Duplicate
     document.querySelectorAll('.block-duplicate-btn').forEach(btn => {
-      btn.addEventListener('click', () => handleDuplicateBlock(btn.dataset.id));
+      btn.addEventListener('click', () => handleDuplicateBlock((btn as HTMLElement).dataset.id!));
     });
 
     // Delete
     document.querySelectorAll('.block-delete-btn').forEach(btn => {
-      btn.addEventListener('click', () => handleDeleteBlock(btn.dataset.id));
+      btn.addEventListener('click', () => handleDeleteBlock((btn as HTMLElement).dataset.id!));
     });
   }
 
-  // ==================== SORTABLE ====================
+  // ── Sortable ──────────────────────────────────────────────────────────────
   function initSortable() {
     const container = document.getElementById('sortable-blocks');
     if (!container) return;
     sortable?.destroy();
-    sortable = new Sortable(container, {
+    sortable = new (window as any).Sortable(container, {
       animation: 200,
       handle: '.drag-handle',
       ghostClass: 'sortable-ghost',
@@ -542,21 +616,18 @@ const BLOCK_TYPES = [
       onEnd: async () => {
         const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
         const blockIds = Array.from(container.children)
-          .map(el => el.dataset.id)
-          .filter(id => id && UUID_RE.test(id));
-        if (blockIds.length === 0) return;
+          .map((el: any) => el.dataset.id)
+          .filter((id: any) => id && UUID_RE.test(id));
+        if (!blockIds.length) return;
         try {
           const res = await fetch('/api/blocks/reorder', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ blockIds }),
           });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          // Update local order
-          const ordered = blockIds.map(id => blocks.find(b => b.id === id)).filter(Boolean);
-          blocks = ordered;
+          if (!res.ok) throw new Error();
+          blocks = blockIds.map((id: string) => blocks.find((b: any) => b.id === id)).filter(Boolean);
           toast.success('Order saved');
-        } catch (err) {
+        } catch {
           toast.error('Failed to save order');
           renderBlocks();
         }
@@ -564,41 +635,31 @@ const BLOCK_TYPES = [
     });
   }
 
-  // ==================== BULK ACTIONS ====================
+  // ── Bulk actions ──────────────────────────────────────────────────────────
   function updateBulkBar() {
-    const bar   = document.getElementById('bulk-bar');
+    const bar = document.getElementById('bulk-bar');
     const count = document.getElementById('bulk-count');
     if (!bar || !count) return;
     if (selectedIds.size > 0) {
-      bar.classList.remove('hidden');
-      bar.classList.add('flex');
+      bar.classList.remove('hidden'); bar.classList.add('flex');
       count.textContent = `${selectedIds.size} selected`;
     } else {
-      bar.classList.add('hidden');
-      bar.classList.remove('flex');
+      bar.classList.add('hidden'); bar.classList.remove('flex');
     }
   }
 
-  document.getElementById('bulk-cancel-btn')?.addEventListener('click', () => {
-    selectedIds.clear();
-    renderBlocks();
-  });
+  document.getElementById('bulk-cancel-btn')?.addEventListener('click', () => { selectedIds.clear(); renderBlocks(); });
 
   document.getElementById('bulk-toggle-btn')?.addEventListener('click', async () => {
     const ids = [...selectedIds];
-    const currentlyActive = ids.every(id => blocks.find(b => b.id === id)?.active);
-    const newActive = !currentlyActive;
+    const newActive = !ids.every(id => blocks.find((b: any) => b.id === id)?.active);
     try {
-      await Promise.all(ids.map(id =>
-        fetch(`/api/blocks/${id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ active: newActive }),
-        })
-      ));
-      ids.forEach(id => { const b = blocks.find(b => b.id === id); if (b) b.active = newActive; });
-      selectedIds.clear();
-      renderBlocks();
+      await Promise.all(ids.map(id => fetch(`/api/blocks/${id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: newActive }),
+      })));
+      ids.forEach(id => { const b = blocks.find((b: any) => b.id === id); if (b) b.active = newActive; });
+      selectedIds.clear(); renderBlocks();
       toast.success(`${ids.length} block${ids.length > 1 ? 's' : ''} ${newActive ? 'activated' : 'deactivated'}`);
     } catch { toast.error('Bulk toggle failed'); }
   });
@@ -608,43 +669,86 @@ const BLOCK_TYPES = [
     if (!confirm(`Delete ${ids.length} block${ids.length > 1 ? 's' : ''}? This cannot be undone.`)) return;
     try {
       await Promise.all(ids.map(id => fetch(`/api/blocks/${id}`, { method: 'DELETE' })));
-      blocks = blocks.filter(b => !ids.includes(b.id));
-      selectedIds.clear();
-      renderBlocks();
+      blocks = blocks.filter((b: any) => !ids.includes(b.id));
+      selectedIds.clear(); renderBlocks();
       toast.success(`${ids.length} block${ids.length > 1 ? 's' : ''} deleted`);
     } catch { toast.error('Bulk delete failed'); }
   });
 
-  // ==================== SEARCH & FILTER ====================
-  document.getElementById('search-input')?.addEventListener('input', (e) => {
-    searchQuery = e.target.value.toLowerCase().trim();
-    renderBlocks();
+  // ── Search & filter ───────────────────────────────────────────────────────
+  document.getElementById('search-input')?.addEventListener('input', (e: any) => {
+    searchQuery = e.target.value.toLowerCase().trim(); renderBlocks();
   });
 
   document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      activeFilter = btn.dataset.filter;
+      activeFilter = (btn as HTMLElement).dataset.filter!;
       document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b === btn));
       renderBlocks();
     });
   });
 
   document.getElementById('clear-search-btn')?.addEventListener('click', () => {
-    searchQuery  = '';
-    activeFilter = 'all';
-    const input  = document.getElementById('search-input');
-    if (input) input.value = '';
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === 'all'));
+    searchQuery = ''; activeFilter = 'all';
+    (document.getElementById('search-input') as HTMLInputElement).value = '';
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', (b as HTMLElement).dataset.filter === 'all'));
     renderBlocks();
   });
 
-  // ==================== MODALS ====================
-  function openModal(id) {
-    document.getElementById(id)?.classList.add('open');
-  }
-  function closeModal(id) {
-    document.getElementById(id)?.classList.remove('open');
-  }
+  // ── Quick-add URL ─────────────────────────────────────────────────────────
+  const quickInput   = document.getElementById('quick-add-input') as HTMLInputElement;
+  const detectZone   = document.getElementById('quick-detect-zone')!;
+  const platIconEl   = document.getElementById('quick-plat-icon')!;
+  const platLabelEl  = document.getElementById('quick-plat-label')!;
+  let   quickUrl     = '';
+  let   quickPlat: any = null;
+
+  quickInput?.addEventListener('input', () => {
+    const val = quickInput.value.trim();
+    if (val.startsWith('http')) {
+      quickUrl  = val;
+      quickPlat = detectPlatform(val);
+      platIconEl.textContent  = quickPlat?.icon  ?? '🔗';
+      platLabelEl.textContent = quickPlat?.label ?? 'Link detected';
+      detectZone.classList.remove('hidden');
+      detectZone.classList.add('flex');
+    } else {
+      detectZone.classList.add('hidden');
+      detectZone.classList.remove('flex');
+    }
+  });
+
+  // Also trigger on paste
+  quickInput?.addEventListener('paste', () => setTimeout(() => quickInput.dispatchEvent(new Event('input')), 0));
+
+  document.getElementById('quick-add-confirm')?.addEventListener('click', async () => {
+    if (!quickUrl) return;
+    if (!canAddBlock) { toast.error('Block limit reached!'); return; }
+    const title   = getDefaultTitle(quickUrl, quickPlat);
+    const iconUrl = quickPlat?.defaultIcon ?? '';
+    try {
+      const res = await fetch('/api/blocks', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'link', title, config: { url: quickUrl, ...(iconUrl ? { icon_url: iconUrl } : {}) } }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      blocks.push({ id: data.id, type: 'link', title, config: { url: quickUrl, icon_url: iconUrl }, active: true, created_at: new Date().toISOString(), clicks: 0 });
+      renderBlocks();
+      toast.success(`${quickPlat?.label ?? 'Link'} added!`);
+      quickInput.value = '';
+      detectZone.classList.add('hidden'); detectZone.classList.remove('flex');
+    } catch (err: any) { toast.error(err.message || 'Failed to add'); }
+  });
+
+  document.getElementById('quick-add-cancel')?.addEventListener('click', () => {
+    quickInput.value = '';
+    detectZone.classList.add('hidden'); detectZone.classList.remove('flex');
+  });
+
+  // ── Modals ────────────────────────────────────────────────────────────────
+  function openModal(id: string)  { document.getElementById(id)?.classList.add('open'); }
+  function closeModal(id: string) { document.getElementById(id)?.classList.remove('open'); }
 
   document.getElementById('type-backdrop')?.addEventListener('click', () => closeModal('type-modal'));
   document.getElementById('edit-backdrop')?.addEventListener('click', () => closeModal('edit-modal'));
@@ -652,120 +756,191 @@ const BLOCK_TYPES = [
   document.getElementById('edit-close')?.addEventListener('click',    () => closeModal('edit-modal'));
   document.getElementById('cancel-btn')?.addEventListener('click',    () => closeModal('edit-modal'));
 
-  document.getElementById('add-block-btn')?.addEventListener('click', () => {
+  function openTypeModal() {
     if (!canAddBlock) { toast.error('Block limit reached. Upgrade your plan!'); return; }
-    openModal('type-modal');
-  });
-  document.getElementById('empty-add-btn')?.addEventListener('click', () => openModal('type-modal'));
 
-  // Type selection
+    // Build platform grid
+    const grid = document.getElementById('platform-grid')!;
+    grid.innerHTML = PLATFORMS.slice(0, 8).map(p => `
+      <button class="plat-btn flex flex-col items-center gap-1.5 p-2.5 glass border border-white/10 rounded-xl hover:border-neon-green/30 hover:bg-white/5 transition-all group"
+        data-pid="${p.id}">
+        <span class="text-xl leading-none">${p.icon}</span>
+        <span class="text-xs text-gray-400 group-hover:text-white transition-colors truncate w-full text-center">${p.label}</span>
+      </button>
+    `).join('');
+
+    grid.querySelectorAll('.plat-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const plat = PLATFORMS.find(p => p.id === (btn as HTMLElement).dataset.pid)!;
+        closeModal('type-modal');
+        openEditModal('link', null, plat);
+      });
+    });
+
+    openModal('type-modal');
+  }
+
+  document.getElementById('add-block-btn')?.addEventListener('click', openTypeModal);
+  document.getElementById('empty-add-btn')?.addEventListener('click', openTypeModal);
+
   document.querySelectorAll('.block-type-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       closeModal('type-modal');
-      openEditModal(btn.dataset.type, null);
+      openEditModal((btn as HTMLElement).dataset.type!, null, null);
     });
   });
 
-  // ==================== FORM RENDERING ====================
+  // ── Form ──────────────────────────────────────────────────────────────────
   const INPUT_CLASS = 'w-full px-4 py-3 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none focus:ring-1 focus:ring-neon-green/20 transition-colors';
 
-  function openEditModal(type, block = null) {
-    const title      = document.getElementById('modal-title');
-    const submitText = document.getElementById('submit-text');
-    const blockIdEl  = document.getElementById('block-id');
-    const blockTypeEl= document.getElementById('block-type');
-    const fields     = document.getElementById('form-fields');
-    if (!fields) return;
+  function openEditModal(type: string, block: any = null, suggestedPlat: any = null) {
+    (document.getElementById('modal-title')!).textContent     = block ? `Edit ${type}` : `Add ${type}`;
+    (document.getElementById('submit-text')!).textContent     = block ? 'Update Block' : 'Save Block';
+    (document.getElementById('block-id') as HTMLInputElement).value   = block?.id ?? '';
+    (document.getElementById('block-type') as HTMLInputElement).value = type;
 
-    if (title) title.textContent     = block ? `Edit ${type}` : `Add ${type}`;
-    if (submitText) submitText.textContent = block ? 'Update Block' : 'Save Block';
-    if (blockIdEl)  blockIdEl.value  = block?.id ?? '';
-    if (blockTypeEl) blockTypeEl.value = type;
+    const val      = (key: string) => (block?.config?.[key] ?? '') as string;
+    const titleVal = block?.title ?? (suggestedPlat?.label ?? '');
+    const iconVal  = block?.config?.icon_url ?? (suggestedPlat?.defaultIcon ?? '');
+    const urlVal   = block?.config?.url ?? '';
 
-    const val = (key) => block?.config?.[key] ?? '';
-    const titleVal = block?.title ?? '';
+    // Icon preview widget
+    const iconWidget = `
+      <div class="space-y-1.5">
+        <label class="text-sm font-medium text-gray-300 flex items-center gap-1.5">
+          Icon
+          <span class="text-xs text-gray-500 font-normal">optional — shown as circle</span>
+        </label>
+        <div class="flex items-center gap-3">
+          <div id="icon-preview-wrap"
+            class="shrink-0 w-12 h-12 rounded-full overflow-hidden border-2 border-white/10 bg-white/5 flex items-center justify-center transition-all">
+            ${iconVal
+              ? `<img src="${iconVal}" class="w-full h-full object-cover" />`
+              : `<svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`
+            }
+          </div>
+          <input type="url" id="field-icon-url" value="${iconVal}"
+            placeholder="https://example.com/icon.png"
+            class="${INPUT_CLASS} flex-1" />
+        </div>
+        <p class="text-xs text-gray-600">Square image recommended (1:1).</p>
+      </div>
+    `;
 
-    const fieldHtml = {
+    const fieldHtml: Record<string, string> = {
       link: `
         <div class="space-y-1.5">
           <label class="text-sm font-medium text-gray-300">Title <span class="text-red-400">*</span></label>
-          <input type="text" id="field-title" value="${titleVal}" required maxlength="100" placeholder="My Instagram" class="${INPUT_CLASS}" />
+          <input type="text" id="field-title" value="${titleVal}" required maxlength="100" placeholder="My Twitch" class="${INPUT_CLASS}" />
         </div>
         <div class="space-y-1.5">
           <label class="text-sm font-medium text-gray-300">URL <span class="text-red-400">*</span></label>
-          <input type="url" id="field-url" value="${val('url')}" required placeholder="https://instagram.com/username" class="${INPUT_CLASS}" />
-        </div>`,
+          <input type="url" id="field-url" value="${urlVal}" required placeholder="https://twitch.tv/username" class="${INPUT_CLASS}" />
+        </div>
+        ${iconWidget}`,
+
       heading: `
         <div class="space-y-1.5">
           <label class="text-sm font-medium text-gray-300">Heading Text <span class="text-red-400">*</span></label>
           <input type="text" id="field-title" value="${titleVal}" required maxlength="100" placeholder="My Social Links" class="${INPUT_CLASS}" />
         </div>`,
-      spacer: `
-        <div class="py-4 text-center text-sm text-gray-500">No configuration needed for spacer blocks.</div>`,
+
+      spacer: `<div class="py-4 text-center text-sm text-gray-500">No configuration needed.</div>`,
+
       image: `
         <div class="space-y-1.5">
           <label class="text-sm font-medium text-gray-300">Image URL <span class="text-red-400">*</span></label>
           <input type="url" id="field-url" value="${val('url')}" required placeholder="https://example.com/image.jpg" class="${INPUT_CLASS}" />
         </div>`,
+
       video: `
         <div class="space-y-1.5">
           <label class="text-sm font-medium text-gray-300">Video URL <span class="text-red-400">*</span></label>
           <input type="url" id="field-url" value="${val('url')}" required placeholder="https://youtube.com/watch?v=…" class="${INPUT_CLASS}" />
           <p class="text-xs text-gray-600">Supports YouTube, Vimeo, TikTok</p>
         </div>`,
+
       social: `
         <div class="space-y-1.5">
-          <label class="text-sm font-medium text-gray-300">Title <span class="text-gray-600 font-normal text-xs ml-1">Optional</span></label>
+          <label class="text-sm font-medium text-gray-300">Title <span class="text-gray-500 font-normal text-xs ml-1">Optional</span></label>
           <input type="text" id="field-title" value="${titleVal}" maxlength="60" placeholder="Follow Me" class="${INPUT_CLASS}" />
         </div>
         <div class="space-y-1.5">
           <label class="text-sm font-medium text-gray-300">Social URLs <span class="text-red-400">*</span></label>
-          <textarea id="field-links" rows="3" required placeholder="https://twitter.com/user&#10;https://instagram.com/user" class="${INPUT_CLASS} resize-none">${block?.config?.links?.map(l => l.url || l).join('\n') ?? ''}</textarea>
+          <textarea id="field-links" rows="3" required placeholder="https://twitter.com/user&#10;https://instagram.com/user" class="${INPUT_CLASS} resize-none">${block?.config?.links?.map((l: any) => l.url || l).join('\n') ?? ''}</textarea>
           <p class="text-xs text-gray-600">One URL per line</p>
         </div>`,
     };
 
+    const fields = document.getElementById('form-fields')!;
     fields.innerHTML = fieldHtml[type] ?? '';
     openModal('edit-modal');
-    // Focus first input
-    setTimeout(() => fields.querySelector('input, textarea')?.focus(), 100);
+    setTimeout(() => (fields.querySelector('input, textarea') as HTMLElement | null)?.focus(), 100);
+
+    // Live icon preview
+    const iconInput = document.getElementById('field-icon-url') as HTMLInputElement | null;
+    const iconWrap  = document.getElementById('icon-preview-wrap');
+    if (iconInput && iconWrap) {
+      const emptyIcon = `<svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`;
+      iconInput.addEventListener('input', () => {
+        const u = iconInput.value.trim();
+        iconWrap.innerHTML = u
+          ? `<img src="${u}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='${emptyIcon.replace(/'/g, "\\'")}'" />`
+          : emptyIcon;
+      });
+
+      // Auto-suggest icon from URL field
+      const urlField = document.getElementById('field-url') as HTMLInputElement | null;
+      urlField?.addEventListener('blur', () => {
+        if (iconInput.value) return; // don't overwrite if user typed something
+        const u = urlField.value.trim();
+        if (!u) return;
+        const plat = detectPlatform(u);
+        if (plat?.defaultIcon) {
+          iconInput.value = plat.defaultIcon;
+          iconWrap.innerHTML = `<img src="${plat.defaultIcon}" class="w-full h-full object-cover" />`;
+        }
+      });
+    }
   }
 
-  // ==================== FORM SUBMIT ====================
-  document.getElementById('block-form')?.addEventListener('submit', async (e) => {
+  // ── Form submit ───────────────────────────────────────────────────────────
+  document.getElementById('block-form')?.addEventListener('submit', async (e: any) => {
     e.preventDefault();
     if (isSaving) return;
 
-    const type    = document.getElementById('block-type')?.value;
-    const blockId = document.getElementById('block-id')?.value ?? '';
-    const submitBtn = document.getElementById('submit-btn');
-    const submitText = document.getElementById('submit-text');
+    const type    = (document.getElementById('block-type') as HTMLInputElement).value;
+    const blockId = (document.getElementById('block-id') as HTMLInputElement).value ?? '';
+    const submitBtn  = document.getElementById('submit-btn');
+    const submitText = document.getElementById('submit-text')!;
 
-    let title  = null;
-    let config = {};
+    let title: string | null = null;
+    let config: any = {};
 
-    // Client-side build + validate
-    const titleEl  = document.getElementById('field-title');
-    const urlEl    = document.getElementById('field-url');
-    const linksEl  = document.getElementById('field-links');
+    const titleEl   = document.getElementById('field-title')   as HTMLInputElement | null;
+    const urlEl     = document.getElementById('field-url')     as HTMLInputElement | null;
+    const linksEl   = document.getElementById('field-links')   as HTMLTextAreaElement | null;
+    const iconUrlEl = document.getElementById('field-icon-url') as HTMLInputElement | null;
 
     switch (type) {
-      case 'link':
-        title = titleEl?.value?.trim();
-        const url = urlEl?.value?.trim();
-        if (!title) { toast.error('Title is required'); return; }
-        if (!url || !url.startsWith('http')) { toast.error('Valid URL required'); return; }
-        config = { url };
+      case 'link': {
+        title = titleEl?.value?.trim() ?? null;
+        const url     = urlEl?.value?.trim() ?? '';
+        const iconUrl = iconUrlEl?.value?.trim() ?? '';
+        if (!title)                               { toast.error('Title is required'); return; }
+        if (!url || !url.startsWith('http'))      { toast.error('Valid URL required'); return; }
+        if (iconUrl && !iconUrl.startsWith('http')) { toast.error('Icon URL must start with https://'); return; }
+        config = { url, ...(iconUrl ? { icon_url: iconUrl } : {}) };
         break;
+      }
       case 'heading':
-        title = titleEl?.value?.trim();
+        title = titleEl?.value?.trim() ?? null;
         if (!title) { toast.error('Heading text is required'); return; }
         break;
-      case 'spacer':
-        break;
+      case 'spacer': break;
       case 'image':
       case 'video': {
-        const u = urlEl?.value?.trim();
+        const u = urlEl?.value?.trim() ?? '';
         if (!u || !u.startsWith('http')) { toast.error('Valid URL required'); return; }
         config = { url: u };
         break;
@@ -782,7 +957,7 @@ const BLOCK_TYPES = [
 
     isSaving = true;
     submitBtn?.setAttribute('disabled', '');
-    if (submitText) submitText.textContent = blockId ? 'Updating…' : 'Saving…';
+    submitText.textContent = blockId ? 'Updating…' : 'Saving…';
 
     try {
       const res = await fetch(blockId ? `/api/blocks/${blockId}` : '/api/blocks', {
@@ -792,94 +967,72 @@ const BLOCK_TYPES = [
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        if (res.status === 403) toast.error('Block limit reached. Upgrade your plan!');
+        if (res.status === 403) toast.error('Block limit reached!');
         else throw new Error(data.error || `HTTP ${res.status}`);
         return;
       }
 
       if (blockId) {
-        // Update in local state
-        const idx = blocks.findIndex(b => b.id === blockId);
+        const idx = blocks.findIndex((b: any) => b.id === blockId);
         if (idx !== -1) blocks[idx] = { ...blocks[idx], title, config, ...data };
       } else {
-        // Add new block to local state
         blocks.push({ id: data.id, type, title, config, active: true, created_at: new Date().toISOString(), clicks: 0, ...data });
       }
-
       closeModal('edit-modal');
       renderBlocks();
       toast.success(blockId ? 'Block updated!' : 'Block added!');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to save block');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save block');
     } finally {
       isSaving = false;
       submitBtn?.removeAttribute('disabled');
-      if (submitText) submitText.textContent = blockId ? 'Update Block' : 'Save Block';
+      submitText.textContent = blockId ? 'Update Block' : 'Save Block';
     }
   });
 
-  // ==================== EDIT ====================
-  function handleEditBlock(id) {
-    const block = blocks.find(b => b.id === id);
-    if (block) openEditModal(block.type, block);
+  // ── Edit / Duplicate / Delete ─────────────────────────────────────────────
+  function handleEditBlock(id: string) {
+    const block = blocks.find((b: any) => b.id === id);
+    if (block) openEditModal(block.type, block, null);
   }
 
-  // ==================== DUPLICATE ====================
-  async function handleDuplicateBlock(id) {
-    const block = blocks.find(b => b.id === id);
+  async function handleDuplicateBlock(id: string) {
+    const block = blocks.find((b: any) => b.id === id);
     if (!block) return;
-    if (!canAddBlock) { toast.error('Block limit reached. Upgrade your plan!'); return; }
+    if (!canAddBlock) { toast.error('Block limit reached!'); return; }
     try {
       const res = await fetch('/api/blocks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type:   block.type,
-          title:  block.title ? `${block.title} (copy)` : null,
-          config: block.config,
-        }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: block.type, title: block.title ? `${block.title} (copy)` : null, config: block.config }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (!res.ok) throw new Error(data.error);
       blocks.push({ ...block, id: data.id, title: block.title ? `${block.title} (copy)` : null, created_at: new Date().toISOString(), clicks: 0 });
       renderBlocks();
       toast.success('Block duplicated!');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to duplicate block');
-    }
+    } catch (err: any) { toast.error(err.message || 'Failed to duplicate'); }
   }
 
-  // ==================== DELETE ====================
-  async function handleDeleteBlock(id) {
+  async function handleDeleteBlock(id: string) {
     if (!confirm('Delete this block? This cannot be undone.')) return;
     try {
       const res = await fetch(`/api/blocks/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      blocks = blocks.filter(b => b.id !== id);
+      blocks = blocks.filter((b: any) => b.id !== id);
       selectedIds.delete(id);
       renderBlocks();
       toast.success('Block deleted');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to delete block');
-    }
+    } catch (err: any) { toast.error(err.message || 'Failed to delete'); }
   }
 
-  // ==================== KEYBOARD SHORTCUTS ====================
-  document.addEventListener('keydown', (e) => {
-    const tag = document.activeElement?.tagName;
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
+  document.addEventListener('keydown', (e: any) => {
+    const tag = (document.activeElement as HTMLElement)?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-
-    if (e.key === 'n' || e.key === 'N') {
-      e.preventDefault();
-      if (canAddBlock) openModal('type-modal');
-      else toast.error('Block limit reached');
-    }
-    if (e.key === 'Escape') {
-      closeModal('type-modal');
-      closeModal('edit-modal');
-    }
+    if (e.key === 'n' || e.key === 'N') { e.preventDefault(); openTypeModal(); }
+    if (e.key === 'Escape') { closeModal('type-modal'); closeModal('edit-modal'); }
   });
 
-  // ==================== INIT ====================
+  // ── Init ──────────────────────────────────────────────────────────────────
   renderBlocks();
 </script>
