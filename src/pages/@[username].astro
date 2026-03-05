@@ -271,7 +271,7 @@ function getSocialIconPath(url?: string): string {
               const hasIcon = Boolean(iconUrl);
 
               return (
-                <div class={`group relative ${theme.animations ? 'animate-fade-in-up' : ''}`} style={animDelay}>
+                <div class={`block-dot-wrap group relative ${theme.animations ? 'animate-fade-in-up' : ''}`} style={animDelay}>
 
                   <!-- Link button -->
                   <a href={url} target="_blank" rel="noopener noreferrer"
@@ -577,6 +577,8 @@ function getSocialIconPath(url?: string): string {
     // ── Dropdown 3-dot ───────────────────────────────────────────────────────
     function closeAllDropdowns() {
       document.querySelectorAll('.dot-dropdown').forEach(d => d.classList.add('hidden'));
+      // Réinitialise le z-index des blocs parents
+      document.querySelectorAll('.block-dot-wrap').forEach(el => el.classList.remove('z-50'));
     }
 
     document.addEventListener('click', closeAllDropdowns);
@@ -590,7 +592,11 @@ function getSocialIconPath(url?: string): string {
         if (!dropdown) return;
         const isOpen = !dropdown.classList.contains('hidden');
         closeAllDropdowns();
-        if (!isOpen) dropdown.classList.remove('hidden');
+        if (!isOpen) {
+          dropdown.classList.remove('hidden');
+          // Élève le bloc parent pour passer au-dessus des blocs suivants
+          btn.closest('.block-dot-wrap')?.classList.add('z-50');
+        }
       });
     });
 
