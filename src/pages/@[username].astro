@@ -260,7 +260,7 @@ function getSocialIconPath(url?: string): string {
           {(profile as any).is_verified === true && (
             <svg class="verified-badge shrink-0" width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" aria-label="Compte vérifié">
               <circle cx="14" cy="14" r="13" fill={pc}/>
-              <path d="M8 14.5 L11.8 18.5 L20 10.5" fill="none" stroke="#ffffff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="stroke:#ffffff !important; stroke-width:2.8px !important;"/>
+              <path d="M8 14.5 L11.8 18.5 L20 10.5" fill="none" stroke="#ffffff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="stroke:#000000 !important; stroke-width:2.8px !important;"/>
             </svg>
           )}
         </h1>
@@ -314,7 +314,7 @@ function getSocialIconPath(url?: string): string {
                         <img src={iconUrl} alt="" class="w-full h-full object-cover" loading="lazy" />
                       </div>
                     )}
-                    <span class={hasIcon ? 'flex-1 text-left' : 'flex-1 text-center'}>
+                    <span class={hasIcon ? 'flex-1 text-center' : 'flex-1 text-center'}>
                       {block.title || 'Link'}
                     </span>
                   </a>
@@ -417,7 +417,7 @@ function getSocialIconPath(url?: string): string {
               const links = Array.isArray(block.config?.links) ? block.config.links : [];
               if (!links.length) return null;
               return (
-                <div class={`flex items-center justify-center gap-3 py-2 overflow-x-auto flex-nowrap scrollbar-none ${theme.animations ? 'animate-fade-in-up' : ''}`} style={animDelay}>
+                <div class={`flex items-center justify-center gap-3 py-2 flex-nowrap scrollbar-none ${theme.animations ? 'animate-fade-in-up' : ''}`} style={animDelay}>
                   {links.map((link: any) => {
                     const url = typeof link === 'string' ? link : link?.url;
                     if (!url) return null;
