@@ -183,6 +183,13 @@ function getSocialIconPath(url?: string): string {
   if (u.includes('discord'))      return SOCIAL_ICONS.discord;
   return 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71';
 }
+
+// ==================== STYLE VARS FOR DYNAMIC COLORS ====================
+const styleVars = {
+  pc70: `${pc}70`,
+  pc00: `${pc}00`,
+  pc80: `${pc}80`,
+};
 ---
 
 <BaseLayout title={pageTitle}>
@@ -718,7 +725,7 @@ function getSocialIconPath(url?: string): string {
   </div>
 
   <!-- ===== STYLES ===== -->
-  <style>
+  <style define:vars={styleVars}>
     @keyframes fade-in-up {
       from { opacity: 0; transform: translateY(16px); }
       to   { opacity: 1; transform: translateY(0); }
@@ -743,9 +750,9 @@ function getSocialIconPath(url?: string): string {
 }
 
 @keyframes badge-pulse {
-  0%   { box-shadow: 0 0 0 0 ${pc}70; }
-  70%  { box-shadow: 0 0 0 12px ${pc}00; }
-  100% { box-shadow: 0 0 0 0 ${pc}00; }
+  0%   { box-shadow: 0 0 0 0 var(--pc70); }
+  70%  { box-shadow: 0 0 0 12px var(--pc00); }
+  100% { box-shadow: 0 0 0 0 var(--pc00); }
 }
 
 .verified-badge-wrapper {
@@ -762,7 +769,7 @@ function getSocialIconPath(url?: string): string {
 }
 
 .verified-badge-main {
-  filter: drop-shadow(0 4px 12px ${pc}80);
+  filter: drop-shadow(0 4px 12px var(--pc80));
 }
   </style>
 
