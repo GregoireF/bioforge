@@ -1,0 +1,666 @@
+---
+// src/pages/dashboard/billing.astro
+import DashboardLayout from '@/layouts/DashboardLayout.astro';
+import { withAuth } from '@/lib/auth/auth';
+import { createClient } from '@supabase/supabase-js';
+import Stripe from 'stripe';
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+let profile: any = null;
+try {
+  const auth = await withAuth({ cookies: Astro.cookies, request: Astro.request });
+  if (auth.success && auth.data) profile = auth.data.profile;
+} catch {}
+
+if (!profile) return Astro.redirect('/login');
+
+// ── Stripe + Supabase ─────────────────────────────────────────────────────────
+const stripe = new Stripe(import.meta.env.STRIPE_SECRET_KEY);
+const supabase = createClient(
+  import.meta.env.PUBLIC_SUPABASE_URL,
+  import.meta.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+// Subscription active
+const { data: subscription } = await supabase
+  .from('subscriptions')
+  .select('*')
+  .eq('profile_id', profile.id)
+  .in('status', ['active', 'trialing', 'past_due'])
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .maybeSingle();
+
+// Factures Stripe
+let invoices: any[] = [];
+if (profile.stripe_customer_id) {
+  try {
+    const inv = await stripe.invoices.list({ customer: profile.stripe_customer_id, limit: 6 });
+    invoices = inv.data.map(i => ({
+      id:       i.id,
+      number:   i.number,
+      date:     new Date(i.created * 1000).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' }),
+      amount:   ((i.amount_paid ?? 0) / 100).toFixed(2),
+      currency: (i.currency ?? 'eur').toUpperCase(),
+      status:   i.status,
+      pdf:      i.invoice_pdf,
+    }));
+  } catch {}
+}
+
+// ── Plans ─────────────────────────────────────────────────────────────────────
+const PLANS = [
+  {
+    key: 'Free', label: 'Free', priceLabel: 'Gratuit', color: '#6b7280',
+    features: ['5 blocks', 'Domaine BioForge', 'Analytics basiques', 'Communauté'],
+    priceId: null, monthlyEur: 0,
+  },
+  {
+    key: 'Creator', label: 'Creator', priceLabel: '7€/mois', color: '#38bdf8',
+    features: ['20 blocks', 'Analytics 30j', 'Sans branding', 'Blocs premium'],
+    priceId: import.meta.env.STRIPE_PRICE_CREATOR, monthlyEur: 7,
+  },
+  {
+    key: 'Pro', label: 'Pro', priceLabel: '14€/mois', color: '#39ff8f', popular: true,
+    features: ['Blocks illimités', 'Domaine custom', 'Analytics avancés', 'Support prioritaire', 'API access'],
+    priceId: import.meta.env.STRIPE_PRICE_PRO, monthlyEur: 14,
+  },
+  {
+    key: 'Enterprise', label: 'Enterprise', priceLabel: '49€/mois', color: '#fb923c',
+    features: ['Tout Pro +', 'SLA 99.9%', 'Onboarding dédié', 'Facturation annuelle'],
+    priceId: import.meta.env.STRIPE_PRICE_ENTERPRISE, monthlyEur: 49,
+  },
+];
+
+const currentPlan = profile.plan ?? 'Free';
+const currentPlanMeta = PLANS.find(p => p.key === currentPlan) ?? PLANS[0];
+const currentPlanIdx  = PLANS.findIndex(p => p.key === currentPlan);
+
+// Formatage date subscription
+function fmtDate(ts: string | null) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
+}
+
+const clientCtx = JSON.stringify({
+  currentPlan,
+  hasCustomer: !!profile.stripe_customer_id,
+  plans: PLANS.map(p => ({ key: p.key, label: p.label, priceLabel: p.priceLabel, priceId: p.priceId ?? null })),
+});
+---
+
+<DashboardLayout title="Billing">
+<div class="bp">
+
+  <!-- ── En-tête ──────────────────────────────────────────────────────────── -->
+  <div class="bp-header">
+    <div>
+      <h1 class="bp-title">Billing</h1>
+      <p class="bp-sub">Gère ton abonnement, ta carte bancaire et tes factures.</p>
+    </div>
+    {profile.stripe_customer_id && (
+      <button id="portal-btn" class="btn-portal">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+        </svg>
+        Gérer via Stripe
+      </button>
+    )}
+  </div>
+
+  <!-- ── Plan actuel ──────────────────────────────────────────────────────── -->
+  <div class="section">
+    <p class="section-label">Plan actuel</p>
+    <div class="current-card">
+      <div class="cc-left">
+        <div class="plan-pill" style={`color:${currentPlanMeta.color}; background:${currentPlanMeta.color}18; border-color:${currentPlanMeta.color}35;`}>
+          <span class="plan-dot" style={`background:${currentPlanMeta.color};`}></span>
+          {currentPlan}
+        </div>
+        <div>
+          {subscription ? (
+            <p class="cc-meta">
+              {subscription.cancel_at
+                ? `⚠ Annulation le ${fmtDate(subscription.cancel_at)}`
+                : `Renouvellement le ${fmtDate(subscription.current_period_end)}`}
+            </p>
+          ) : (
+            <p class="cc-meta">Aucun abonnement actif</p>
+          )}
+          {subscription && (
+            <p class={`cc-status s-${subscription.status}`}>
+              {subscription.status === 'active'   && '● Actif'}
+              {subscription.status === 'trialing' && '◌ Période d\'essai'}
+              {subscription.status === 'past_due' && '⚠ Paiement en retard'}
+            </p>
+          )}
+        </div>
+      </div>
+      <div class="cc-right">
+        <p class="cc-price">{currentPlanMeta.priceLabel}</p>
+        {subscription && !subscription.cancel_at && currentPlan !== 'Free' && (
+          <button id="cancel-btn" class="btn-cancel-sub">Annuler l'abonnement</button>
+        )}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Plans ────────────────────────────────────────────────────────────── -->
+  <div class="section">
+    <p class="section-label">Changer de plan</p>
+    <div class="plans-grid">
+      {PLANS.map((plan, idx) => {
+        const isCurrent = plan.key === currentPlan;
+        const isUpgrade = idx > currentPlanIdx;
+        return (
+          <div class={`plan-card${plan.popular ? ' pop' : ''}${isCurrent ? ' cur' : ''}`}
+            style={`--pc:${plan.color};`}>
+
+            {plan.popular && <div class="pop-tag">⚡ Populaire</div>}
+
+            <div class="pc-head">
+              <span class="pc-name" style={`color:${plan.color};`}>{plan.label}</span>
+              <span class="pc-price">{plan.priceLabel}</span>
+            </div>
+
+            <ul class="pc-feats">
+              {plan.features.map(f => (
+                <li>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={plan.color} stroke-width="2.5" stroke-linecap="round">
+                    <path d="M20 6L9 17l-5-5"/>
+                  </svg>
+                  {f}
+                </li>
+              ))}
+            </ul>
+
+            {isCurrent
+              ? <div class="pc-current">Plan actuel</div>
+              : <button class="pc-btn" data-plan={plan.key} data-price-id={plan.priceId ?? ''} data-label={plan.label} data-price-label={plan.priceLabel} disabled={!plan.priceId} style={`color:${plan.color}; background:${plan.color}15; border-color:${plan.color}35;`}>
+                  {plan.key === 'Free' ? 'Rétrograder' : isUpgrade ? 'Upgrader →' : 'Changer'}
+                </button>
+            }
+          </div>
+        );
+      })}
+    </div>
+  </div>
+
+  <!-- ── Factures ──────────────────────────────────────────────────────────── -->
+  <div class="section">
+    <p class="section-label">Historique des factures</p>
+    {invoices.length > 0 ? (
+      <div class="inv-table">
+        {invoices.map(inv => (
+          <div class="inv-row">
+            <div>
+              <p class="inv-num">{inv.number ?? '—'}</p>
+              <p class="inv-date">{inv.date}</p>
+            </div>
+            <div class="inv-right">
+              <span class={`inv-badge s-${inv.status}`}>
+                {inv.status === 'paid' ? 'Payée' : inv.status === 'open' ? 'En attente' : inv.status}
+              </span>
+              <span class="inv-amount">{inv.amount} {inv.currency}</span>
+              {inv.pdf && (
+                <a href={inv.pdf} target="_blank" rel="noopener" class="inv-dl" title="Télécharger PDF">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                  </svg>
+                </a>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div class="inv-empty">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1.5">
+          <path d="M9 14H5a2 2 0 01-2-2V5a2 2 0 012-2h11l3 3v4M9 14v7h10V14H9z"/>
+        </svg>
+        <span>Aucune facture pour le moment</span>
+      </div>
+    )}
+  </div>
+
+</div>
+
+<!-- ── Modal checkout Stripe Elements ─────────────────────────────────────── -->
+<div id="checkout-modal" class="modal-bg">
+  <div class="modal">
+    <div class="mhead">
+      <div>
+        <h2 id="mo-title" class="mo-title">Upgrade</h2>
+        <p id="mo-price" class="mo-price"></p>
+      </div>
+      <button id="mo-close" class="mo-x">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6L6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="mbody">
+      <div id="stripe-wrap">
+        <div id="stripe-loading" class="stripe-loader">
+          <div class="s-spin"></div>
+          <span>Chargement…</span>
+        </div>
+        <div id="payment-element"></div>
+      </div>
+      <p id="pay-error" class="pay-error hidden"></p>
+    </div>
+    <div class="mfoot">
+      <span class="secure">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Sécurisé par Stripe
+      </span>
+      <button id="pay-btn" class="btn-pay" disabled>
+        <span id="pay-lbl">Confirmer</span>
+        <svg id="pay-spin" class="spin hidden" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal confirmation annulation ─────────────────────────────────────── -->
+<div id="cancel-modal" class="modal-bg">
+  <div class="modal" style="max-width:380px;">
+    <div class="mhead">
+      <h2 class="mo-title">Annuler l'abonnement ?</h2>
+      <button id="cm-close" class="mo-x">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6L6 18M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="mbody">
+      <p style="font-size:0.875rem; color:rgba(255,255,255,0.55); line-height:1.7;">
+        Ton abonnement reste actif jusqu'à la fin de la période en cours.<br/>
+        Tu pourras te réabonner à tout moment.
+      </p>
+    </div>
+    <div class="mfoot" style="gap:0.625rem;">
+      <button id="cm-keep" class="btn-keep">Garder mon plan</button>
+      <button id="cm-confirm" class="btn-danger">
+        <span id="cm-lbl">Confirmer l'annulation</span>
+        <svg id="cm-spin" class="spin hidden" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="https://js.stripe.com/v3/" is:inline></script>
+
+<style>
+  .bp { display:flex; flex-direction:column; gap:2rem; }
+  .bp-header { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+  .bp-title { font-size:1.375rem; font-weight:700; color:#fff; letter-spacing:-0.02em; margin-bottom:.2rem; }
+  .bp-sub   { font-size:.8125rem; color:rgba(255,255,255,.4); }
+
+  .btn-portal {
+    display:inline-flex; align-items:center; gap:.45rem;
+    padding:.5rem 1rem; border-radius:.75rem;
+    background:rgba(255,255,255,.05); color:rgba(255,255,255,.6);
+    border:1px solid rgba(255,255,255,.1); font-size:.8rem; font-weight:500;
+    cursor:pointer; transition:all .15s; white-space:nowrap;
+  }
+  .btn-portal:hover { background:rgba(255,255,255,.09); color:#fff; }
+
+  .section { display:flex; flex-direction:column; gap:.75rem; }
+  .section-label { font-size:.7rem; font-weight:700; color:rgba(255,255,255,.35); text-transform:uppercase; letter-spacing:.09em; }
+
+  /* Plan actuel */
+  .current-card {
+    display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap;
+    background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.08);
+    border-radius:1rem; padding:1.25rem 1.5rem;
+  }
+  .cc-left  { display:flex; align-items:center; gap:1rem; }
+  .plan-pill {
+    display:inline-flex; align-items:center; gap:.4rem;
+    padding:.35rem .875rem; border-radius:99px; border:1px solid;
+    font-size:.875rem; font-weight:700; white-space:nowrap;
+  }
+  .plan-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+  .cc-meta   { font-size:.8rem; color:rgba(255,255,255,.45); margin-bottom:.2rem; }
+  .cc-status { font-size:.72rem; font-weight:600; }
+  .cc-status.s-active   { color:#39ff8f; }
+  .cc-status.s-trialing { color:#38bdf8; }
+  .cc-status.s-past_due { color:#f59e0b; }
+  .cc-right { display:flex; flex-direction:column; align-items:flex-end; gap:.5rem; }
+  .cc-price { font-size:1.125rem; font-weight:800; color:#fff; }
+
+  .btn-cancel-sub {
+    font-size:.72rem; color:rgba(255,100,100,.65);
+    background:transparent; border:1px solid rgba(255,100,100,.2);
+    border-radius:.5rem; padding:.28rem .65rem; cursor:pointer; transition:all .15s;
+  }
+  .btn-cancel-sub:hover { color:#ff6b6b; border-color:rgba(255,107,107,.4); background:rgba(255,107,107,.06); }
+
+  /* Plans grid */
+  .plans-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:.875rem; }
+  @media(max-width:1100px) { .plans-grid { grid-template-columns:repeat(2,1fr); } }
+  @media(max-width:580px)  { .plans-grid { grid-template-columns:1fr; } }
+
+  .plan-card {
+    position:relative;
+    background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07);
+    border-radius:1rem; padding:1.25rem;
+    display:flex; flex-direction:column; gap:.875rem; transition:all .15s;
+  }
+  .plan-card:hover { background:rgba(255,255,255,.05); transform:translateY(-2px); box-shadow:0 12px 40px rgba(0,0,0,.25); }
+  .plan-card.pop { border-color:rgba(57,255,143,.22); }
+  .plan-card.cur { border-color:color-mix(in srgb,var(--pc) 30%,transparent); }
+
+  .pop-tag {
+    position:absolute; top:-.65rem; left:50%; transform:translateX(-50%);
+    background:linear-gradient(90deg,#39ff8f,#b4ff6e); color:#050c08;
+    font-size:.62rem; font-weight:800; padding:.18rem .7rem; border-radius:99px;
+    white-space:nowrap; letter-spacing:.04em;
+  }
+
+  .pc-head { display:flex; flex-direction:column; gap:.2rem; }
+  .pc-name  { font-size:.8125rem; font-weight:700; }
+  .pc-price { font-size:1.125rem; font-weight:800; color:#fff; }
+
+  .pc-feats { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:.4rem; flex:1; }
+  .pc-feats li { display:flex; align-items:center; gap:.4rem; font-size:.75rem; color:rgba(255,255,255,.55); }
+
+  .pc-btn {
+    padding:.5rem; border-radius:.625rem; border:1px solid; width:100%;
+    font-size:.79rem; font-weight:600; cursor:pointer; transition:all .15s;
+  }
+  .pc-btn:hover:not(:disabled) { filter:brightness(1.15); transform:translateY(-1px); }
+  .pc-btn:disabled { opacity:.35; cursor:not-allowed; transform:none !important; }
+
+  .pc-current {
+    padding:.5rem; border-radius:.625rem; text-align:center;
+    font-size:.79rem; font-weight:600; color:rgba(255,255,255,.25);
+    background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07);
+  }
+
+  /* Factures */
+  .inv-table { background:rgba(255,255,255,.02); border:1px solid rgba(255,255,255,.07); border-radius:1rem; overflow:hidden; }
+  .inv-row {
+    display:flex; align-items:center; justify-content:space-between; gap:1rem;
+    padding:.875rem 1.25rem; border-bottom:1px solid rgba(255,255,255,.05); transition:background .15s;
+  }
+  .inv-row:last-child { border-bottom:none; }
+  .inv-row:hover { background:rgba(255,255,255,.03); }
+  .inv-num   { font-size:.8rem; font-weight:600; color:#fff; margin-bottom:.15rem; }
+  .inv-date  { font-size:.7rem; color:rgba(255,255,255,.35); }
+  .inv-right { display:flex; align-items:center; gap:.875rem; }
+  .inv-badge { font-size:.68rem; font-weight:600; padding:.18rem .5rem; border-radius:99px; }
+  .s-paid    { background:rgba(57,255,143,.1); color:#39ff8f; }
+  .s-open    { background:rgba(245,158,11,.1); color:#f59e0b; }
+  .s-void    { background:rgba(255,255,255,.05); color:rgba(255,255,255,.3); }
+  .inv-amount{ font-size:.875rem; font-weight:700; color:#fff; }
+  .inv-dl    { padding:.3rem; color:rgba(255,255,255,.4); border-radius:.375rem; transition:all .15s; display:flex; }
+  .inv-dl:hover { color:#fff; background:rgba(255,255,255,.08); }
+
+  .inv-empty {
+    display:flex; flex-direction:column; align-items:center; gap:.75rem;
+    padding:3rem; text-align:center;
+    background:rgba(255,255,255,.02); border:1px solid rgba(255,255,255,.07); border-radius:1rem;
+    font-size:.875rem; color:rgba(255,255,255,.28);
+  }
+
+  /* Modal */
+  .modal-bg {
+    display:none; position:fixed; inset:0; z-index:9000;
+    background:rgba(0,0,0,.78); backdrop-filter:blur(10px);
+    align-items:center; justify-content:center; padding:1rem;
+  }
+  .modal-bg.open { display:flex; }
+  .modal {
+    background:#0f1114; border:1px solid rgba(255,255,255,.09);
+    border-radius:1.375rem; width:100%; max-width:480px;
+    box-shadow:0 24px 80px rgba(0,0,0,.5);
+    animation:modal-in .22s cubic-bezier(.34,1.2,.64,1);
+  }
+  @keyframes modal-in { from{opacity:0;transform:scale(.95) translateY(8px)} to{opacity:1;transform:scale(1) translateY(0)} }
+
+  .mhead {
+    display:flex; align-items:flex-start; justify-content:space-between; gap:1rem;
+    padding:1.25rem 1.5rem 1rem; border-bottom:1px solid rgba(255,255,255,.07);
+  }
+  .mo-title { font-size:1rem; font-weight:700; color:#fff; margin-bottom:.2rem; }
+  .mo-price { font-size:.8rem; color:rgba(255,255,255,.4); }
+  .mo-x {
+    padding:.3rem; background:transparent; border:none; border-radius:.5rem;
+    color:rgba(255,255,255,.4); cursor:pointer; transition:all .15s; flex-shrink:0;
+  }
+  .mo-x:hover { background:rgba(255,255,255,.06); color:#fff; }
+
+  .mbody { padding:1.25rem 1.5rem; min-height:80px; }
+
+  .stripe-loader { display:flex; align-items:center; gap:.625rem; color:rgba(255,255,255,.4); font-size:.8rem; padding:.5rem 0; }
+  .s-spin {
+    width:18px; height:18px; border-radius:50%;
+    border:2px solid rgba(255,255,255,.1); border-top-color:rgba(255,255,255,.5);
+    animation:spin .7s linear infinite; flex-shrink:0;
+  }
+
+  .pay-error { margin-top:.75rem; font-size:.8rem; color:#ff6b6b; }
+  .pay-error.hidden { display:none; }
+
+  .mfoot {
+    display:flex; align-items:center; gap:.75rem;
+    padding:1rem 1.5rem 1.25rem; border-top:1px solid rgba(255,255,255,.07);
+  }
+  .secure { flex:1; display:flex; align-items:center; gap:.35rem; font-size:.68rem; color:rgba(255,255,255,.25); }
+
+  .btn-pay {
+    display:inline-flex; align-items:center; gap:.4rem;
+    padding:.6rem 1.25rem; background:#39ff8f; color:#050c08;
+    border:none; border-radius:.625rem; font-size:.8125rem; font-weight:700;
+    cursor:pointer; transition:all .15s;
+  }
+  .btn-pay:hover:not(:disabled) { background:#b4ff6e; transform:translateY(-1px); }
+  .btn-pay:disabled { opacity:.4; cursor:not-allowed; }
+
+  .btn-keep {
+    flex:1; padding:.5rem .875rem; background:transparent;
+    border:1px solid rgba(255,255,255,.1); border-radius:.5rem;
+    color:rgba(255,255,255,.5); font-size:.8rem; font-weight:500; cursor:pointer; transition:all .15s;
+  }
+  .btn-keep:hover { border-color:rgba(255,255,255,.2); color:#fff; }
+
+  .btn-danger {
+    display:inline-flex; align-items:center; gap:.4rem;
+    padding:.5rem 1rem; background:rgba(255,107,107,.1); color:#ff6b6b;
+    border:1px solid rgba(255,107,107,.25); border-radius:.5rem;
+    font-size:.8rem; font-weight:600; cursor:pointer; transition:all .15s;
+  }
+  .btn-danger:hover { background:rgba(255,107,107,.18); }
+  .btn-danger:disabled { opacity:.5; pointer-events:none; }
+
+  .spin { animation:spin .7s linear infinite; }
+  .spin.hidden { display:none; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+
+  .toast {
+    position:fixed; bottom:5rem; right:1.5rem; z-index:9999;
+    padding:.625rem 1.125rem; border-radius:.75rem;
+    font-size:.8rem; font-weight:600;
+    box-shadow:0 8px 32px rgba(0,0,0,.35);
+    animation:toast-in .2s ease both; pointer-events:none;
+  }
+  .toast.ok  { background:rgba(57,255,143,.14); color:#39ff8f; border:1px solid rgba(57,255,143,.28); }
+  .toast.err { background:rgba(255,107,107,.14); color:#ff6b6b; border:1px solid rgba(255,107,107,.28); }
+  @keyframes toast-in { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+</style>
+
+<script define:vars={{ clientCtx, stripePk: import.meta.env.PUBLIC_STRIPE_PUBLISHABLE_KEY }}>
+(function () {
+  const ctx  = JSON.parse(clientCtx);
+  let stripe = null, elements = null;
+
+  function toast(msg, type = 'ok') {
+    const el = Object.assign(document.createElement('div'), { className:`toast ${type}`, textContent:msg });
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+  }
+
+  // ── Portail Stripe ─────────────────────────────────────────────────────────
+  document.getElementById('portal-btn')?.addEventListener('click', async function() {
+    this.textContent = 'Chargement…'; this.disabled = true;
+    try {
+      const res  = await fetch('/api/billing/billingPortal', { method:'POST' });
+      const json = await res.json();
+      if (json.url) window.location.href = json.url;
+      else toast(json.error ?? 'Erreur', 'err');
+    } catch { toast('Erreur réseau', 'err'); }
+    this.textContent = 'Gérer via Stripe'; this.disabled = false;
+  });
+
+  // ── Checkout modal ─────────────────────────────────────────────────────────
+  const modal      = document.getElementById('checkout-modal');
+  const moTitle    = document.getElementById('mo-title');
+  const moPrice    = document.getElementById('mo-price');
+  const moClose    = document.getElementById('mo-close');
+  const payEl      = document.getElementById('payment-element');
+  const loading    = document.getElementById('stripe-loading');
+  const payErr     = document.getElementById('pay-error');
+  const payBtn     = document.getElementById('pay-btn');
+  const payLbl     = document.getElementById('pay-lbl');
+  const paySpin    = document.getElementById('pay-spin');
+
+  async function openModal(planLabel, priceLabel, priceId) {
+    if (moTitle) moTitle.textContent = `Upgrade vers ${planLabel}`;
+    if (moPrice) moPrice.textContent = priceLabel;
+    if (payEl)   payEl.innerHTML = '';
+    if (loading) loading.style.display = '';
+    if (payErr)  { payErr.textContent = ''; payErr.classList.add('hidden'); }
+    if (payBtn)  payBtn.disabled = true;
+    modal?.classList.add('open');
+
+    try {
+      const res  = await fetch('/api/billing/createSubscription', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ priceId }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.clientSecret) throw new Error(json.error ?? 'Erreur serveur');
+
+      if (!stripe) stripe = Stripe(stripePk);
+
+      elements = stripe.elements({
+        clientSecret: json.clientSecret,
+        appearance: {
+          theme: 'night',
+          variables: {
+            colorPrimary:    '#39ff8f',
+            colorBackground: '#0f1114',
+            colorText:       '#e8f0eb',
+            colorDanger:     '#ff6b6b',
+            borderRadius:    '8px',
+          },
+        },
+      });
+
+      const pe = elements.create('payment');
+      pe.mount('#payment-element');
+      pe.on('ready', () => {
+        if (loading) loading.style.display = 'none';
+        if (payBtn)  payBtn.disabled = false;
+      });
+      pe.on('change', e => {
+        if (payErr) {
+          payErr.textContent = e.error?.message ?? '';
+          payErr.classList.toggle('hidden', !e.error);
+        }
+      });
+    } catch (e) {
+      if (loading) loading.style.display = 'none';
+      if (payErr)  { payErr.textContent = e.message; payErr.classList.remove('hidden'); }
+    }
+  }
+
+  function closeModal() {
+    modal?.classList.remove('open');
+    elements = null;
+  }
+
+  moClose?.addEventListener('click', closeModal);
+  modal?.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+
+  document.querySelectorAll('.pc-btn[data-price-id]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const { priceId, label, priceLabel } = btn.dataset;
+      if (priceId) openModal(label, priceLabel, priceId);
+    });
+  });
+
+  // ── Confirmer paiement ─────────────────────────────────────────────────────
+  payBtn?.addEventListener('click', async () => {
+    if (!elements || !stripe) return;
+    if (payLbl)  payLbl.textContent = 'Traitement…';
+    paySpin?.classList.remove('hidden');
+    if (payBtn) payBtn.disabled = true;
+
+    const { error } = await stripe.confirmPayment({
+      elements,
+      confirmParams: { return_url: `${location.origin}/dashboard/billing?success=1` },
+    });
+
+    if (error) {
+      if (payErr) { payErr.textContent = error.message; payErr.classList.remove('hidden'); }
+      if (payLbl)  payLbl.textContent = 'Confirmer';
+      paySpin?.classList.add('hidden');
+      if (payBtn) payBtn.disabled = false;
+    }
+  });
+
+  // Succès après redirect Stripe
+  if (new URLSearchParams(location.search).get('success') === '1') {
+    toast('Abonnement activé ! Bienvenue 🎉');
+    history.replaceState({}, '', '/dashboard/billing');
+  }
+
+  // ── Annulation ─────────────────────────────────────────────────────────────
+  const cancelModal = document.getElementById('cancel-modal');
+  const cmClose     = document.getElementById('cm-close');
+  const cmKeep      = document.getElementById('cm-keep');
+  const cmConfirm   = document.getElementById('cm-confirm');
+  const cmLbl       = document.getElementById('cm-lbl');
+  const cmSpin      = document.getElementById('cm-spin');
+
+  document.getElementById('cancel-btn')?.addEventListener('click', () => cancelModal?.classList.add('open'));
+  cmClose?.addEventListener('click', () => cancelModal?.classList.remove('open'));
+  cmKeep?.addEventListener('click',  () => cancelModal?.classList.remove('open'));
+  cancelModal?.addEventListener('click', e => { if (e.target === cancelModal) cancelModal.classList.remove('open'); });
+
+  cmConfirm?.addEventListener('click', async () => {
+    if (cmLbl)  cmLbl.textContent = 'Annulation…';
+    cmSpin?.classList.remove('hidden');
+    if (cmConfirm) cmConfirm.disabled = true;
+
+    try {
+      const res  = await fetch('/api/billing/cancelSubscription', { method:'POST' });
+      const json = await res.json();
+      if (res.ok) {
+        cancelModal?.classList.remove('open');
+        toast('Abonnement annulé. Actif jusqu\'à la fin de la période.');
+        setTimeout(() => location.reload(), 1800);
+      } else {
+        toast(json.error ?? 'Erreur', 'err');
+      }
+    } catch { toast('Erreur réseau', 'err'); }
+
+    if (cmLbl)  cmLbl.textContent = 'Confirmer l\'annulation';
+    cmSpin?.classList.add('hidden');
+    if (cmConfirm) cmConfirm.disabled = false;
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeModal(); cancelModal?.classList.remove('open'); }
+  });
+})();
+</script>
+
+</DashboardLayout>
