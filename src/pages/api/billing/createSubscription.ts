@@ -1,23 +1,27 @@
+// src/pages/api/billing/createSubscription.ts
+
 import type { APIRoute } from 'astro'
 import { createClient } from '@supabase/supabase-js'
 import Stripe from 'stripe'
 import { withAuth } from '@/lib/auth/auth'
 
-type Expanded<T> = T & Record<string, any>;
+type Expanded<T> = T & Record<string, any>
 
 export const POST: APIRoute = async ({ request, cookies }) => {
 
-  // ─────────────────────────────────────────────────────────
+  // ─────────────────────────────────────
   // AUTH
-  // ─────────────────────────────────────────────────────────
+  // ─────────────────────────────────────
 
   let profile: any = null
 
   try {
     const auth = await withAuth({ cookies, request })
+
     if (auth.success && auth.data) {
       profile = auth.data.profile
     }
+
   } catch {}
 
   if (!profile) {
@@ -27,13 +31,14 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     )
   }
 
-  // ─────────────────────────────────────────────────────────
+  // ─────────────────────────────────────
   // BODY
-  // ─────────────────────────────────────────────────────────
+  // ─────────────────────────────────────
 
   let priceId: string
 
   try {
+
     const body = await request.json()
 
     priceId = body.priceId
@@ -43,30 +48,30 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     }
 
   } catch {
+
     return new Response(
       JSON.stringify({ error: 'priceId manquant' }),
       { status: 400 }
     )
+
   }
 
-  // ─────────────────────────────────────────────────────────
-  // ENV CHECK
-  // ─────────────────────────────────────────────────────────
+  // ─────────────────────────────────────
+  // ENV
+  // ─────────────────────────────────────
 
   const STRIPE_SECRET_KEY = import.meta.env.STRIPE_SECRET_KEY
 
   if (!STRIPE_SECRET_KEY) {
+
     console.error('[create-subscription] STRIPE_SECRET_KEY manquant')
 
     return new Response(
       JSON.stringify({ error: 'Configuration Stripe manquante' }),
       { status: 500 }
     )
-  }
 
-  // ─────────────────────────────────────────────────────────
-  // CLIENTS
-  // ─────────────────────────────────────────────────────────
+  }
 
   const stripe = new Stripe(STRIPE_SECRET_KEY)
 
@@ -77,15 +82,14 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
   try {
 
-    // ─────────────────────────────────────────────────────────
-    // 1️⃣ CUSTOMER STRIPE
-    // ─────────────────────────────────────────────────────────
+    // ─────────────────────────────────────
+    // CUSTOMER
+    // ─────────────────────────────────────
 
     let customerId: string | null = profile.stripe_customer_id ?? null
 
     if (!customerId) {
 
-      // Vérifie si un customer existe déjà
       if (profile.email) {
 
         const existing = await stripe.customers.list({
@@ -96,24 +100,23 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         if (existing.data.length > 0) {
           customerId = existing.data[0].id
         }
+
       }
 
-      // Sinon on le crée
       if (!customerId) {
 
         const customer = await stripe.customers.create({
           email: profile.email ?? undefined,
           name: profile.display_name ?? profile.username ?? undefined,
           metadata: {
-            profile_id: profile.id,
-            username: profile.username ?? ''
+            profile_id: profile.id
           }
         })
 
         customerId = customer.id
+
       }
 
-      // Sauvegarde dans Supabase
       await supabase
         .from('profiles')
         .update({ stripe_customer_id: customerId })
@@ -121,9 +124,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
     }
 
-    // ─────────────────────────────────────────────────────────
-    // 2️⃣ NETTOIE LES SUBSCRIPTIONS INCOMPLETE
-    // ─────────────────────────────────────────────────────────
+    // ─────────────────────────────────────
+    // CLEAN INCOMPLETE SUBS
+    // ─────────────────────────────────────
 
     const existingSubs = await stripe.subscriptions.list({
       customer: customerId,
@@ -135,9 +138,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       await stripe.subscriptions.cancel(sub.id)
     }
 
-    // ─────────────────────────────────────────────────────────
-    // 3️⃣ CRÉE LA SUBSCRIPTION
-    // ─────────────────────────────────────────────────────────
+    // ─────────────────────────────────────
+    // CREATE SUB
+    // ─────────────────────────────────────
 
     const subscription = await stripe.subscriptions.create({
 
@@ -162,11 +165,15 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         profile_id: profile.id
       }
 
+    }, {
+
+      idempotencyKey: `sub_${profile.id}_${priceId}`
+
     })
 
-    // ─────────────────────────────────────────────────────────
-    // 4️⃣ RÉCUPÈRE PAYMENT INTENT
-    // ─────────────────────────────────────────────────────────
+    // ─────────────────────────────────────
+    // PAYMENT INTENT
+    // ─────────────────────────────────────
 
     const invoice = subscription.latest_invoice as Expanded<Stripe.Invoice>
 
@@ -176,9 +183,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       paymentIntent = invoice.payment_intent
     }
 
-    // ─────────────────────────────────────────────────────────
-    // 5️⃣ SETUP INTENT (TRIAL / ZERO AMOUNT)
-    // ─────────────────────────────────────────────────────────
+    // ─────────────────────────────────────
+    // SETUP INTENT
+    // ─────────────────────────────────────
 
     let setupIntent: Stripe.SetupIntent | null = null
 
@@ -194,20 +201,20 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       setupIntent?.client_secret ??
       null
 
-    // ─────────────────────────────────────────────────────────
-    // DEBUG LOGS
-    // ─────────────────────────────────────────────────────────
+    // ─────────────────────────────────────
+    // DEBUG
+    // ─────────────────────────────────────
 
     console.log('[create-subscription]')
-    console.log('sub.status:', subscription.status)
-    console.log('invoice:', invoice?.id ?? 'null')
-    console.log('PI:', paymentIntent?.id ?? 'null')
-    console.log('SI:', setupIntent?.id ?? 'null')
+    console.log('status:', subscription.status)
+    console.log('invoice:', invoice?.id)
+    console.log('paymentIntent:', paymentIntent?.id)
+    console.log('setupIntent:', setupIntent?.id)
     console.log('clientSecret:', !!clientSecret)
 
-    // ─────────────────────────────────────────────────────────
-    // CAS : SUB DÉJÀ ACTIVE
-    // ─────────────────────────────────────────────────────────
+    // ─────────────────────────────────────
+    // ALREADY ACTIVE
+    // ─────────────────────────────────────
 
     if (!clientSecret) {
 
@@ -220,16 +227,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
           }),
           { status: 200 }
         )
+
       }
 
-      throw new Error(
-        `Pas de client_secret — status: ${subscription.status}`
-      )
-    }
+      throw new Error('Impossible de récupérer le client_secret')
 
-    // ─────────────────────────────────────────────────────────
-    // SUCCESS
-    // ─────────────────────────────────────────────────────────
+    }
 
     return new Response(
       JSON.stringify({
@@ -251,5 +254,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       }),
       { status: 500 }
     )
+
   }
+
 }
