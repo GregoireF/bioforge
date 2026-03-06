@@ -347,8 +347,9 @@ const clientCtx = JSON.stringify({
 
     if (!priceId || priceId === '') {
       if (label?.toLowerCase() === 'free') {
-        toast('Rétrogradation vers Free en cours...', 'ok');
-        // TODO : implémenter /api/billing/downgrade-to-free si tu veux une action dédiée
+        toast('Rétrogradation vers Free programmée à la fin de période', 'ok');
+        // TODO : appelle /api/billing/downgrade-to-free quand tu l'auras créé
+        // Pour l'instant on simule juste le refresh
         setTimeout(() => location.reload(), 1800);
       }
       return;
@@ -359,7 +360,7 @@ const clientCtx = JSON.stringify({
     btn.textContent = 'Traitement…';
 
     try {
-      const res = await fetch('/api/billing/createSubscription', {
+      const res = await fetch('/api/billing/createSubscription', {   // ← CORRECTION ICI
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ priceId }),
@@ -453,9 +454,7 @@ const clientCtx = JSON.stringify({
 
   function closeModal() {
     modal?.classList.remove('open');
-    if (elements) {
-      elements = null;
-    }
+    elements = null;
   }
 
   moClose?.addEventListener('click', closeModal);
@@ -487,7 +486,6 @@ const clientCtx = JSON.stringify({
       paySpin?.classList.add('hidden');
       payBtn.disabled = false;
     }
-    // sinon → redirect automatique vers return_url
   });
 
   // Succès après redirect
@@ -549,8 +547,6 @@ const clientCtx = JSON.stringify({
 </script>
 
 <style>
-  /* Ton style existant reste inchangé – je ne le répète pas ici pour gagner de la place */
-  /* Ajoute juste ceci si tu veux un meilleur feedback loading sur les boutons plan */
   .pc-btn:disabled {
     opacity: 0.5;
     cursor: wait;
