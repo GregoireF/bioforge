@@ -1,32 +1,30 @@
 ---
 // src/components/landing/CTA.astro
-
-interface Props {
-  profileCount?: number;
-}
+interface Props { profileCount?: number; }
 const { profileCount = 0 } = Astro.props;
 
 const countDisplay = profileCount > 1000
-  ? `${(profileCount / 1000).toFixed(1).replace('.0','') }k+`
+  ? `${(profileCount / 1000).toFixed(1).replace('.0','')}k+`
   : profileCount > 0 ? `${profileCount}+` : null;
 ---
 
-<section class="cta" aria-labelledby="cta-title">
+<section class="cta-section" aria-labelledby="cta-title">
+
   <div class="cta-bg" aria-hidden="true">
-    <div class="cta-glow cta-glow-1"></div>
-    <div class="cta-glow cta-glow-2"></div>
+    <div class="cta-glow g1"></div>
+    <div class="cta-glow g2"></div>
   </div>
 
-  <div class="cta-box reveal">
-    <!-- Badge -->
+  <div class="cta-box">
+
     <div class="cta-badge">
-      <span class="badge-dot" aria-hidden="true"></span>
+      <span class="cta-dot"></span>
       Gratuit · Aucune CB requise
     </div>
 
     <h2 id="cta-title" class="cta-title">
       Prêt à forger<br>
-      <span class="cta-accent">ta page&nbsp;?</span>
+      <span class="cta-accent">ta page ?</span>
     </h2>
 
     {countDisplay && (
@@ -35,114 +33,124 @@ const countDisplay = profileCount > 1000
       </p>
     )}
 
-    <!-- Champ username inline -->
-    <div class="cta-input-row">
-      <div class="cta-prefix" aria-hidden="true">bioforge.click/@</div>
-      <input
-        type="text"
-        class="cta-input"
-        placeholder="tonpseudo"
-        aria-label="Ton pseudonyme"
-        maxlength="30"
-        autocomplete="off"
-        autocorrect="off"
-        spellcheck="false"
-      />
-      <a href="/signin" class="cta-btn" id="cta-go-btn">
-        Forge-le
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-          <path d="M5 12h14M12 5l7 7-7 7"/>
-        </svg>
-      </a>
-    </div>
-
-    <p class="cta-fine">Setup en 2 min · Ton URL, tes règles</p>
-
-    <!-- Trust badges -->
-    <div class="cta-trust">
-      {[
-        ['M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', 'SSL & RGPD'],
-        ['M22 11.08V12a10 10 0 11-5.93-9.14M22 4L12 14.01l-3-3', 'Uptime 99.9%'],
-        ['M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z', 'No-code'],
-      ].map(([path, label]) => (
-        <span class="trust-badge">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path d={path}/>
+    <!-- Input username inline -->
+    <div class="cta-field-wrap">
+      <div class="cta-field" id="cta-field">
+        <span class="cta-prefix" aria-hidden="true">bioforge.click/@</span>
+        <input
+          type="text"
+          id="cta-username"
+          class="cta-input"
+          placeholder="tonpseudo"
+          maxlength="24"
+          autocomplete="off"
+          autocorrect="off"
+          spellcheck="false"
+          aria-label="Ton pseudonyme"
+          inputmode="text"
+        />
+        <a href="/signin" id="cta-go" class="cta-go">
+          Forge-le
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="5" y1="12" x2="19" y2="12"/>
+            <polyline points="12 5 19 12 12 19"/>
           </svg>
-          {label}
-        </span>
-      ))}
+        </a>
+      </div>
+      <p class="cta-hint">Setup en 2 min · Ton URL, tes règles</p>
     </div>
+
+    <!-- Trust row -->
+    <div class="cta-trust">
+      <span class="cta-trust-item">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        SSL & RGPD
+      </span>
+      <span class="cta-trust-sep" aria-hidden="true">·</span>
+      <span class="cta-trust-item">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Uptime 99.9%
+      </span>
+      <span class="cta-trust-sep" aria-hidden="true">·</span>
+      <span class="cta-trust-item">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="3" width="7" height="7"/>
+          <rect x="14" y="3" width="7" height="7"/>
+          <rect x="3" y="14" width="7" height="7"/>
+          <rect x="14" y="14" width="7" height="7"/>
+        </svg>
+        No-code
+      </span>
+    </div>
+
   </div>
+
 </section>
 
 <script>
-  // Redirige vers /signin avec le username prérempli dans l'URL
-  const input = document.querySelector('.cta-input') as HTMLInputElement;
-  const btn   = document.getElementById('cta-go-btn') as HTMLAnchorElement;
+  const input = document.getElementById('cta-username') as HTMLInputElement;
+  const go    = document.getElementById('cta-go')      as HTMLAnchorElement;
+  const field = document.getElementById('cta-field')   as HTMLDivElement;
 
-  if (input && btn) {
-    function updateHref() {
-      const val = input.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
-      btn.href = val ? `/signin?username=${encodeURIComponent(val)}` : '/signin';
+  if (input && go) {
+    function sanitize(v: string) {
+      return v.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24);
     }
-    input.addEventListener('input', updateHref);
+
+    input.addEventListener('input', () => {
+      const clean = sanitize(input.value);
+      // Réaffiche la version nettoyée sans le curseur qui saute
+      if (input.value !== clean) input.value = clean;
+      go.href = clean ? `/signin?username=${encodeURIComponent(clean)}` : '/signin';
+    });
 
     input.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); btn.click(); }
+      if (e.key === 'Enter') { e.preventDefault(); go.click(); }
     });
   }
 
   // Reveal
-  document.querySelectorAll('.reveal').forEach(el =>
-    new IntersectionObserver(
-      ([e]) => { if (e.isIntersecting) el.classList.add('visible'); },
-      { threshold: 0.15 }
-    ).observe(el)
-  );
+  const box = document.querySelector('.cta-box');
+  if (box) {
+    new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) (e.target as HTMLElement).classList.add('revealed');
+    }, { threshold: 0.15 }).observe(box);
+  }
 </script>
 
 <style>
-  .cta {
-    position: relative;
-    padding: 6rem 1.5rem;
+  .cta-section {
+    position: relative; padding: 6rem 1.5rem;
     overflow: hidden;
+    display: flex; justify-content: center;
   }
 
+  /* Background glows */
   .cta-bg { position: absolute; inset: 0; pointer-events: none; }
-  .cta-glow {
-    position: absolute; border-radius: 50%;
-    filter: blur(120px); pointer-events: none;
-  }
-  .cta-glow-1 {
-    width: 600px; height: 400px;
-    top: -20%; left: -10%;
-    background: rgba(57,255,143,0.07);
-  }
-  .cta-glow-2 {
-    width: 500px; height: 400px;
-    bottom: -20%; right: -5%;
-    background: rgba(124,58,237,0.06);
-  }
+  .cta-glow { position: absolute; border-radius: 50%; filter: blur(120px); }
+  .g1 { width: 600px; height: 400px; top: -20%; left: -10%; background: rgba(57,255,143,0.07); }
+  .g2 { width: 500px; height: 400px; bottom: -20%; right: -5%; background: rgba(124,58,237,0.055); }
 
-  .reveal {
-    opacity: 0; transform: translateY(20px);
-    transition: opacity 0.6s ease, transform 0.6s ease;
-  }
-  .reveal.visible { opacity: 1; transform: none; }
-
-  /* ── Box ── */
+  /* Box */
   .cta-box {
     position: relative; z-index: 1;
-    max-width: 600px; margin: 0 auto;
+    max-width: 600px; width: 100%;
     display: flex; flex-direction: column; align-items: center; gap: 1.5rem;
-    background: rgba(13,16,18,0.7);
+    background: rgba(13,16,18,0.75);
     border: 1px solid rgba(255,255,255,0.08);
     border-radius: 2rem; padding: 3.5rem 3rem;
     text-align: center;
-    backdrop-filter: blur(12px);
+    backdrop-filter: blur(16px);
     box-shadow: 0 0 0 1px rgba(57,255,143,0.04), 0 40px 100px rgba(0,0,0,0.4);
+    /* Reveal */
+    opacity: 0; transform: translateY(20px);
+    transition: opacity 0.55s ease, transform 0.55s ease;
   }
+  .cta-box.revealed { opacity: 1; transform: none; }
 
   /* Badge */
   .cta-badge {
@@ -152,21 +160,17 @@ const countDisplay = profileCount > 1000
     border-radius: 99px; font-size: 0.72rem; font-weight: 700;
     color: #39ff8f; letter-spacing: 0.03em; text-transform: uppercase;
   }
-  .badge-dot {
+  .cta-dot {
     width: 6px; height: 6px; border-radius: 50%; background: #39ff8f;
-    animation: pulse-dot 2s ease-in-out infinite;
+    animation: cpd 2s ease-in-out infinite;
   }
-  @keyframes pulse-dot {
-    0%,100% { opacity: 1; }
-    50%      { opacity: 0.5; }
-  }
+  @keyframes cpd { 0%,100%{opacity:1} 50%{opacity:0.45} }
 
-  /* Titre */
+  /* Title */
   .cta-title {
     font-family: 'Syne', sans-serif;
     font-size: clamp(2.25rem, 5vw, 3.5rem);
-    font-weight: 800; color: #fff;
-    letter-spacing: -0.04em; line-height: 1.05;
+    font-weight: 800; color: #fff; letter-spacing: -0.04em; line-height: 1.05;
   }
   .cta-accent {
     background: linear-gradient(90deg, #39ff8f, #b4ff6e);
@@ -174,30 +178,28 @@ const countDisplay = profileCount > 1000
     background-clip: text;
   }
 
-  .cta-proof {
-    font-size: 0.875rem; color: rgba(255,255,255,0.45);
-  }
+  .cta-proof { font-size: 0.875rem; color: rgba(255,255,255,0.42); }
   .cta-proof strong { color: rgba(255,255,255,0.8); font-weight: 600; }
 
-  /* Input row */
-  .cta-input-row {
-    display: flex; align-items: center;
-    width: 100%; max-width: 420px;
+  /* Field */
+  .cta-field-wrap { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: 100%; max-width: 420px; }
+
+  .cta-field {
+    display: flex; align-items: center; width: 100%; overflow: hidden;
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 0.875rem; overflow: hidden;
+    border-radius: 0.875rem;
     transition: border-color 0.15s, box-shadow 0.15s;
   }
-  .cta-input-row:focus-within {
+  .cta-field:focus-within {
     border-color: rgba(57,255,143,0.35);
     box-shadow: 0 0 0 3px rgba(57,255,143,0.08);
   }
 
   .cta-prefix {
-    padding: 0 0 0 0.875rem;
-    font-size: 0.8125rem; color: rgba(255,255,255,0.35);
-    white-space: nowrap; flex-shrink: 0;
-    font-family: 'DM Mono', monospace, sans-serif;
+    padding: 0 0 0 0.875rem; white-space: nowrap;
+    font-size: 0.8125rem; color: rgba(255,255,255,0.3);
+    font-family: monospace; flex-shrink: 0;
   }
 
   .cta-input {
@@ -205,36 +207,31 @@ const countDisplay = profileCount > 1000
     padding: 0.75rem 0.5rem;
     background: transparent; border: none; outline: none;
     color: #fff; font-size: 0.875rem; font-weight: 500;
-    font-family: 'DM Mono', monospace, sans-serif;
+    font-family: monospace;
   }
   .cta-input::placeholder { color: rgba(255,255,255,0.2); }
 
-  .cta-btn {
+  .cta-go {
     display: inline-flex; align-items: center; gap: 0.35rem;
-    padding: 0.75rem 1.125rem;
+    padding: 0.75rem 1.125rem; flex-shrink: 0;
     background: linear-gradient(135deg, #39ff8f, #b4ff6e);
     color: #050c08; font-size: 0.8125rem; font-weight: 700;
-    text-decoration: none; white-space: nowrap; flex-shrink: 0;
-    transition: filter 0.15s;
+    text-decoration: none; transition: filter 0.15s;
+    border-left: none; /* dans le border du parent */
   }
-  .cta-btn:hover { filter: brightness(1.07); }
+  .cta-go:hover { filter: brightness(1.07); }
 
-  .cta-fine { font-size: 0.72rem; color: rgba(255,255,255,0.25); }
+  .cta-hint { font-size: 0.7rem; color: rgba(255,255,255,0.25); }
 
   /* Trust */
-  .cta-trust { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; justify-content: center; }
-  .trust-badge {
-    display: inline-flex; align-items: center; gap: 0.3rem;
-    font-size: 0.7rem; color: rgba(255,255,255,0.3);
-  }
+  .cta-trust { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+  .cta-trust-item { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.7rem; color: rgba(255,255,255,0.28); }
+  .cta-trust-sep { color: rgba(255,255,255,0.15); font-size: 0.7rem; }
 
+  /* Responsive */
   @media (max-width: 600px) {
     .cta-box { padding: 2.5rem 1.5rem; border-radius: 1.5rem; }
-    .cta-input-row { max-width: 100%; }
     .cta-prefix { display: none; }
     .cta-input { padding-left: 0.875rem; }
-  }
-  @media (max-width: 380px) {
-    .cta-btn span { display: none; }
   }
 </style>

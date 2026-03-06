@@ -1,316 +1,335 @@
 ---
 // src/components/layout/Header.astro
-// Zero GSAP — scroll progress, hide/show, mobile menu en CSS pur
-
 const navItems = [
   { label: 'Fonctionnalités', href: '/features' },
   { label: 'Tarifs',          href: '/pricing'  },
 ];
 ---
 
-<header id="main-header" class="site-header" aria-label="Navigation principale">
+<header id="site-header">
+  <div class="header-progress" id="header-progress" aria-hidden="true"></div>
 
-  <!-- Barre de progression de scroll -->
-  <div id="scroll-progress" class="scroll-bar" aria-hidden="true"></div>
-
-  <div class="header-inner">
-
-    <!-- Logo -->
-    <a href="/" class="logo" aria-label="BioForge — Accueil">
-      <div class="logo-icon" aria-hidden="true">⚡</div>
-      <span class="logo-text">BioForge</span>
+  <div class="header-container">
+    <a href="/" class="header-logo" aria-label="BioForge — Accueil">
+      <div class="logo-mark" aria-hidden="true">⚡</div>
+      <span class="logo-name">BioForge</span>
     </a>
 
-    <!-- Nav desktop -->
-    <nav class="nav-desktop" aria-label="Menu principal">
+    <nav class="header-nav" aria-label="Navigation principale">
       {navItems.map(item => (
-        <a href={item.href} class="nav-link">{item.label}</a>
+        <a href={item.href} class="header-nav-link">{item.label}</a>
       ))}
     </nav>
 
-    <!-- CTA desktop -->
-    <div class="header-cta">
-      <a href="/signin" class="btn-signin">
+    <div class="header-end">
+      <a href="/signin" class="header-cta">
         Connexion
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-          <path d="M5 12h14M12 5l7 7-7 7"/>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="5" y1="12" x2="19" y2="12"/>
+          <polyline points="12 5 19 12 12 19"/>
         </svg>
       </a>
+
+      <button
+        id="burger-btn"
+        class="burger-btn"
+        aria-label="Ouvrir le menu"
+        aria-expanded="false"
+        aria-controls="mobile-nav"
+      >
+        <svg id="icon-menu" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <line x1="3" y1="6"  x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+        <svg id="icon-close" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="display:none">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
     </div>
-
-    <!-- Bouton menu mobile -->
-    <button
-      id="mobile-toggle"
-      class="mobile-toggle"
-      aria-label="Ouvrir le menu"
-      aria-expanded="false"
-      aria-controls="mobile-menu"
-    >
-      <span class="burger-line"></span>
-      <span class="burger-line"></span>
-      <span class="burger-line"></span>
-    </button>
-
   </div>
 
-  <!-- Menu mobile -->
-  <nav
-    id="mobile-menu"
-    class="mobile-menu"
-    aria-label="Menu mobile"
-    aria-hidden="true"
-  >
-    <div class="mobile-menu-inner">
-      {navItems.map(item => (
-        <a href={item.href} class="mobile-link">{item.label}</a>
-      ))}
-      <a href="/signin" class="mobile-cta">Créer ma page — gratuit →</a>
-    </div>
+  <nav id="mobile-nav" class="mobile-nav" aria-label="Menu mobile" aria-hidden="true">
+    {navItems.map(item => (
+      <a href={item.href} class="mobile-nav-link">{item.label}</a>
+    ))}
+    <a href="/signin" class="mobile-nav-cta">Créer ma page — gratuit →</a>
   </nav>
-
 </header>
 
 <script>
-  const header   = document.getElementById('main-header')!;
-  const progress = document.getElementById('scroll-progress')!;
-  const toggle   = document.getElementById('mobile-toggle')!;
-  const menu     = document.getElementById('mobile-menu')!;
+(function() {
+  const header   = document.getElementById('site-header')!;
+  const progress = document.getElementById('header-progress')!;
+  const burgerBtn = document.getElementById('burger-btn')!;
+  const mobileNav = document.getElementById('mobile-nav')!;
+  const iconMenu  = document.getElementById('icon-menu')!;
+  const iconClose = document.getElementById('icon-close')!;
 
-  // ── Scroll : progress bar + hide on scroll down ──────────────────────────
-  let lastY = 0, rafId = 0;
+  // ── Scroll ──────────────────────────────────────────────────────────────
+  let lastY = 0;
+  let ticking = false;
 
-  function updateScroll() {
-    const y        = window.scrollY;
-    const maxY     = document.documentElement.scrollHeight - window.innerHeight;
-    const pct      = maxY > 0 ? (y / maxY) * 100 : 0;
+  function onScroll() {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      const y      = window.scrollY;
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      const pct    = maxScroll > 0 ? (y / maxScroll) * 100 : 0;
 
-    progress.style.transform = `scaleX(${pct / 100})`;
+      // Progress bar
+      progress.style.transform = `scaleX(${pct / 100})`;
 
-    // Scrolled state → frosted background
-    header.classList.toggle('scrolled', y > 40);
+      // Frosted glass après 50px
+      if (y > 50) {
+        header.classList.add('is-scrolled');
+      } else {
+        header.classList.remove('is-scrolled');
+      }
 
-    // Hide on scroll down, show on scroll up
-    if (y > lastY && y > 80) {
-      header.classList.add('hidden-up');
-    } else {
-      header.classList.remove('hidden-up');
-    }
+      // Cache en scroll down, montre en scroll up
+      if (y > lastY && y > 120) {
+        header.classList.add('is-hidden');
+      } else {
+        header.classList.remove('is-hidden');
+      }
 
-    lastY  = y;
-    rafId  = 0;
+      lastY = y;
+      ticking = false;
+    });
   }
 
-  window.addEventListener('scroll', () => {
-    if (!rafId) rafId = requestAnimationFrame(updateScroll);
-  }, { passive: true });
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
 
-  updateScroll();
+  // ── Menu mobile ──────────────────────────────────────────────────────────
+  let isOpen = false;
 
-  // ── Mobile menu toggle ───────────────────────────────────────────────────
-  let menuOpen = false;
-
-  function openMenu() {
-    menuOpen = true;
-    toggle.setAttribute('aria-expanded', 'true');
-    toggle.setAttribute('aria-label', 'Fermer le menu');
-    toggle.classList.add('open');
-    menu.classList.add('open');
-    menu.setAttribute('aria-hidden', 'false');
-    document.body.style.overflow = 'hidden';
+  function toggleMenu() {
+    isOpen = !isOpen;
+    burgerBtn.setAttribute('aria-expanded', String(isOpen));
+    burgerBtn.setAttribute('aria-label', isOpen ? 'Fermer le menu' : 'Ouvrir le menu');
+    mobileNav.setAttribute('aria-hidden', String(!isOpen));
+    mobileNav.classList.toggle('is-open', isOpen);
+    iconMenu.style.display  = isOpen ? 'none'  : 'block';
+    iconClose.style.display = isOpen ? 'block' : 'none';
+    document.body.style.overflow = isOpen ? 'hidden' : '';
   }
 
-  function closeMenu() {
-    menuOpen = false;
-    toggle.setAttribute('aria-expanded', 'false');
-    toggle.setAttribute('aria-label', 'Ouvrir le menu');
-    toggle.classList.remove('open');
-    menu.classList.remove('open');
-    menu.setAttribute('aria-hidden', 'true');
-    document.body.style.overflow = '';
-  }
-
-  toggle.addEventListener('click', () => menuOpen ? closeMenu() : openMenu());
-
-  // Ferme au clic sur un lien
-  menu.querySelectorAll('a').forEach(a => a.addEventListener('click', closeMenu));
-
-  // Ferme avec Escape
+  burgerBtn.addEventListener('click', toggleMenu);
+  mobileNav.querySelectorAll('a').forEach(a => a.addEventListener('click', () => {
+    if (isOpen) toggleMenu();
+  }));
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && menuOpen) closeMenu();
+    if (e.key === 'Escape' && isOpen) toggleMenu();
   });
+})();
 </script>
 
 <style>
-  /* ── Header shell ── */
-  .site-header {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-    transition: transform 0.3s ease, background 0.25s ease;
+  /* ── Reset ── */
+  #site-header {
+    /* position fixe propre — pas de flex/grid sur l'élément lui-même */
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 200;
+    /* PAS de display:flex ici — ça casse le fixed sur certains browsers */
+    /* PAS de height ici — géré par header-container */
   }
 
-  /* Frosted bg au scroll */
-  .site-header.scrolled .header-inner {
-    background: rgba(8,10,12,0.85);
-    backdrop-filter: blur(20px) saturate(160%);
-    border-bottom-color: rgba(255,255,255,0.07);
+  /* Transition globale */
+  #site-header {
+    transition: transform 0.3s ease;
   }
-
-  /* Disparaît en scroll down */
-  .site-header.hidden-up { transform: translateY(-100%); }
+  #site-header.is-hidden {
+    transform: translateY(-100%);
+  }
 
   /* ── Barre de progression ── */
-  .scroll-bar {
-    position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+  .header-progress {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
     background: linear-gradient(90deg, #39ff8f, #38bdf8, #a78bfa);
-    transform: scaleX(0); transform-origin: left;
+    transform: scaleX(0);
+    transform-origin: left center;
     transition: transform 0.1s linear;
     pointer-events: none;
+    z-index: 1;
   }
 
-  /* ── Inner ── */
-  .header-inner {
-    display: flex; align-items: center; gap: 1rem;
-    padding: 0 1.5rem;
+  /* ── Container principal ── */
+  .header-container {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
     height: 64px;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-    transition: background 0.25s, border-color 0.25s;
-    max-width: 1200px; margin: 0 auto;
-    /* NB: le max-width ici s'applique à l'inner, le header lui-même est full-width */
+    padding: 0 1.5rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    /* Fond transparent par défaut, devient frosted au scroll */
+    background: transparent;
+    border-bottom: 1px solid transparent;
+    transition: background 0.25s ease, border-color 0.25s ease, backdrop-filter 0.25s ease;
   }
 
-  /* Trick : header full-width mais inner centré */
-  .site-header { display: flex; flex-direction: column; }
-  .header-inner { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 1.5rem; }
+  /* Quand scrollé : fond frosted + bordure */
+  #site-header.is-scrolled .header-container {
+    background: rgba(8, 10, 12, 0.88);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+  }
 
   /* ── Logo ── */
-  .logo {
-    display: flex; align-items: center; gap: 0.5rem;
-    text-decoration: none; flex-shrink: 0;
-  }
-  .logo-icon {
-    width: 30px; height: 30px; border-radius: 7px;
-    background: linear-gradient(135deg, #39ff8f, #b4ff6e);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 14px; line-height: 1;
+  .header-logo {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
     flex-shrink: 0;
   }
-  .logo-text {
+  .logo-mark {
+    width: 30px; height: 30px;
+    border-radius: 7px;
+    background: linear-gradient(135deg, #39ff8f, #b4ff6e);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; line-height: 1; flex-shrink: 0;
+  }
+  .logo-name {
     font-family: 'Syne', sans-serif;
     font-size: 1rem; font-weight: 800;
     color: #fff; letter-spacing: -0.02em;
     transition: color 0.15s;
   }
-  .logo:hover .logo-text { color: #39ff8f; }
+  .header-logo:hover .logo-name { color: #39ff8f; }
 
   /* ── Nav desktop ── */
-  .nav-desktop {
-    display: flex; align-items: center; gap: 0.25rem;
-    margin-left: 1.5rem; flex: 1;
+  .header-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: 1.5rem;
+    flex: 1;
   }
-
-  .nav-link {
+  .header-nav-link {
     position: relative;
     padding: 0.375rem 0.75rem;
     font-size: 0.875rem; font-weight: 500;
-    color: rgba(255,255,255,0.55);
-    text-decoration: none; border-radius: 0.5rem;
+    color: rgba(255, 255, 255, 0.52);
+    text-decoration: none;
+    border-radius: 0.5rem;
     transition: color 0.15s, background 0.15s;
   }
-  .nav-link::after {
+  .header-nav-link::after {
     content: '';
-    position: absolute; bottom: -2px; left: 0.75rem; right: 0.75rem; height: 1px;
-    background: #39ff8f;
+    position: absolute; bottom: -1px; left: 0.75rem; right: 0.75rem;
+    height: 1.5px; background: #39ff8f;
     transform: scaleX(0); transform-origin: left;
     transition: transform 0.2s ease;
   }
-  .nav-link:hover { color: #fff; background: rgba(255,255,255,0.04); }
-  .nav-link:hover::after { transform: scaleX(1); }
+  .header-nav-link:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.04);
+  }
+  .header-nav-link:hover::after { transform: scaleX(1); }
 
-  /* ── CTA ── */
-  .header-cta { margin-left: auto; flex-shrink: 0; }
+  /* ── End zone ── */
+  .header-end {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
 
-  .btn-signin {
+  .header-cta {
     display: inline-flex; align-items: center; gap: 0.4rem;
     padding: 0.5rem 1.125rem;
     background: linear-gradient(135deg, #39ff8f, #b4ff6e);
     color: #050c08;
     border-radius: 0.625rem;
     font-size: 0.8125rem; font-weight: 700;
-    text-decoration: none; letter-spacing: -0.01em;
-    transition: filter 0.15s, transform 0.15s, box-shadow 0.15s;
-    box-shadow: 0 2px 12px rgba(57,255,143,0.2);
+    text-decoration: none;
+    transition: filter 0.15s, transform 0.15s;
+    box-shadow: 0 2px 12px rgba(57, 255, 143, 0.2);
   }
-  .btn-signin:hover {
+  .header-cta:hover {
     filter: brightness(1.08);
     transform: translateY(-1px);
-    box-shadow: 0 4px 20px rgba(57,255,143,0.3);
-  }
-  .btn-signin:active { transform: translateY(0); }
-
-  /* ── Burger ── */
-  .mobile-toggle {
-    display: none; flex-direction: column; justify-content: center; gap: 5px;
-    width: 36px; height: 36px; padding: 6px;
-    background: transparent; border: none; cursor: pointer;
-    border-radius: 0.5rem; transition: background 0.15s;
-    margin-left: auto; flex-shrink: 0;
-  }
-  .mobile-toggle:hover { background: rgba(255,255,255,0.06); }
-
-  .burger-line {
-    display: block; width: 100%; height: 1.5px;
-    background: rgba(255,255,255,0.7); border-radius: 2px;
-    transform-origin: center;
-    transition: transform 0.25s cubic-bezier(0.34,1.2,0.64,1), opacity 0.2s;
   }
 
-  /* Hamburger → X */
-  .mobile-toggle.open .burger-line:nth-child(1) { transform: translateY(6.5px) rotate(45deg); }
-  .mobile-toggle.open .burger-line:nth-child(2) { opacity: 0; transform: scaleX(0); }
-  .mobile-toggle.open .burger-line:nth-child(3) { transform: translateY(-6.5px) rotate(-45deg); }
-
-  /* ── Mobile menu ── */
-  .mobile-menu {
-    position: fixed; inset: 0; top: 64px; z-index: 99;
-    background: rgba(8,10,12,0.97);
-    backdrop-filter: blur(20px);
-    display: flex; align-items: flex-start;
-    pointer-events: none; opacity: 0;
-    transition: opacity 0.2s ease;
-  }
-  .mobile-menu.open { pointer-events: auto; opacity: 1; }
-
-  .mobile-menu-inner {
-    display: flex; flex-direction: column; gap: 0.25rem;
-    padding: 1.5rem;
-    width: 100%;
-    transform: translateY(-8px);
-    transition: transform 0.25s cubic-bezier(0.34,1.2,0.64,1);
-  }
-  .mobile-menu.open .mobile-menu-inner { transform: translateY(0); }
-
-  .mobile-link {
-    display: block; padding: 0.875rem 1rem;
-    font-size: 1.0625rem; font-weight: 500;
-    color: rgba(255,255,255,0.6); text-decoration: none;
-    border-radius: 0.75rem;
+  .burger-btn {
+    display: none;
+    align-items: center; justify-content: center;
+    width: 36px; height: 36px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.5rem;
+    color: rgba(255, 255, 255, 0.75);
+    cursor: pointer;
     transition: background 0.15s, color 0.15s;
-    border: 1px solid transparent;
   }
-  .mobile-link:hover { background: rgba(255,255,255,0.05); color: #fff; border-color: rgba(255,255,255,0.08); }
+  .burger-btn:hover {
+    background: rgba(255, 255, 255, 0.09);
+    color: #fff;
+  }
 
-  .mobile-cta {
-    display: block; margin-top: 0.5rem; padding: 0.9375rem 1rem;
+  /* ── Mobile nav ── */
+  .mobile-nav {
+    position: absolute;
+    top: 64px; left: 0; right: 0;
+    background: rgba(8, 10, 12, 0.97);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    padding: 1rem 1.5rem 1.5rem;
+    display: flex; flex-direction: column; gap: 0.25rem;
+
+    /* Fermé par défaut */
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-6px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .mobile-nav.is-open {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+
+  .mobile-nav-link {
+    display: block;
+    padding: 0.75rem 1rem;
+    font-size: 1rem; font-weight: 500;
+    color: rgba(255, 255, 255, 0.58);
+    text-decoration: none;
+    border-radius: 0.75rem;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+  }
+  .mobile-nav-link:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .mobile-nav-cta {
+    display: block; margin-top: 0.5rem;
+    padding: 0.875rem 1rem;
     background: linear-gradient(135deg, #39ff8f, #b4ff6e);
-    color: #050c08; font-size: 0.9375rem; font-weight: 700;
-    border-radius: 0.875rem; text-decoration: none;
-    text-align: center;
+    color: #050c08; font-weight: 700; font-size: 0.9375rem;
+    border-radius: 0.875rem; text-decoration: none; text-align: center;
     transition: filter 0.15s;
   }
-  .mobile-cta:hover { filter: brightness(1.06); }
+  .mobile-nav-cta:hover { filter: brightness(1.06); }
 
   /* ── Responsive ── */
   @media (max-width: 768px) {
-    .nav-desktop, .header-cta { display: none; }
-    .mobile-toggle { display: flex; }
+    .header-nav { display: none; }
+    .header-cta { display: none; }
+    .burger-btn { display: flex; }
   }
 </style>

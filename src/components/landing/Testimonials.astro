@@ -1,134 +1,206 @@
 ---
-// Testimonials section with real user stories
+// src/components/landing/Testimonials.astro
+// Réécriture complète — zéro Tailwind custom, styles scoped uniquement
+
 const testimonials = [
   {
-    name: 'Sarah Chen',
-    role: 'Content Creator',
-    avatar: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    quote: "BioForge transformed how I connect with my audience. The analytics are insane—I finally understand what content drives clicks. My link clicks increased by 300% in just two months!",
-    stats: '+300% clicks',
-    platform: 'YouTube'
+    quote: "J'ai migré depuis Linktree en 10 minutes. Le dashboard analytics est 10x plus lisible et mes clics ont augmenté juste en changeant la mise en page.",
+    name:  "Léa Moreau",
+    role:  "Créatrice lifestyle · 48k abonnés",
+    plan:  "Pro",
+    color: "#39ff8f",
+    initials: "LM",
+    grad: "linear-gradient(135deg,#39ff8f,#0ea5e9)",
   },
   {
-    name: 'Marcus Rodriguez',
-    role: 'Professional Gamer',
-    avatar: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-    quote: "As a pro gamer, my bio link is crucial for sponsors and fans. BioForge's design options let me match my brand perfectly. The mobile experience is flawless—exactly what my audience needs.",
-    stats: '50K+ visits/month',
-    platform: 'Twitch'
+    quote: "En tant que streamer Twitch, pouvoir intégrer mes clips et mon planning directement dans ma bio page c'est un game changer. Plus besoin de 4 outils différents.",
+    name:  "MaxPlay",
+    role:  "Streamer Twitch · 22k viewers",
+    plan:  "Creator",
+    color: "#a78bfa",
+    initials: "MP",
+    grad: "linear-gradient(135deg,#7c3aed,#a78bfa)",
   },
   {
-    name: 'Emma Williams',
-    role: 'Digital Artist',
-    avatar: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-    quote: "I've tried every link-in-bio tool out there. BioForge is the only one that doesn't look generic. The customization is incredible, and the load speed is blazing fast. Worth every penny!",
-    stats: '5-star experience',
-    platform: 'Instagram'
+    quote: "BioForge est la seule plateforme qui comprend les créateurs gaming. Le design sombre, les blocs Twitch natifs, les stats en temps réel — c'est fait pour nous.",
+    name:  "Kira Nyx",
+    role:  "Gameuse · YouTubeuse · 31k subs",
+    plan:  "Pro",
+    color: "#38bdf8",
+    initials: "KN",
+    grad: "linear-gradient(135deg,#38bdf8,#a78bfa)",
   },
-  {
-    name: 'Alex Kim',
-    role: 'Tech Influencer',
-    avatar: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
-    quote: "The real-time analytics dashboard is a game-changer. I can see exactly which links perform best and optimize on the fly. BioForge pays for itself with the insights alone.",
-    stats: 'ROI in week 1',
-    platform: 'Twitter'
-  }
-];
+] as const;
 ---
 
-<section class="relative py-32 overflow-hidden" data-scroll-section>
-  <!-- Background -->
-  <div class="absolute inset-0 bg-gradient-to-b from-dark-800 to-dark-900"></div>
-  <div class="absolute inset-0 opacity-10">
-    <div class="absolute top-0 left-1/4 w-96 h-96 bg-neon-purple rounded-full blur-[150px] animate-pulse-slow"></div>
-    <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-neon-blue rounded-full blur-[150px] animate-pulse-slow" style="animation-delay: 1.5s;"></div>
+<section class="tst" aria-labelledby="tst-title">
+
+  <div class="tst-head">
+    <div class="tst-badge">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+      </svg>
+      Ce qu'ils en pensent
+    </div>
+    <h2 id="tst-title" class="tst-title">
+      Des créateurs qui ont<br>
+      <span class="tst-accent">fait le saut</span>
+    </h2>
   </div>
 
-  <div class="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8">
-    <!-- Section Header -->
-    <div class="text-center max-w-3xl mx-auto mb-20">
-      <div class="inline-flex items-center space-x-2 px-4 py-2 glass rounded-full text-sm text-neon-purple mb-6">
-        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-        </svg>
-        <span>Loved by creators</span>
-      </div>
-      
-      <h2 class="text-5xl sm:text-6xl font-display font-bold text-white mb-6">
-        What Creators
-        <span class="text-transparent bg-clip-text bg-gradient-to-r from-neon-purple to-neon-pink text-glow-purple">
-          Say
-        </span>
-      </h2>
-      <p class="text-xl text-gray-400 leading-relaxed">
-        Real stories from real creators who leveled up with BioForge
-      </p>
-    </div>
+  <div class="tst-grid" role="list">
+    {testimonials.map((t, i) => (
+      <article
+        class="tst-card"
+        style={`--c:${t.color}; animation-delay:${i * 0.1}s`}
+        role="listitem"
+      >
+        <!-- Quote marks décoratifs -->
+        <div class="tst-quote-mark" aria-hidden="true">"</div>
 
-    <!-- Testimonials Grid -->
-    <div class="grid md:grid-cols-2 gap-6 max-w-6xl mx-auto">
-      {testimonials.map((testimonial, index) => (
-        <div class="reveal" style={`animation-delay: ${index * 0.1}s`}>
-          <div class="glass-strong rounded-3xl p-8 border border-white/10 hover:border-neon-purple/30 transition-all duration-500 h-full group cursor-pointer">
-            <!-- Quote Icon -->
-            <div class="mb-6">
-              <svg class="w-10 h-10 text-neon-purple/30 group-hover:text-neon-purple/50 transition-colors" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
-              </svg>
-            </div>
+        <!-- Plan badge -->
+        <div class="tst-plan" style={`color:${t.color}; border-color:${t.color}22; background:${t.color}12`}>
+          {t.plan}
+        </div>
 
-            <!-- Quote Text -->
-            <p class="text-gray-300 text-lg leading-relaxed mb-6 italic">
-              "{testimonial.quote}"
-            </p>
+        <blockquote class="tst-quote">
+          <p>{t.quote}</p>
+        </blockquote>
 
-            <!-- Author Info -->
-            <div class="flex items-center justify-between pt-6 border-t border-white/10">
-              <div class="flex items-center space-x-4">
-                <!-- Avatar -->
-                <div 
-                  class="w-14 h-14 rounded-full glow-purple group-hover:scale-110 transition-transform duration-300"
-                  style={`background: ${testimonial.avatar}`}
-                ></div>
-                
-                <!-- Name & Role -->
-                <div>
-                  <p class="font-semibold text-white">{testimonial.name}</p>
-                  <p class="text-sm text-gray-400">{testimonial.role}</p>
-                </div>
-              </div>
-
-              <!-- Stats Badge -->
-              <div class="text-right">
-                <div class="inline-flex items-center space-x-1 px-3 py-1.5 glass rounded-full border border-neon-purple/30">
-                  <svg class="w-4 h-4 text-neon-purple" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
-                  </svg>
-                  <span class="text-xs text-neon-purple font-semibold">{testimonial.stats}</span>
-                </div>
-                <p class="text-xs text-gray-500 mt-1">{testimonial.platform}</p>
-              </div>
-            </div>
-
-            <!-- Hover Glow -->
-            <div class="absolute inset-0 bg-gradient-to-br from-neon-purple/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl pointer-events-none"></div>
+        <div class="tst-author">
+          <div class="tst-avatar" style={`background:${t.grad}`} aria-hidden="true">
+            {t.initials}
+          </div>
+          <div>
+            <p class="tst-name">{t.name}</p>
+            <p class="tst-role">{t.role}</p>
           </div>
         </div>
-      ))}
-    </div>
 
-    <!-- Stars Rating -->
-    <div class="text-center mt-16 reveal">
-      <div class="inline-flex items-center space-x-2 mb-4">
-        {[...Array(5)].map(() => (
-          <svg class="w-6 h-6 text-neon-green" fill="currentColor" viewBox="0 0 20 20">
-            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-          </svg>
-        ))}
-      </div>
-      <p class="text-gray-400">
-        <span class="text-white font-bold">4.9/5</span> from over <span class="text-neon-green font-semibold">2,500+ reviews</span>
-      </p>
-    </div>
+        <!-- Étoiles -->
+        <div class="tst-stars" aria-label="5 étoiles sur 5">
+          {Array.from({ length: 5 }).map(() => (
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="#f59e0b" stroke="none" aria-hidden="true">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+          ))}
+        </div>
+      </article>
+    ))}
   </div>
+
 </section>
+
+<script>
+  document.querySelectorAll('.tst-head, .tst-card').forEach(el =>
+    new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) {
+        (e.target as HTMLElement).classList.add('revealed');
+      }
+    }, { threshold: 0.15 }).observe(el)
+  );
+</script>
+
+<style>
+  .tst {
+    padding: 6rem 1.5rem;
+    max-width: 1100px; margin: 0 auto;
+    display: flex; flex-direction: column; align-items: center; gap: 3.5rem;
+  }
+
+  /* Reveal */
+  .tst-head, .tst-card {
+    opacity: 0; transform: translateY(18px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+    transition-delay: var(--delay, 0s);
+  }
+  .revealed { opacity: 1; transform: none; }
+
+  /* Head */
+  .tst-head { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.875rem; }
+  .tst-badge {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.3rem 0.875rem;
+    background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2);
+    border-radius: 99px; font-size: 0.72rem; font-weight: 700;
+    color: #f59e0b; text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .tst-title {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(1.875rem, 4vw, 2.75rem);
+    font-weight: 800; color: #fff; letter-spacing: -0.03em; line-height: 1.1;
+  }
+  .tst-accent {
+    background: linear-gradient(90deg, #f59e0b, #fb923c);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Grid */
+  .tst-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem; width: 100%;
+  }
+
+  /* Card */
+  .tst-card {
+    position: relative; overflow: hidden;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 1.25rem;
+    padding: 1.75rem;
+    display: flex; flex-direction: column; gap: 1.125rem;
+    transition: border-color 0.2s, background 0.2s, transform 0.2s;
+  }
+  .tst-card::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--c) 5%, transparent), transparent);
+    pointer-events: none;
+  }
+  .tst-card:hover {
+    border-color: color-mix(in srgb, var(--c) 22%, transparent);
+    background: rgba(255,255,255,0.04);
+    transform: translateY(-3px);
+  }
+
+  /* Quote mark déco */
+  .tst-quote-mark {
+    position: absolute; top: 1rem; right: 1.25rem;
+    font-family: Georgia, serif; font-size: 4rem; line-height: 1;
+    color: color-mix(in srgb, var(--c) 12%, transparent);
+    pointer-events: none; user-select: none;
+  }
+
+  /* Plan badge */
+  .tst-plan {
+    display: inline-block; width: fit-content;
+    font-size: 0.65rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; padding: 0.2rem 0.6rem; border-radius: 99px;
+    border: 1px solid; /* couleur via style inline */
+  }
+
+  /* Quote */
+  .tst-quote { margin: 0; }
+  .tst-quote p {
+    font-size: 0.875rem; color: rgba(255,255,255,0.58); line-height: 1.75;
+    font-style: italic;
+  }
+
+  /* Author */
+  .tst-author { display: flex; align-items: center; gap: 0.75rem; margin-top: auto; }
+  .tst-avatar {
+    width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; font-weight: 700; color: rgba(0,0,0,0.75);
+  }
+  .tst-name { font-size: 0.875rem; font-weight: 600; color: #fff; }
+  .tst-role { font-size: 0.72rem; color: rgba(255,255,255,0.38); margin-top: 0.1rem; }
+
+  /* Stars */
+  .tst-stars { display: flex; gap: 2px; }
+
+  /* Responsive */
+  @media (max-width: 860px) { .tst-grid { grid-template-columns: 1fr; max-width: 480px; } }
+  @media (max-width: 480px) { .tst { padding: 4rem 1rem; } }
+</style>

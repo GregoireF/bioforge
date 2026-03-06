@@ -1,39 +1,14 @@
 ---
 // src/components/landing/HowItWorks.astro
-// Zéro GSAP, zéro dépendance JS — CSS animations au scroll via IntersectionObserver natif
-
-const steps = [
-  {
-    n:     '01',
-    title: 'Crée ton compte',
-    body:  'Inscription en 30 secondes avec Google ou Discord. Ton URL bioforge.click/@toi est réservée immédiatement. Aucune CB requise.',
-    icon:  'M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8zM19 8v6M22 11h-6',
-    color: '#39ff8f',
-  },
-  {
-    n:     '02',
-    title: 'Construis ta page',
-    body:  'Ajoute des blocs par drag & drop : liens, réseaux sociaux, musique, QR code, compteur. Personalise les couleurs, la typo, le fond.',
-    icon:  'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z',
-    color: '#38bdf8',
-  },
-  {
-    n:     '03',
-    title: 'Partage & mesure',
-    body:  'Publie en un clic. Suivi en temps réel des vues, clics et sources de trafic. Vois exactement ce qui performe et optimise.',
-    icon:  'M13 10V3L4 14h7v7l9-11h-7z',
-    color: '#fb923c',
-  },
-] as const;
+// Tous les SVGs sont inline — zéro path passé comme prop
 ---
 
 <section id="how-it-works" class="hiw" aria-labelledby="hiw-title">
 
-  <!-- En-tête -->
-  <div class="hiw-head reveal">
-    <div class="hiw-eyebrow">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-        <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+  <div class="hiw-head">
+    <div class="hiw-badge">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
       </svg>
       Simple et rapide
     </div>
@@ -41,153 +16,179 @@ const steps = [
       Opérationnel en<br>
       <span class="hiw-accent">moins de 5 minutes</span>
     </h2>
-    <p class="hiw-sub">Pas de compétences techniques requises. Du drag & drop, c'est tout.</p>
+    <p class="hiw-sub">Pas de compétences techniques. Du drag & drop, c'est tout.</p>
   </div>
 
-  <!-- Steps -->
   <div class="hiw-steps" role="list">
+    <div class="hiw-connector" aria-hidden="true"></div>
 
-    <!-- Ligne de connexion desktop -->
-    <div class="steps-line" aria-hidden="true"></div>
-
-    {steps.map((step, i) => (
-      <article
-        class="step reveal"
-        style={`--c: ${step.color}; animation-delay: ${i * 0.12}s`}
-        role="listitem"
-      >
-        <!-- Numéro + icône -->
-        <div class="step-top">
-          <span class="step-num" aria-hidden="true">{step.n}</span>
-          <div class="step-icon" aria-hidden="true">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-                 stroke={step.color} stroke-width="2" stroke-linecap="round">
-              <path d={step.icon}/>
-            </svg>
-          </div>
+    <!-- Step 01 -->
+    <article class="hiw-step" style="--c:#39ff8f; --delay:0s" role="listitem">
+      <div class="step-header">
+        <span class="step-num" aria-hidden="true">01</span>
+        <div class="step-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#39ff8f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+            <line x1="19" y1="8" x2="19" y2="14"/>
+            <line x1="22" y1="11" x2="16" y2="11"/>
+          </svg>
         </div>
+      </div>
+      <h3 class="step-title">Crée ton compte</h3>
+      <p class="step-body">Inscription en 30 secondes avec Google ou Discord. Ton URL <code>bioforge.click/@toi</code> est réservée immédiatement. Aucune CB.</p>
+    </article>
 
-        <!-- Dot sur la ligne -->
-        <div class="step-dot" aria-hidden="true">
-          <div class="dot-inner"></div>
-          <div class="dot-ping"></div>
+    <!-- Step 02 -->
+    <article class="hiw-step" style="--c:#38bdf8; --delay:0.1s" role="listitem">
+      <div class="step-header">
+        <span class="step-num" aria-hidden="true">02</span>
+        <div class="step-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"/>
+            <rect x="14" y="3" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/>
+          </svg>
         </div>
+      </div>
+      <h3 class="step-title">Construis ta page</h3>
+      <p class="step-body">Ajoute des blocs par drag & drop — liens, réseaux, musique, QR code. Personnalise les couleurs, la typo, le fond.</p>
+    </article>
 
-        <!-- Contenu -->
-        <h3 class="step-title">{step.title}</h3>
-        <p class="step-body">{step.body}</p>
-      </article>
-    ))}
+    <!-- Step 03 -->
+    <article class="hiw-step" style="--c:#fb923c; --delay:0.2s" role="listitem">
+      <div class="step-header">
+        <span class="step-num" aria-hidden="true">03</span>
+        <div class="step-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fb923c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+        </div>
+      </div>
+      <h3 class="step-title">Partage & mesure</h3>
+      <p class="step-body">Publie en un clic. Suivi en temps réel des vues, clics et sources de trafic. Vois exactement ce qui performe.</p>
+    </article>
+
   </div>
 
-  <!-- CTA inline -->
-  <div class="hiw-cta reveal">
-    <a href="/signin" class="hiw-btn" aria-label="Commencer à créer ta page bio">
+  <div class="hiw-cta">
+    <a href="/signin" class="hiw-btn">
       Commencer maintenant
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-        <path d="M5 12h14M12 5l7 7-7 7"/>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <line x1="5" y1="12" x2="19" y2="12"/>
+        <polyline points="12 5 19 12 12 19"/>
       </svg>
     </a>
-    <p class="hiw-fine">Gratuit · Aucune CB</p>
+    <p class="hiw-fine">Gratuit · Aucune CB · Setup 2 min</p>
   </div>
 
 </section>
 
 <script>
-  // Scroll reveal léger — IntersectionObserver natif, zéro lib
-  const els = document.querySelectorAll('.reveal');
-  const io  = new IntersectionObserver(
-    (entries) => entries.forEach(e => {
-      if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); }
-    }),
-    { threshold: 0.15, rootMargin: '0px 0px -40px 0px' }
-  );
-  els.forEach(el => io.observe(el));
+  // Reveal au scroll — IntersectionObserver natif
+  const items = document.querySelectorAll('.hiw-head, .hiw-step, .hiw-cta');
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        (e.target as HTMLElement).style.animationPlayState = 'running';
+        e.target.classList.add('revealed');
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+  items.forEach(el => io.observe(el));
 </script>
 
 <style>
   .hiw {
     padding: 6rem 1.5rem;
-    max-width: 1100px;
-    margin: 0 auto;
+    max-width: 1100px; margin: 0 auto;
     display: flex; flex-direction: column; align-items: center; gap: 4rem;
   }
 
-  /* ── Reveal animation ── */
-  .reveal {
-    opacity: 0; transform: translateY(24px);
-    transition: opacity 0.55s ease, transform 0.55s ease;
+  /* ── Reveal ── */
+  .hiw-head, .hiw-step, .hiw-cta {
+    opacity: 0; transform: translateY(20px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+    transition-delay: var(--delay, 0s);
   }
-  .reveal.visible { opacity: 1; transform: none; }
+  .hiw-head.revealed, .hiw-step.revealed, .hiw-cta.revealed {
+    opacity: 1; transform: none;
+  }
 
-  /* ── Header ── */
-  .hiw-head { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
-
-  .hiw-eyebrow {
+  /* ── Head ── */
+  .hiw-head {
+    text-align: center; display: flex; flex-direction: column;
+    align-items: center; gap: 1rem;
+  }
+  .hiw-badge {
     display: inline-flex; align-items: center; gap: 0.4rem;
     padding: 0.3rem 0.875rem;
     background: rgba(57,255,143,0.07); border: 1px solid rgba(57,255,143,0.18);
     border-radius: 99px; font-size: 0.72rem; font-weight: 700;
     color: #39ff8f; text-transform: uppercase; letter-spacing: 0.08em;
   }
-
   .hiw-title {
     font-family: 'Syne', sans-serif;
     font-size: clamp(2rem, 4.5vw, 3rem);
-    font-weight: 800; color: #fff;
-    letter-spacing: -0.03em; line-height: 1.1;
+    font-weight: 800; color: #fff; letter-spacing: -0.03em; line-height: 1.1;
   }
   .hiw-accent {
     background: linear-gradient(90deg, #39ff8f, #b4ff6e);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     background-clip: text;
   }
-
-  .hiw-sub { font-size: 1rem; color: rgba(255,255,255,0.45); max-width: 420px; }
+  .hiw-sub { font-size: 0.9375rem; color: rgba(255,255,255,0.42); }
 
   /* ── Steps ── */
   .hiw-steps {
     position: relative;
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem;
-    width: 100%;
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem; width: 100%;
   }
 
-  /* Ligne de connexion */
-  .steps-line {
-    position: absolute; top: 5.5rem; left: calc(16.66% + 1rem); right: calc(16.66% + 1rem);
+  /* Ligne de connexion entre les steps */
+  .hiw-connector {
+    position: absolute;
+    top: 2.75rem; /* milieu de l'icône */
+    left: calc(16.66% + 1.5rem);
+    right: calc(16.66% + 1.5rem);
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(57,255,143,0.25) 20%, rgba(57,255,143,0.25) 80%, transparent);
+    background: linear-gradient(90deg,
+      transparent,
+      rgba(57,255,143,0.2) 20%,
+      rgba(56,189,248,0.2) 50%,
+      rgba(251,146,60,0.2) 80%,
+      transparent
+    );
     pointer-events: none;
   }
 
-  .step {
+  .hiw-step {
     background: rgba(255,255,255,0.025);
     border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 1.25rem;
-    padding: 1.75rem;
+    border-radius: 1.25rem; padding: 1.75rem;
     display: flex; flex-direction: column; gap: 0.875rem;
-    position: relative;
     transition: border-color 0.2s, background 0.2s, transform 0.2s;
   }
-  .step:hover {
-    border-color: color-mix(in srgb, var(--c) 25%, transparent);
+  .hiw-step:hover {
+    border-color: color-mix(in srgb, var(--c) 28%, transparent);
     background: rgba(255,255,255,0.04);
     transform: translateY(-3px);
   }
 
-  .step-top {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 0.25rem;
+  .step-header {
+    display: flex; align-items: center;
+    justify-content: space-between;
   }
-
   .step-num {
     font-family: 'Syne', sans-serif;
-    font-size: 2.5rem; font-weight: 800;
-    color: color-mix(in srgb, var(--c) 20%, transparent);
-    letter-spacing: -0.04em; line-height: 1;
+    font-size: 2.5rem; font-weight: 800; line-height: 1; letter-spacing: -0.04em;
+    color: color-mix(in srgb, var(--c) 18%, transparent);
     transition: color 0.2s;
   }
-  .step:hover .step-num { color: color-mix(in srgb, var(--c) 35%, transparent); }
+  .hiw-step:hover .step-num { color: color-mix(in srgb, var(--c) 30%, transparent); }
 
   .step-icon {
     width: 44px; height: 44px; border-radius: 0.75rem; flex-shrink: 0;
@@ -196,69 +197,39 @@ const steps = [
     border: 1px solid color-mix(in srgb, var(--c) 20%, transparent);
     transition: transform 0.2s;
   }
-  .step:hover .step-icon { transform: scale(1.08); }
-
-  /* Dot sur la ligne -->  */
-  .step-dot {
-    position: absolute; top: calc(5.5rem - 5px);
-    left: 50%; transform: translateX(-50%);
-    width: 10px; height: 10px;
-    display: none; /* visible uniquement md+ */
-  }
-  .dot-inner {
-    width: 10px; height: 10px; border-radius: 50%;
-    background: #0d1012; border: 2px solid #39ff8f;
-    position: relative; z-index: 1;
-  }
-  .dot-ping {
-    position: absolute; inset: -3px;
-    border-radius: 50%; border: 1px solid rgba(57,255,143,0.35);
-    animation: ping 2s ease-in-out infinite;
-  }
-  @keyframes ping {
-    0%,100% { transform: scale(1); opacity: 0.5; }
-    50%      { transform: scale(1.6); opacity: 0; }
-  }
+  .hiw-step:hover .step-icon { transform: scale(1.08); }
 
   .step-title {
     font-family: 'Syne', sans-serif;
-    font-size: 1rem; font-weight: 700; color: #fff;
-    letter-spacing: -0.01em;
+    font-size: 1rem; font-weight: 700; color: #fff; letter-spacing: -0.01em;
   }
-
   .step-body {
-    font-size: 0.8375rem; color: rgba(255,255,255,0.48);
-    line-height: 1.7;
+    font-size: 0.8375rem; color: rgba(255,255,255,0.46); line-height: 1.7;
+  }
+  .step-body code {
+    font-family: monospace; font-size: 0.8em;
+    background: rgba(255,255,255,0.07); padding: 0.1em 0.4em; border-radius: 4px;
+    color: rgba(255,255,255,0.65);
   }
 
   /* ── CTA ── */
   .hiw-cta { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
-
   .hiw-btn {
     display: inline-flex; align-items: center; gap: 0.5rem;
     padding: 0.75rem 1.5rem;
     background: rgba(57,255,143,0.1); color: #39ff8f;
-    border: 1px solid rgba(57,255,143,0.25);
-    border-radius: 0.75rem;
+    border: 1px solid rgba(57,255,143,0.25); border-radius: 0.75rem;
     font-size: 0.875rem; font-weight: 600;
     text-decoration: none; transition: all 0.15s;
   }
   .hiw-btn:hover { background: rgba(57,255,143,0.16); border-color: rgba(57,255,143,0.4); transform: translateY(-1px); }
-
   .hiw-fine { font-size: 0.72rem; color: rgba(255,255,255,0.28); }
 
   /* ── Responsive ── */
-  @media (min-width: 900px) {
-    .step-dot { display: block; }
-  }
-
   @media (max-width: 860px) {
-    .hiw-steps { grid-template-columns: 1fr; gap: 1rem; }
-    .steps-line { display: none; }
-    .step { flex-direction: row; flex-wrap: wrap; gap: 0.75rem; }
-    .step-top { width: 100%; }
+    .hiw-steps { grid-template-columns: 1fr; }
+    .hiw-connector { display: none; }
   }
-
   @media (max-width: 480px) {
     .hiw { padding: 4rem 1rem; gap: 3rem; }
   }
