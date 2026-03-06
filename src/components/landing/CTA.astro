@@ -1,115 +1,240 @@
 ---
-import Button from '@/components/ui/Button.astro';
+// src/components/landing/CTA.astro
+
+interface Props {
+  profileCount?: number;
+}
+const { profileCount = 0 } = Astro.props;
+
+const countDisplay = profileCount > 1000
+  ? `${(profileCount / 1000).toFixed(1).replace('.0','') }k+`
+  : profileCount > 0 ? `${profileCount}+` : null;
 ---
 
-<!-- Final CTA Section - Ultra Modern -->
-    <section class="relative py-32 overflow-hidden" data-scroll-section>
-      <!-- Animated Background -->
-      <div class="absolute inset-0">
-        <div class="absolute inset-0 bg-gradient-to-br from-neon-green/5 via-transparent to-neon-purple/5"></div>
-        
-        <!-- Morphing gradient orbs -->
-        <div class="absolute top-0 left-0 w-[600px] h-[600px] bg-neon-green/15 rounded-full blur-[150px] animate-blob"></div>
-        <div class="absolute bottom-0 right-0 w-[600px] h-[600px] bg-neon-purple/15 rounded-full blur-[150px] animate-blob animation-delay-2000"></div>
-        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-neon-blue/15 rounded-full blur-[150px] animate-blob animation-delay-4000"></div>
-      </div>
+<section class="cta" aria-labelledby="cta-title">
+  <div class="cta-bg" aria-hidden="true">
+    <div class="cta-glow cta-glow-1"></div>
+    <div class="cta-glow cta-glow-2"></div>
+  </div>
 
-      <!-- Content -->
-      <div class="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="max-w-5xl mx-auto">
-          <!-- Badge -->
-          <div class="text-center mb-8">
-            <div class="inline-flex items-center space-x-2 px-5 py-2.5 glass rounded-full text-sm border border-neon-green/30">
-              <span class="relative flex h-2.5 w-2.5">
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-neon-green opacity-75"></span>
-                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-neon-green"></span>
-              </span>
-              <span class="text-gray-300">Free forever • No credit card required</span>
-            </div>
-          </div>
+  <div class="cta-box reveal">
+    <!-- Badge -->
+    <div class="cta-badge">
+      <span class="badge-dot" aria-hidden="true"></span>
+      Gratuit · Aucune CB requise
+    </div>
 
-          <!-- Main CTA Content -->
-          <div class="glass-strong rounded-[3rem] p-12 md:p-16 border border-white/10 text-center">
-            <!-- Heading -->
-            <div class="mb-10">
-              <h2 class="text-5xl sm:text-6xl lg:text-7xl font-display font-bold text-white leading-tight mb-6 smooth-font">
-                Ready to
-                <span class="block mt-2 text-transparent bg-clip-text bg-gradient-to-r from-neon-green via-neon-blue to-neon-purple animate-gradient text-glow-green">
-                  Level Up?
-                </span>
-              </h2>
-              <p class="text-xl sm:text-2xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
-                Join <span class="text-neon-green font-semibold count-up" data-count="10" data-suffix="K+">10K+</span> creators who've already transformed their online presence with BioForge.
-              </p>
-            </div>
+    <h2 id="cta-title" class="cta-title">
+      Prêt à forger<br>
+      <span class="cta-accent">ta page&nbsp;?</span>
+    </h2>
 
-            <!-- CTA Buttons -->
-            <div class="flex flex-col sm:flex-row gap-5 justify-center items-center mb-12">
-              <Button 
-                variant="primary" 
-                size="lg" 
-                href="/signup"
-                class="magnetic glow-green group text-lg px-10 py-5"
-              >
-                <span class="relative z-10">Start Building — Free</span>
-                <svg class="w-6 h-6 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-                </svg>
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="lg" 
-                href="/features"
-                class="magnetic text-lg px-10 py-5"
-              >
-                <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-                Watch Demo
-              </Button>
-            </div>
+    {countDisplay && (
+      <p class="cta-proof">
+        Rejoins <strong>{countDisplay}</strong> créateurs qui ont déjà leur page BioForge.
+      </p>
+    )}
 
-            <!-- Trust Badges -->
-            <div class="flex flex-wrap items-center justify-center gap-8 text-sm">
-              <div class="flex items-center space-x-2 text-gray-400 hover:text-neon-green transition-colors">
-                <svg class="w-5 h-5 text-neon-green" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                </svg>
-                <span>SSL Secured</span>
-              </div>
-              <div class="flex items-center space-x-2 text-gray-400 hover:text-neon-green transition-colors">
-                <svg class="w-5 h-5 text-neon-green" fill="currentColor" viewBox="0 0 20 20">
-                  <path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                </svg>
-                <span>GDPR Compliant</span>
-              </div>
-              <div class="flex items-center space-x-2 text-gray-400 hover:text-neon-green transition-colors">
-                <svg class="w-5 h-5 text-neon-green" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 3.5a1.5 1.5 0 013 0V4a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-.5a1.5 1.5 0 000 3h.5a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-.5a1.5 1.5 0 00-3 0v.5a1 1 0 01-1 1H6a1 1 0 01-1-1v-3a1 1 0 00-1-1h-.5a1.5 1.5 0 010-3H4a1 1 0 001-1V6a1 1 0 011-1h3a1 1 0 001-1v-.5z"/>
-                </svg>
-                <span>99.9% Uptime</span>
-              </div>
-              <div class="flex items-center space-x-2 text-gray-400 hover:text-neon-green transition-colors">
-                <svg class="w-5 h-5 text-neon-green" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                </svg>
-                <span>4.9/5 Rating</span>
-              </div>
-            </div>
-          </div>
+    <!-- Champ username inline -->
+    <div class="cta-input-row">
+      <div class="cta-prefix" aria-hidden="true">bioforge.click/@</div>
+      <input
+        type="text"
+        class="cta-input"
+        placeholder="tonpseudo"
+        aria-label="Ton pseudonyme"
+        maxlength="30"
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck="false"
+      />
+      <a href="/signin" class="cta-btn" id="cta-go-btn">
+        Forge-le
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </a>
+    </div>
 
-          <!-- Social Proof Logos (Optional) -->
-          <div class="mt-16 text-center">
-            <p class="text-sm text-gray-500 mb-6 uppercase tracking-wider">Trusted by creators at</p>
-            <div class="flex flex-wrap items-center justify-center gap-12 opacity-50 grayscale hover:opacity-100 hover:grayscale-0 transition-all duration-500">
-              <!-- Add logo placeholders or text -->
-              <div class="text-2xl font-bold text-white">TWITCH</div>
-              <div class="text-2xl font-bold text-white">YOUTUBE</div>
-              <div class="text-2xl font-bold text-white">DISCORD</div>
-              <div class="text-2xl font-bold text-white">TWITTER</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
+    <p class="cta-fine">Setup en 2 min · Ton URL, tes règles</p>
+
+    <!-- Trust badges -->
+    <div class="cta-trust">
+      {[
+        ['M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', 'SSL & RGPD'],
+        ['M22 11.08V12a10 10 0 11-5.93-9.14M22 4L12 14.01l-3-3', 'Uptime 99.9%'],
+        ['M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z', 'No-code'],
+      ].map(([path, label]) => (
+        <span class="trust-badge">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d={path}/>
+          </svg>
+          {label}
+        </span>
+      ))}
+    </div>
+  </div>
+</section>
+
+<script>
+  // Redirige vers /signin avec le username prérempli dans l'URL
+  const input = document.querySelector('.cta-input') as HTMLInputElement;
+  const btn   = document.getElementById('cta-go-btn') as HTMLAnchorElement;
+
+  if (input && btn) {
+    function updateHref() {
+      const val = input.value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+      btn.href = val ? `/signin?username=${encodeURIComponent(val)}` : '/signin';
+    }
+    input.addEventListener('input', updateHref);
+
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); btn.click(); }
+    });
+  }
+
+  // Reveal
+  document.querySelectorAll('.reveal').forEach(el =>
+    new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) el.classList.add('visible'); },
+      { threshold: 0.15 }
+    ).observe(el)
+  );
+</script>
+
+<style>
+  .cta {
+    position: relative;
+    padding: 6rem 1.5rem;
+    overflow: hidden;
+  }
+
+  .cta-bg { position: absolute; inset: 0; pointer-events: none; }
+  .cta-glow {
+    position: absolute; border-radius: 50%;
+    filter: blur(120px); pointer-events: none;
+  }
+  .cta-glow-1 {
+    width: 600px; height: 400px;
+    top: -20%; left: -10%;
+    background: rgba(57,255,143,0.07);
+  }
+  .cta-glow-2 {
+    width: 500px; height: 400px;
+    bottom: -20%; right: -5%;
+    background: rgba(124,58,237,0.06);
+  }
+
+  .reveal {
+    opacity: 0; transform: translateY(20px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  .reveal.visible { opacity: 1; transform: none; }
+
+  /* ── Box ── */
+  .cta-box {
+    position: relative; z-index: 1;
+    max-width: 600px; margin: 0 auto;
+    display: flex; flex-direction: column; align-items: center; gap: 1.5rem;
+    background: rgba(13,16,18,0.7);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 2rem; padding: 3.5rem 3rem;
+    text-align: center;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 0 0 1px rgba(57,255,143,0.04), 0 40px 100px rgba(0,0,0,0.4);
+  }
+
+  /* Badge */
+  .cta-badge {
+    display: inline-flex; align-items: center; gap: 0.45rem;
+    padding: 0.35rem 0.875rem;
+    background: rgba(57,255,143,0.08); border: 1px solid rgba(57,255,143,0.2);
+    border-radius: 99px; font-size: 0.72rem; font-weight: 700;
+    color: #39ff8f; letter-spacing: 0.03em; text-transform: uppercase;
+  }
+  .badge-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: #39ff8f;
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%,100% { opacity: 1; }
+    50%      { opacity: 0.5; }
+  }
+
+  /* Titre */
+  .cta-title {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(2.25rem, 5vw, 3.5rem);
+    font-weight: 800; color: #fff;
+    letter-spacing: -0.04em; line-height: 1.05;
+  }
+  .cta-accent {
+    background: linear-gradient(90deg, #39ff8f, #b4ff6e);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .cta-proof {
+    font-size: 0.875rem; color: rgba(255,255,255,0.45);
+  }
+  .cta-proof strong { color: rgba(255,255,255,0.8); font-weight: 600; }
+
+  /* Input row */
+  .cta-input-row {
+    display: flex; align-items: center;
+    width: 100%; max-width: 420px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 0.875rem; overflow: hidden;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .cta-input-row:focus-within {
+    border-color: rgba(57,255,143,0.35);
+    box-shadow: 0 0 0 3px rgba(57,255,143,0.08);
+  }
+
+  .cta-prefix {
+    padding: 0 0 0 0.875rem;
+    font-size: 0.8125rem; color: rgba(255,255,255,0.35);
+    white-space: nowrap; flex-shrink: 0;
+    font-family: 'DM Mono', monospace, sans-serif;
+  }
+
+  .cta-input {
+    flex: 1; min-width: 0;
+    padding: 0.75rem 0.5rem;
+    background: transparent; border: none; outline: none;
+    color: #fff; font-size: 0.875rem; font-weight: 500;
+    font-family: 'DM Mono', monospace, sans-serif;
+  }
+  .cta-input::placeholder { color: rgba(255,255,255,0.2); }
+
+  .cta-btn {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    padding: 0.75rem 1.125rem;
+    background: linear-gradient(135deg, #39ff8f, #b4ff6e);
+    color: #050c08; font-size: 0.8125rem; font-weight: 700;
+    text-decoration: none; white-space: nowrap; flex-shrink: 0;
+    transition: filter 0.15s;
+  }
+  .cta-btn:hover { filter: brightness(1.07); }
+
+  .cta-fine { font-size: 0.72rem; color: rgba(255,255,255,0.25); }
+
+  /* Trust */
+  .cta-trust { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+  .trust-badge {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    font-size: 0.7rem; color: rgba(255,255,255,0.3);
+  }
+
+  @media (max-width: 600px) {
+    .cta-box { padding: 2.5rem 1.5rem; border-radius: 1.5rem; }
+    .cta-input-row { max-width: 100%; }
+    .cta-prefix { display: none; }
+    .cta-input { padding-left: 0.875rem; }
+  }
+  @media (max-width: 380px) {
+    .cta-btn span { display: none; }
+  }
+</style>

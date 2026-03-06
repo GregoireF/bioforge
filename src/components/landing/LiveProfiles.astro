@@ -1,0 +1,305 @@
+---
+// src/components/landing/LiveProfiles.astro
+// Vrais profils depuis la DB — remplace la fake CreatorsSection
+
+interface Profile {
+  username:     string;
+  display_name: string | null;
+  avatar_url:   string | null;
+  plan:         string;
+  is_verified:  boolean;
+}
+
+interface Props {
+  profiles: Profile[];
+}
+const { profiles } = Astro.props;
+
+// Fallback si pas encore de profils
+const SITE_URL = import.meta.env.PUBLIC_SITE_URL ?? 'https://bioforge.click';
+
+// Couleurs de gradient pour les avatars sans photo
+const gradients = [
+  'linear-gradient(135deg,#39ff8f,#0ea5e9)',
+  'linear-gradient(135deg,#7c3aed,#f59e0b)',
+  'linear-gradient(135deg,#f472b6,#fb923c)',
+  'linear-gradient(135deg,#38bdf8,#a78bfa)',
+  'linear-gradient(135deg,#39ff8f,#b4ff6e)',
+  'linear-gradient(135deg,#fb923c,#f472b6)',
+  'linear-gradient(135deg,#0ea5e9,#39ff8f)',
+];
+
+function initials(profile: Profile): string {
+  const name = profile.display_name ?? profile.username ?? '?';
+  return name.slice(0, 2).toUpperCase();
+}
+---
+
+<section class="lp" aria-labelledby="lp-title">
+
+  <div class="lp-head reveal">
+    <div class="lp-eyebrow">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 7a4 4 0 100 8 4 4 0 000-8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+      </svg>
+      Ils ont déjà forgé leur page
+    </div>
+    <h2 id="lp-title" class="lp-title">
+      De vrais créateurs,<br>
+      <span class="lp-accent">pas des exemples</span>
+    </h2>
+    <p class="lp-sub">Ces profils sont réels — créés par notre communauté. Le tien pourrait être parmi eux.</p>
+  </div>
+
+  {profiles.length > 0 ? (
+    <div class="lp-grid" role="list" aria-label="Profils récents BioForge">
+      {profiles.slice(0, 14).map((profile, i) => (
+        <a
+          href={`${SITE_URL}/@${profile.username}`}
+          class="lp-card reveal"
+          style={`animation-delay: ${i * 0.05}s`}
+          role="listitem"
+          aria-label={`Voir la page de ${profile.display_name ?? profile.username}`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <!-- Avatar -->
+          <div class="lp-avatar-wrap">
+            {profile.avatar_url ? (
+              <img
+                src={profile.avatar_url}
+                alt=""
+                class="lp-avatar"
+                width="64" height="64"
+                loading="lazy"
+                decoding="async"
+              />
+            ) : (
+              <div
+                class="lp-avatar lp-avatar-fallback"
+                style={`background: ${gradients[i % gradients.length]};`}
+                aria-hidden="true"
+              >
+                {initials(profile)}
+              </div>
+            )}
+
+            <!-- Badge vérifié -->
+            {profile.is_verified && (
+              <div class="lp-verified" aria-label="Compte vérifié" title="Vérifié">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="white" aria-hidden="true">
+                  <path d="M20 6L9 17l-5-5"/>
+                </svg>
+              </div>
+            )}
+
+            <!-- Dot live -->
+            <div class="lp-live" aria-hidden="true"></div>
+          </div>
+
+          <p class="lp-name">{profile.display_name ?? profile.username}</p>
+          <p class="lp-handle">@{profile.username}</p>
+
+          {profile.plan !== 'Free' && (
+            <span class="lp-plan">{profile.plan}</span>
+          )}
+        </a>
+      ))}
+    </div>
+  ) : (
+    <!-- État vide — tant que la communauté se construit -->
+    <div class="lp-empty">
+      <p>Sois parmi les premiers ✦</p>
+      <a href="/signin" class="lp-empty-cta">Créer ma page gratuitement</a>
+    </div>
+  )}
+
+  <!-- CTA -->
+  <div class="lp-footer reveal">
+    <a href="/signin" class="lp-join">
+      Rejoindre la communauté
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+        <path d="M5 12h14M12 5l7 7-7 7"/>
+      </svg>
+    </a>
+  </div>
+
+</section>
+
+<script>
+  const els = document.querySelectorAll('.reveal');
+  const io  = new IntersectionObserver(
+    entries => entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); }
+    }),
+    { threshold: 0.1, rootMargin: '0px 0px -30px 0px' }
+  );
+  els.forEach(el => io.observe(el));
+</script>
+
+<style>
+  .lp {
+    padding: 6rem 1.5rem;
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex; flex-direction: column; align-items: center; gap: 3.5rem;
+  }
+
+  .reveal {
+    opacity: 0; transform: translateY(20px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .reveal.visible { opacity: 1; transform: none; }
+
+  /* ── Header ── */
+  .lp-head { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+
+  .lp-eyebrow {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.3rem 0.875rem;
+    background: rgba(56,189,248,0.07); border: 1px solid rgba(56,189,248,0.18);
+    border-radius: 99px; font-size: 0.72rem; font-weight: 700;
+    color: #38bdf8; text-transform: uppercase; letter-spacing: 0.08em;
+  }
+
+  .lp-title {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(1.875rem, 4vw, 2.75rem);
+    font-weight: 800; color: #fff;
+    letter-spacing: -0.03em; line-height: 1.1;
+    text-align: center;
+  }
+  .lp-accent {
+    background: linear-gradient(90deg, #38bdf8, #a78bfa);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .lp-sub { font-size: 0.9rem; color: rgba(255,255,255,0.42); max-width: 400px; text-align: center; }
+
+  /* ── Grille ── */
+  .lp-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 0.75rem;
+    width: 100%;
+  }
+
+  .lp-card {
+    display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+    padding: 1.25rem 0.75rem;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 1rem;
+    text-decoration: none;
+    transition: all 0.18s;
+    position: relative; overflow: hidden;
+  }
+  .lp-card::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(57,255,143,0.05), transparent);
+    opacity: 0; transition: opacity 0.2s;
+  }
+  .lp-card:hover {
+    border-color: rgba(57,255,143,0.2);
+    background: rgba(255,255,255,0.05);
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.25);
+  }
+  .lp-card:hover::before { opacity: 1; }
+
+  /* Avatar */
+  .lp-avatar-wrap { position: relative; width: 52px; height: 52px; flex-shrink: 0; }
+
+  .lp-avatar {
+    width: 52px; height: 52px; border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(255,255,255,0.07);
+  }
+  .lp-avatar-fallback {
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.875rem; font-weight: 700; color: rgba(0,0,0,0.7);
+  }
+
+  .lp-verified {
+    position: absolute; bottom: -1px; right: -1px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #39ff8f; border: 2px solid #080a0c;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .lp-live {
+    position: absolute; top: 0; left: 0;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #39ff8f; border: 2px solid #080a0c;
+  }
+  .lp-live::after {
+    content: '';
+    position: absolute; inset: -2px; border-radius: 50%;
+    background: rgba(57,255,143,0.4);
+    animation: lp-ping 2s ease-in-out infinite;
+  }
+  @keyframes lp-ping {
+    0%,100% { transform: scale(1); opacity: 0.5; }
+    50%      { transform: scale(1.8); opacity: 0; }
+  }
+
+  .lp-name {
+    font-size: 0.75rem; font-weight: 600; color: #fff;
+    text-align: center; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; width: 100%;
+    transition: color 0.15s;
+  }
+  .lp-card:hover .lp-name { color: #39ff8f; }
+
+  .lp-handle {
+    font-size: 0.65rem; color: rgba(255,255,255,0.32);
+    text-align: center; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; width: 100%;
+  }
+
+  .lp-plan {
+    font-size: 0.58rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+    padding: 0.15rem 0.45rem; border-radius: 99px;
+    background: rgba(57,255,143,0.1); color: #39ff8f;
+    border: 1px solid rgba(57,255,143,0.2);
+  }
+
+  /* ── État vide ── */
+  .lp-empty {
+    display: flex; flex-direction: column; align-items: center; gap: 1rem;
+    padding: 3rem;
+    background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.08);
+    border-radius: 1.25rem; width: 100%; text-align: center;
+  }
+  .lp-empty p { font-size: 1rem; color: rgba(255,255,255,0.4); }
+  .lp-empty-cta {
+    padding: 0.625rem 1.25rem;
+    background: rgba(57,255,143,0.1); color: #39ff8f;
+    border: 1px solid rgba(57,255,143,0.22); border-radius: 0.75rem;
+    font-size: 0.875rem; font-weight: 600; text-decoration: none;
+    transition: all 0.15s;
+  }
+  .lp-empty-cta:hover { background: rgba(57,255,143,0.18); }
+
+  /* ── CTA footer ── */
+  .lp-footer { display: flex; justify-content: center; }
+  .lp-join {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.65);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 0.75rem;
+    font-size: 0.875rem; font-weight: 500; text-decoration: none;
+    transition: all 0.15s;
+  }
+  .lp-join:hover { background: rgba(255,255,255,0.09); color: #fff; }
+
+  /* ── Responsive ── */
+  @media (max-width: 1100px) { .lp-grid { grid-template-columns: repeat(5, 1fr); } }
+  @media (max-width: 760px)  { .lp-grid { grid-template-columns: repeat(4, 1fr); } }
+  @media (max-width: 560px)  { .lp-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 400px)  {
+    .lp-grid { grid-template-columns: repeat(2, 1fr); }
+    .lp { padding: 4rem 1rem; }
+  }
+</style>

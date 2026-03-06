@@ -1,279 +1,392 @@
 ---
-import Button from '@/components/ui/Button.astro';
+// src/components/landing/Hero.astro
 import ProfileCard from '@/components/landing/ProfileCard.astro';
+
+interface Props {
+  profileCount?: number;
+}
+const { profileCount = 0 } = Astro.props;
+
+// Formatage du nombre pour l'affichage
+const countDisplay = profileCount > 1000
+  ? `${(profileCount / 1000).toFixed(1).replace('.0', '')}k+`
+  : profileCount > 0
+  ? `${profileCount}+`
+  : null;
 ---
 
-<section 
-  class="relative min-h-screen flex items-center justify-center overflow-hidden"
-  data-scroll-section
->
-  <!-- Video Background (subtle) -->
-  <div class="absolute inset-0 z-0 opacity-20">
-    <div class="absolute inset-0 bg-gradient-to-br from-dark-900 via-dark-800 to-dark-900"></div>
-    <svg class="absolute w-full h-full" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <filter id="goo">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur"/>
-          <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="goo"/>
-          <feBlend in="SourceGraphic" in2="goo"/>
-        </filter>
-      </defs>
-      <g filter="url(#goo)">
-        <circle class="animate-blob" cx="30%" cy="40%" r="20%" fill="#00ff9d" opacity="0.1"/>
-        <circle class="animate-blob animation-delay-2000" cx="70%" cy="60%" r="25%" fill="#bf00ff" opacity="0.1"/>
-        <circle class="animate-blob animation-delay-4000" cx="50%" cy="30%" r="22%" fill="#00d4ff" opacity="0.1"/>
-      </g>
+<section class="hero" aria-label="BioForge — présentation">
+
+  <!-- Background : CSS only, zero JS -->
+  <div class="hero-bg" aria-hidden="true">
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+    <div class="bg-grain"></div>
+  </div>
+
+  <div class="hero-inner">
+
+    <!-- ── Colonne gauche ─────────────────────────────────────────────────── -->
+    <div class="hero-content">
+
+      <!-- Badge live -->
+      <div class="hero-badge" role="status">
+        <span class="badge-dot" aria-hidden="true"></span>
+        <span>Plateforme active · Nouvelle feature chaque semaine</span>
+      </div>
+
+      <!-- H1 : proposition de valeur différenciante -->
+      <h1 class="hero-title">
+        <span class="title-line-1">Forge ta</span>
+        <span class="title-line-2">présence<br>en ligne.</span>
+      </h1>
+
+      <!-- Sous-titre : bénéfices concrets -->
+      <p class="hero-sub">
+        Pas juste une liste de liens — un hub créateur avec&nbsp;
+        <strong>analytics en temps réel</strong>, blocs personnalisés et
+        un design qui te représente vraiment.
+      </p>
+
+      <!-- CTAs -->
+      <div class="hero-ctas">
+        <a href="/signin" class="cta-primary">
+          Crée ta page — c'est gratuit
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+            <path d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </a>
+        <a href="#how-it-works" class="cta-secondary">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+            <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/>
+          </svg>
+          Voir comment ça marche
+        </a>
+      </div>
+
+      <!-- Social proof -->
+      <div class="hero-proof">
+        <div class="proof-avatars" aria-hidden="true">
+          {['#7c3aed','#0ea5e9','#f59e0b','#39ff8f'].map(c => (
+            <div class="proof-avatar" style={`background:${c};`}></div>
+          ))}
+        </div>
+        <p class="proof-text">
+          {countDisplay
+            ? <><strong>{countDisplay}</strong> créateurs ont déjà forgé leur page</>
+            : <>Rejoins les créateurs qui ont déjà leur page</>
+          }
+        </p>
+      </div>
+
+      <!-- Badges de confiance -->
+      <div class="trust-row" aria-label="Garanties">
+        <span class="trust-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+          SSL · RGPD
+        </span>
+        <span class="trust-sep" aria-hidden="true">·</span>
+        <span class="trust-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          Aucune CB requise
+        </span>
+        <span class="trust-sep" aria-hidden="true">·</span>
+        <span class="trust-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+          </svg>
+          Setup en 2 min
+        </span>
+      </div>
+
+    </div>
+
+    <!-- ── Colonne droite — aperçu de page ──────────────────────────────── -->
+    <div class="hero-visual" aria-label="Aperçu d'une page BioForge">
+      <div class="visual-device">
+        <div class="device-notch" aria-hidden="true"></div>
+        <div class="device-screen">
+          <ProfileCard />
+        </div>
+      </div>
+      <!-- Halo derrière le device -->
+      <div class="visual-halo" aria-hidden="true"></div>
+    </div>
+
+  </div>
+
+  <!-- Scroll indicator -->
+  <a href="#social-proof" class="scroll-hint" aria-label="Défiler vers le bas">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 5v14M5 12l7 7 7-7"/>
     </svg>
-  </div>
+  </a>
 
-  <!-- Animated Grid Background (Parallax) -->
-  <div 
-    class="absolute inset-0 z-0 opacity-10" 
-    data-scroll
-    data-scroll-speed="-2"
-  >
-    <div 
-      class="absolute inset-0 animate-grid-move"
-      style="background-image: linear-gradient(#00ff9d 1.5px, transparent 1.5px), linear-gradient(90deg, #00ff9d 1.5px, transparent 1.5px); background-size: 60px 60px;"
-    ></div>
-  </div>
-
-  <!-- Gradient Mesh (Parallax) -->
-  <div 
-    class="absolute inset-0 z-0"
-    data-scroll
-    data-scroll-speed="-1"
-  >
-    <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-neon-green/10 rounded-full blur-[120px] animate-pulse-slow"></div>
-    <div class="absolute bottom-1/4 right-1/4 w-96 h-96 bg-neon-purple/10 rounded-full blur-[120px] animate-pulse-slow" style="animation-delay: 1s;"></div>
-    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-neon-blue/10 rounded-full blur-[120px] animate-pulse-slow" style="animation-delay: 2s;"></div>
-  </div>
-
-  <!-- Morphing Shapes SVG -->
-  <svg class="absolute inset-0 w-full h-full z-0 opacity-20" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" style="stop-color:#00ff9d;stop-opacity:0.3" />
-        <stop offset="100%" style="stop-color:#bf00ff;stop-opacity:0.3" />
-      </linearGradient>
-    </defs>
-    <path class="morph-path" fill="url(#grad1)">
-      <animate 
-        attributeName="d"
-        dur="20s"
-        repeatCount="indefinite"
-        values="
-          M0,100 C150,200 350,0 500,100 L500,0 L0,0 Z;
-          M0,50 C150,150 350,50 500,150 L500,0 L0,0 Z;
-          M0,150 C150,50 350,150 500,50 L500,0 L0,0 Z;
-          M0,100 C150,200 350,0 500,100 L500,0 L0,0 Z
-        "
-      />
-    </path>
-  </svg>
-
-  <!-- Content -->
-  <div class="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 py-20">
-    <div class="grid lg:grid-cols-2 gap-12 items-center">
-      <!-- Left Column - Text Content -->
-      <div 
-        class="space-y-8 text-center lg:text-left"
-        data-scroll
-        data-scroll-speed="1"
-      >
-        <!-- Badge with Glow -->
-        <div 
-          class="inline-flex items-center space-x-2 px-5 py-2.5 glass rounded-full text-neon-green text-sm font-medium glow-green"
-        >
-          <span class="relative flex h-2.5 w-2.5">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-neon-green opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-neon-green"></span>
-          </span>
-          <span class="text-glow-green">LIVE & TRENDING</span>
-        </div>
-
-        <!-- Heading with Text Reveal -->
-        <div class="space-y-6">
-          <h1 class="text-6xl sm:text-7xl lg:text-8xl font-display font-bold leading-[0.95] smooth-font">
-            <span 
-              class="block text-white text-glow-green"
-              data-scroll
-              data-scroll-speed="0.5"
-            >
-              Level Up Your
-            </span>
-            <span 
-              class="block mt-2 text-transparent bg-clip-text bg-gradient-to-r from-neon-green via-neon-blue to-neon-purple animate-gradient"
-              data-scroll
-              data-scroll-speed="0.3"
-            >
-              Link-in-Bio.
-            </span>
-          </h1>
-          <p 
-            class="text-xl sm:text-2xl text-gray-300 max-w-2xl leading-relaxed"
-            data-scroll
-            data-scroll-speed="0.2"
-          >
-            Create a <span class="text-neon-green font-semibold">stunning bio page</span> that stands out. 
-            Built for <span class="text-neon-purple font-semibold">creators</span>, 
-            <span class="text-neon-blue font-semibold">gamers</span>, and modern professionals.
-          </p>
-        </div>
-
-        <!-- CTA Buttons with Magnetic Effect -->
-        <div class="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-          <Button 
-            variant="primary" 
-            size="lg" 
-            href="/signup"
-            class="magnetic glow-green group"
-          >
-            <span class="relative z-10">Forge Your Link — Free</span>
-            <svg class="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-            </svg>
-          </Button>
-          <Button 
-            variant="outline" 
-            size="lg" 
-            href="/features"
-            class="magnetic"
-          >
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            Watch Demo
-          </Button>
-        </div>
-
-        <!-- Social Proof with Glassmorphism -->
-        <div 
-          class="flex items-center space-x-8 text-sm text-gray-400 justify-center lg:justify-start glass rounded-2xl p-4 inline-flex"
-        >
-          <div class="flex items-center space-x-2">
-            <svg class="w-5 h-5 text-neon-green" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-            </svg>
-            <span class="text-white font-semibold">4.9/5</span>
-            <span>rating</span>
-          </div>
-          <div class="border-l border-gray-700 h-6"></div>
-          <div>
-            <span class="text-white font-bold text-lg count-up" data-count="10000">0</span>
-            <span class="text-white font-semibold">K+</span> creators
-          </div>
-          <div class="border-l border-gray-700 h-6"></div>
-          <div>
-            <span class="text-white font-bold text-lg count-up" data-count="50">0</span>
-            <span class="text-white font-semibold">M+</span> clicks
-          </div>
-        </div>
-      </div>
-
-      <!-- Right Column - Profile Card Preview (Parallax) -->
-      <div 
-        class="flex justify-center lg:justify-end"
-        data-scroll
-        data-scroll-speed="2"
-      >
-        <ProfileCard />
-      </div>
-    </div>
-  </div>
-
-  <!-- Scroll Indicator (Animated) -->
-  <div 
-    class="absolute bottom-12 left-1/2 transform -translate-x-1/2 z-20"
-    data-scroll
-    data-scroll-speed="-1"
-  >
-    <div class="flex flex-col items-center space-y-2 animate-bounce">
-      <span class="text-xs text-gray-400 uppercase tracking-wider">Scroll to explore</span>
-      <svg class="w-6 h-6 text-neon-green glow-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
-      </svg>
-    </div>
-  </div>
 </section>
 
-<script>
-  import { CountUp } from 'countup.js';
-
-  // Initialize CountUp animations
-  document.addEventListener('DOMContentLoaded', () => {
-    const counters = document.querySelectorAll('.count-up');
-    
-    const observerOptions = {
-      threshold: 0.5
-    };
-
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          const element = entry.target as HTMLElement;
-          const count = parseInt(element.dataset.count || '0');
-          
-          const countUp = new CountUp(element, count, {
-            duration: 2.5,
-            useEasing: true,
-            useGrouping: true,
-            separator: ',',
-          });
-          
-          countUp.start();
-          observer.unobserve(element);
-        }
-      });
-    }, observerOptions);
-
-    counters.forEach(counter => observer.observe(counter));
-  });
-</script>
-
 <style>
-  @keyframes blob {
-    0%, 100% {
-      transform: translate(0, 0) scale(1);
-    }
-    25% {
-      transform: translate(20px, -50px) scale(1.1);
-    }
-    50% {
-      transform: translate(-20px, 20px) scale(0.9);
-    }
-    75% {
-      transform: translate(50px, 50px) scale(1.05);
-    }
+  /* ── Variables locales ── */
+  :root {
+    --neon:  #39ff8f;
+    --neon2: #b4ff6e;
+    --bg:    #080a0c;
   }
 
-  .animate-blob {
-    animation: blob 20s ease-in-out infinite;
-    will-change: transform;
-    transform: translate3d(0,0,0);
+  /* ── Section ── */
+  .hero {
+    position: relative;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 5rem 1.5rem 4rem;
   }
 
-  .animation-delay-2000 {
-    animation-delay: 2s;
+  /* ── Background ── */
+  .hero-bg { position: absolute; inset: 0; pointer-events: none; }
+
+  .bg-grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(57,255,143,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(57,255,143,0.04) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 40%, transparent 100%);
   }
 
-  .animation-delay-4000 {
-    animation-delay: 4s;
+  .bg-glow {
+    position: absolute; border-radius: 50%;
+    filter: blur(100px); pointer-events: none;
+  }
+  .bg-glow-1 {
+    width: 500px; height: 500px;
+    top: -10%; left: -5%;
+    background: rgba(57,255,143,0.07);
+    animation: glow-drift 12s ease-in-out infinite alternate;
+  }
+  .bg-glow-2 {
+    width: 400px; height: 400px;
+    bottom: 0; right: -5%;
+    background: rgba(124,58,237,0.06);
+    animation: glow-drift 16s ease-in-out infinite alternate-reverse;
+  }
+  @keyframes glow-drift {
+    from { transform: translate(0, 0); }
+    to   { transform: translate(30px, 20px); }
   }
 
-  @keyframes grid-move {
-    0% {
-      transform: translateY(0) translateX(0);
+  .bg-grain {
+    position: absolute; inset: 0; opacity: 0.35;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  }
+
+  /* ── Layout ── */
+  .hero-inner {
+    position: relative; z-index: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: center;
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  /* ── Content ── */
+  .hero-content {
+    display: flex; flex-direction: column; gap: 1.75rem;
+    animation: fade-up 0.7s cubic-bezier(0.4,0,0.2,1) both;
+  }
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Badge */
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.375rem 0.875rem;
+    background: rgba(57,255,143,0.08);
+    border: 1px solid rgba(57,255,143,0.2);
+    border-radius: 99px;
+    font-size: 0.75rem; font-weight: 600;
+    color: var(--neon); letter-spacing: 0.02em;
+    width: fit-content;
+  }
+  .badge-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--neon);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%,100% { opacity: 1; box-shadow: 0 0 0 0 rgba(57,255,143,0.5); }
+    50%      { opacity: 0.8; box-shadow: 0 0 0 5px rgba(57,255,143,0); }
+  }
+
+  /* Headline */
+  .hero-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.04em;
+    display: flex; flex-direction: column; gap: 0.1em;
+  }
+  .title-line-1 {
+    font-size: clamp(2.5rem, 5vw, 3.5rem);
+    color: rgba(255,255,255,0.55);
+    display: block;
+  }
+  .title-line-2 {
+    font-size: clamp(3.5rem, 7.5vw, 5.5rem);
+    color: #fff;
+    display: block;
+    text-shadow: 0 0 80px rgba(57,255,143,0.15);
+  }
+
+  /* Sous-titre */
+  .hero-sub {
+    font-size: clamp(1rem, 2vw, 1.125rem);
+    color: rgba(255,255,255,0.55);
+    line-height: 1.7;
+    max-width: 480px;
+  }
+  .hero-sub strong { color: rgba(255,255,255,0.85); font-weight: 600; }
+
+  /* CTAs */
+  .hero-ctas { display: flex; align-items: center; gap: 0.875rem; flex-wrap: wrap; }
+
+  .cta-primary {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.875rem 1.5rem;
+    background: linear-gradient(135deg, var(--neon), var(--neon2));
+    color: #050c08;
+    border-radius: 0.875rem;
+    font-size: 0.9375rem; font-weight: 700;
+    text-decoration: none; letter-spacing: -0.01em;
+    transition: all 0.15s;
+    box-shadow: 0 4px 24px rgba(57,255,143,0.2);
+  }
+  .cta-primary:hover {
+    filter: brightness(1.07);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(57,255,143,0.3);
+  }
+  .cta-primary:active { transform: translateY(0); }
+
+  .cta-secondary {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.875rem 1.25rem;
+    color: rgba(255,255,255,0.6);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 0.875rem;
+    font-size: 0.875rem; font-weight: 500;
+    text-decoration: none;
+    transition: all 0.15s;
+  }
+  .cta-secondary:hover { color: #fff; border-color: rgba(255,255,255,0.25); background: rgba(255,255,255,0.04); }
+
+  /* Social proof */
+  .hero-proof { display: flex; align-items: center; gap: 0.75rem; }
+  .proof-avatars { display: flex; }
+  .proof-avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 2px solid var(--bg);
+    margin-left: -8px;
+  }
+  .proof-avatars .proof-avatar:first-child { margin-left: 0; }
+  .proof-text { font-size: 0.8rem; color: rgba(255,255,255,0.45); }
+  .proof-text strong { color: rgba(255,255,255,0.8); font-weight: 600; }
+
+  /* Trust row */
+  .trust-row {
+    display: flex; align-items: center; gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .trust-item {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    font-size: 0.72rem; color: rgba(255,255,255,0.32);
+  }
+  .trust-sep { color: rgba(255,255,255,0.15); }
+
+  /* ── Visual / device mockup ── */
+  .hero-visual {
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    animation: fade-up 0.7s 0.15s cubic-bezier(0.4,0,0.2,1) both;
+  }
+
+  .visual-device {
+    position: relative; z-index: 1;
+    background: #0d1012;
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 2rem;
+    padding: 1.5rem;
+    width: 100%; max-width: 340px;
+    box-shadow:
+      0 0 0 1px rgba(57,255,143,0.04),
+      0 32px 80px rgba(0,0,0,0.5);
+    overflow: hidden;
+  }
+
+  .device-notch {
+    width: 80px; height: 6px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 99px;
+    margin: 0 auto 1.25rem;
+  }
+
+  .device-screen { border-radius: 1rem; overflow: hidden; }
+
+  .visual-halo {
+    position: absolute; inset: -20%;
+    background: radial-gradient(ellipse 60% 60% at 50% 50%, rgba(57,255,143,0.08), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Scroll hint ── */
+  .scroll-hint {
+    position: absolute; bottom: 2rem; left: 50%; transform: translateX(-50%);
+    color: rgba(255,255,255,0.2);
+    animation: bounce-down 2s ease-in-out infinite;
+    z-index: 1; transition: color 0.15s;
+  }
+  .scroll-hint:hover { color: rgba(255,255,255,0.5); }
+  @keyframes bounce-down {
+    0%,100% { transform: translateX(-50%) translateY(0); }
+    50%      { transform: translateX(-50%) translateY(6px); }
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 900px) {
+    .hero-inner {
+      grid-template-columns: 1fr;
+      gap: 2.5rem;
+      text-align: center;
     }
-    100% {
-      transform: translateY(60px) translateX(60px);
-    }
+    .hero-content { align-items: center; }
+    .hero-badge   { margin: 0 auto; }
+    .hero-sub     { max-width: 100%; }
+    .hero-ctas    { justify-content: center; }
+    .hero-proof   { justify-content: center; }
+    .trust-row    { justify-content: center; }
+    .title-line-1,
+    .title-line-2 { text-align: center; }
+    .hero-visual  { order: -1; }
+    .visual-device { max-width: 280px; }
   }
 
-  .animate-grid-move {
-    animation: grid-move 30s linear infinite;
-    will-change: transform;  /* GPU acceleration */
-    transform: translate3d(0,0,0);  /* force layer */
+  @media (max-width: 480px) {
+    .hero { padding: 4rem 1rem 3rem; }
+    .cta-primary, .cta-secondary { width: 100%; justify-content: center; }
+    .hero-ctas { flex-direction: column; }
   }
 </style>

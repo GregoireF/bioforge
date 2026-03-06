@@ -68,7 +68,7 @@ const testimonials = [
     <!-- Testimonials Grid -->
     <div class="grid md:grid-cols-2 gap-6 max-w-6xl mx-auto">
       {testimonials.map((testimonial, index) => (
-        <div style={`animation-delay: ${index * 0.1}s`}>
+        <div class="reveal" style={`animation-delay: ${index * 0.1}s`}>
           <div class="glass-strong rounded-3xl p-8 border border-white/10 hover:border-neon-purple/30 transition-all duration-500 h-full group cursor-pointer">
             <!-- Quote Icon -->
             <div class="mb-6">
@@ -118,7 +118,7 @@ const testimonials = [
     </div>
 
     <!-- Stars Rating -->
-    <div class="text-center mt-16">
+    <div class="text-center mt-16 reveal">
       <div class="inline-flex items-center space-x-2 mb-4">
         {[...Array(5)].map(() => (
           <svg class="w-6 h-6 text-neon-green" fill="currentColor" viewBox="0 0 20 20">
