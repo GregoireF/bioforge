@@ -23,10 +23,7 @@ export const GET: APIRoute = wrapApiHandler<undefined, { available: boolean; use
     }
 
     const { data, error } = await supabase
-      .from('profiles')
-      .select('username')
-      .eq('username', username)
-      .maybeSingle();
+      .rpc('is_username_taken', { p_username: username });
 
     if (error) {
       throw new AppError({
@@ -36,6 +33,6 @@ export const GET: APIRoute = wrapApiHandler<undefined, { available: boolean; use
       });
     }
 
-    return { available: data === null, username };
+    return { available: data === false, username };
   }
 );
