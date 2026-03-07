@@ -1,175 +1,521 @@
 ---
+// src/pages/help.astro
 import BaseLayout from '@/layouts/BaseLayout.astro';
-import Header from '@/components/layout/Header.astro';
-import Footer from '@/components/layout/Footer.astro';
 
-const categories = [
+const GUIDES = [
   {
-    name: 'Getting Started',
-    icon: 'rocket',
-    articles: [
-      { title: 'How to create your first link', views: '12.5K' },
-      { title: 'Setting up your profile', views: '8.2K' },
-      { title: 'Customizing your page', views: '6.1K' },
-    ]
+    icon: 'M13 10V3L4 14h7v7l9-11h-7z',
+    category: 'Getting Started',
+    title: 'Create your BioForge page in 5 minutes',
+    desc: 'Sign up, pick a username, add your first blocks and share your link.',
+    time: '5 min read',
+    href: '#',
   },
   {
-    name: 'Links & Content',
-    icon: 'link',
-    articles: [
-      { title: 'Adding and organizing links', views: '5.8K' },
-      { title: 'Link scheduling and expiration', views: '4.2K' },
-      { title: 'Embedding content', views: '3.9K' },
-    ]
+    icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z',
+    category: 'Blocks',
+    title: 'Understanding block types',
+    desc: 'Links, embeds, countdowns, live streams — a complete tour of every block.',
+    time: '8 min read',
+    href: '#',
   },
   {
-    name: 'Analytics',
-    icon: 'chart',
-    articles: [
-      { title: 'Understanding your analytics', views: '7.3K' },
-      { title: 'Tracking link performance', views: '5.1K' },
-      { title: 'Exporting data', views: '2.8K' },
-    ]
+    icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z',
+    category: 'Billing',
+    title: 'Plans, upgrades & invoices',
+    desc: 'Compare plans, manage your Stripe subscription and download receipts.',
+    time: '4 min read',
+    href: '#',
   },
   {
-    name: 'Account & Billing',
-    icon: 'settings',
-    articles: [
-      { title: 'Upgrading to Pro', views: '9.4K' },
-      { title: 'Managing your subscription', views: '4.7K' },
-      { title: 'Payment methods', views: '3.2K' },
-    ]
+    icon: 'M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9',
+    category: 'Custom Domain',
+    title: 'Connect your own domain',
+    desc: 'Step-by-step DNS setup for Cloudflare, Namecheap, GoDaddy and more.',
+    time: '10 min read',
+    href: '#',
+  },
+  {
+    icon: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4',
+    category: 'API',
+    title: 'BioForge API — quick start',
+    desc: 'Authentication, endpoints, rate limits and example integrations.',
+    time: '12 min read',
+    href: '#',
+  },
+  {
+    icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+    category: 'Getting Started',
+    title: 'Reading your analytics',
+    desc: 'Understand views, click-through rates, sources and retention data.',
+    time: '6 min read',
+    href: '#',
+  },
+];
+
+const FAQ = [
+  {
+    category: 'getting-started',
+    label: 'Getting Started',
+    color: 'text-neon-green',
+    bg: 'bg-neon-green/10',
+    border: 'border-neon-green/20',
+    items: [
+      {
+        q: 'How do I create my BioForge page?',
+        a: 'Sign up with your Google or Discord account, choose a unique username (e.g. <strong class="text-white">bioforge.click/@yourname</strong>), then use the dashboard to add blocks, customize your theme and publish. The whole process takes under 5 minutes.',
+      },
+      {
+        q: 'Can I change my username after signing up?',
+        a: 'Yes — go to <strong class="text-white">Settings → Profile</strong> and update your username. Note that your old URL will stop working immediately, so update any links you have shared.',
+      },
+      {
+        q: 'Is BioForge free?',
+        a: 'Yes, the Free plan is free forever with up to 5 blocks. Upgrading to Creator or Pro unlocks unlimited blocks, custom domains, advanced analytics and more.',
+      },
+      {
+        q: 'How do I share my page?',
+        a: 'Your public URL is <strong class="text-white">bioforge.click/@username</strong>. Copy it from Settings, generate a QR code, or share directly to X, Instagram, TikTok and other platforms from your dashboard.',
+      },
+    ],
+  },
+  {
+    category: 'blocks',
+    label: 'Blocks',
+    color: 'text-neon-blue',
+    bg: 'bg-neon-blue/10',
+    border: 'border-neon-blue/20',
+    items: [
+      {
+        q: 'What is a block?',
+        a: 'A block is any element on your page — a link, heading, video embed, live-stream card, countdown timer, product, donation button and more. Blocks are draggable, togglable and fully customisable.',
+      },
+      {
+        q: 'How many blocks can I add?',
+        a: 'The Free plan allows up to 5 blocks total. Creator unlocks 20, and Pro gives unlimited blocks. Premium block types (live-stream, countdown, donation…) require Creator or above.',
+      },
+      {
+        q: 'Can I reorder my blocks?',
+        a: 'Yes — drag and drop blocks in the editor to reorder them. Changes are auto-saved.',
+      },
+      {
+        q: 'What is the difference between a link block and an embed block?',
+        a: 'A link block displays a title, optional thumbnail and a URL — your visitor clicks through. An embed block renders external content (YouTube, Twitch clip, Spotify, etc.) inline on your page without leaving it.',
+      },
+    ],
+  },
+  {
+    category: 'billing',
+    label: 'Billing',
+    color: 'text-neon-purple',
+    bg: 'bg-neon-purple/10',
+    border: 'border-neon-purple/20',
+    items: [
+      {
+        q: 'How do I upgrade my plan?',
+        a: 'Go to <strong class="text-white">Dashboard → Upgrade</strong> or visit the <a href="/pricing" class="text-neon-green hover:underline">Pricing page</a>. You will be redirected to a secure Stripe checkout. Upgrades take effect immediately.',
+      },
+      {
+        q: 'Can I cancel anytime?',
+        a: 'Yes — cancel from <strong class="text-white">Settings → Billing</strong>. You keep Pro features until the end of your billing period, then downgrade to Free automatically.',
+      },
+      {
+        q: 'Where are my invoices?',
+        a: 'All invoices are in <strong class="text-white">Settings → Billing → Invoices</strong> and also emailed to you automatically by Stripe after each charge.',
+      },
+      {
+        q: 'Do you offer refunds?',
+        a: 'We offer a 7-day refund on first-time upgrades. After that, subscriptions are non-refundable but you can cancel to stop future charges. Email <a href="mailto:billing@bioforge.click" class="text-neon-green hover:underline">billing@bioforge.click</a> for help.',
+      },
+    ],
+  },
+  {
+    category: 'custom-domain',
+    label: 'Custom Domain',
+    color: 'text-yellow-400',
+    bg: 'bg-yellow-400/10',
+    border: 'border-yellow-400/20',
+    items: [
+      {
+        q: 'Which plan includes custom domains?',
+        a: 'Custom domains are available on the <strong class="text-white">Pro plan</strong> and above.',
+      },
+      {
+        q: 'How do I connect my domain?',
+        a: 'In <strong class="text-white">Settings → Custom Domain</strong>, enter your domain and follow the DNS instructions. Add a CNAME record pointing to <code class="bg-white/5 px-1.5 py-0.5 rounded text-neon-green font-mono text-xs">cname.bioforge.click</code>. Propagation typically takes 1–24 hours.',
+      },
+      {
+        q: 'Is HTTPS included?',
+        a: 'Yes — SSL is provisioned automatically for your custom domain via Let\'s Encrypt. No extra configuration needed.',
+      },
+      {
+        q: 'Can I use a subdomain like link.mysite.com?',
+        a: 'Absolutely. Create a CNAME for <code class="bg-white/5 px-1.5 py-0.5 rounded text-neon-green font-mono text-xs">link.mysite.com</code> pointing to <code class="bg-white/5 px-1.5 py-0.5 rounded text-neon-green font-mono text-xs">cname.bioforge.click</code>, then enter it in Settings.',
+      },
+    ],
+  },
+  {
+    category: 'technical',
+    label: 'Technical Issues',
+    color: 'text-red-400',
+    bg: 'bg-red-400/10',
+    border: 'border-red-400/20',
+    items: [
+      {
+        q: 'My page is not loading. What should I do?',
+        a: 'First check our <a href="/support/status" class="text-neon-green hover:underline">Status page</a> for any ongoing incidents. If all systems are operational, try a hard refresh (Ctrl+Shift+R / Cmd+Shift+R) or clear your browser cache.',
+      },
+      {
+        q: 'My analytics seem off. Why?',
+        a: 'Analytics are updated every hour. Ad blockers and privacy tools (uBlock, Brave shields) may filter some requests, so counts can be slightly lower than actual traffic. Bot traffic is filtered automatically.',
+      },
+      {
+        q: 'I cannot log in with my OAuth provider.',
+        a: 'Make sure cookies and third-party redirects are allowed in your browser. If the issue persists, try an incognito window or a different browser. Contact support if you are still blocked.',
+      },
+      {
+        q: 'Why is my embed not showing?',
+        a: 'Some platforms (Twitter/X, certain news sites) block iframe embeds. Check that the URL you entered is a supported embed type. See the full list of supported embeds in our docs.',
+      },
+    ],
+  },
+  {
+    category: 'api',
+    label: 'API & Integrations',
+    color: 'text-orange-400',
+    bg: 'bg-orange-400/10',
+    border: 'border-orange-400/20',
+    items: [
+      {
+        q: 'How do I get an API key?',
+        a: 'API access is available on the <strong class="text-white">Pro plan</strong>. Once upgraded, generate your key from <strong class="text-white">Settings → API</strong>. Keep it secret — treat it like a password.',
+      },
+      {
+        q: 'What can I do with the API?',
+        a: 'You can read and update your profile, manage blocks (create, update, reorder, delete), fetch analytics data, and automate content updates. Full reference in the <a href="#" class="text-neon-green hover:underline">API docs</a>.',
+      },
+      {
+        q: 'What are the rate limits?',
+        a: 'The API allows <strong class="text-white">300 requests per minute</strong> per key. Exceeding this returns a <code class="bg-white/5 px-1.5 py-0.5 rounded text-neon-green font-mono text-xs">429 Too Many Requests</code>. Contact us if you need higher limits.',
+      },
+      {
+        q: 'Can I use the API to power a live auto-update?',
+        a: 'Yes — the live-auto-update feature on Pro uses the same endpoints. You can push updates programmatically (stream title, viewer count, product stock…) and they reflect on your page within seconds.',
+      },
+    ],
   },
 ];
 ---
 
-<BaseLayout title="Help Center - BioForge">
-  <Header />
-  
-  <main>
-    <!-- Hero -->
-    <section class="relative pt-32 pb-20 overflow-hidden" data-scroll-section>
-      <div class="absolute inset-0 bg-gradient-to-b from-dark-900 via-dark-800 to-dark-900"></div>
-      
-      <div class="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="max-w-4xl mx-auto text-center reveal">
-          <div class="inline-flex items-center space-x-2 px-4 py-2 glass rounded-full text-sm text-neon-blue mb-8">
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
-            </svg>
-            <span>Help Center</span>
-          </div>
+<BaseLayout
+  title="Help Center"
+  description="Find answers to your questions about BioForge — getting started, blocks, billing, custom domains, API and more."
+>
+  <div class="min-h-screen bg-[#0a0a0f]">
 
-          <h1 class="text-6xl sm:text-7xl font-display font-bold text-white leading-tight mb-8">
-            How Can We
-            <span class="block text-transparent bg-clip-text bg-gradient-to-r from-neon-blue via-neon-purple to-neon-pink text-glow-blue">
-              Help?
-            </span>
-          </h1>
-
-          <p class="text-xl text-gray-300 mb-12">
-            Search our knowledge base or browse categories below
-          </p>
-
-          <!-- Search Bar -->
-          <div class="relative max-w-2xl mx-auto">
-            <input
-              type="text"
-              placeholder="Search for articles..."
-              class="w-full px-6 py-4 pl-14 glass border border-white/10 rounded-2xl text-white placeholder-gray-500 focus:border-neon-blue/50 focus:outline-none focus:ring-2 focus:ring-neon-blue/20 transition-all"
-            />
-            <svg class="absolute left-5 top-1/2 transform -translate-y-1/2 w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-            </svg>
-          </div>
+    <!-- ═══════ NAV ═══════ -->
+    <nav class="border-b border-white/5 backdrop-blur-xl sticky top-0 z-40 bg-[#0a0a0f]/80">
+      <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+        <a href="/" class="flex items-center gap-2.5">
+          <svg class="w-7 h-7 text-neon-green" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L2 7L12 12L22 7L12 2Z"  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 17L12 22L22 17"            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 12L12 17L22 12"            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="font-display font-semibold text-white tracking-wide text-sm">BioForge</span>
+        </a>
+        <div class="flex items-center gap-4">
+          <a href="/support/status" class="flex items-center gap-1.5 text-xs text-gray-500 hover:text-white transition-colors">
+            <span class="inline-block w-1.5 h-1.5 rounded-full bg-neon-green" style="box-shadow:0 0 6px rgba(0,255,157,0.8)"></span>
+            All systems operational
+          </a>
+          <a href="/dashboard" class="px-4 py-2 text-xs font-medium text-black bg-neon-green rounded-lg hover:bg-neon-green/90 transition-all">
+            Dashboard
+          </a>
         </div>
       </div>
-    </section>
+    </nav>
 
-    <!-- Categories -->
-    <section class="relative py-20" data-scroll-section>
-      <div class="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
-          {categories.map((category, index) => (
-            <div class="glass-strong rounded-2xl p-6 border border-white/10 hover:border-neon-blue/30 transition-all reveal" style={`animation-delay: ${index * 0.1}s`}>
-              <div class="flex items-center space-x-3 mb-6">
-                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-neon-blue/20 to-neon-blue/10 border border-neon-blue/30 flex items-center justify-center">
-                  {category.icon === 'rocket' && (
-                    <svg class="w-6 h-6 text-neon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                    </svg>
-                  )}
-                  {category.icon === 'link' && (
-                    <svg class="w-6 h-6 text-neon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
-                    </svg>
-                  )}
-                  {category.icon === 'chart' && (
-                    <svg class="w-6 h-6 text-neon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                    </svg>
-                  )}
-                  {category.icon === 'settings' && (
-                    <svg class="w-6 h-6 text-neon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                    </svg>
-                  )}
-                </div>
-                <h3 class="text-xl font-bold text-white">{category.name}</h3>
+    <!-- ═══════ HERO ═══════ -->
+    <div class="relative border-b border-white/5 overflow-hidden">
+      <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-neon-green/5 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="max-w-6xl mx-auto px-6 py-16 text-center relative">
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-neon-green/10 border border-neon-green/20 text-neon-green text-xs font-medium mb-6">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          Help Center
+        </div>
+        <h1 class="text-4xl sm:text-5xl font-display font-bold text-white mb-4 tracking-tight">
+          How can we help?
+        </h1>
+        <p class="text-gray-400 text-lg max-w-xl mx-auto mb-8">
+          Guides, answers and everything you need to get the most out of BioForge.
+        </p>
+
+        <!-- Search -->
+        <div class="relative max-w-lg mx-auto">
+          <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+          <input
+            id="faq-search"
+            type="text"
+            placeholder="Search questions…"
+            autocomplete="off"
+            class="w-full pl-11 pr-12 py-3.5 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/40 focus:outline-none focus:ring-1 focus:ring-neon-green/20 transition-all"
+          />
+          <kbd class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-600 bg-white/5 px-2 py-0.5 rounded border border-white/10 hidden sm:block">⌘K</kbd>
+        </div>
+      </div>
+    </div>
+
+    <div class="max-w-6xl mx-auto px-6 py-14 space-y-16">
+
+      <!-- ═══════ GUIDES ═══════ -->
+      <section>
+        <div class="flex items-center justify-between mb-6">
+          <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-widest">Popular Guides</h2>
+          <a href="#" class="text-xs text-neon-green hover:underline">View all →</a>
+        </div>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {GUIDES.map(guide => (
+            <a href={guide.href}
+              class="group flex flex-col gap-3 p-5 glass rounded-2xl border border-white/8 hover:border-white/15 hover:bg-white/[0.03] transition-all">
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-500">{guide.category}</span>
+                <span class="text-xs text-gray-600">{guide.time}</span>
               </div>
-              <ul class="space-y-3">
-                {category.articles.map((article) => (
-                  <li>
-                    <a href="#" class="flex items-center justify-between p-3 glass rounded-xl border border-transparent hover:border-neon-blue/30 transition-all group">
-                      <span class="text-gray-300 group-hover:text-white transition-colors">{article.title}</span>
-                      <span class="text-xs text-gray-500">{article.views}</span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-              <a href="#" class="inline-flex items-center space-x-2 text-neon-blue hover:text-neon-green transition-colors mt-4 text-sm font-medium">
-                <span>View all articles</span>
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div class="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+                <svg class="w-4 h-4 text-gray-400 group-hover:text-neon-green transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={guide.icon}/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-white group-hover:text-neon-green transition-colors leading-snug mb-1">{guide.title}</p>
+                <p class="text-xs text-gray-500 leading-relaxed">{guide.desc}</p>
+              </div>
+              <div class="mt-auto flex items-center gap-1 text-xs text-gray-600 group-hover:text-neon-green transition-colors">
+                Read guide
+                <svg class="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                 </svg>
-              </a>
-            </div>
+              </div>
+            </a>
           ))}
         </div>
-      </div>
-    </section>
+      </section>
 
-    <!-- Contact Support -->
-    <section class="relative py-20" data-scroll-section>
-      <div class="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="max-w-4xl mx-auto text-center glass-strong rounded-3xl p-12 border border-white/10 reveal">
-          <h2 class="text-4xl font-display font-bold text-white mb-4">
-            Still Need Help?
-          </h2>
-          <p class="text-xl text-gray-300 mb-8">
-            Can't find what you're looking for? Get in touch with our support team.
-          </p>
-          <div class="flex flex-col sm:flex-row gap-4 justify-center">
-            <a href="/contact" class="inline-flex items-center justify-center space-x-2 px-6 py-3 bg-gradient-to-r from-neon-blue to-neon-purple text-white font-semibold rounded-xl hover:opacity-90 transition-all glow-blue">
-              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/>
-                <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/>
-              </svg>
-              <span>Email Support</span>
-            </a>
-            <a href="#" class="inline-flex items-center justify-center space-x-2 px-6 py-3 glass border border-white/10 text-white font-semibold rounded-xl hover:border-neon-blue/30 transition-all">
-              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M2 5a2 2 0 012-2h7a2 2 0 012 2v4a2 2 0 01-2 2H9l-3 3v-3H4a2 2 0 01-2-2V5z"/>
-                <path d="M15 7v2a4 4 0 01-4 4H9.828l-1.766 1.767c.28.149.599.233.938.233h2l3 3v-3h2a2 2 0 002-2V9a2 2 0 00-2-2h-1z"/>
-              </svg>
-              <span>Live Chat</span>
-            </a>
+      <!-- ═══════ FAQ ═══════ -->
+      <section>
+        <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-6">Frequently Asked Questions</h2>
+
+        <!-- Category tabs -->
+        <div class="flex items-center gap-2 flex-wrap mb-6">
+          <button class="faq-tab active px-3 py-1.5 rounded-lg text-xs font-medium transition-all" data-cat="all">All</button>
+          {FAQ.map(cat => (
+            <button class="faq-tab px-3 py-1.5 rounded-lg text-xs font-medium transition-all" data-cat={cat.category}>
+              {cat.label}
+            </button>
+          ))}
+        </div>
+
+        <div id="faq-list" class="space-y-3">
+          {FAQ.map(cat => cat.items.map(item => (
+            <details
+              class="faq-item glass rounded-xl border border-white/8 group"
+              data-cat={cat.category}
+              data-q={item.q.toLowerCase()}
+            >
+              <summary class="flex items-center justify-between px-5 py-4 cursor-pointer list-none hover:bg-white/[0.02] transition-colors">
+                <div class="flex items-center gap-3 min-w-0">
+                  <span class={`text-xs px-2 py-0.5 rounded-full shrink-0 ${cat.bg} ${cat.color} border ${cat.border}`}>
+                    {cat.label}
+                  </span>
+                  <span class="text-sm text-white font-medium truncate">{item.q}</span>
+                </div>
+                <svg class="w-4 h-4 text-gray-600 shrink-0 ml-3 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </summary>
+              <div class="px-5 pb-5 pt-1">
+                <p class="text-sm text-gray-400 leading-relaxed" set:html={item.a}></p>
+              </div>
+            </details>
+          )))}
+
+          <!-- Empty state -->
+          <div id="faq-empty" class="hidden text-center py-12 glass rounded-2xl border border-white/5">
+            <svg class="w-8 h-8 text-gray-700 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <p class="text-sm text-gray-500">No results found</p>
+            <p class="text-xs text-gray-600 mt-1">
+              Try different keywords or
+              <button id="reset-search" class="text-neon-green hover:underline">clear the search</button>
+            </p>
           </div>
         </div>
-      </div>
-    </section>
-  </main>
+      </section>
 
-  <Footer />
+      <!-- ═══════ STATUS BANNER ═══════ -->
+      <a href="/support/status"
+        class="flex items-center justify-between p-5 glass rounded-2xl border border-neon-green/20 hover:border-neon-green/40 hover:bg-neon-green/[0.03] transition-all group">
+        <div class="flex items-center gap-4">
+          <div class="relative flex items-center justify-center w-9 h-9 rounded-xl bg-neon-green/10 border border-neon-green/20 shrink-0">
+            <span class="animate-ping absolute inline-flex h-3 w-3 rounded-full bg-neon-green opacity-40"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-neon-green"></span>
+          </div>
+          <div>
+            <p class="text-sm font-semibold text-white">All systems operational</p>
+            <p class="text-xs text-gray-500 mt-0.5">Check the real-time status of all BioForge services</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1 text-xs text-neon-green group-hover:translate-x-1 transition-transform shrink-0">
+          View status
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+        </div>
+      </a>
+
+      <!-- ═══════ CONTACT / CHAT ═══════ -->
+      <section>
+        <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-6">Still need help?</h2>
+        <div class="grid sm:grid-cols-2 gap-4">
+
+          <!-- Live Chat -->
+          <div class="flex flex-col gap-4 p-6 glass rounded-2xl border border-white/8">
+            <div class="w-10 h-10 rounded-xl bg-neon-green/10 border border-neon-green/20 flex items-center justify-center">
+              <svg class="w-5 h-5 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+              </svg>
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-white mb-1">Live Chat</p>
+              <p class="text-xs text-gray-500 leading-relaxed">
+                Chat with our support team directly. Available Monday–Friday, 9am–6pm CET.
+              </p>
+            </div>
+            <span class="inline-flex items-center gap-1.5 text-xs text-neon-green mt-auto">
+              <span class="w-1.5 h-1.5 rounded-full bg-neon-green inline-block" style="box-shadow:0 0 5px rgba(0,255,157,0.7)"></span>
+              Online now
+            </span>
+            <button id="open-chat-btn"
+              class="w-full py-2.5 bg-neon-green text-black text-sm font-semibold rounded-xl hover:bg-neon-green/90 active:scale-[0.98] transition-all">
+              Start a conversation
+            </button>
+          </div>
+
+          <!-- Email -->
+          <div class="flex flex-col gap-4 p-6 glass rounded-2xl border border-white/8">
+            <div class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+              <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              </svg>
+            </div>
+            <div>
+              <p class="text-sm font-semibold text-white mb-1">Email Support</p>
+              <p class="text-xs text-gray-500 leading-relaxed">
+                For billing, account issues or anything requiring a detailed response. Typical reply time: under 24h.
+              </p>
+            </div>
+            <span class="text-xs text-gray-600 mt-auto">
+              Avg. response: <span class="text-gray-400">~4 hours</span>
+            </span>
+            <a href="mailto:support@bioforge.click"
+              class="w-full py-2.5 glass border border-white/10 text-white text-sm font-medium rounded-xl hover:border-white/20 hover:bg-white/5 active:scale-[0.98] transition-all text-center block">
+              support@bioforge.click
+            </a>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ═══════ FOOTER ═══════ -->
+      <footer class="pt-6 border-t border-white/5 flex items-center justify-between text-xs text-gray-600">
+        <span>© {new Date().getFullYear()} BioForge</span>
+        <div class="flex items-center gap-4">
+          <a href="/legal/privacy" class="hover:text-gray-400 transition-colors">Privacy</a>
+          <a href="/legal/terms"   class="hover:text-gray-400 transition-colors">Terms</a>
+          <a href="/support/status"        class="hover:text-gray-400 transition-colors">Status</a>
+        </div>
+      </footer>
+
+    </div>
+  </div>
 </BaseLayout>
+
+<style>
+  details > summary::-webkit-details-marker { display: none; }
+
+  .faq-tab {
+    background: transparent;
+    color: #6b7280;
+    border: 1px solid transparent;
+    cursor: pointer;
+  }
+  .faq-tab:hover {
+    color: white;
+    background: rgba(255,255,255,0.05);
+  }
+  .faq-tab.active {
+    background: rgba(0, 255, 157, 0.1);
+    color: #00ff9d;
+    border-color: rgba(0, 255, 157, 0.2);
+  }
+</style>
+
+<script>
+  // ==================== SEARCH ====================
+  const searchInput = document.getElementById('faq-search') as HTMLInputElement;
+  const faqItems    = document.querySelectorAll<HTMLElement>('.faq-item');
+  const faqEmpty    = document.getElementById('faq-empty');
+
+  function filterFAQ() {
+    const query     = searchInput?.value.toLowerCase().trim() ?? '';
+    const activeCat = document.querySelector<HTMLElement>('.faq-tab.active')?.dataset.cat ?? 'all';
+    let visible     = 0;
+
+    faqItems.forEach(item => {
+      const matchesSearch = !query || (item.dataset.q ?? '').includes(query);
+      const matchesCat    = activeCat === 'all' || item.dataset.cat === activeCat;
+      const show          = matchesSearch && matchesCat;
+      item.style.display  = show ? '' : 'none';
+      if (show) visible++;
+    });
+
+    faqEmpty?.classList.toggle('hidden', visible > 0);
+  }
+
+  searchInput?.addEventListener('input', filterFAQ);
+
+  document.getElementById('reset-search')?.addEventListener('click', () => {
+    if (searchInput) searchInput.value = '';
+    filterFAQ();
+  });
+
+  // ⌘K / Ctrl+K focus
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      searchInput?.focus();
+    }
+  });
+
+  // ==================== CATEGORY TABS ====================
+  document.querySelectorAll<HTMLElement>('.faq-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.faq-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      filterFAQ();
+    });
+  });
+
+  // ==================== CHAT ====================
+  document.getElementById('open-chat-btn')?.addEventListener('click', () => {
+    // Branche ton widget ici (Crisp, Intercom, Tawk…)
+    // Exemple Crisp : window.$crisp?.push(['do', 'chat:open']);
+    console.log('[chat] open');
+  });
+</script>
