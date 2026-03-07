@@ -1,382 +1,637 @@
 ---
+// src/pages/pricing.astro
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Header from '@/components/layout/Header.astro';
 import Footer from '@/components/layout/Footer.astro';
-import Button from '@/components/ui/Button.astro';
 
+const SITE_URL = import.meta.env.PUBLIC_SITE_URL ?? 'https://bioforge.click';
+
+const SEO = {
+  title:       'Tarifs — BioForge',
+  description: 'Plans et tarifs BioForge. Gratuit pour démarrer, Creator à 4.99€/mois, Pro à 9.99€/mois. Aucune CB requise pour le plan gratuit.',
+  url:         `${SITE_URL}/pricing`,
+};
+
+// ── Plans ─────────────────────────────────────────────────────────────────────
 const plans = [
   {
-    name: 'Free',
-    price: { monthly: 0, yearly: 0 },
-    description: 'Perfect for getting started',
+    id:       'free',
+    name:     'Free',
+    color:    'rgba(255,255,255,0.55)',
+    monthly:  0,
+    annual:   0,
+    desc:     'Pour découvrir sans engagement.',
+    cta:      { label: 'Créer mon compte', href: '/signin', style: 'ghost' },
     features: [
-      'Unlimited links',
-      'Basic analytics',
-      'bioforge.link subdomain',
-      '5 theme templates',
-      'Mobile optimized',
-      'SSL certificate',
-      'Email support'
+      '5 blocs actifs',
+      'URL bioforge.click/@toi',
+      'Analytics basiques (7 jours)',
+      'Thèmes prédéfinis',
+      'Support communauté',
     ],
-    notIncluded: [
-      'Custom domain',
-      'Advanced analytics',
-      'Remove branding',
-      'Priority support'
+    limits: [
+      'Domaine custom',
+      'Analytics avancés',
+      'Branding BioForge visible',
     ],
-    cta: 'Get Started',
-    href: '/signup',
-    popular: false,
-    color: 'neon-green'
   },
   {
-    name: 'Pro',
-    price: { monthly: 5, yearly: 49 },
-    description: 'For serious creators',
+    id:       'creator',
+    name:     'Creator',
+    color:    '#38bdf8',
+    monthly:  4.99,
+    annual:   3.99,
+    desc:     'Pour les créateurs qui débutent leur croissance.',
+    cta:      { label: 'Commencer Creator', href: '/signin?plan=creator', style: 'blue' },
     features: [
-      'Everything in Free',
-      'Custom domain',
-      'Advanced analytics',
-      'Remove BioForge branding',
-      '50+ premium themes',
-      'Custom CSS',
-      'Priority email support',
-      'Link scheduling',
-      'Google Analytics integration',
-      'Facebook Pixel integration'
+      '20 blocs actifs',
+      'URL bioforge.click/@toi',
+      'Analytics 30 jours',
+      'Thèmes prédéfinis + couleurs custom',
+      'Suppression branding BioForge',
+      'Support email prioritaire',
     ],
-    notIncluded: [],
-    cta: 'Start Free Trial',
-    href: '/signup?plan=pro',
-    popular: true,
-    color: 'neon-purple'
+    limits: [
+      'Domaine custom',
+      'Analytics avancés (sources de trafic)',
+      'Blocs premium (live stream, shop)',
+    ],
   },
   {
-    name: 'Enterprise',
-    price: { monthly: 'Custom', yearly: 'Custom' },
-    description: 'For teams and agencies',
+    id:       'pro',
+    name:     'Pro',
+    color:    '#39ff8f',
+    monthly:  9.99,
+    annual:   7.99,
+    popular:  true,
+    desc:     'Le plan complet pour les créateurs sérieux.',
+    cta:      { label: 'Commencer Pro', href: '/signin?plan=pro', style: 'green' },
     features: [
-      'Everything in Pro',
-      'Unlimited team members',
-      'White-label solution',
-      'Custom integrations',
-      'Dedicated account manager',
-      '24/7 phone support',
-      'SLA guarantee',
-      'Custom development',
-      'Advanced security',
-      'API access'
+      'Blocs illimités',
+      'Domaine custom (liens.toi.com)',
+      'Analytics avancés (90 jours + sources)',
+      'Tous les thèmes + CSS custom',
+      'Tous les blocs premium',
+      'Suppression branding BioForge',
+      'Support email prioritaire',
+      'Accès fonctionnalités bêta',
     ],
-    notIncluded: [],
-    cta: 'Contact Sales',
-    href: '/contact',
-    popular: false,
-    color: 'neon-blue'
-  }
-];
+    limits: [],
+  },
+  {
+    id:       'enterprise',
+    name:     'Enterprise',
+    color:    '#fb923c',
+    monthly:  29.99,
+    annual:   23.99,
+    desc:     'Pour les agences et créateurs à fort volume.',
+    cta:      { label: 'Nous contacter', href: '/contact?subject=enterprise', style: 'orange' },
+    features: [
+      'Tout le plan Pro',
+      'Plusieurs profils (multi-compte)',
+      'Analytics illimités (historique complet)',
+      'API access',
+      'Intégrations custom sur demande',
+      'SLA uptime garanti',
+      'Account manager dédié',
+      'Onboarding personnalisé',
+    ],
+    limits: [],
+  },
+] as const;
 
-const faqs = [
-  {
-    question: 'Can I switch plans anytime?',
-    answer: 'Yes! You can upgrade or downgrade your plan at any time. Changes take effect immediately and we\'ll prorate any differences.'
-  },
-  {
-    question: 'What payment methods do you accept?',
-    answer: 'We accept all major credit cards (Visa, Mastercard, American Express), PayPal, and for Enterprise customers, we can arrange bank transfers or custom invoicing.'
-  },
-  {
-    question: 'Is there a free trial for Pro?',
-    answer: 'Yes! We offer a 14-day free trial for the Pro plan. No credit card required to start. You can cancel anytime during the trial period.'
-  },
-  {
-    question: 'What happens if I cancel?',
-    answer: 'You can cancel your subscription anytime. You\'ll continue to have access to Pro features until the end of your billing period, then your account will revert to the Free plan.'
-  },
-  {
-    question: 'Do you offer refunds?',
-    answer: 'Yes, we offer a 30-day money-back guarantee. If you\'re not satisfied with BioForge for any reason, contact us within 30 days of purchase for a full refund.'
-  }
+// ── Tableau comparatif ────────────────────────────────────────────────────────
+type PlanId = 'free' | 'creator' | 'pro' | 'enterprise';
+type CellValue = boolean | string;
+
+const compareRows: { label: string; cat: string; values: Record<PlanId, CellValue> }[] = [
+  // Blocs
+  { label: 'Blocs actifs',        cat: 'Éditeur',       values: { free: '5',          creator: '20',        pro: 'Illimités',  enterprise: 'Illimités' } },
+  { label: 'Types de blocs',      cat: 'Éditeur',       values: { free: 'Standard',   creator: 'Standard',  pro: 'Tous',       enterprise: 'Tous' } },
+  { label: 'Blocs premium',       cat: 'Éditeur',       values: { free: false,         creator: false,        pro: true,         enterprise: true } },
+  { label: 'Drag & drop',         cat: 'Éditeur',       values: { free: true,          creator: true,         pro: true,         enterprise: true } },
+  // Analytics
+  { label: 'Vues & clics',        cat: 'Analytics',     values: { free: '7 jours',    creator: '30 jours',  pro: '90 jours',   enterprise: 'Illimités' } },
+  { label: 'Sources de trafic',   cat: 'Analytics',     values: { free: false,         creator: false,        pro: true,         enterprise: true } },
+  { label: 'Export CSV',          cat: 'Analytics',     values: { free: false,         creator: false,        pro: true,         enterprise: true } },
+  { label: 'API analytics',       cat: 'Analytics',     values: { free: false,         creator: false,        pro: false,        enterprise: true } },
+  // Personnalisation
+  { label: 'Thèmes prédéfinis',   cat: 'Design',        values: { free: true,          creator: true,         pro: true,         enterprise: true } },
+  { label: 'Couleurs custom',     cat: 'Design',        values: { free: false,         creator: true,         pro: true,         enterprise: true } },
+  { label: 'CSS custom',          cat: 'Design',        values: { free: false,         creator: false,        pro: true,         enterprise: true } },
+  { label: 'Domaine custom',      cat: 'Design',        values: { free: false,         creator: false,        pro: true,         enterprise: true } },
+  { label: 'Suppression branding',cat: 'Design',        values: { free: false,         creator: true,         pro: true,         enterprise: true } },
+  // Compte
+  { label: 'Multi-profils',       cat: 'Compte',        values: { free: false,         creator: false,        pro: false,        enterprise: true } },
+  { label: 'API access',          cat: 'Compte',        values: { free: false,         creator: false,        pro: false,        enterprise: true } },
+  { label: 'Support',             cat: 'Compte',        values: { free: 'Communauté', creator: 'Email',      pro: 'Prioritaire',enterprise: 'Dédié' } },
 ];
 ---
 
-<BaseLayout title="Pricing - BioForge | Simple & Transparent">
+<BaseLayout title={SEO.title}>
+  <Fragment slot="head">
+    <meta name="description"        content={SEO.description} />
+    <link rel="canonical"           href={SEO.url} />
+    <meta property="og:title"       content={SEO.title} />
+    <meta property="og:description" content={SEO.description} />
+    <meta property="og:url"         content={SEO.url} />
+  </Fragment>
+
   <Header />
-  
-  <main>
-    <!-- Hero Section -->
-    <section class="relative pt-32 pb-20 overflow-hidden" data-scroll-section>
-      <div class="absolute inset-0 bg-gradient-to-b from-dark-900 via-dark-800 to-dark-900"></div>
-      
-      <div class="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="max-w-4xl mx-auto text-center">
-          <!-- Badge -->
-          <div class="inline-flex items-center space-x-2 px-4 py-2 glass rounded-full text-sm text-neon-purple mb-8">
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
-              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clip-rule="evenodd"/>
-            </svg>
-            <span>Simple Pricing</span>
-          </div>
 
-          <h1 class="text-6xl sm:text-7xl lg:text-8xl font-display font-bold text-white leading-[0.95] mb-8">
-            Choose Your
-            <span class="block mt-2 text-transparent bg-clip-text bg-gradient-to-r from-neon-purple via-neon-pink to-neon-blue animate-gradient text-glow-purple">
-              Plan
-            </span>
-          </h1>
+  <main class="pricing-main">
 
-          <p class="text-xl sm:text-2xl text-gray-300 max-w-3xl mx-auto leading-relaxed mb-12">
-            Start free, upgrade when you're ready. All plans include our core features with no hidden fees.
-          </p>
+    <!-- Hero -->
+    <section class="pr-hero">
+      <div class="pr-bg" aria-hidden="true">
+        <div class="pr-glow g1"></div>
+        <div class="pr-glow g2"></div>
+        <div class="pr-grid"></div>
+      </div>
+      <div class="pr-hero-inner">
+        <div class="pr-badge">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          </svg>
+          Tarifs simples et transparents
+        </div>
+        <h1 class="pr-hero-title">
+          Le bon plan<br>
+          <span class="pr-accent">pour chaque créateur</span>
+        </h1>
+        <p class="pr-hero-sub">Commence gratuitement. Passe au niveau supérieur quand tu es prêt. Aucune CB requise pour démarrer.</p>
 
-          <!-- Billing Toggle -->
-          <div class="inline-flex items-center space-x-4 glass rounded-full p-2">
-            <button id="monthly-btn" class="billing-toggle active px-6 py-3 rounded-full font-semibold text-sm transition-all duration-300">
-              Monthly
-            </button>
-            <button id="yearly-btn" class="billing-toggle px-6 py-3 rounded-full font-semibold text-sm transition-all duration-300">
-              Yearly
-              <span class="ml-2 text-xs text-neon-green">Save 20%</span>
-            </button>
-          </div>
+        <!-- Toggle mensuel / annuel -->
+        <div class="billing-toggle" role="group" aria-label="Période de facturation">
+          <button id="toggle-monthly" class="toggle-btn active" aria-pressed="true">Mensuel</button>
+          <button id="toggle-annual"  class="toggle-btn"        aria-pressed="false">
+            Annuel
+            <span class="toggle-save">-20%</span>
+          </button>
         </div>
       </div>
     </section>
 
-    <!-- Pricing Cards -->
-    <section class="relative py-20" data-scroll-section>
-      <div class="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="grid md:grid-cols-3 gap-8 max-w-7xl mx-auto">
-          {plans.map((plan, index) => (
-            <div style={`animation-delay: ${index * 0.1}s`}>
-              <div class={`relative glass-strong rounded-3xl p-8 border ${plan.popular ? 'border-neon-purple/50 scale-105' : 'border-white/10'} transition-all duration-500 hover:scale-105 h-full flex flex-col`}>
-                {plan.popular && (
-                  <div class="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <span class="inline-flex items-center px-4 py-1.5 rounded-full text-xs font-bold bg-gradient-to-r from-neon-purple to-neon-pink text-white glow-purple">
-                      MOST POPULAR
-                    </span>
-                  </div>
-                )}
-
-                <!-- Plan Name -->
-                <h3 class="text-2xl font-display font-bold text-white mb-2">
-                  {plan.name}
-                </h3>
-                <p class="text-gray-400 mb-6">{plan.description}</p>
-
-                <!-- Price -->
-                <div class="mb-8">
-                  <div class="price-display">
-                    <span class="monthly-price">
-                      {typeof plan.price.monthly === 'number' ? (
-                        <>
-                          <span class="text-5xl font-bold text-white">${plan.price.monthly}</span>
-                          <span class="text-gray-400 ml-2">/month</span>
-                        </>
-                      ) : (
-                        <span class="text-5xl font-bold text-white">{plan.price.monthly}</span>
-                      )}
-                    </span>
-                    <span class="yearly-price hidden">
-                      {typeof plan.price.yearly === 'number' ? (
-                        <>
-                          <span class="text-5xl font-bold text-white">${plan.price.yearly}</span>
-                          <span class="text-gray-400 ml-2">/year</span>
-                          {plan.price.yearly > 0 && (
-                            <div class="text-sm text-neon-green mt-2">
-                              ${(plan.price.yearly / 12).toFixed(2)}/month
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <span class="text-5xl font-bold text-white">{plan.price.yearly}</span>
-                      )}
-                    </span>
-                  </div>
-                </div>
-
-                <!-- CTA Button -->
-                <Button 
-                  variant={plan.popular ? 'primary' : 'outline'}
-                  size="lg" 
-                  href={plan.href}
-                  class={`w-full mb-8 ${plan.popular ? 'glow-purple' : ''}`}
-                >
-                  {plan.cta}
-                </Button>
-
-                <!-- Features List -->
-                <div class="space-y-4 mb-auto">
-                  <p class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Included:</p>
-                  <ul class="space-y-3">
-                    {plan.features.map((feature) => (
-                      <li class="flex items-start space-x-3 text-sm text-gray-300">
-                        <svg class="w-5 h-5 text-neon-green flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                        </svg>
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  
-                  {plan.notIncluded.length > 0 && (
-                    <ul class="space-y-3 pt-4 border-t border-white/10">
-                      {plan.notIncluded.map((feature) => (
-                        <li class="flex items-start space-x-3 text-sm text-gray-500">
-                          <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
-                          </svg>
-                          <span>{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+    <!-- Cards -->
+    <section class="pr-cards-section" aria-label="Plans tarifaires">
+      <div class="pr-cards">
+        {plans.map((plan, i) => (
+          <div
+            class={`pr-card${plan.popular ? ' pr-card-popular' : ''}`}
+            style={`--c:${plan.color}; animation-delay:${i*0.08}s`}
+          >
+            {plan.popular && (
+              <div class="popular-badge">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+                Populaire
               </div>
+            )}
+
+            <div class="plan-top">
+              <div class="plan-name" style={`color:${plan.color}`}>{plan.name}</div>
+              <p class="plan-desc">{plan.desc}</p>
             </div>
-          ))}
-        </div>
 
-        <!-- Trust Badge -->
-        <div class="text-center mt-12">
-          <p class="text-gray-400 flex items-center justify-center space-x-2">
-            <svg class="w-5 h-5 text-neon-green" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-            </svg>
-            <span>30-day money-back guarantee • Cancel anytime</span>
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <!-- FAQ Section -->
-    <section class="relative py-20" data-scroll-section>
-      <div class="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="max-w-4xl mx-auto">
-          <div class="text-center mb-16">
-            <h2 class="text-5xl sm:text-6xl font-display font-bold text-white mb-6">
-              Pricing
-              <span class="text-transparent bg-clip-text bg-gradient-to-r from-neon-purple to-neon-pink text-glow-purple">
-                FAQ
-              </span>
-            </h2>
-          </div>
-
-          <div class="space-y-4">
-            {faqs.map((faq, _index) => (
-              <div class="faq-item glass-strong rounded-2xl border border-white/10 overflow-hidden transition-all duration-300 hover:border-neon-purple/30">
-                <button class="faq-question w-full px-8 py-6 text-left flex items-center justify-between group">
-                  <span class="text-lg font-semibold text-white group-hover:text-neon-purple transition-colors pr-8">
-                    {faq.question}
-                  </span>
-                  <svg class="faq-icon w-6 h-6 text-neon-purple transition-transform duration-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                  </svg>
-                </button>
-                <div class="faq-answer max-h-0 overflow-hidden transition-all duration-300">
-                  <div class="px-8 pb-6 text-gray-400 leading-relaxed">
-                    {faq.answer}
-                  </div>
+            <div class="plan-price-wrap">
+              {plan.monthly === 0 ? (
+                <div class="plan-price">
+                  <span class="price-amount">Gratuit</span>
                 </div>
-              </div>
-            ))}
+              ) : (
+                <div class="plan-price">
+                  <span class="price-currency">€</span>
+                  <span class="price-amount" data-monthly={plan.monthly} data-annual={plan.annual}>
+                    {plan.monthly}
+                  </span>
+                  <span class="price-period">/mois</span>
+                </div>
+              )}
+              {plan.monthly > 0 && (
+                <p class="price-annual-note hidden" id={`note-${plan.id}`}>
+                  Facturé annuellement (€{(plan.annual * 12).toFixed(2)}/an)
+                </p>
+              )}
+            </div>
+
+            <a href={plan.cta.href} class={`plan-cta cta-${plan.cta.style}`}>
+              {plan.cta.label}
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="5" y1="12" x2="19" y2="12"/>
+                <polyline points="12 5 19 12 12 19"/>
+              </svg>
+            </a>
+
+            <ul class="plan-features" aria-label={`Fonctionnalités du plan ${plan.name}`}>
+              {plan.features.map(f => (
+                <li class="feat-item feat-ok">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#39ff8f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12"/>
+                  </svg>
+                  {f}
+                </li>
+              ))}
+              {plan.limits.map(l => (
+                <li class="feat-item feat-no">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                  {l}
+                </li>
+              ))}
+            </ul>
           </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- Tableau comparatif -->
+    <section class="pr-compare" aria-labelledby="compare-title">
+      <div class="pr-compare-inner">
+        <h2 id="compare-title" class="compare-title">Comparaison détaillée</h2>
+        <p class="compare-sub">Toutes les fonctionnalités, plan par plan.</p>
+
+        <div class="compare-table-wrap">
+          <table class="compare-table" role="table">
+            <thead>
+              <tr>
+                <th scope="col" class="col-feature">Fonctionnalité</th>
+                <th scope="col" class="col-plan">Free</th>
+                <th scope="col" class="col-plan">Creator</th>
+                <th scope="col" class="col-plan col-plan-pro">Pro</th>
+                <th scope="col" class="col-plan">Enterprise</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(() => {
+                let lastCat = '';
+                return compareRows.map(row => {
+                  const catRow = row.cat !== lastCat ? (lastCat = row.cat, row.cat) : null;
+                  return (
+                    <>
+                      {catRow && (
+                        <tr class="cat-row">
+                          <td colspan="5" class="cat-label">{catRow}</td>
+                        </tr>
+                      )}
+                      <tr class="data-row">
+                        <td class="feat-label">{row.label}</td>
+                        {(['free','creator','pro','enterprise'] as PlanId[]).map(pid => (
+                          <td class={`feat-val${pid === 'pro' ? ' col-pro-val' : ''}`}>
+                            {typeof row.values[pid] === 'boolean' ? (
+                              row.values[pid] ? (
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#39ff8f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Inclus">
+                                  <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                              ) : (
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Non inclus">
+                                  <line x1="18" y1="6" x2="6" y2="18"/>
+                                  <line x1="6" y1="6" x2="18" y2="18"/>
+                                </svg>
+                              )
+                            ) : (
+                              <span>{row.values[pid]}</span>
+                            )}
+                          </td>
+                        ))}
+                      </tr>
+                    </>
+                  );
+                });
+              })()}
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
 
-    <!-- Final CTA -->
-    <section class="relative py-20" data-scroll-section>
-      <div class="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="max-w-4xl mx-auto text-center glass-strong rounded-3xl p-12 border border-white/10">
-          <h2 class="text-4xl sm:text-5xl font-display font-bold text-white mb-6">
-            Still Have Questions?
-          </h2>
-          <p class="text-xl text-gray-300 mb-8">
-            Our team is here to help you find the perfect plan
-          </p>
-          <div class="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button variant="primary" size="lg" href="/contact" class="glow-purple">
-              Contact Sales
-            </Button>
-            <Button variant="outline" size="lg" href="/signup">
-              Start Free Trial
-            </Button>
-          </div>
-        </div>
+    <!-- FAQ pricing -->
+    <section class="pr-faq" aria-labelledby="pr-faq-title">
+      <div class="pr-faq-inner">
+        <h2 id="pr-faq-title" class="pr-faq-title">Questions sur les tarifs</h2>
+
+        {[
+          { q: 'Puis-je changer de plan à tout moment ?', a: "Oui. Tu peux upgrader immédiatement — la différence est calculée au prorata. Pour downgrader, le changement s'applique à la fin de la période en cours." },
+          { q: "Que se passe-t-il si j'annule ?", a: "Tu gardes l'accès au plan payant jusqu'à la fin de la période déjà payée. Ensuite tu repasses automatiquement au plan Free : ta page reste en ligne, tes données sont conservées." },
+          { q: 'Le plan annuel est-il engageant ?', a: "Non. Tu peux annuler quand tu veux. Si tu annules un plan annuel, tu gardes l'accès jusqu'à la fin des 12 mois payés. Aucun remboursement partiel sauf cas exceptionnel." },
+          { q: 'Y a-t-il une période d\'essai pour les plans payants ?', a: "Oui — 7 jours d'essai gratuit sur Creator et Pro, sans CB. Tu rentres tes infos de paiement seulement à la fin de la période d'essai." },
+          { q: 'Quels modes de paiement acceptez-vous ?', a: "Carte bancaire (Visa, Mastercard, Amex) et SEPA (virement). Tout est géré de manière sécurisée via Stripe." },
+        ].map((faq, i) => (
+          <details class="pr-faq-item" style={`animation-delay:${i * 0.05}s`}>
+            <summary class="pr-faq-q">
+              <span>{faq.q}</span>
+              <span class="pr-faq-chevron" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </span>
+            </summary>
+            <div class="pr-faq-a"><p>{faq.a}</p></div>
+          </details>
+        ))}
       </div>
     </section>
+
+    <!-- Enterprise CTA -->
+    <section class="pr-enterprise">
+      <div class="pr-enterprise-inner">
+        <div class="ent-icon" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fb923c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="7" width="20" height="14" rx="2"/>
+            <path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>
+          </svg>
+        </div>
+        <div class="ent-text">
+          <h2 class="ent-title">Besoin d'une solution sur-mesure ?</h2>
+          <p class="ent-desc">Agences, labels, créateurs à fort volume — discutons de tes besoins spécifiques, volume de profils, intégrations custom et SLA.</p>
+        </div>
+        <a href="/contact?subject=enterprise" class="ent-cta">
+          Contacter l'équipe
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="5" y1="12" x2="19" y2="12"/>
+            <polyline points="12 5 19 12 12 19"/>
+          </svg>
+        </a>
+      </div>
+    </section>
+
   </main>
 
   <Footer />
 </BaseLayout>
 
 <script>
-  import { gsap } from 'gsap';
+  // ── Toggle mensuel / annuel ───────────────────────────────────────────────
+  const btnMonthly = document.getElementById('toggle-monthly')!;
+  const btnAnnual  = document.getElementById('toggle-annual')!;
+  const prices     = document.querySelectorAll<HTMLElement>('.price-amount[data-monthly]');
+  const notes      = document.querySelectorAll<HTMLElement>('[id^="note-"]');
+  let isAnnual = false;
 
-  // Billing toggle
-  const monthlyBtn = document.getElementById('monthly-btn');
-  const yearlyBtn = document.getElementById('yearly-btn');
-  const monthlyPrices = document.querySelectorAll('.monthly-price');
-  const yearlyPrices = document.querySelectorAll('.yearly-price');
+  function setMode(annual: boolean) {
+    isAnnual = annual;
+    btnMonthly.classList.toggle('active', !annual);
+    btnAnnual.classList.toggle('active', annual);
+    btnMonthly.setAttribute('aria-pressed', String(!annual));
+    btnAnnual.setAttribute('aria-pressed',  String(annual));
 
-  monthlyBtn?.addEventListener('click', () => {
-    monthlyBtn.classList.add('active');
-    yearlyBtn?.classList.remove('active');
-    monthlyPrices.forEach(p => p.classList.remove('hidden'));
-    yearlyPrices.forEach(p => p.classList.add('hidden'));
-  });
+    prices.forEach(el => {
+      const v = annual
+        ? parseFloat(el.dataset.annual!)
+        : parseFloat(el.dataset.monthly!);
+      el.textContent = v.toFixed(2).replace('.00','').replace(/\.(\d)$/, '.$10');
+    });
 
-  yearlyBtn?.addEventListener('click', () => {
-    yearlyBtn.classList.add('active');
-    monthlyBtn?.classList.remove('active');
-    yearlyPrices.forEach(p => p.classList.remove('hidden'));
-    monthlyPrices.forEach(p => p.classList.add('hidden'));
-  });
+    notes.forEach(el => el.classList.toggle('hidden', !annual));
+  }
 
-  // FAQ Accordion
-  const faqButtons = document.querySelectorAll('.faq-question');
-  faqButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      const faqItem = button.parentElement;
-      const faqAnswer = faqItem?.querySelector('.faq-answer');
-      const faqIcon = button.querySelector('.faq-icon');
-      const isOpen = faqItem?.classList.contains('active');
-      
-      document.querySelectorAll('.faq-item').forEach((item) => {
-        if (item !== faqItem) {
-          item.classList.remove('active');
-          const answer = item.querySelector('.faq-answer');
-          const icon = item.querySelector('.faq-icon');
-          if (answer) gsap.to(answer, { maxHeight: 0, duration: 0.3, ease: 'power2.inOut' });
-          if (icon) gsap.to(icon, { rotation: 0, duration: 0.3, ease: 'power2.inOut' });
-        }
-      });
-      
-      if (isOpen) {
-        faqItem?.classList.remove('active');
-        if (faqAnswer) gsap.to(faqAnswer, { maxHeight: 0, duration: 0.3, ease: 'power2.inOut' });
-        if (faqIcon) gsap.to(faqIcon, { rotation: 0, duration: 0.3, ease: 'power2.inOut' });
-      } else {
-        faqItem?.classList.add('active');
-        if (faqAnswer) gsap.to(faqAnswer, { maxHeight: faqAnswer.scrollHeight + 24, duration: 0.3, ease: 'power2.inOut' });
-        if (faqIcon) gsap.to(faqIcon, { rotation: 180, duration: 0.3, ease: 'power2.inOut' });
+  btnMonthly.addEventListener('click', () => setMode(false));
+  btnAnnual.addEventListener('click',  () => setMode(true));
+
+  // ── FAQ accordion ─────────────────────────────────────────────────────────
+  document.querySelectorAll('.pr-faq-item').forEach(item => {
+    item.addEventListener('toggle', () => {
+      if ((item as HTMLDetailsElement).open) {
+        document.querySelectorAll('.pr-faq-item').forEach(o => {
+          if (o !== item) (o as HTMLDetailsElement).open = false;
+        });
       }
     });
   });
+
+  // ── Reveal ────────────────────────────────────────────────────────────────
+  document.querySelectorAll('.pr-card, .pr-faq-item, .pr-enterprise-inner, .compare-title').forEach(el =>
+    new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) (e.target as HTMLElement).classList.add('revealed');
+    }, { threshold: 0.1 }).observe(el)
+  );
 </script>
 
 <style>
-  .billing-toggle {
-    color: #9ca3af;
+  .pricing-main { padding-top: 64px; }
+
+  /* ── Hero ── */
+  .pr-hero {
+    position: relative; overflow: hidden;
+    padding: 5rem 1.5rem 4rem; text-align: center;
   }
-  
-  .billing-toggle.active {
-    background: linear-gradient(to right, #bf00ff, #ff00e5);
-    color: white;
+  .pr-bg { position: absolute; inset: 0; pointer-events: none; }
+  .pr-glow { position: absolute; border-radius: 50%; filter: blur(100px); }
+  .g1 { width: 500px; height: 400px; top: -20%; left: -10%; background: rgba(57,255,143,.07); }
+  .g2 { width: 400px; height: 300px; bottom: 0; right: -5%; background: rgba(251,146,60,.055); }
+  .pr-grid {
+    position: absolute; inset: 0;
+    background-image: linear-gradient(rgba(57,255,143,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(57,255,143,.035) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
   }
 
-  .faq-item.active {
-    border-color: rgba(191, 0, 255, 0.3);
+  .pr-hero-inner { position: relative; z-index: 1; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 1.25rem; }
+
+  .pr-badge {
+    display: inline-flex; align-items: center; gap: .4rem;
+    padding: .3rem .875rem;
+    background: rgba(57,255,143,.08); border: 1px solid rgba(57,255,143,.2);
+    border-radius: 99px; font-size: .72rem; font-weight: 700; color: #39ff8f;
+    text-transform: uppercase; letter-spacing: .08em;
+  }
+
+  .pr-hero-title {
+    font-family: 'Syne', sans-serif; font-weight: 800;
+    font-size: clamp(2.25rem, 5vw, 3.5rem);
+    color: #fff; letter-spacing: -.04em; line-height: 1.05;
+  }
+  .pr-accent {
+    background: linear-gradient(90deg, #39ff8f, #38bdf8);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .pr-hero-sub { font-size: 1rem; color: rgba(255,255,255,.48); max-width: 480px; line-height: 1.65; }
+
+  /* Toggle */
+  .billing-toggle {
+    display: inline-flex; align-items: center; gap: 0;
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+    border-radius: .75rem; padding: 3px; margin-top: .5rem;
+  }
+  .toggle-btn {
+    display: inline-flex; align-items: center; gap: .4rem;
+    padding: .5rem 1.25rem; border: none; border-radius: .5rem;
+    background: transparent; color: rgba(255,255,255,.45);
+    font-size: .8375rem; font-weight: 600; cursor: pointer; transition: all .2s;
+  }
+  .toggle-btn.active { background: rgba(255,255,255,.1); color: #fff; }
+  .toggle-save {
+    font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+    background: rgba(57,255,143,.15); color: #39ff8f;
+    border: 1px solid rgba(57,255,143,.25); border-radius: 99px;
+    padding: .1rem .4rem;
+  }
+
+  /* ── Cards ── */
+  .pr-cards-section { padding: 3rem 1.5rem; }
+  .pr-cards {
+    max-width: 1100px; margin: 0 auto;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;
+  }
+
+  .pr-card {
+    position: relative; display: flex; flex-direction: column; gap: 1.25rem;
+    padding: 1.75rem;
+    background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.08);
+    border-radius: 1.25rem;
+    opacity: 0; transform: translateY(16px);
+    transition: opacity .45s ease, transform .45s ease, border-color .2s, background .2s;
+    transition-delay: var(--delay, 0s);
+  }
+  .pr-card.revealed { opacity: 1; transform: none; }
+  .pr-card:hover { border-color: color-mix(in srgb, var(--c) 25%, transparent); background: rgba(255,255,255,.04); }
+
+  .pr-card-popular {
+    border-color: rgba(57,255,143,.25) !important;
+    background: rgba(57,255,143,.04) !important;
+    box-shadow: 0 0 0 1px rgba(57,255,143,.1), 0 24px 64px rgba(0,0,0,.3);
+  }
+
+  .popular-badge {
+    position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+    display: inline-flex; align-items: center; gap: .35rem;
+    padding: .3rem .875rem;
+    background: linear-gradient(135deg, #39ff8f, #b4ff6e);
+    color: #050c08; font-size: .7rem; font-weight: 800; letter-spacing: .04em;
+    text-transform: uppercase; border-radius: 99px;
+    white-space: nowrap;
+  }
+
+  .plan-name { font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 800; letter-spacing: -.01em; }
+  .plan-desc { font-size: .775rem; color: rgba(255,255,255,.42); line-height: 1.5; margin-top: .25rem; }
+
+  .plan-price { display: flex; align-items: baseline; gap: .15rem; }
+  .price-currency { font-size: 1.25rem; font-weight: 700; color: rgba(255,255,255,.7); }
+  .price-amount { font-family: 'Syne', sans-serif; font-size: 2.25rem; font-weight: 800; color: #fff; letter-spacing: -.04em; line-height: 1; }
+  .price-period { font-size: .8rem; color: rgba(255,255,255,.38); margin-left: .1rem; }
+  .price-annual-note { font-size: .7rem; color: rgba(255,255,255,.3); margin-top: .35rem; }
+  .hidden { display: none; }
+
+  /* CTA variants */
+  .plan-cta {
+    display: flex; align-items: center; justify-content: center; gap: .4rem;
+    padding: .75rem 1rem; border-radius: .75rem;
+    font-size: .8375rem; font-weight: 700; text-decoration: none;
+    transition: all .15s;
+  }
+  .cta-ghost  { background: rgba(255,255,255,.06); color: rgba(255,255,255,.65); border: 1px solid rgba(255,255,255,.12); }
+  .cta-ghost:hover { background: rgba(255,255,255,.1); color: #fff; }
+  .cta-blue   { background: rgba(56,189,248,.12); color: #38bdf8; border: 1px solid rgba(56,189,248,.25); }
+  .cta-blue:hover { background: rgba(56,189,248,.2); }
+  .cta-green  { background: linear-gradient(135deg, #39ff8f, #b4ff6e); color: #050c08; border: none; box-shadow: 0 4px 20px rgba(57,255,143,.2); }
+  .cta-green:hover { filter: brightness(1.07); transform: translateY(-1px); }
+  .cta-orange { background: rgba(251,146,60,.12); color: #fb923c; border: 1px solid rgba(251,146,60,.25); }
+  .cta-orange:hover { background: rgba(251,146,60,.2); }
+
+  /* Features list */
+  .plan-features { list-style: none; padding: 0; display: flex; flex-direction: column; gap: .6rem; margin-top: auto; }
+  .feat-item { display: flex; align-items: flex-start; gap: .6rem; font-size: .8rem; line-height: 1.4; }
+  .feat-item svg { flex-shrink: 0; margin-top: .1em; }
+  .feat-ok { color: rgba(255,255,255,.65); }
+  .feat-no { color: rgba(255,255,255,.22); }
+
+  /* ── Tableau comparatif ── */
+  .pr-compare { padding: 4rem 1.5rem; }
+  .pr-compare-inner { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 2rem; }
+  .compare-title { font-family: 'Syne', sans-serif; font-size: clamp(1.5rem, 3vw, 2.25rem); font-weight: 800; color: #fff; letter-spacing: -.03em; text-align: center; }
+  .compare-sub { text-align: center; color: rgba(255,255,255,.38); font-size: .875rem; margin-top: -.75rem; }
+
+  .compare-table-wrap { overflow-x: auto; border-radius: 1rem; border: 1px solid rgba(255,255,255,.07); }
+  .compare-table { width: 100%; border-collapse: collapse; }
+
+  .compare-table thead tr { background: rgba(255,255,255,.04); }
+  .compare-table th { padding: 1rem; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: rgba(255,255,255,.45); text-align: center; white-space: nowrap; }
+  .col-feature { text-align: left !important; width: 35%; }
+  .col-plan-pro { color: #39ff8f !important; }
+
+  .cat-row td { padding: .6rem 1rem; background: rgba(57,255,143,.04); border-top: 1px solid rgba(255,255,255,.06); }
+  .cat-label { font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: #39ff8f; }
+
+  .data-row { border-top: 1px solid rgba(255,255,255,.04); transition: background .15s; }
+  .data-row:hover { background: rgba(255,255,255,.025); }
+
+  .feat-label { padding: .875rem 1rem; font-size: .825rem; color: rgba(255,255,255,.65); }
+  .feat-val { padding: .875rem 1rem; text-align: center; font-size: .825rem; color: rgba(255,255,255,.55); }
+  .feat-val svg { display: block; margin: 0 auto; }
+  .col-pro-val { background: rgba(57,255,143,.03); }
+
+  /* ── FAQ ── */
+  .pr-faq { padding: 4rem 1.5rem; }
+  .pr-faq-inner { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 1rem; }
+  .pr-faq-title { font-family: 'Syne', sans-serif; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 800; color: #fff; letter-spacing: -.03em; text-align: center; margin-bottom: 1rem; }
+
+  .pr-faq-item {
+    background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.07);
+    border-radius: .875rem; overflow: hidden;
+    opacity: 0; transform: translateY(12px);
+    transition: opacity .4s ease, transform .4s ease, border-color .2s;
+    transition-delay: var(--delay, 0s);
+  }
+  .pr-faq-item.revealed { opacity: 1; transform: none; }
+  .pr-faq-item[open] { border-color: rgba(57,255,143,.2); }
+
+  .pr-faq-q {
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    padding: 1rem 1.25rem; cursor: pointer; list-style: none;
+    font-size: .9rem; font-weight: 600; color: #fff; user-select: none;
+  }
+  .pr-faq-q::-webkit-details-marker { display: none; }
+  .pr-faq-q::marker { display: none; }
+  .pr-faq-item[open] .pr-faq-q { color: #39ff8f; }
+
+  .pr-faq-chevron {
+    flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+    background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform .25s cubic-bezier(.34,1.2,.64,1);
+    color: rgba(255,255,255,.45);
+  }
+  .pr-faq-item[open] .pr-faq-chevron { transform: rotate(180deg); color: #39ff8f; background: rgba(57,255,143,.1); border-color: rgba(57,255,143,.25); }
+
+  .pr-faq-a { padding: 0 1.25rem 1rem; }
+  .pr-faq-a p { font-size: .8375rem; color: rgba(255,255,255,.48); line-height: 1.75; }
+
+  /* ── Enterprise CTA ── */
+  .pr-enterprise { padding: 3rem 1.5rem 5rem; }
+  .pr-enterprise-inner {
+    max-width: 900px; margin: 0 auto;
+    display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;
+    background: rgba(251,146,60,.05); border: 1px solid rgba(251,146,60,.18);
+    border-radius: 1.5rem; padding: 2.5rem;
+    opacity: 0; transform: translateY(16px);
+    transition: opacity .5s ease, transform .5s ease;
+  }
+  .pr-enterprise-inner.revealed { opacity: 1; transform: none; }
+
+  .ent-icon {
+    width: 60px; height: 60px; border-radius: 1rem; flex-shrink: 0;
+    background: rgba(251,146,60,.1); border: 1px solid rgba(251,146,60,.2);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ent-text { flex: 1; min-width: 200px; }
+  .ent-title { font-family: 'Syne', sans-serif; font-size: 1.25rem; font-weight: 800; color: #fff; margin-bottom: .5rem; }
+  .ent-desc { font-size: .875rem; color: rgba(255,255,255,.48); line-height: 1.65; }
+  .ent-cta {
+    display: inline-flex; align-items: center; gap: .45rem;
+    padding: .75rem 1.5rem; flex-shrink: 0;
+    background: rgba(251,146,60,.12); color: #fb923c;
+    border: 1px solid rgba(251,146,60,.3); border-radius: .875rem;
+    font-size: .875rem; font-weight: 700; text-decoration: none;
+    transition: all .15s;
+  }
+  .ent-cta:hover { background: rgba(251,146,60,.2); transform: translateY(-1px); }
+
+  /* Responsive */
+  @media (max-width: 1000px) { .pr-cards { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px)  {
+    .pr-cards { grid-template-columns: 1fr; }
+    .pr-enterprise-inner { flex-direction: column; align-items: flex-start; }
   }
 </style>

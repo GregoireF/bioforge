@@ -1,144 +1,230 @@
 ---
+// src/pages/legal/privacy.astro
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Header from '@/components/layout/Header.astro';
 import Footer from '@/components/layout/Footer.astro';
 
-const lastUpdated = 'February 1, 2026';
+const updated   = '07 mars 2026';
+const SITE_URL  = import.meta.env.PUBLIC_SITE_URL ?? 'https://bioforge.click';
+
+// ── PLACEHOLDERS — à remplacer avant mise en ligne ──────────────────────────
+const company = {
+  name:    'BioForge',        // ex: BioForge SAS
+  form:    '',       // ex: SAS
+  capital: '',        // ex: 1 000 €
+  siret:   '',
+  rcs:     'Valenciennes',
+  siege:   '6 Bis Boulevard des Alliés',
+  email:   '',    // ← peut rester tel quel
+  dpo:     '',  // ← peut rester tel quel
+};
+
+const sections = [
+  {
+    id: 'responsable',
+    title: '1. Responsable du traitement',
+    content: `Le responsable du traitement des données collectées via le site bioforge.click est :\n\n**${company.name}** — ${company.form} au capital de ${company.capital}\nSIRET : ${company.siret} · RCS ${company.rcs}\nSiège social : ${company.siege}\nEmail : ${company.email}`,
+  },
+  {
+    id: 'donnees',
+    title: '2. Données collectées',
+    content: `Nous collectons les données suivantes :\n\n**Lors de la création de compte**\n— Adresse email (via magic link ou OAuth)\n— Identifiant social (Google, Discord) sous forme de token opaque\n— Pseudonyme choisi (username)\n— Photo de profil (si transmise par le fournisseur OAuth, avec ton accord)\n\n**Lors de l'utilisation du service**\n— Contenu que tu ajoutes à ta page (liens, titres, descriptions, images)\n— Préférences de thème et de design\n— Logs d'activité (connexions, modifications)\n\n**Automatiquement (analytics)**\n— Adresse IP (anonymisée après traitement)\n— Navigateur et type d'appareil (user agent)\n— Pages visitées et blocs cliqués sur les profils publics\n— Source de trafic (referrer HTTP)`,
+  },
+  {
+    id: 'finalites',
+    title: '3. Finalités du traitement',
+    content: `Tes données sont utilisées pour :\n\n| Finalité | Base légale |\n|---|---|\n| Créer et gérer ton compte | Exécution du contrat |\n| Fournir le service de page bio | Exécution du contrat |\n| Afficher les analytics sur ton dashboard | Exécution du contrat |\n| Facturation et gestion des abonnements | Exécution du contrat / Obligation légale |\n| Améliorer le produit (données agrégées) | Intérêt légitime |\n| T'envoyer des communications produit | Consentement |\n| Respecter nos obligations légales | Obligation légale |`,
+  },
+  {
+    id: 'conservation',
+    title: '4. Durée de conservation',
+    content: `— **Données de compte** : conservées pendant toute la durée de ton compte, puis supprimées dans un délai de 30 jours après fermeture.\n— **Données de facturation** : conservées 10 ans à compter de la transaction (obligation légale comptable).\n— **Logs d'accès** : 12 mois maximum.\n— **Analytics** : selon ton plan (7 jours pour Free, 30 jours pour Creator, 90 jours pour Pro, illimité pour Enterprise).`,
+  },
+  {
+    id: 'partage',
+    title: '5. Partage des données',
+    content: `Tes données ne sont pas vendues. Elles peuvent être transmises à :\n\n**Prestataires techniques (sous-traitants)**\n— **Supabase** (base de données, hébergé dans l'UE)\n— **Stripe** (paiement, certifié PCI-DSS)\n— **Cloudflare** (réseau de diffusion, protection DDoS)\n— **Vercel / hébergeur** (infrastructure serveur)\n\nChacun est lié par un accord de traitement conforme au RGPD (DPA).\n\nAucun transfert vers des pays hors UE/EEE sans garanties appropriées (clauses contractuelles types ou décision d'adéquation).`,
+  },
+  {
+    id: 'droits',
+    title: '6. Tes droits',
+    content: `Conformément au RGPD (Règlement UE 2016/679), tu disposes des droits suivants :\n\n— **Droit d'accès** : obtenir une copie de tes données.\n— **Droit de rectification** : corriger des données inexactes.\n— **Droit à l'effacement** : demander la suppression de tes données ("droit à l'oubli").\n— **Droit à la portabilité** : recevoir tes données dans un format lisible par machine (JSON/CSV).\n— **Droit d'opposition** : t'opposer aux traitements fondés sur l'intérêt légitime.\n— **Droit à la limitation** : suspendre un traitement pendant une contestation.\n— **Droit de retrait du consentement** : à tout moment pour les traitements basés sur le consentement.\n\nPour exercer ces droits : **${company.dpo}** — nous répondons sous 30 jours.\n\nTu peux également déposer une réclamation auprès de la **CNIL** : cnil.fr`,
+  },
+  {
+    id: 'cookies',
+    title: '7. Cookies',
+    content: `Nous utilisons des cookies strictement nécessaires au fonctionnement du service (session, authentification). Pour le détail complet, consulte notre [politique de cookies](/legal/cookies).\n\nNous n'utilisons aucun cookie publicitaire ou tracker tiers sur les pages publiques de profil.`,
+  },
+  {
+    id: 'securite',
+    title: '8. Sécurité',
+    content: `Nous mettons en œuvre des mesures techniques et organisationnelles appropriées :\n— Communications chiffrées en TLS 1.3\n— Mots de passe non stockés (authentification OAuth / magic link)\n— Accès aux données de production restreint au personnel habilité\n— Journalisation des accès administratifs\n— Tests de sécurité réguliers\n\nEn cas de violation de données susceptible d'engendrer un risque pour tes droits, nous te notifions dans les 72h conformément à l'article 34 du RGPD.`,
+  },
+  {
+    id: 'modifications',
+    title: '9. Modifications',
+    content: `Cette politique peut être mise à jour. En cas de modification substantielle, tu seras notifié par email au moins 7 jours avant l'entrée en vigueur. La date de dernière mise à jour est indiquée en haut de cette page.`,
+  },
+  {
+    id: 'contact',
+    title: '10. Contact',
+    content: `Pour toute question relative à cette politique ou à tes données personnelles :\n\n📧 **${company.dpo}**\n📮 ${company.siege}`,
+  },
+];
 ---
 
-<BaseLayout title="Privacy Policy - BioForge">
+<BaseLayout title="Politique de confidentialité — BioForge">
+  <Fragment slot="head">
+    <meta name="description" content="Politique de confidentialité et protection des données personnelles de BioForge. RGPD, droits des utilisateurs, cookies." />
+    <link rel="canonical" href={`${SITE_URL}/legal/privacy`} />
+    <meta name="robots" content="noindex, follow" />
+  </Fragment>
+
   <Header />
-  
-  <main>
-    <!-- Hero -->
-    <section class="relative pt-32 pb-20" data-scroll-section>
-      <div class="absolute inset-0 bg-gradient-to-b from-dark-900 via-dark-800 to-dark-900"></div>
-      
-      <div class="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="max-w-4xl mx-auto text-center reveal">
-          <h1 class="text-5xl sm:text-6xl font-display font-bold text-white mb-6">
-            Privacy Policy
-          </h1>
-          <p class="text-xl text-gray-400">Last updated: {lastUpdated}</p>
-        </div>
-      </div>
-    </section>
 
-    <!-- Content -->
-    <section class="relative py-20" data-scroll-section>
-      <div class="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="max-w-4xl mx-auto">
-          <div class="glass-strong rounded-3xl p-10 border border-white/10 reveal space-y-8 text-gray-300 leading-relaxed">
-            
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">1. Information We Collect</h2>
-              <p class="mb-4">
-                We collect information you provide directly to us when you create an account, use our services, or communicate with us. This includes:
-              </p>
-              <ul class="list-disc pl-6 space-y-2">
-                <li>Account information (name, email address, password)</li>
-                <li>Profile information (username, bio, links, profile picture)</li>
-                <li>Usage data (page views, clicks, device information)</li>
-                <li>Communication data (support messages, feedback)</li>
-              </ul>
-            </div>
+  <main class="legal-main">
+    <div class="legal-layout">
 
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">2. How We Use Your Information</h2>
-              <p class="mb-4">We use the information we collect to:</p>
-              <ul class="list-disc pl-6 space-y-2">
-                <li>Provide, maintain, and improve our services</li>
-                <li>Process your transactions and send related information</li>
-                <li>Send you technical notices and support messages</li>
-                <li>Respond to your comments and questions</li>
-                <li>Analyze usage patterns and optimize user experience</li>
-                <li>Detect, prevent, and address fraud and abuse</li>
-              </ul>
-            </div>
+      <!-- Sidebar ToC -->
+      <aside class="legal-toc" aria-label="Table des matières">
+        <p class="toc-label">Sur cette page</p>
+        <nav>
+          {sections.map(s => (
+            <a href={`#${s.id}`} class="toc-link">{s.title}</a>
+          ))}
+        </nav>
+      </aside>
 
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">3. Information Sharing</h2>
-              <p class="mb-4">
-                We do not sell your personal information. We may share your information in the following circumstances:
-              </p>
-              <ul class="list-disc pl-6 space-y-2">
-                <li><strong>With your consent:</strong> We'll share information when you explicitly agree</li>
-                <li><strong>Service providers:</strong> We work with third-party providers who help us operate our service</li>
-                <li><strong>Legal requirements:</strong> We may disclose information if required by law or legal process</li>
-                <li><strong>Business transfers:</strong> In the event of a merger or acquisition, your information may be transferred</li>
-              </ul>
-            </div>
-
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">4. Data Security</h2>
-              <p>
-                We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction. This includes encryption, secure servers, and regular security audits.
-              </p>
-            </div>
-
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">5. Your Rights</h2>
-              <p class="mb-4">Depending on your location, you may have the following rights:</p>
-              <ul class="list-disc pl-6 space-y-2">
-                <li>Access, correct, or delete your personal information</li>
-                <li>Object to or restrict processing of your data</li>
-                <li>Request data portability</li>
-                <li>Withdraw consent for data processing</li>
-                <li>Lodge a complaint with a supervisory authority</li>
-              </ul>
-            </div>
-
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">6. Cookies and Tracking</h2>
-              <p>
-                We use cookies and similar tracking technologies to collect usage information and improve our services. You can control cookies through your browser settings, but disabling them may limit some functionality.
-              </p>
-            </div>
-
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">7. Data Retention</h2>
-              <p>
-                We retain your information for as long as your account is active or as needed to provide you services. You may delete your account at any time, and we will delete your data within 30 days, except where we're required to retain it by law.
-              </p>
-            </div>
-
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">8. Children's Privacy</h2>
-              <p>
-                Our services are not intended for children under 13. We do not knowingly collect personal information from children under 13. If you become aware that a child has provided us with personal information, please contact us.
-              </p>
-            </div>
-
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">9. International Data Transfers</h2>
-              <p>
-                Your information may be transferred to and processed in countries other than your own. We ensure appropriate safeguards are in place to protect your information in accordance with this Privacy Policy.
-              </p>
-            </div>
-
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">10. Changes to This Policy</h2>
-              <p>
-                We may update this Privacy Policy from time to time. We will notify you of any material changes by posting the new Privacy Policy on this page and updating the "Last updated" date.
-              </p>
-            </div>
-
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">11. Contact Us</h2>
-              <p class="mb-4">
-                If you have questions about this Privacy Policy, please contact us:
-              </p>
-              <ul class="space-y-2">
-                <li>Email: <a href="mailto:privacy@bioforge.link" class="text-neon-blue hover:text-neon-green transition-colors">privacy@bioforge.link</a></li>
-                <li>Address: 100 Smith Street, Melbourne VIC 3000, Australia</li>
-              </ul>
-            </div>
-
+      <!-- Content -->
+      <article class="legal-content">
+        <header class="legal-header">
+          <div class="legal-badge">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            Confidentialité
           </div>
-        </div>
-      </div>
-    </section>
+          <h1 class="legal-title">Politique de confidentialité</h1>
+          <p class="legal-updated">Dernière mise à jour : <time datetime="2026-03-07">{updated}</time></p>
+          <p class="legal-intro">BioForge s'engage à protéger ta vie privée. Cette politique explique quelles données nous collectons, pourquoi, et comment tu peux les contrôler.</p>
+        </header>
+
+        {sections.map(s => (
+          <section id={s.id} class="legal-section">
+            <h2 class="legal-section-title">{s.title}</h2>
+            <div class="legal-body" set:html={
+              s.content
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="legal-link">$1</a>')
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n—/g, '<br>—')
+                .replace(/\n/g, '<br>')
+                .replace(/^/, '<p>')
+                .replace(/$/, '</p>')
+            } />
+          </section>
+        ))}
+      </article>
+
+    </div>
   </main>
 
   <Footer />
 </BaseLayout>
+
+<style>
+  .legal-main { padding-top: 64px; }
+
+  .legal-layout {
+    max-width: 1100px; margin: 0 auto;
+    display: grid; grid-template-columns: 240px 1fr;
+    gap: 4rem; padding: 4rem 1.5rem 6rem;
+    align-items: start;
+  }
+
+  /* ToC */
+  .legal-toc {
+    position: sticky; top: 88px;
+    background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.07);
+    border-radius: 1rem; padding: 1.25rem;
+  }
+  .toc-label {
+    font-size: .68rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .09em; color: rgba(255,255,255,.3); margin-bottom: .75rem;
+  }
+  .toc-link {
+    display: block; padding: .375rem .5rem; border-radius: .375rem;
+    font-size: .775rem; color: rgba(255,255,255,.45); text-decoration: none;
+    transition: all .15s; margin-bottom: .125rem;
+    line-height: 1.4;
+  }
+  .toc-link:hover { color: #39ff8f; background: rgba(57,255,143,.07); }
+
+  /* Content */
+  .legal-content { min-width: 0; }
+
+  .legal-header { margin-bottom: 3rem; padding-bottom: 2rem; border-bottom: 1px solid rgba(255,255,255,.07); }
+
+  .legal-badge {
+    display: inline-flex; align-items: center; gap: .4rem;
+    padding: .3rem .875rem; margin-bottom: 1rem;
+    background: rgba(57,255,143,.07); border: 1px solid rgba(57,255,143,.18);
+    border-radius: 99px; font-size: .72rem; font-weight: 700; color: #39ff8f;
+    text-transform: uppercase; letter-spacing: .08em;
+  }
+
+  .legal-title {
+    font-family: 'Syne', sans-serif; font-size: clamp(1.75rem, 3vw, 2.5rem);
+    font-weight: 800; color: #fff; letter-spacing: -.03em; margin-bottom: .5rem;
+  }
+
+  .legal-updated { font-size: .8rem; color: rgba(255,255,255,.32); margin-bottom: 1rem; }
+
+  .legal-intro {
+    font-size: 1rem; color: rgba(255,255,255,.55); line-height: 1.7;
+    padding: 1.125rem 1.375rem;
+    background: rgba(57,255,143,.05); border-left: 3px solid rgba(57,255,143,.4);
+    border-radius: 0 .75rem .75rem 0;
+  }
+
+  /* Sections */
+  .legal-section { margin-bottom: 2.75rem; padding-bottom: 2.75rem; border-bottom: 1px solid rgba(255,255,255,.05); }
+  .legal-section:last-child { border-bottom: none; }
+
+  .legal-section-title {
+    font-family: 'Syne', sans-serif; font-size: 1.125rem; font-weight: 800;
+    color: #fff; letter-spacing: -.02em; margin-bottom: 1rem;
+  }
+
+  .legal-body { font-size: .875rem; color: rgba(255,255,255,.55); line-height: 1.8; }
+  .legal-body p { margin-bottom: .875rem; }
+  .legal-body p:last-child { margin-bottom: 0; }
+  .legal-body strong { color: rgba(255,255,255,.82); font-weight: 600; }
+
+  /* Faux tableau markdown */
+  .legal-body :global(table) {
+    width: 100%; border-collapse: collapse; margin: 1rem 0;
+    font-size: .8125rem;
+  }
+  .legal-body :global(th) {
+    text-align: left; padding: .625rem .875rem;
+    background: rgba(255,255,255,.05); color: rgba(255,255,255,.5);
+    font-weight: 700; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+  }
+  .legal-body :global(td) {
+    padding: .625rem .875rem; color: rgba(255,255,255,.55);
+    border-bottom: 1px solid rgba(255,255,255,.04);
+  }
+
+  .legal-link { color: #39ff8f; text-decoration: none; }
+  .legal-link:hover { text-decoration: underline; }
+
+  @media (max-width: 820px) {
+    .legal-layout { grid-template-columns: 1fr; gap: 2rem; }
+    .legal-toc { position: static; }
+  }
+  @media (max-width: 480px) {
+    .legal-layout { padding: 2rem 1rem 4rem; }
+  }
+</style>

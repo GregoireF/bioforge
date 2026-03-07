@@ -1,166 +1,163 @@
 ---
+// src/pages/legal/terms.astro
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import Header from '@/components/layout/Header.astro';
 import Footer from '@/components/layout/Footer.astro';
 
-const lastUpdated = 'February 1, 2026';
+const updated  = '07 mars 2026';
+const SITE_URL = import.meta.env.PUBLIC_SITE_URL ?? 'https://bioforge.click';
+
+const company = {
+  name:  'BioForge',
+  siege: '6 Bis Boulevard des Alliés, Valenciennes 59300 FRANCE',
+  email: '',
+};
+
+const sections = [
+  {
+    id: 'objet',
+    title: '1. Objet et acceptation',
+    content: `Les présentes Conditions Générales d'Utilisation (CGU) régissent l'accès et l'utilisation du service BioForge accessible à l'adresse bioforge.click et ses sous-domaines (le "Service"), édité par ${company.name}.\n\nEn créant un compte ou en accédant au Service, tu acceptes pleinement et sans réserve ces CGU. Si tu n'acceptes pas ces conditions, tu ne peux pas utiliser le Service.\n\nNous nous réservons le droit de modifier ces CGU à tout moment. En cas de modification substantielle, nous t'informerons par email au moins 7 jours avant l'entrée en vigueur. L'utilisation continue du Service après cette date vaut acceptation des nouvelles CGU.`,
+  },
+  {
+    id: 'compte',
+    title: '2. Création de compte',
+    content: `**Éligibilité**\nLe Service est accessible aux personnes physiques majeures (18 ans et plus) ou aux mineurs disposant de l'autorisation de leur représentant légal.\n\n**Inscription**\nLa création de compte est gratuite. Tu peux t'inscrire via OAuth (Google, Discord) ou par magic link email. Tu es responsable de la confidentialité de ton accès et de toutes les actions effectuées depuis ton compte.\n\n**Username**\nTon username doit être unique, entre 3 et 24 caractères alphanumériques. BioForge se réserve le droit de récupérer des usernames inactifs depuis plus de 12 mois.\n\n**Un compte par personne**\nChaque personne physique ne peut posséder qu'un seul compte gratuit. Les comptes Enterprise peuvent gérer plusieurs profils.`,
+  },
+  {
+    id: 'service',
+    title: '3. Description du Service',
+    content: `BioForge est une plateforme de création de pages "link-in-bio" permettant de :\n— Créer une page publique personnalisée accessible via une URL unique\n— Ajouter des blocs de contenu (liens, médias, informations)\n— Visualiser des statistiques d'audience\n— Personnaliser l'apparence de sa page\n\nLe Service est fourni "tel quel". Nous nous efforçons de maintenir une disponibilité de 99.9%, sans garantie absolue.\n\nNous nous réservons le droit de modifier, suspendre ou interrompre tout ou partie du Service à tout moment, avec notification préalable raisonnable sauf urgence.`,
+  },
+  {
+    id: 'contenu',
+    title: '4. Contenu utilisateur',
+    content: `**Ta responsabilité**\nTu es seul responsable du contenu que tu publies sur ta page. Tu garantis que ce contenu :\n— Ne viole aucun droit de propriété intellectuelle de tiers\n— N'est pas illégal, diffamatoire, obscène, ou discriminatoire\n— Ne contient pas de malware, spam ou liens frauduleux\n— Respecte les lois applicables (notamment françaises et européennes)\n\n**Licence accordée à BioForge**\nEn publiant du contenu, tu accordes à BioForge une licence mondiale, non-exclusive, gratuite, pour héberger, reproduire et afficher ce contenu dans le seul but de fournir le Service.\n\n**Suppression de contenu**\nNous nous réservons le droit de supprimer tout contenu violant ces CGU, sans préavis, et de suspendre le compte concerné.`,
+  },
+  {
+    id: 'interdit',
+    title: '5. Utilisations interdites',
+    content: `Il est strictement interdit d'utiliser le Service pour :\n— Publier du contenu pornographique, pédopornographique ou sexuellement explicite non consenti\n— Inciter à la haine, à la discrimination ou à la violence\n— Usurper l'identité d'une personne ou d'une organisation\n— Diffuser des logiciels malveillants, phishing ou arnaque\n— Contourner les limitations techniques du Service\n— Utiliser des bots ou scripts automatisés sans autorisation écrite\n— Violer les droits de propriété intellectuelle de tiers\n— Collecter des données personnelles d'autres utilisateurs sans leur consentement\n\nToute violation peut entraîner la suspension immédiate du compte, sans remboursement des sommes versées.`,
+  },
+  {
+    id: 'plans',
+    title: '6. Plans et facturation',
+    content: `**Plan gratuit**\nLe plan Free est disponible sans engagement et sans CB. Il peut être modifié ou supprimé avec un préavis de 30 jours.\n\n**Plans payants**\nLes plans Creator, Pro et Enterprise sont facturés mensuellement ou annuellement selon ton choix. Les prix sont indiqués TTC sur la page Tarifs.\n\n**Paiement**\nLes paiements sont gérés par Stripe. En souscrivant un plan payant, tu autorises Stripe à débiter ta carte ou ton compte bancaire de manière récurrente.\n\n**Annulation**\nTu peux annuler à tout moment depuis ton dashboard. L'annulation prend effet à la fin de la période en cours. Aucun remboursement partiel n'est accordé sauf obligation légale.\n\n**Rétractation**\nConformément à l'article L221-18 du Code de la consommation, tu bénéficies d'un délai de rétractation de 14 jours après souscription d'un plan payant, sauf si le service a commencé à être fourni avec ton accord exprès.\n\n**Modif de prix**\nNous nous réservons le droit de modifier les tarifs avec un préavis de 30 jours. La poursuite de l'abonnement après cette date vaut acceptation des nouveaux tarifs.`,
+  },
+  {
+    id: 'propriete',
+    title: '7. Propriété intellectuelle',
+    content: `**Notre propriété**\nLe Service, son design, son code, ses logos et marques sont la propriété exclusive de ${company.name} ou de ses concédants de licence. Toute reproduction non autorisée est interdite.\n\n**Ta propriété**\nTu conserves tous tes droits sur le contenu que tu publies. BioForge ne revendique aucune propriété sur tes données.\n\n**Réclamations DMCA/copyright**\nSi tu constates une violation de tes droits d'auteur sur notre plateforme, contacte-nous à ${company.email} avec les informations nécessaires à l'identification du contenu litigieux.`,
+  },
+  {
+    id: 'responsabilite',
+    title: '8. Limitation de responsabilité',
+    content: `Dans les limites autorisées par la loi :\n— BioForge n'est pas responsable des dommages indirects, perte de données, perte de revenus résultant de l'utilisation ou de l'impossibilité d'utiliser le Service.\n— Notre responsabilité totale ne peut excéder le montant des sommes effectivement payées par toi au cours des 12 derniers mois.\n— Nous ne garantissons pas que le Service sera exempt d'erreurs ou disponible en permanence.\n\nCes limitations ne s'appliquent pas en cas de dommage causé par notre faute lourde ou dolosive, ni aux droits légaux incompressibles.`,
+  },
+  {
+    id: 'resiliation',
+    title: '9. Résiliation',
+    content: `**Par toi**\nTu peux fermer ton compte à tout moment depuis les paramètres de ton dashboard. Tes données publiques sont supprimées immédiatement ; tes données personnelles dans un délai de 30 jours (sauf obligations légales de conservation).\n\n**Par nous**\nNous pouvons suspendre ou résilier ton compte en cas de violation des présentes CGU, avec notification préalable sauf urgence (contenu illégal, atteinte à des tiers).\n\nEn cas de résiliation pour faute, aucun remboursement ne sera accordé.`,
+  },
+  {
+    id: 'droit',
+    title: '10. Droit applicable et litiges',
+    content: `Les présentes CGU sont régies par le droit français.\n\nEn cas de litige, une solution amiable sera recherchée en priorité. À défaut, les tribunaux compétents seront ceux du ressort du siège social de ${company.name}.\n\n**Médiation**\nConformément à l'article L612-1 du Code de la consommation, tu peux recourir gratuitement à la médiation. Notre médiateur : [à compléter].\n\nPour tout litige en ligne : ec.europa.eu/consumers/odr`,
+  },
+  {
+    id: 'contact',
+    title: '11. Contact',
+    content: `Pour toute question relative aux présentes CGU :\n\n📧 **${company.email}**\n📮 ${company.siege}`,
+  },
+];
 ---
 
-<BaseLayout title="Terms of Service - BioForge">
+<BaseLayout title="Conditions Générales d'Utilisation — BioForge">
+  <Fragment slot="head">
+    <meta name="description" content="Conditions générales d'utilisation de BioForge. Droit applicable, responsabilités, facturation, contenu utilisateur." />
+    <link rel="canonical" href={`${SITE_URL}/legal/terms`} />
+    <meta name="robots" content="noindex, follow" />
+  </Fragment>
+
   <Header />
-  
-  <main>
-    <!-- Hero -->
-    <section class="relative pt-32 pb-20" data-scroll-section>
-      <div class="absolute inset-0 bg-gradient-to-b from-dark-900 via-dark-800 to-dark-900"></div>
-      
-      <div class="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="max-w-4xl mx-auto text-center reveal">
-          <h1 class="text-5xl sm:text-6xl font-display font-bold text-white mb-6">
-            Terms of Service
-          </h1>
-          <p class="text-xl text-gray-400">Last updated: {lastUpdated}</p>
-        </div>
-      </div>
-    </section>
 
-    <!-- Content -->
-    <section class="relative py-20" data-scroll-section>
-      <div class="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="max-w-4xl mx-auto">
-          <div class="glass-strong rounded-3xl p-10 border border-white/10 reveal space-y-8 text-gray-300 leading-relaxed">
-            
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">1. Acceptance of Terms</h2>
-              <p>
-                By accessing or using BioForge's services, you agree to be bound by these Terms of Service and our Privacy Policy. If you disagree with any part of these terms, you may not access our services.
-              </p>
-            </div>
+  <main class="legal-main">
+    <div class="legal-layout">
 
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">2. Description of Service</h2>
-              <p>
-                BioForge provides a link-in-bio platform that allows users to create customizable landing pages to showcase their content, links, and social media profiles. Our services include page creation, analytics, customization tools, and related features.
-              </p>
-            </div>
+      <aside class="legal-toc" aria-label="Table des matières">
+        <p class="toc-label">Sur cette page</p>
+        <nav>
+          {sections.map(s => (
+            <a href={`#${s.id}`} class="toc-link">{s.title}</a>
+          ))}
+        </nav>
+      </aside>
 
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">3. User Accounts</h2>
-              <p class="mb-4">To use certain features, you must register for an account. You agree to:</p>
-              <ul class="list-disc pl-6 space-y-2">
-                <li>Provide accurate, current, and complete information during registration</li>
-                <li>Maintain and promptly update your account information</li>
-                <li>Maintain the security of your password</li>
-                <li>Accept responsibility for all activities under your account</li>
-                <li>Notify us immediately of any unauthorized use</li>
-              </ul>
-            </div>
-
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">4. Acceptable Use</h2>
-              <p class="mb-4">You agree not to use our services to:</p>
-              <ul class="list-disc pl-6 space-y-2">
-                <li>Violate any laws or regulations</li>
-                <li>Infringe on intellectual property rights</li>
-                <li>Transmit harmful code or viruses</li>
-                <li>Harass, abuse, or harm others</li>
-                <li>Distribute spam or unsolicited messages</li>
-                <li>Impersonate others or misrepresent your affiliation</li>
-                <li>Scrape or copy content without permission</li>
-                <li>Interfere with or disrupt our services</li>
-              </ul>
-            </div>
-
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">5. Content Ownership</h2>
-              <p class="mb-4">
-                You retain all rights to the content you upload to BioForge. By uploading content, you grant us a worldwide, non-exclusive license to:
-              </p>
-              <ul class="list-disc pl-6 space-y-2">
-                <li>Host, store, and display your content</li>
-                <li>Process and analyze usage data</li>
-                <li>Make backups for service reliability</li>
-              </ul>
-            </div>
-
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">6. Subscription and Payment</h2>
-              <p class="mb-4">
-                Some features require a paid subscription. By subscribing, you agree to:
-              </p>
-              <ul class="list-disc pl-6 space-y-2">
-                <li>Pay all fees associated with your subscription</li>
-                <li>Provide accurate payment information</li>
-                <li>Automatic renewal unless cancelled</li>
-                <li>Our refund policy as stated in our documentation</li>
-              </ul>
-            </div>
-
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">7. Service Availability</h2>
-              <p>
-                We strive to maintain 99.9% uptime but do not guarantee uninterrupted access. We reserve the right to modify, suspend, or discontinue services with or without notice. We are not liable for any modification, suspension, or discontinuation.
-              </p>
-            </div>
-
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">8. Intellectual Property</h2>
-              <p>
-                BioForge and its original content, features, and functionality are owned by BioForge and are protected by international copyright, trademark, and other intellectual property laws.
-              </p>
-            </div>
-
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">9. Termination</h2>
-              <p>
-                We may terminate or suspend your account immediately, without prior notice, for any breach of these Terms. Upon termination, your right to use the services will immediately cease. You may also terminate your account at any time from your account settings.
-              </p>
-            </div>
-
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">10. Disclaimer of Warranties</h2>
-              <p>
-                Our services are provided "as is" and "as available" without warranties of any kind, either express or implied. We do not warrant that services will be uninterrupted, secure, or error-free.
-              </p>
-            </div>
-
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">11. Limitation of Liability</h2>
-              <p>
-                To the maximum extent permitted by law, BioForge shall not be liable for any indirect, incidental, special, consequential, or punitive damages resulting from your use of or inability to use the services.
-              </p>
-            </div>
-
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">12. Governing Law</h2>
-              <p>
-                These Terms shall be governed by and construed in accordance with the laws of Australia, without regard to its conflict of law provisions.
-              </p>
-            </div>
-
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">13. Changes to Terms</h2>
-              <p>
-                We reserve the right to modify these terms at any time. We will notify you of material changes by email or through our services. Your continued use after changes constitutes acceptance of the new terms.
-              </p>
-            </div>
-
-            <div>
-              <h2 class="text-3xl font-bold text-white mb-4">14. Contact Us</h2>
-              <p class="mb-4">
-                If you have questions about these Terms, please contact us:
-              </p>
-              <ul class="space-y-2">
-                <li>Email: <a href="mailto:legal@bioforge.link" class="text-neon-blue hover:text-neon-green transition-colors">legal@bioforge.link</a></li>
-                <li>Address: 100 Smith Street, Melbourne VIC 3000, Australia</li>
-              </ul>
-            </div>
-
+      <article class="legal-content">
+        <header class="legal-header">
+          <div class="legal-badge">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/>
+              <line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+            CGU
           </div>
-        </div>
-      </div>
-    </section>
+          <h1 class="legal-title">Conditions Générales d'Utilisation</h1>
+          <p class="legal-updated">Dernière mise à jour : <time datetime="2026-03-07">{updated}</time></p>
+          <p class="legal-intro">Ces conditions régissent l'utilisation du service BioForge. Merci de les lire attentivement avant de créer un compte.</p>
+        </header>
+
+        {sections.map(s => (
+          <section id={s.id} class="legal-section">
+            <h2 class="legal-section-title">{s.title}</h2>
+            <div class="legal-body" set:html={
+              s.content
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="legal-link" target="_blank" rel="noopener">$1</a>')
+                .replace(/\n—/g, '<br>—')
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n/g, '<br>')
+                .replace(/^/, '<p>')
+                .replace(/$/, '</p>')
+            } />
+          </section>
+        ))}
+      </article>
+
+    </div>
   </main>
 
   <Footer />
 </BaseLayout>
+
+<style>
+  .legal-main { padding-top: 64px; }
+  .legal-layout {
+    max-width: 1100px; margin: 0 auto;
+    display: grid; grid-template-columns: 240px 1fr;
+    gap: 4rem; padding: 4rem 1.5rem 6rem; align-items: start;
+  }
+  .legal-toc { position: sticky; top: 88px; background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.07); border-radius: 1rem; padding: 1.25rem; }
+  .toc-label { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: rgba(255,255,255,.3); margin-bottom: .75rem; }
+  .toc-link { display: block; padding: .375rem .5rem; border-radius: .375rem; font-size: .775rem; color: rgba(255,255,255,.45); text-decoration: none; transition: all .15s; margin-bottom: .125rem; line-height: 1.4; }
+  .toc-link:hover { color: #38bdf8; background: rgba(56,189,248,.07); }
+  .legal-content { min-width: 0; }
+  .legal-header { margin-bottom: 3rem; padding-bottom: 2rem; border-bottom: 1px solid rgba(255,255,255,.07); }
+  .legal-badge { display: inline-flex; align-items: center; gap: .4rem; padding: .3rem .875rem; margin-bottom: 1rem; background: rgba(56,189,248,.07); border: 1px solid rgba(56,189,248,.18); border-radius: 99px; font-size: .72rem; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: .08em; }
+  .legal-title { font-family: 'Syne', sans-serif; font-size: clamp(1.75rem, 3vw, 2.5rem); font-weight: 800; color: #fff; letter-spacing: -.03em; margin-bottom: .5rem; }
+  .legal-updated { font-size: .8rem; color: rgba(255,255,255,.32); margin-bottom: 1rem; }
+  .legal-intro { font-size: 1rem; color: rgba(255,255,255,.55); line-height: 1.7; padding: 1.125rem 1.375rem; background: rgba(56,189,248,.05); border-left: 3px solid rgba(56,189,248,.4); border-radius: 0 .75rem .75rem 0; }
+  .legal-section { margin-bottom: 2.75rem; padding-bottom: 2.75rem; border-bottom: 1px solid rgba(255,255,255,.05); }
+  .legal-section:last-child { border-bottom: none; }
+  .legal-section-title { font-family: 'Syne', sans-serif; font-size: 1.125rem; font-weight: 800; color: #fff; letter-spacing: -.02em; margin-bottom: 1rem; }
+  .legal-body { font-size: .875rem; color: rgba(255,255,255,.55); line-height: 1.8; }
+  .legal-body p { margin-bottom: .875rem; }
+  .legal-body p:last-child { margin-bottom: 0; }
+  .legal-body strong { color: rgba(255,255,255,.82); font-weight: 600; }
+  .legal-link { color: #38bdf8; text-decoration: none; }
+  .legal-link:hover { text-decoration: underline; }
+  @media (max-width: 820px) { .legal-layout { grid-template-columns: 1fr; gap: 2rem; } .legal-toc { position: static; } }
+  @media (max-width: 480px) { .legal-layout { padding: 2rem 1rem 4rem; } }
+</style>
