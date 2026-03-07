@@ -43,6 +43,7 @@
     "stripe": "^20.4.0",
     "tailwind-merge": "^3.5.0",
     "typescript": "^5.9.3",
+    "ua-parser-js": "^2.0.9",
     "vanilla-tilt": "^1.8.1",
     "zod": "^4.3.6"
   },
@@ -56,6 +57,7 @@
     "@types/node": "^25.2.1",
     "@types/qrcode": "^1.5.6",
     "@types/sortablejs": "^1.15.9",
+    "@types/ua-parser-js": "^0.7.39",
     "@vite-pwa/astro": "^1.2.0",
     "prettier": "^3.8.1",
     "prettier-plugin-astro": "^0.14.1",
