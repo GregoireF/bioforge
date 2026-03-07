@@ -601,7 +601,8 @@ const bridge = JSON.stringify({
     try {
       const r = await fetch(`/api/profile/check-username?username=${encodeURIComponent(val)}`);
       const d = await r.json();
-      showFeedback(d.available ? '✓ Available!' : '✗ Already taken', d.available);
+      const available = d.data?.available ?? false;
+      showFeedback(available ? '✓ Available!' : '✗ Already taken', available);
     } catch { showFeedback('Could not check availability', false); }
   }
 
@@ -709,10 +710,10 @@ const bridge = JSON.stringify({
     const list = document.getElementById('sessions-list');
     if (!list) return;
     try {
-      const res = await fetch('/api/profile/sessions/');
+      const res = await fetch('/api/profile/sessions');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const sessions = await res.json();
-      if (!sessions.length) { list.innerHTML = '<p class="text-xs text-gray-500 text-center py-6">No sessions found</p>'; return; }
+      const { data: sessions } = await res.json();
+      if (!sessions?.length) { list.innerHTML = '<p class="text-xs text-gray-500 text-center py-6">No sessions found</p>'; return; }
       list.innerHTML = sessions.map((s, i) => {
         const isCurrent = i === 0;
         const iconPath  = DEVICE_ICONS[s.device_type ?? 'desktop'] ?? DEVICE_ICONS.desktop;
@@ -755,7 +756,7 @@ const bridge = JSON.stringify({
   document.getElementById('revoke-all-btn')?.addEventListener('click', async () => {
     if (!confirm('Sign out all other devices?')) return;
     try {
-      const r = await fetch('/api/profile/sessions/', { method: 'DELETE' });
+      const r = await fetch('/api/profile/sessions', { method: 'DELETE' });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       toast.success('All other sessions revoked');
       loadSessions();
