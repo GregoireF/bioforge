@@ -10,8 +10,8 @@ const SITE_URL  = import.meta.env.PUBLIC_SITE_URL ?? 'https://bioforge.click';
 // ── PLACEHOLDERS — à remplacer avant mise en ligne ──────────────────────────
 const company = {
   name:    'BioForge',        // ex: BioForge SAS
-  form:    '',       // ex: SAS
-  capital: '',        // ex: 1 000 €
+  form:    'SAS',       // ex: SAS
+  capital: '50 €',        // ex: 1 000 €
   siret:   '',
   rcs:     'Valenciennes',
   siege:   '6 Bis Boulevard des Alliés',
@@ -23,7 +23,7 @@ const sections = [
   {
     id: 'responsable',
     title: '1. Responsable du traitement',
-    content: `Le responsable du traitement des données collectées via le site bioforge.click est :\n\n**${company.name}** — ${company.form} au capital de ${company.capital}\nSIRET : ${company.siret} · RCS ${company.rcs}\nSiège social : ${company.siege}\nEmail : ${company.email}`,
+    content: `Le responsable du traitement des données collectées via le site bioforge.click est :\n\n**${company.name}** — ${company.form} au capital de ${company.capital}\nSiège social : ${company.siege}\nEmail : ${company.email}`,
   },
   {
     id: 'donnees',
