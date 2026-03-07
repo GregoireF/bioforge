@@ -1,18 +1,17 @@
 ---
-import { AstroFont } from 'astro-font';
-import { ViewTransition } from 'astro:transitions';
+// src/layouts/BaseLayout.astro
 import GlobalScripts from '@/components/ui/Global.astro';
 import "../styles/global.css";
 
 interface Props {
-  title: string;
-  description?: string;
-  ogImage?: string;
-  ogUrl?: string;
-  noindex?: boolean;
-  canonical?: string;       // ← optionnel : permet de forcer un canonical différent
-  twitterHandle?: string;   // ← ex: "@BioForgeApp"
-  jsonLd?: Record<string, any>; // ← permet de passer un JSON-LD spécifique par page
+  title:          string;
+  description?:   string;
+  ogImage?:       string;
+  ogUrl?:         string;
+  noindex?:       boolean;
+  canonical?:     string;
+  twitterHandle?: string;
+  jsonLd?:        Record<string, any>;
 }
 
 const {
@@ -20,35 +19,31 @@ const {
   description,
   ogImage,
   ogUrl,
-  noindex = false,
+  noindex       = false,
   canonical,
   twitterHandle = "@BioForgeApp",
-  jsonLd: pageJsonLd,
+  jsonLd:         pageJsonLd,
 } = Astro.props;
 
-const siteName = "BioForge";
-const defaultDescription = "BioForge - Lien en bio premium pour streamers, créateurs de contenu et communautés";
-const finalDescription = description || defaultDescription;
-
-const baseUrl = import.meta.env.PUBLIC_SITE_URL || "https://bioforge.app";
-const currentPath = Astro.url.pathname;
-const canonicalUrl = canonical || new URL(currentPath, baseUrl).toString();
+const siteName          = "BioForge";
+const defaultDesc       = "BioForge — Lien en bio premium pour streamers, créateurs de contenu et communautés gaming.";
+const finalDescription  = description || defaultDesc;
+const baseUrl           = import.meta.env.PUBLIC_SITE_URL || "https://bioforge.click";
+const canonicalUrl      = canonical || new URL(Astro.url.pathname, baseUrl).toString();
+const finalOgImage      = ogImage
+  ? (ogImage.startsWith('http') ? ogImage : `${baseUrl}${ogImage}`)
+  : `${baseUrl}/og.png`;
 
 const defaultJsonLd = {
   "@context": "https://schema.org",
-  "@type": "Organization",
-  name: siteName,
-  url: baseUrl,
-  logo: `${baseUrl}/logo-512.png`,           // ← mets une vraie image carrée 512×512
+  "@type":    "Organization",
+  name:       siteName,
+  url:        baseUrl,
+  logo:       `${baseUrl}/logo-512.png`,
   sameAs: [
-    "https://twitter.com/BioForgeApp",        // ← corrige avec le vrai compte
-    "https://www.twitch.tv/bioforge",
-    "https://www.youtube.com/@BioForge",
-    "https://www.instagram.com/bioforge.app/",
-    // ajoute les autres réseaux pertinents
+    "https://twitter.com/BioForgeApp",
   ],
 };
-
 const finalJsonLd = pageJsonLd || defaultJsonLd;
 ---
 
@@ -58,174 +53,147 @@ const finalJsonLd = pageJsonLd || defaultJsonLd;
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-
     <meta name="generator" content={Astro.generator} />
 
-    <!-- Favicons -->
-    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <!-- ═══════ SECURITY ═══════ -->
+    <!--
+      NOTE : préfère les headers HTTP pour le CSP (astro.config.mjs > server headers).
+      Ce meta tag est un fallback pour les environnements sans contrôle des headers.
+    -->
+    <meta http-equiv="Content-Security-Policy" content={[
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
+      "font-src 'self' https://fonts.gstatic.com",
+      "img-src 'self' data: blob: https:",
+      "connect-src 'self' https://*.supabase.co https://api.stripe.com",
+      "frame-src https://js.stripe.com https://hooks.stripe.com",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join('; ')} />
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
+    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=()" />
+
+    <!-- ═══════ FAVICONS ═══════ -->
+    <link rel="icon" type="image/x-icon"  href="/favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
 
-    <!-- SEO principal -->
-     <title>{title} | {siteName}</title>
+    <!-- ═══════ SEO ═══════ -->
+    <title>{title} | {siteName}</title>
     <meta name="description" content={finalDescription} />
     <link rel="canonical" href={canonicalUrl} />
+    {noindex
+      ? <meta name="robots" content="noindex, nofollow" />
+      : <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    }
 
-    <!-- Indexing control -->
-    {!noindex && <meta name="robots" content="index, follow" />}
-
-    <!-- Open Graph -->
-    <meta property="og:site_name" content={siteName} />
-    <meta property="og:type" content="website" />
-    <meta property="og:title" content={title} />
+    <!-- ═══════ OPEN GRAPH ═══════ -->
+    <meta property="og:site_name"   content={siteName} />
+    <meta property="og:type"        content="website" />
+    <meta property="og:title"       content={title} />
     <meta property="og:description" content={finalDescription} />
-    <meta property="og:url" content={ogUrl || canonicalUrl} />
-    {ogImage && (
-      <>
-        <meta property="og:image" content={ogImage.startsWith('http') ? ogImage : `${baseUrl}${ogImage}`} />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        <meta property="og:image:alt" content={`Visuel illustrant ${title} – BioForge`} />
-        <meta property="og:image:type" content="image/jpeg" /> <!-- ou png/webp selon ton cas -->
-      </>
-    )}
+    <meta property="og:url"         content={ogUrl || canonicalUrl} />
+    <meta property="og:image"       content={finalOgImage} />
+    <meta property="og:image:width"  content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt"    content={`${title} – BioForge`} />
+    <meta property="og:locale"       content="fr_FR" />
 
-    <!-- Twitter / X Cards – toujours utile en 2026 -->
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content={title} />
+    <!-- ═══════ TWITTER / X ═══════ -->
+    <meta name="twitter:card"        content="summary_large_image" />
+    <meta name="twitter:title"       content={title} />
     <meta name="twitter:description" content={finalDescription} />
-    <meta name="twitter:site" content={twitterHandle} />
-    <meta name="twitter:creator" content={twitterHandle} /> <!-- bonus branding -->
-    {ogImage && (
-      <meta name="twitter:image" content={ogImage.startsWith('http') ? ogImage : `${baseUrl}${ogImage}`} />
-    )}
+    <meta name="twitter:site"        content={twitterHandle} />
+    <meta name="twitter:creator"     content={twitterHandle} />
+    <meta name="twitter:image"       content={finalOgImage} />
 
-    <!-- Discovery -->
-    <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap-index.xml" />
-    
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <AstroFont
-      config={[
-        {
-          name: "Afacad",
-          src: [
-            {
-              style: 'normal',
-              weight: '400',
-              path: './public/fonts/Afacad-Regular.woff2'
-            },
-          ],
-          preload: true,
-          display: "swap",
-          selector: "body",
-          fallback: "sans-serif",
-        },
-      ]}
+    <!-- ═══════ DISCOVERY ═══════ -->
+    <link rel="sitemap" type="application/xml" href="/sitemap-index.xml" />
+
+    <!-- ═══════ FONTS — Syne + DM Sans ═══════ -->
+    <!--
+      DNS prefetch en premier, puis preconnect.
+      On ne charge que les weights réellement utilisés.
+    -->
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+    <link rel="preconnect"   href="https://fonts.googleapis.com" />
+    <link rel="preconnect"   href="https://fonts.gstatic.com" crossorigin />
+
+    <!--
+      display=swap → pas de FOIT.
+      On précharge la Google Fonts CSS pour éviter un render-blocking request.
+    -->
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap"
     />
-    <link 
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700;800&display=swap" 
-      rel="stylesheet" 
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap"
     />
-    
-    <!-- Locomotive Scroll CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/locomotive-scroll@4.1.4/dist/locomotive-scroll.min.css" />
 
-    <!-- Structured Data -->
-    <script type="application/ld+json">
-      {JSON.stringify(finalJsonLd)}
-    </script>
+    <!-- ═══════ STRUCTURED DATA ═══════ -->
+    <script type="application/ld+json" set:html={JSON.stringify(finalJsonLd)} />
 
-    <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)" />
+    <!-- ═══════ THEME ═══════ -->
+    <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-
-    <meta name="referrer" content="strict-origin-when-cross-origin" />
   </head>
-  <body class="min-h-screen bg-dark-900 text-white font-sans antialiased smooth-font">
-    <!-- Smooth scroll container -->
-    <div data-scroll-container>
-      <slot />
-    </div>
 
-    <!-- Global Scripts (cursor trail, particles, etc.) -->
-    <GlobalScripts />
+  <body class="min-h-screen bg-dark-900 text-white font-sans antialiased">
 
-    <!-- Loading Screen -->
-    <div id="loading-screen" class="fixed inset-0 bg-dark-900 z-50 flex items-center justify-center transition-opacity duration-500">
+    <slot />
+
+    <GlobalScripts title={title} />
+
+    <!-- ═══════ LOADING SCREEN ═══════ -->
+    <div id="loading-screen" class="fixed inset-0 bg-[#0a0a0a] z-[9999] flex items-center justify-center" aria-hidden="true">
       <div class="text-center">
-        <div class="inline-flex items-center space-x-2 mb-4">
-          <svg 
-            class="w-12 h-12 text-neon-green animate-pulse" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path 
-              d="M12 2L2 7L12 12L22 7L12 2Z" 
-              stroke="currentColor" 
-              stroke-width="2" 
-              stroke-linecap="round" 
-              stroke-linejoin="round"
-              class="glow-green"
-            />
-            <path 
-              d="M2 17L12 22L22 17" 
-              stroke="currentColor" 
-              stroke-width="2" 
-              stroke-linecap="round" 
-              stroke-linejoin="round"
-              class="glow-green"
-            />
-            <path 
-              d="M2 12L12 17L22 12" 
-              stroke="currentColor" 
-              stroke-width="2" 
-              stroke-linecap="round" 
-              stroke-linejoin="round"
-              class="glow-green"
-            />
+        <div class="inline-flex items-center gap-2 mb-4">
+          <svg class="w-10 h-10 text-neon-green" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M12 2L2 7L12 12L22 7L12 2Z"   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 17L12 22L22 17"             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 12L12 17L22 12"             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          <span class="text-2xl font-display font-bold text-neon-green text-glow-green">BIOFORGE</span>
+          <span class="text-2xl font-display font-bold text-neon-green tracking-widest">BIOFORGE</span>
         </div>
-        <div class="w-48 h-1 bg-dark-800 rounded-full overflow-hidden">
-          <div class="h-full bg-gradient-to-r from-neon-green to-neon-blue rounded-full animate-loading-bar"></div>
+        <div class="w-48 h-0.5 bg-white/10 rounded-full overflow-hidden mx-auto">
+          <div id="loading-bar" class="h-full bg-gradient-to-r from-neon-green to-neon-blue rounded-full w-0"></div>
         </div>
       </div>
     </div>
 
-    <script>
-      // Hide loading screen when page is loaded
-      window.addEventListener('load', () => {
-        const loadingScreen = document.getElementById('loading-screen');
-        if (loadingScreen) {
-          setTimeout(() => {
-            loadingScreen.style.opacity = '0';
-            setTimeout(() => {
-              loadingScreen.style.display = 'none';
-            }, 500);
-          }, 500);
-        }
-      });
+    <script is:inline>
+      (function () {
+        var screen = document.getElementById('loading-screen');
+        var bar    = document.getElementById('loading-bar');
+        if (!screen || !bar) return;
+
+        // Barre de progression rapide
+        var pct = 0;
+        var tick = setInterval(function () {
+          pct = Math.min(pct + Math.random() * 15, 90);
+          bar.style.width = pct + '%';
+        }, 80);
+
+        window.addEventListener('load', function () {
+          clearInterval(tick);
+          bar.style.transition = 'width 0.2s ease';
+          bar.style.width = '100%';
+          setTimeout(function () {
+            screen.style.transition = 'opacity 0.4s ease';
+            screen.style.opacity    = '0';
+            setTimeout(function () {
+              screen.style.display = 'none';
+            }, 400);
+          }, 150);
+        });
+      })();
     </script>
 
-    <style>
-      @keyframes loading-bar {
-        0% {
-          width: 0%;
-        }
-        100% {
-          width: 100%;
-        }
-      }
-
-      .animate-loading-bar {
-        animation: loading-bar 1.5s ease-in-out infinite;
-      }
-
-      /* Ensure locomotive scroll container takes full height */
-      [data-scroll-container] {
-        min-height: 100vh;
-      }
-    </style>
   </body>
 </html>
