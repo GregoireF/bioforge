@@ -3,8 +3,8 @@ import { wrapApiHandler } from '@/lib/api/middleware';
 import { AppError, ErrorCode } from '@/lib/core/errors';
 
 export const GET: APIRoute = wrapApiHandler<undefined, { available: boolean; username: string }>(
-  async ({ supabase, url }) => {
-    const username = url.searchParams.get('username')?.trim().toLowerCase() ?? '';
+  async ({ supabase, context }) => {
+    const username = context.url.searchParams.get('username')?.trim().toLowerCase() ?? '';
 
     if (!username) {
       throw new AppError({
@@ -23,7 +23,10 @@ export const GET: APIRoute = wrapApiHandler<undefined, { available: boolean; use
     }
 
     const { data, error } = await supabase
-      .rpc('is_username_taken', { p_username: username });
+      .from('profiles')
+      .select('username')
+      .eq('username', username)
+      .maybeSingle();
 
     if (error) {
       throw new AppError({
@@ -33,6 +36,66 @@ export const GET: APIRoute = wrapApiHandler<undefined, { available: boolean; use
       });
     }
 
-    return { available: data === false, username };
+    return { available: data === null, username };
   }
 );
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
