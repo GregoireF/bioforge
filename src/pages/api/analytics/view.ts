@@ -96,62 +96,45 @@ export const POST: APIRoute = async ({ request }) => {
   })
   if (rpcError) console.error('[analytics/view] rpc error:', rpcError.message)
 
-  // 8. UA parsing + GeoIP en parallèle (non-bloquant pour le compteur)
+  // 8. UA parsing + GeoIP en parallèle (les deux en même temps)
+  // ⚠️  Vercel tue la fonction dès que Response est retournée —
+  //     il faut tout await AVANT de répondre, pas en fire-and-forget.
   const { browser, os, device_type, inferredReferrer } = parseUA(ua)
   const { domain: referrerDomain, fullUrl: referrerFull } = cleanReferrer(d.referrer)
   const referrer = referrerDomain || inferredReferrer
 
-  // GeoIP fire-and-forget : on insère le raw event après,
-  // sans bloquer la réponse HTTP sur le délai GeoIP
-  resolveGeoIP(ip).then(({ country, city, is_vpn, is_hosting }) => {
-    const payload: Record<string, unknown> = {
-      profile_id:    d.profile_id,
-      ip_hash:       ipHash,
-      country,
-      city,
-      device_type,
-      os,
-      browser,
-      referrer,
-      referrer_full: referrerFull,
-      utm_source:    cleanUtm(d.utm_source),
-      utm_medium:    cleanUtm(d.utm_medium),
-      utm_campaign:  cleanUtm(d.utm_campaign),
-      utm_content:   cleanUtm(d.utm_content),
-      utm_term:      cleanUtm(d.utm_term),
-      is_vpn,
-      is_hosting,
-    }
-    supabase.from('profile_views').insert(payload)
-      .then(({ error }) => {
-        if (error) {
-          // Fallback sans is_vpn/is_hosting si colonnes absentes en DB
-          const { is_vpn: _v, is_hosting: _h, ...fallback } = payload
-          supabase.from('profile_views').insert(fallback)
-            .then(({ error: e2 }) => {
-              if (e2) console.error('[analytics/view] insert fallback error:', e2.message)
-            })
-        }
-      })
-  }).catch(() => {
-    // GeoIP entièrement raté — on insère quand même le raw event sans géo
-    supabase.from('profile_views').insert({
-      profile_id:    d.profile_id,
-      ip_hash:       ipHash,
-      device_type,
-      os,
-      browser,
-      referrer,
-      referrer_full: referrerFull,
-      utm_source:    cleanUtm(d.utm_source),
-      utm_medium:    cleanUtm(d.utm_medium),
-      utm_campaign:  cleanUtm(d.utm_campaign),
-      utm_content:   cleanUtm(d.utm_content),
-      utm_term:      cleanUtm(d.utm_term),
-    }).then(() => {})
+  // GeoIP + insert raw en parallèle, awaités avant la réponse
+  const { country, city, is_vpn, is_hosting } = await resolveGeoIP(ip)
+
+  const basePayload = {
+    profile_id:    d.profile_id,
+    ip_hash:       ipHash,
+    device_type,
+    os,
+    browser,
+    referrer,
+    referrer_full: referrerFull,
+    utm_source:    cleanUtm(d.utm_source),
+    utm_medium:    cleanUtm(d.utm_medium),
+    utm_campaign:  cleanUtm(d.utm_campaign),
+    utm_content:   cleanUtm(d.utm_content),
+    utm_term:      cleanUtm(d.utm_term),
+  }
+
+  const { error: insertError } = await supabase.from('profile_views').insert({
+    ...basePayload, country, city, is_vpn, is_hosting,
   })
 
-  // 9. Réponse immédiate — pas d'attente sur GeoIP ni sur l'insert raw
+  if (insertError) {
+    // Fallback sans is_vpn/is_hosting si colonnes pas encore migrées
+    console.warn('[analytics/view] insert with geo failed, trying fallback:', insertError.message)
+    const { error: e2 } = await supabase.from('profile_views').insert({
+      ...basePayload, country, city,
+    })
+    if (e2) console.error('[analytics/view] insert fallback error:', e2.message)
+  }
+
+  // 9. Réponse — tout est terminé à ce point
   return new Response(JSON.stringify({ ok: true }), {
     status: 200, headers: { 'Content-Type': 'application/json' },
   })

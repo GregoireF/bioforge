@@ -79,50 +79,36 @@ export const POST: APIRoute = async ({ request }) => {
   })
   if (rpcError) console.error('[analytics/click] rpc error:', rpcError.message)
 
-  // 8. GeoIP + insert raw click (fire-and-forget, non-bloquant)
-  resolveGeoIP(ip).then(({ country, city, is_vpn, is_hosting }) => {
-    const payload: Record<string, unknown> = {
-      block_id:    d.block_id,
-      profile_id:  block.profile_id,
-      ip_hash:     ipHash,
-      country,
-      city,
-      device_type,
-      os,
-      browser,
-      referrer,
-      utm_source:   cleanUtm(d.utm_source),
-      utm_medium:   cleanUtm(d.utm_medium),
-      utm_campaign: cleanUtm(d.utm_campaign),
-      is_vpn,
-      is_hosting,
-    }
-    supabase.from('block_clicks').insert(payload)
-      .then(({ error }) => {
-        if (error) {
-          const { is_vpn: _v, is_hosting: _h, ...fallback } = payload
-          supabase.from('block_clicks').insert(fallback)
-            .then(({ error: e2 }) => {
-              if (e2) console.error('[analytics/click] insert fallback error:', e2.message)
-            })
-        }
-      })
-  }).catch(() => {
-    supabase.from('block_clicks').insert({
-      block_id:    d.block_id,
-      profile_id:  block.profile_id,
-      ip_hash:     ipHash,
-      device_type,
-      os,
-      browser,
-      referrer,
-      utm_source:   cleanUtm(d.utm_source),
-      utm_medium:   cleanUtm(d.utm_medium),
-      utm_campaign: cleanUtm(d.utm_campaign),
-    }).then(() => {})
+  // 8. GeoIP awaité — Vercel tue la fonction dès que Response est retournée,
+  //    le fire-and-forget ne s'exécute jamais.
+  const { country, city, is_vpn, is_hosting } = await resolveGeoIP(ip)
+
+  const basePayload = {
+    block_id:    d.block_id,
+    profile_id:  block.profile_id,
+    ip_hash:     ipHash,
+    device_type,
+    os,
+    browser,
+    referrer,
+    utm_source:   cleanUtm(d.utm_source),
+    utm_medium:   cleanUtm(d.utm_medium),
+    utm_campaign: cleanUtm(d.utm_campaign),
+  }
+
+  const { error: insertError } = await supabase.from('block_clicks').insert({
+    ...basePayload, country, city, is_vpn, is_hosting,
   })
 
-  // 9. Réponse immédiate
+  if (insertError) {
+    console.warn('[analytics/click] insert with geo failed, trying fallback:', insertError.message)
+    const { error: e2 } = await supabase.from('block_clicks').insert({
+      ...basePayload, country, city,
+    })
+    if (e2) console.error('[analytics/click] insert fallback error:', e2.message)
+  }
+
+  // 9. Réponse
   return new Response(JSON.stringify({ ok: true }), {
     status: 200, headers: { 'Content-Type': 'application/json' },
   })
