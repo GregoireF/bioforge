@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '@/layouts/BaseLayout.astro';
-import { getProfileByUsername, getActiveBlocks, incrementProfileView } from '@/lib/supabase/queries';
+import { getProfileByUsername, getActiveBlocks } from '@/lib/supabase/queries';
 import QRCode from 'qrcode';
 
 // ==================== PARAMS ====================
@@ -17,7 +17,6 @@ const blocksResult = await getActiveBlocks(profile.id);
 const blocks = blocksResult.success ? blocksResult.data : [];
 
 // ==================== VIEW COUNT ====================
-incrementProfileView(username).catch(console.error);
 
 // ==================== GROUP CONSECUTIVE SOCIAL BLOCKS ====================
 // Fusionne les blocks social consécutifs en un seul pour affichage inline
@@ -148,6 +147,7 @@ try {
 
 // ==================== BRIDGE ====================
 const bridge = JSON.stringify({
+  profileId: profile.id,
   profileUrl,
   profileName: String(profile.display_name || profile.username || ''),
   primaryColor: pc,
@@ -183,13 +183,6 @@ function getSocialIconPath(url?: string): string {
   if (u.includes('discord'))      return SOCIAL_ICONS.discord;
   return 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71';
 }
-
-// ==================== STYLE VARS FOR DYNAMIC COLORS ====================
-const styleVars = {
-  pc70: `${pc}70`,
-  pc00: `${pc}00`,
-  pc80: `${pc}80`,
-};
 ---
 
 <BaseLayout title={pageTitle}>
@@ -253,97 +246,27 @@ const styleVars = {
       <!-- HEADER -->
       <header class="text-center mb-10 animate-fade-in-up">
         {profile.avatar_url ? (
-          <img 
-            src={profile.avatar_url} 
-            alt={`Photo de profil de ${profile.display_name || profile.username}`}
+          <img src={profile.avatar_url} alt={`Photo de profil de ${profile.display_name || profile.username}`}
             class="w-24 h-24 lg:w-28 lg:h-28 rounded-full mx-auto mb-5 object-cover"
-            style={`border: 3px solid ${pc}; box-shadow: 0 0 40px ${pc}50;`} 
-            loading="eager" 
-          />
+            style={`border: 3px solid ${pc}; box-shadow: 0 0 40px ${pc}50;`} loading="eager" />
         ) : (
-          <div 
-            class="w-24 h-24 lg:w-28 lg:h-28 rounded-full mx-auto mb-5 flex items-center justify-center text-4xl font-bold"
-            style={`background: linear-gradient(135deg, ${pc}, ${pc}80); color: ${bg}; box-shadow: 0 0 40px ${pc}50;`}
-          >
+          <div class="w-24 h-24 lg:w-28 lg:h-28 rounded-full mx-auto mb-5 flex items-center justify-center text-4xl font-bold"
+            style={`background: linear-gradient(135deg, ${pc}, ${pc}80); color: ${bg}; box-shadow: 0 0 40px ${pc}50;`}>
             {(profile.display_name || profile.username || '?').charAt(0).toUpperCase()}
           </div>
         )}
-
-        <h1 
-          class="text-2xl lg:text-3xl font-bold mb-2 tracking-tight inline-flex items-center justify-center gap-2 flex-wrap"
-          style={`color: ${tc};`}
-        >
+        <h1 class="text-2xl lg:text-3xl font-bold mb-2 tracking-tight inline-flex items-center justify-center gap-2 flex-wrap" style={`color: ${tc};`}>
           <span>{profile.display_name || `@${profile.username}`}</span>
-
           {(profile as any).is_verified === true && (
-            <div class="verified-badge-wrapper relative inline-flex shrink-0">
-              <svg 
-                class="verified-badge-main" 
-                width="36" 
-                height="36" 
-                viewBox="0 0 36 36" 
-                fill="none" 
-                xmlns="http://www.w3.org/2000/svg"
-                aria-label="Compte vérifié"
-              >
-                <defs>
-                  <radialGradient id="badgeRadial" cx="50%" cy="50%" r="70%">
-                    <stop offset="0%" stop-color={pc} />
-                    <stop offset="100%" stop-color={`${pc}40`} />
-                  </radialGradient>
-                  <filter id="glowFilter" x="-50%" y="-50%" width="200%" height="200%">
-                    <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
-                    <feMerge>
-                      <feMergeNode in="coloredBlur"/>
-                      <feMergeNode in="SourceGraphic"/>
-                    </feMerge>
-                  </filter>
-                </defs>
-
-                {/* Cercle extérieur glow */}
-                <circle 
-                  cx="18" 
-                  cy="18" 
-                  r="17" 
-                  fill="none" 
-                  stroke={`${pc}60`} 
-                  stroke-width="2" 
-                  filter="url(#glowFilter)"
-                />
-
-                {/* Cercle principal avec gradient */}
-                <circle 
-                  cx="18" 
-                  cy="18" 
-                  r="14.5" 
-                  fill="url(#badgeRadial)" 
-                  stroke="#ffffff" 
-                  stroke-width="1.5"
-                />
-
-                {/* Checkmark stylé plus épais et moderne */}
-                <path 
-                  d="M12 18.5 L16.2 22.7 L25 14" 
-                  stroke="#ffffff" 
-                  stroke-width="3.5" 
-                  stroke-linecap="round" 
-                  stroke-linejoin="round"
-                />
-              </svg>
-
-              {/* Effet pulse subtil sur hover */}
-              <div 
-                class="absolute inset-0 rounded-full pointer-events-none badge-pulse"
-                style={`box-shadow: 0 0 0 0 ${pc}60;`}
-              ></div>
-            </div>
+            <svg class="verified-badge shrink-0" width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" title="Compte vérifié BioForge" aria-label="Compte vérifié">
+              <circle cx="14" cy="14" r="13" fill={pc}/>
+              <path d="M8 14.5 L11.8 18.5 L20 10.5" fill="none" stroke="#ffffff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" style="stroke:#ffffff !important; stroke-width:2.8px !important;"/>
+            </svg>
           )}
         </h1>
-
         {profile.display_name && (
           <p class="text-sm mb-3 font-mono" style={`color: ${tc}; opacity: 0.45;`}>@{profile.username}</p>
         )}
-
         {profile.bio && (
           <p class="text-sm lg:text-base leading-relaxed max-w-sm mx-auto" style={`color: ${tc}; opacity: 0.75;`}>
             {profile.bio}
@@ -391,7 +314,7 @@ const styleVars = {
                         <img src={iconUrl} alt="" class="w-full h-full object-cover" loading="lazy" />
                       </div>
                     )}
-                    <span class={hasIcon ? 'flex-1 text-center' : 'flex-1 text-center'}>
+                    <span class={hasIcon ? 'flex-1 text-left' : 'flex-1 text-center'}>
                       {block.title || 'Link'}
                     </span>
                   </a>
@@ -494,7 +417,7 @@ const styleVars = {
               const links = Array.isArray(block.config?.links) ? block.config.links : [];
               if (!links.length) return null;
               return (
-                <div class={`flex items-center justify-center gap-3 py-2 flex-nowrap scrollbar-none ${theme.animations ? 'animate-fade-in-up' : ''}`} style={animDelay}>
+                <div class={`flex items-center justify-center gap-3 py-2 overflow-x-auto flex-nowrap scrollbar-none ${theme.animations ? 'animate-fade-in-up' : ''}`} style={animDelay}>
                   {links.map((link: any) => {
                     const url = typeof link === 'string' ? link : link?.url;
                     if (!url) return null;
@@ -725,7 +648,7 @@ const styleVars = {
   </div>
 
   <!-- ===== STYLES ===== -->
-  <style define:vars={styleVars}>
+  <style>
     @keyframes fade-in-up {
       from { opacity: 0; transform: translateY(16px); }
       to   { opacity: 1; transform: translateY(0); }
@@ -739,38 +662,10 @@ const styleVars = {
       60%  { transform: scale(1.2) rotate(3deg); }
       100% { transform: scale(1) rotate(0deg); opacity: 1; }
     }
+    .verified-badge { animation: badge-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both; filter: drop-shadow(0 0 8px var(--pc, #00ff9d)); }
     .scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
     .scrollbar-none::-webkit-scrollbar { display: none; }
     #share-modal.open { display: flex; }
-    @keyframes badge-entry {
-  0%   { transform: scale(0.4) rotate(-15deg); opacity: 0; }
-  55%  { transform: scale(1.18) rotate(4deg);  opacity: 0.9; }
-  80%  { transform: scale(0.95) rotate(-2deg); opacity: 1; }
-  100% { transform: scale(1)   rotate(0deg);   opacity: 1; }
-}
-
-@keyframes badge-pulse {
-  0%   { box-shadow: 0 0 0 0 var(--pc70); }
-  70%  { box-shadow: 0 0 0 12px var(--pc00); }
-  100% { box-shadow: 0 0 0 0 var(--pc00); }
-}
-
-.verified-badge-wrapper {
-  animation: badge-entry 0.7s cubic-bezier(0.34, 1.8, 0.64, 1) 0.5s both;
-  transition: transform 0.2s ease;
-}
-
-.verified-badge-wrapper:hover {
-  transform: scale(1.15);
-}
-
-.verified-badge-wrapper:hover .badge-pulse {
-  animation: badge-pulse 1.8s infinite;
-}
-
-.verified-badge-main {
-  filter: drop-shadow(0 4px 12px var(--pc80));
-}
   </style>
 
   <!-- ===== SCRIPT ===== -->
@@ -781,7 +676,25 @@ const styleVars = {
   -->
   <script type="module" define:vars={{ bridgeJson: bridge }}>
 
-    const { profileUrl, profileName, primaryColor: pc, bgColor: bg, textColor: tc, qrDataUrl } = JSON.parse(bridgeJson);
+    const { profileId, profileUrl, profileName, primaryColor: pc, bgColor: bg, textColor: tc, qrDataUrl } = JSON.parse(bridgeJson);
+
+    // ── View tracking (fire-and-forget, client-side pour capturer referrer + UTM) ─
+    ;(async () => {
+      const p = new URLSearchParams(window.location.search);
+      fetch('/api/analytics/view', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          profile_id:   profileId,
+          referrer:     document.referrer || null,
+          utm_source:   p.get('utm_source'),
+          utm_medium:   p.get('utm_medium'),
+          utm_campaign: p.get('utm_campaign'),
+          utm_content:  p.get('utm_content'),
+          utm_term:     p.get('utm_term'),
+        }),
+      }).catch(() => {});
+    })();
 
     // ── Dropdown 3-dot ───────────────────────────────────────────────────────
     function closeAllDropdowns() {
@@ -959,10 +872,11 @@ const styleVars = {
       window.open(`/report?url=${encodeURIComponent(currentShareUrl || profileUrl)}`, '_blank');
     });
 
-    // ── Analytics ────────────────────────────────────────────────────────────
+    // ── Analytics — clicks ───────────────────────────────────────────────────
+    const _utmP = new URLSearchParams(window.location.search);
     let clickCooldown = false;
     document.querySelectorAll('[data-block-id]').forEach(el => {
-      el.addEventListener('click', async () => {
+      el.addEventListener('click', () => {
         if (clickCooldown) return;
         clickCooldown = true;
         setTimeout(() => { clickCooldown = false; }, 1000);
@@ -970,8 +884,14 @@ const styleVars = {
         if (!blockId) return;
         fetch('/api/analytics/click', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-csrf-token': 'dev-bypass' },
-          body: JSON.stringify({ block_id: blockId }),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            block_id:     blockId,
+            referrer:     document.referrer || null,
+            utm_source:   _utmP.get('utm_source'),
+            utm_medium:   _utmP.get('utm_medium'),
+            utm_campaign: _utmP.get('utm_campaign'),
+          }),
         }).catch(() => {});
       });
     });
