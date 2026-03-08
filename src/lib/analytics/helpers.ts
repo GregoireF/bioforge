@@ -1,5 +1,5 @@
 // src/lib/analytics/helpers.ts
-import { createHash } from 'node:crypto'
+import { createHmac } from 'node:crypto'
 import { UAParser } from 'ua-parser-js'
 
 // ─────────────────────────────────────────────────────────────
@@ -24,25 +24,80 @@ export interface BotInfo {
   botName: string | null  // 'Googlebot', 'GPTBot'… ou null si humain
 }
 
+const SECRET = 
+  import.meta.env?.ANALYTICS_SECRET ??
+  process.env?.ANALYTICS_SECRET ??
+  'bioforge-analytics-secret'
+
 // ─────────────────────────────────────────────────────────────
 // IP
 // ─────────────────────────────────────────────────────────────
-
-/** IP réelle — Vercel injecte x-forwarded-for automatiquement */
+/** Extraire l’IP propre derrière proxies */
 export function getIP(request: Request): string {
-  return (
-    request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
-    request.headers.get('x-real-ip') ||
-    '0.0.0.0'
-  )
+  const headers = request.headers
+
+  const candidates = [
+    headers.get('cf-connecting-ip'),
+    headers.get('x-forwarded-for')?.split(',').map(ip => ip.trim()).find(ip => ip && ip !== 'unknown'),
+    headers.get('x-real-ip')
+  ]
+
+  for (const ip of candidates) {
+    if (ip) return normalizeIP(ip)
+  }
+
+  return '0.0.0.0'
 }
 
-/** Hash anonymisé SHA-256 tronqué à 16 chars — jamais l'IP brute en base */
-export function hashIP(ip: string): string {
-  const salt = (import.meta.env?.ANALYTICS_SALT ?? process.env?.ANALYTICS_SALT ?? 'bioforge-analytics-v1')
-  return createHash('sha256').update(ip + salt).digest('hex').slice(0, 16)
+/** Normaliser IPv6 mapped IPv4 et IPv6 trunc */
+function normalizeIP(ip: string): string {
+  if (ip.startsWith('::ffff:')) return ip.slice(7)
+  return ip
 }
 
+/** Anonymiser l’IP pour RGPD */
+function anonymizeIP(ip: string): string {
+  if (ip.includes('.')) {
+    const parts = ip.split('.')
+    parts[3] = '0'
+    return parts.join('.')
+  }
+
+  if (ip.includes(':')) {
+    const parts = ip.split(':')
+    return parts.slice(0, 4).join(':') + '::'
+  }
+
+  return ip
+}
+
+/** Normaliser User-Agent pour éviter fingerprinting */
+function normalizeUA(ua?: string): string {
+  if (!ua) return ''
+
+  ua = ua.toLowerCase()
+
+  if (ua.includes('chrome')) return 'chrome'
+  if (ua.includes('firefox')) return 'firefox'
+  if (ua.includes('safari')) return 'safari'
+  if (ua.includes('edge')) return 'edge'
+
+  return 'other'
+}
+
+/** Hash anonymisé et journalier */
+export function hashIP(ip?: string, userAgent?: string): string {
+  const day = new Date().toISOString().slice(0, 10)
+  const hmac = createHmac('sha256', SECRET)
+
+  hmac.update(anonymizeIP(ip ?? '0.0.0.0'))
+  hmac.update('|')
+  hmac.update(normalizeUA(userAgent))
+  hmac.update('|')
+  hmac.update(day)
+
+  return hmac.digest('hex').substring(0, 24)
+}
 // ─────────────────────────────────────────────────────────────
 // BOT DETECTION
 // ─────────────────────────────────────────────────────────────
