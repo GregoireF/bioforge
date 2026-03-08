@@ -1,4 +1,7 @@
 ---
+// src/pages/dashboard/blocks.astro — Blocks v3.1
+// Fixes: (1+4) API unwrap data.data, (2) reorder stable sous filtre, (3) hard delete
+
 import DashboardLayout from '@/layouts/DashboardLayout.astro';
 import PlanLimitIndicator from '@/components/features/PlanLimitIndicator.astro';
 import { withAuth } from '@/lib/auth/auth';
@@ -563,6 +566,15 @@ const BLOCK_TYPES = [
   function initSortable() {
     const container = document.getElementById('sortable-blocks');
     if (!container) return;
+
+    // Sortable CDN peut ne pas être encore chargé au premier appel :
+    // le <script> Astro est un ES module (defer implicite) qui s'exécute
+    // avant que window.Sortable soit défini. On réessaie jusqu'à ce qu'il soit prêt.
+    if (!(window as any).Sortable) {
+      setTimeout(initSortable, 30);
+      return;
+    }
+
     sortable?.destroy();
     sortable = new (window as any).Sortable(container, {
       animation: 200,
