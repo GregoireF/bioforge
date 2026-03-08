@@ -2,10 +2,12 @@
 import type { APIRoute } from 'astro'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
-import { UAParser } from 'ua-parser-js'
-import { createHash } from 'node:crypto'
+import {
+  getIP, hashIP,
+  detectBot, parseUA,
+  resolveGeoIP, cleanReferrer, cleanUtm,
+} from '@/lib/analytics/helpers'
 
-// ── Supabase service client ──────────────────────────────────
 const supabase = createClient(
   import.meta.env.PUBLIC_SUPABASE_URL,
   import.meta.env.SUPABASE_SERVICE_ROLE_KEY
@@ -22,122 +24,106 @@ const schema = z.object({
   utm_term:     z.string().max(100).nullable().optional(),
 })
 
-// ── Helpers ──────────────────────────────────────────────────
-
-/** Hash l'IP avec un sel — jamais l'IP brute en base */
-function hashIP(ip: string): string {
-  const salt = import.meta.env.ANALYTICS_SALT || 'bioforge-analytics-salt'
-  return createHash('sha256').update(ip + salt).digest('hex').slice(0, 16)
-}
-
-/** IP réelle depuis les headers Cloudflare / proxy */
-function getIP(request: Request): string {
-  return (
-    request.headers.get('CF-Connecting-IP') ||
-    request.headers.get('X-Forwarded-For')?.split(',')[0].trim() ||
-    request.headers.get('X-Real-IP') ||
-    '0.0.0.0'
-  )
-}
-
-/** Filtre les bots connus avant d'insérer en base */
-function isBot(ua: string): boolean {
-  return /bot|crawl|spider|headless|lighthouse|pagespeed|prerender|scrapy|wget|curl/i.test(ua)
-}
-
-/** Parse User-Agent → browser, os, device_type */
-function parseUA(ua: string) {
-  const r = new UAParser(ua).getResult()
-  const dt = r.device.type // 'mobile' | 'tablet' | undefined (= desktop)
-  return {
-    browser:     r.browser.name || null,
-    os:          r.os.name || null,
-    device_type: (dt === 'mobile' ? 'mobile' : dt === 'tablet' ? 'tablet' : 'desktop') as string,
-  }
-}
-
-/** Extrait le domaine propre du referrer (ex: instagram.com) */
-function cleanReferrer(ref: string | null | undefined): { domain: string | null; full: string | null } {
-  if (!ref) return { domain: null, full: null }
-  try {
-    const url = new URL(ref)
-    return {
-      domain: url.hostname.replace(/^www\./, ''),
-      full:   ref.slice(0, 500),
-    }
-  } catch {
-    return { domain: null, full: ref.slice(0, 500) }
-  }
-}
-
-// ── Handler ──────────────────────────────────────────────────
 export const POST: APIRoute = async ({ request }) => {
   // 1. Content-type
   if (!request.headers.get('content-type')?.includes('application/json'))
     return new Response(null, { status: 415 })
 
-  // 2. Origin guard (évite les inflations depuis des domaines externes en prod)
+  // 2. Origin guard (prod uniquement)
   const origin = request.headers.get('origin') || request.headers.get('referer') || ''
   if (import.meta.env.PROD && !origin.includes('bioforge.click'))
     return new Response(null, { status: 403 })
 
   // 3. Parse body
   let body: unknown
-  try { body = await request.json() } catch { return new Response(null, { status: 400 }) }
-
+  try { body = await request.json() } catch {
+    return new Response(null, { status: 400 })
+  }
   const parsed = schema.safeParse(body)
   if (!parsed.success) return new Response(null, { status: 400 })
-
   const d = parsed.data
 
-  // 4. UA — ignorer les bots
+  // 4. User-Agent
   const ua = request.headers.get('user-agent') || ''
-  if (isBot(ua))
-    return new Response(JSON.stringify({ ok: true, skipped: 'bot' }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
+
+  // 5. Bot detection — log les bots nommés, skip les generiques
+  const { isBot, botName } = detectBot(ua)
+  if (isBot) {
+    // On logge les crawlers nommés (SEO, LLMs) pour info mais on n'incrémente pas les views
+    if (botName) {
+      await supabase.from('profile_views').insert({
+        profile_id:  d.profile_id,
+        device_type: 'bot',
+        browser:     botName,
+        os:          null,
+        country:     null,
+        city:        null,
+        ip_hash:     null, // pas de hash pour les bots
+        is_vpn:      false,
+        is_hosting:  true,
+      }).then(() => {}) // fire-and-forget, pas d'await bloquant
+    }
+    return new Response(JSON.stringify({ ok: true, skipped: 'bot', name: botName }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
     })
+  }
 
-  // 5. IP & géo (headers Cloudflare)
-  const ip      = getIP(request)
-  const ipHash  = hashIP(ip)
-  const rawCountry = request.headers.get('CF-IPCountry') // 'XX' = inconnu
-  const country = rawCountry && rawCountry !== 'XX' ? rawCountry : null
-  const city    = request.headers.get('CF-IPCity') || null
+  // 6. IP + hash
+  const ip     = getIP(request)
+  const ipHash = hashIP(ip)
 
-  // 6. Device / Browser / OS
-  const { browser, os, device_type } = parseUA(ua)
-
-  // 7. Referrer
-  const { domain: referrer, full: referrerFull } = cleanReferrer(d.referrer)
-
-  // 8. Insert raw event
-  const { error: insertError } = await supabase
+  // 7. Déduplication ip_hash + profile_id sur les dernières 24h
+  const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const { count } = await supabase
     .from('profile_views')
-    .insert({
-      profile_id:    d.profile_id,
-      ip_hash:       ipHash,
-      country,
-      city,
-      device_type,
-      os,
-      browser,
-      referrer,
-      referrer_full: referrerFull,
-      utm_source:    d.utm_source   || null,
-      utm_medium:    d.utm_medium   || null,
-      utm_campaign:  d.utm_campaign || null,
-      utm_content:   d.utm_content  || null,
-      utm_term:      d.utm_term     || null,
+    .select('id', { count: 'exact', head: true })
+    .eq('profile_id', d.profile_id)
+    .eq('ip_hash', ipHash)
+    .neq('device_type', 'bot')   // exclure les bots du comptage
+    .gte('viewed_at', since24h)
+
+  if ((count ?? 0) > 0) {
+    return new Response(JSON.stringify({ ok: true, skipped: 'dedup_24h' }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
     })
+  }
+
+  // 8. UA parsing (browser, os, device_type, inferredReferrer)
+  const { browser, os, device_type, inferredReferrer } = parseUA(ua)
+
+  // 9. GeoIP via ip-api.com (timeout 2s, silencieux si erreur)
+  const { country, city, is_vpn, is_hosting } = await resolveGeoIP(ip)
+
+  // 10. Referrer — priorité : referrer HTTP explicite > in-app browser inféré
+  const { domain: referrerDomain, fullUrl: referrerFull } = cleanReferrer(d.referrer)
+  const referrer = referrerDomain || inferredReferrer
+
+  // 11. Insert raw event
+  const { error: insertError } = await supabase.from('profile_views').insert({
+    profile_id:    d.profile_id,
+    ip_hash:       ipHash,
+    country,
+    city,
+    is_vpn,
+    is_hosting,
+    device_type,
+    os,
+    browser,
+    referrer,
+    referrer_full: referrerFull,
+    utm_source:    cleanUtm(d.utm_source),
+    utm_medium:    cleanUtm(d.utm_medium),
+    utm_campaign:  cleanUtm(d.utm_campaign),
+    utm_content:   cleanUtm(d.utm_content),
+    utm_term:      cleanUtm(d.utm_term),
+  })
 
   if (insertError) {
-    console.error('[analytics/view] insert error:', insertError.message)
-    // On retourne quand même 200 — ne pas bloquer le visiteur pour une erreur d'analytics
+    console.error('[analytics/view] insert:', insertError.message)
     return new Response(JSON.stringify({ ok: false }), { status: 200 })
   }
 
-  // 9. Incrément compteur journalier (upsert atomique via RPC)
+  // 12. Incrément compteur journalier (upsert atomique RPC)
   const today = new Date().toISOString().split('T')[0]
   await supabase.rpc('increment_profile_views', {
     p_profile_id: d.profile_id,
@@ -145,7 +131,6 @@ export const POST: APIRoute = async ({ request }) => {
   })
 
   return new Response(JSON.stringify({ ok: true }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
+    status: 200, headers: { 'Content-Type': 'application/json' },
   })
 }

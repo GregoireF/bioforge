@@ -2,14 +2,18 @@
 import type { APIRoute } from 'astro'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
-import { UAParser } from 'ua-parser-js'
-import { createHash } from 'node:crypto'
+import {
+  getIP, hashIP,
+  detectBot, parseUA,
+  resolveGeoIP, cleanReferrer, cleanUtm,
+} from '@/lib/analytics/helpers'
 
 const supabase = createClient(
   import.meta.env.PUBLIC_SUPABASE_URL,
   import.meta.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
+// ── Validation ───────────────────────────────────────────────
 const schema = z.object({
   block_id:     z.string().uuid(),
   referrer:     z.string().max(500).nullable().optional(),
@@ -18,44 +22,6 @@ const schema = z.object({
   utm_campaign: z.string().max(100).nullable().optional(),
 })
 
-function hashIP(ip: string): string {
-  const salt = import.meta.env.ANALYTICS_SALT || 'bioforge-analytics-salt'
-  return createHash('sha256').update(ip + salt).digest('hex').slice(0, 16)
-}
-
-function getIP(request: Request): string {
-  return (
-    request.headers.get('CF-Connecting-IP') ||
-    request.headers.get('X-Forwarded-For')?.split(',')[0].trim() ||
-    request.headers.get('X-Real-IP') ||
-    '0.0.0.0'
-  )
-}
-
-function isBot(ua: string): boolean {
-  return /bot|crawl|spider|headless|lighthouse|pagespeed|prerender|scrapy|wget|curl/i.test(ua)
-}
-
-function parseUA(ua: string) {
-  const r = new UAParser(ua).getResult()
-  const dt = r.device.type
-  return {
-    browser:     r.browser.name || null,
-    os:          r.os.name || null,
-    device_type: (dt === 'mobile' ? 'mobile' : dt === 'tablet' ? 'tablet' : 'desktop') as string,
-  }
-}
-
-function cleanReferrer(ref: string | null | undefined): string | null {
-  if (!ref) return null
-  try {
-    return new URL(ref).hostname.replace(/^www\./, '')
-  } catch {
-    return null
-  }
-}
-
-// ── Handler ──────────────────────────────────────────────────
 export const POST: APIRoute = async ({ request }) => {
   // 1. Content-type
   if (!request.headers.get('content-type')?.includes('application/json'))
@@ -68,23 +34,23 @@ export const POST: APIRoute = async ({ request }) => {
 
   // 3. Parse body
   let body: unknown
-  try { body = await request.json() } catch { return new Response(null, { status: 400 }) }
-
+  try { body = await request.json() } catch {
+    return new Response(null, { status: 400 })
+  }
   const parsed = schema.safeParse(body)
   if (!parsed.success) return new Response(null, { status: 400 })
-
   const d = parsed.data
 
-  // 4. Bot check
+  // 4. Bot check — les bots ne génèrent pas de clicks réels
   const ua = request.headers.get('user-agent') || ''
-  if (isBot(ua))
-    return new Response(JSON.stringify({ ok: true, skipped: 'bot' }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
+  const { isBot, botName } = detectBot(ua)
+  if (isBot) {
+    return new Response(JSON.stringify({ ok: true, skipped: 'bot', name: botName }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
     })
+  }
 
   // 5. Résoudre profile_id depuis block_id
-  // (nécessaire pour RLS ownership + foreign key block_clicks)
   const { data: block, error: blockError } = await supabase
     .from('blocks')
     .select('profile_id')
@@ -93,45 +59,46 @@ export const POST: APIRoute = async ({ request }) => {
     .single()
 
   if (blockError || !block)
-    return new Response(JSON.stringify({ ok: false }), { status: 200 }) // silencieux
+    return new Response(JSON.stringify({ ok: false }), { status: 200 })
 
-  // 6. IP & géo
-  const ip      = getIP(request)
-  const ipHash  = hashIP(ip)
-  const rawCountry = request.headers.get('CF-IPCountry')
-  const country = rawCountry && rawCountry !== 'XX' ? rawCountry : null
-  const city    = request.headers.get('CF-IPCity') || null
+  // 6. IP + hash
+  const ip     = getIP(request)
+  const ipHash = hashIP(ip)
 
   // 7. UA
-  const { browser, os, device_type } = parseUA(ua)
+  const { browser, os, device_type, inferredReferrer } = parseUA(ua)
 
-  // 8. Referrer
-  const referrer = cleanReferrer(d.referrer)
+  // 8. GeoIP (timeout 2s, silencieux si erreur)
+  const { country, city, is_vpn, is_hosting } = await resolveGeoIP(ip)
 
-  // 9. Insert raw click event
-  const { error: insertError } = await supabase
-    .from('block_clicks')
-    .insert({
-      block_id:    d.block_id,
-      profile_id:  block.profile_id,
-      ip_hash:     ipHash,
-      country,
-      city,
-      device_type,
-      os,
-      browser,
-      referrer,
-      utm_source:   d.utm_source   || null,
-      utm_medium:   d.utm_medium   || null,
-      utm_campaign: d.utm_campaign || null,
-    })
+  // 9. Referrer
+  const { domain: referrerDomain } = cleanReferrer(d.referrer)
+  const referrer = referrerDomain || inferredReferrer
+
+  // 10. Insert raw click
+  const { error: insertError } = await supabase.from('block_clicks').insert({
+    block_id:    d.block_id,
+    profile_id:  block.profile_id,
+    ip_hash:     ipHash,
+    country,
+    city,
+    is_vpn,
+    is_hosting,
+    device_type,
+    os,
+    browser,
+    referrer,
+    utm_source:   cleanUtm(d.utm_source),
+    utm_medium:   cleanUtm(d.utm_medium),
+    utm_campaign: cleanUtm(d.utm_campaign),
+  })
 
   if (insertError) {
-    console.error('[analytics/click] insert error:', insertError.message)
+    console.error('[analytics/click] insert:', insertError.message)
     return new Response(JSON.stringify({ ok: false }), { status: 200 })
   }
 
-  // 10. Incrément compteur journalier
+  // 11. Incrément compteur journalier
   const today = new Date().toISOString().split('T')[0]
   await supabase.rpc('increment_block_clicks', {
     p_block_id: d.block_id,
@@ -139,7 +106,6 @@ export const POST: APIRoute = async ({ request }) => {
   })
 
   return new Response(JSON.stringify({ ok: true }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
+    status: 200, headers: { 'Content-Type': 'application/json' },
   })
 }
