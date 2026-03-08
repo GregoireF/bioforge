@@ -28,16 +28,9 @@ export const POST: APIRoute = async ({ request }) => {
   if (!request.headers.get('content-type')?.includes('application/json'))
     return new Response(null, { status: 415 })
 
-  // 2. Origin guard — accepte bioforge.click ET les previews Vercel (.vercel.app)
-  //    La vraie protection est le profile_id UUID valide + RLS Supabase
-  const origin = request.headers.get('origin') || request.headers.get('referer') || ''
-  if (import.meta.env.PROD) {
-    const allowed = origin.includes('bioforge.click') || origin.includes('.vercel.app')
-    if (!allowed) {
-      console.warn('[analytics/view] blocked origin:', origin)
-      return new Response(null, { status: 403 })
-    }
-  }
+  // 2. Protection : profile_id/block_id UUID valide + SUPABASE_SERVICE_ROLE_KEY côté serveur.
+  //    Pas de origin guard — les navigateurs n'envoient pas l'header Origin
+  //    sur les requêtes same-origin fetch, ce qui bloquerait toutes les requêtes légitimes.
 
   // 3. Parse + validate body
   let body: unknown
