@@ -1,7 +1,4 @@
 ---
-// src/pages/dashboard/blocks.astro — Blocks v3.1
-// Fixes: (1+4) API unwrap data.data, (2) reorder stable sous filtre, (3) hard delete
-
 import DashboardLayout from '@/layouts/DashboardLayout.astro';
 import PlanLimitIndicator from '@/components/features/PlanLimitIndicator.astro';
 import { withAuth } from '@/lib/auth/auth';
@@ -339,18 +336,18 @@ const BLOCK_TYPES = [
 
   // ── Platform registry ─────────────────────────────────────────────────────
   const PLATFORMS = [
-    { id: 'twitch',    label: 'Twitch',    icon: '🟣', match: ['twitch.tv'],                     defaultIcon: 'https://assets.twitch.tv/assets/favicon-32-e29e246c157142c94346.png' },
-    { id: 'youtube',   label: 'YouTube',   icon: '🔴', match: ['youtube.com', 'youtu.be'],        defaultIcon: 'https://www.youtube.com/favicon.ico' },
-    { id: 'tiktok',    label: 'TikTok',    icon: '⬛', match: ['tiktok.com'],                     defaultIcon: 'https://www.tiktok.com/favicon.ico' },
+    { id: 'twitch',    label: 'Twitch',    icon: '🟣', match: ['twitch.tv'],                     defaultIcon: 'https://bioforge.click/social/twitch.png' },
+    { id: 'youtube',   label: 'YouTube',   icon: '🔴', match: ['youtube.com', 'youtu.be'],        defaultIcon: 'https://bioforge.click/social/youtube.png' },
+    { id: 'tiktok',    label: 'TikTok',    icon: '⬛', match: ['tiktok.com'],                     defaultIcon: 'https://bioforge.click/social/tiktok.png' },
     { id: 'instagram', label: 'Instagram', icon: '📸', match: ['instagram.com'],                  defaultIcon: 'https://bioforge.click/social/instagram.png' },
-    { id: 'twitter',   label: 'X',         icon: '🐦', match: ['twitter.com', 'x.com'],           defaultIcon: 'https://abs.twimg.com/favicons/twitter.3.ico' },
-    { id: 'discord',   label: 'Discord',   icon: '💬', match: ['discord.com', 'discord.gg'],      defaultIcon: 'https://discord.com/assets/847541504914fd33810e70a0ea73177e.ico' },
-    { id: 'kick',      label: 'Kick',      icon: '🟢', match: ['kick.com'],                       defaultIcon: 'https://kick.com/favicon.ico' },
-    { id: 'spotify',   label: 'Spotify',   icon: '🎵', match: ['spotify.com', 'open.spotify.com'],defaultIcon: 'https://open.spotify.com/favicon.ico' },
-    { id: 'github',    label: 'GitHub',    icon: '🐙', match: ['github.com'],                     defaultIcon: 'https://github.com/favicon.ico' },
+    { id: 'twitter',   label: 'X',         icon: '🐦', match: ['twitter.com', 'x.com'],           defaultIcon: 'https://bioforge.click/social/x.png' },
+    { id: 'discord',   label: 'Discord',   icon: '💬', match: ['discord.com', 'discord.gg'],      defaultIcon: 'https://bioforge.click/social/discord.png' },
+    { id: 'kick',      label: 'Kick',      icon: '🟢', match: ['kick.com'],                       defaultIcon: 'https://bioforge.click/social/kick.png' },
+    { id: 'spotify',   label: 'Spotify',   icon: '🎵', match: ['spotify.com', 'open.spotify.com'],defaultIcon: 'https://bioforge.click/social/spotify.png' },
+    { id: 'github',    label: 'GitHub',    icon: '🐙', match: ['github.com'],                     defaultIcon: 'https://bioforge.click/social/github.png' },
     { id: 'linkedin',  label: 'LinkedIn',  icon: '💼', match: ['linkedin.com'],                   defaultIcon: 'https://www.linkedin.com/favicon.ico' },
     { id: 'patreon',   label: 'Patreon',   icon: '🎁', match: ['patreon.com'],                    defaultIcon: 'https://c5.patreon.com/external/favicon/favicon.ico' },
-    { id: 'snapchat',  label: 'Snapchat',  icon: '👻', match: ['snapchat.com'],                   defaultIcon: 'https://static.snapchat.com/favicon.ico' },
+    { id: 'snapchat',  label: 'Snapchat',  icon: '👻', match: ['snapchat.com'],                   defaultIcon: 'https://bioforge.click/social/snapchat.png' },
   ];
 
   function detectPlatform(url: string) {
