@@ -1,7 +1,4 @@
 ---
-// src/pages/dashboard/blocks.astro — Blocks v3
-// Nouveautés : icon_url cercle sur les links, quick-add URL, détection plateforme auto, 3-dot menu
-
 import DashboardLayout from '@/layouts/DashboardLayout.astro';
 import PlanLimitIndicator from '@/components/features/PlanLimitIndicator.astro';
 import { withAuth } from '@/lib/auth/auth';
@@ -10,14 +7,12 @@ import { getAnalyticsSummary } from '@/lib/db/queries.server';
 import { createServerClient } from '@supabase/ssr';
 import { parse } from 'cookie';
 
-// ── Auth ──────────────────────────────────────────────────────────────────────
 const authResult = await withAuth({ cookies: Astro.cookies, request: Astro.request });
 if (!authResult.success || !authResult.data) {
   return Astro.redirect(authResult.redirect || '/signin?error=auth_failed');
 }
 const { user, profile, planLimits } = authResult.data;
 
-// ── Sanitization ──────────────────────────────────────────────────────────────
 function escapeHtml(val: unknown): string {
   return String(val ?? '')
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -27,7 +22,6 @@ function safeNum(val: unknown): number {
   const n = Number(val); return isFinite(n) ? n : 0;
 }
 
-// ── Data ──────────────────────────────────────────────────────────────────────
 const cookies = parse(Astro.request.headers.get('cookie') ?? '');
 const supabase = createServerClient(
   import.meta.env.PUBLIC_SUPABASE_URL!,
@@ -70,7 +64,6 @@ const safeBridgeBlocks = blocks
     },
   }));
 
-// ── Plan limits ───────────────────────────────────────────────────────────────
 const blockCount  = blocks.length;
 const blockLimit  = planLimits?.max_blocks_total ?? 15;
 const canAddBlock = blockLimit === -1 || blockCount < blockLimit;
@@ -78,20 +71,17 @@ const isNearLimit = blockLimit !== -1 && blockCount >= blockLimit * 0.8 && block
 const blocksError = blocksResult.success ? null : (blocksResult.error?.message ?? 'Failed to load blocks');
 
 const bridge = JSON.stringify({
-  blocks:     safeBridgeBlocks,
-  blockCount,
-  blockLimit,
-  canAddBlock,
-  profileId:  escapeHtml(safeProfileId),
+  blocks: safeBridgeBlocks, blockCount, blockLimit, canAddBlock,
+  profileId: escapeHtml(safeProfileId),
 });
 
 const BLOCK_TYPES = [
-  { type: 'link',    emoji: '🔗', label: 'Link',    desc: 'Clickable link'  },
-  { type: 'heading', emoji: '📝', label: 'Heading', desc: 'Section title'   },
-  { type: 'spacer',  emoji: '—',  label: 'Spacer',  desc: 'Add spacing'     },
-  { type: 'image',   emoji: '🖼️', label: 'Image',   desc: 'Display image'   },
-  { type: 'video',   emoji: '🎥', label: 'Video',   desc: 'Embed video'     },
-  { type: 'social',  emoji: '👥', label: 'Social',  desc: 'Social icons'    },
+  { type: 'link',    emoji: '🔗', label: 'Link',    desc: 'Clickable link' },
+  { type: 'heading', emoji: '📝', label: 'Heading', desc: 'Section title'  },
+  { type: 'spacer',  emoji: '—',  label: 'Spacer',  desc: 'Add spacing'    },
+  { type: 'image',   emoji: '🖼️', label: 'Image',   desc: 'Display image'  },
+  { type: 'video',   emoji: '🎥', label: 'Video',   desc: 'Embed video'    },
+  { type: 'social',  emoji: '👥', label: 'Social',  desc: 'Social icons'   },
 ];
 ---
 
@@ -107,7 +97,6 @@ const BLOCK_TYPES = [
       <p class="text-sm text-gray-400 mt-0.5">Build and manage your profile page</p>
     </div>
     <div class="flex items-center gap-2">
-      <!-- Bulk bar -->
       <div id="bulk-bar" class="hidden items-center gap-2">
         <span id="bulk-count" class="text-xs text-gray-400 font-medium px-2">0 selected</span>
         <button id="bulk-toggle-btn"
@@ -123,7 +112,6 @@ const BLOCK_TYPES = [
         </button>
         <button id="bulk-cancel-btn" class="px-3 py-2 text-xs text-gray-500 hover:text-white transition-colors">Cancel</button>
       </div>
-
       <button id="add-block-btn"
         class={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.98]
           ${canAddBlock ? 'bg-neon-green text-black hover:bg-neon-green/90' : 'glass border border-white/10 text-gray-400 cursor-not-allowed opacity-60'}`}
@@ -136,12 +124,10 @@ const BLOCK_TYPES = [
     </div>
   </div>
 
-  <!-- Plan indicator -->
   <div class="mb-5">
     <PlanLimitIndicator current={blockCount} limit={blockLimit} feature="Blocks" showUpgrade={true} />
   </div>
 
-  <!-- Alerts -->
   {isNearLimit && (
     <div class="mb-5 flex items-center gap-3 p-4 glass border border-yellow-400/20 rounded-xl">
       <svg class="w-4 h-4 text-yellow-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -173,13 +159,8 @@ const BLOCK_TYPES = [
       <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
       </svg>
-      <input
-        type="url"
-        id="quick-add-input"
-        placeholder="Paste a URL to add a link instantly…"
-        class="flex-1 bg-transparent text-white text-sm placeholder-gray-600 focus:outline-none min-w-0"
-      />
-      <!-- Detected platform badge + actions (hidden by default) -->
+      <input type="url" id="quick-add-input" placeholder="Paste a URL to add a link instantly…"
+        class="flex-1 bg-transparent text-white text-sm placeholder-gray-600 focus:outline-none min-w-0" />
       <div id="quick-detect-zone" class="hidden items-center gap-2 shrink-0">
         <span id="quick-plat-icon" class="text-lg leading-none"></span>
         <span id="quick-plat-label" class="text-xs font-semibold text-neon-green whitespace-nowrap"></span>
@@ -258,15 +239,11 @@ const BLOCK_TYPES = [
           </svg>
         </button>
       </div>
-
-      <!-- Platform shortcuts -->
       <div id="platform-suggestions" class="mb-5">
         <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-3">Popular platforms</p>
         <div class="grid grid-cols-4 gap-2" id="platform-grid"></div>
         <div class="my-4 border-t border-white/10"></div>
       </div>
-
-      <!-- Block types -->
       <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-3">Block types</p>
       <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {BLOCK_TYPES.map(t => (
@@ -320,18 +297,12 @@ const BLOCK_TYPES = [
   .filter-btn { color: rgb(107 114 128); border: 1px solid transparent; background: transparent; }
   .filter-btn:hover { color: white; background: rgba(255,255,255,0.05); }
   .filter-btn.active { color: white; background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.15); }
-
   #type-modal.open, #edit-modal.open { display: flex; }
-
   .block-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
   .block-card.selected { border-color: rgba(0,255,157,0.4) !important; background: rgba(0,255,157,0.03); }
   .block-card.sortable-ghost { opacity: 0.4; }
   .block-card.sortable-drag  { box-shadow: 0 20px 60px rgba(0,0,0,0.5); transform: rotate(1deg); }
-
-  .block-menu-dropdown {
-    backdrop-filter: blur(16px);
-    background: rgba(12, 12, 18, 0.96);
-  }
+  .block-menu-dropdown { backdrop-filter: blur(16px); background: rgba(12,12,18,0.96); }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
@@ -350,6 +321,19 @@ const BLOCK_TYPES = [
   let isSaving     = false;
   let sortable: any = null;
 
+  // ─── FIX 1 + 4 : helper central qui unwrap { success, data } ─────────────
+  // wrapApiHandler retourne toujours { success: true, data: {...} }
+  // L'ancien code lisait data.id => undefined. On lit maintenant json.data.id.
+  async function apiCall(url: string, options: RequestInit = {}) {
+    const res  = await fetch(url, options);
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(json.error?.message ?? json.error ?? `HTTP ${res.status}`);
+    }
+    // wrapApiHandler envelope : { success, data } — on retourne data directement
+    return json.data ?? json;
+  }
+
   // ── Platform registry ─────────────────────────────────────────────────────
   const PLATFORMS = [
     { id: 'twitch',    label: 'Twitch',    icon: '🟣', match: ['twitch.tv'],                     defaultIcon: 'https://assets.twitch.tv/assets/favicon.ico' },
@@ -367,10 +351,8 @@ const BLOCK_TYPES = [
   ];
 
   function detectPlatform(url: string) {
-    try {
-      const lower = url.toLowerCase();
-      return PLATFORMS.find(p => p.match.some(m => lower.includes(m))) ?? null;
-    } catch { return null; }
+    try { const l = url.toLowerCase(); return PLATFORMS.find(p => p.match.some(m => l.includes(m))) ?? null; }
+    catch { return null; }
   }
 
   function getDefaultTitle(url: string, platform: any): string {
@@ -381,7 +363,6 @@ const BLOCK_TYPES = [
     } catch { return platform.label; }
   }
 
-  // ── Block emoji map ───────────────────────────────────────────────────────
   const BLOCK_EMOJI: Record<string, string> = {
     link: '🔗', heading: '📝', spacer: '—', image: '🖼️', video: '🎥', social: '👥'
   };
@@ -398,7 +379,7 @@ const BLOCK_TYPES = [
     });
   }
 
-  // ── Render blocks ─────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   function renderBlocks() {
     const container  = document.getElementById('sortable-blocks');
     const noResults  = document.getElementById('no-results');
@@ -430,10 +411,10 @@ const BLOCK_TYPES = [
       const iconUrl    = block.config?.icon_url || '';
       const platform   = block.type === 'link' ? detectPlatform(block.config?.url || '') : null;
 
-      // Decide what to show in the icon slot
       const iconHtml = iconUrl
         ? `<div class="shrink-0 w-9 h-9 rounded-full overflow-hidden border border-white/10 bg-white/5">
-             <img src="${iconUrl}" class="w-full h-full object-cover" loading="lazy" onerror="this.parentElement.innerHTML='<span class=\'flex items-center justify-center w-full h-full text-base\'>${BLOCK_EMOJI[block.type] ?? '📌'}</span>'" />
+             <img src="${iconUrl}" class="w-full h-full object-cover" loading="lazy"
+               onerror="this.parentElement.innerHTML='<span class=\'flex items-center justify-center w-full h-full text-base\'>${BLOCK_EMOJI[block.type] ?? '📌'}</span>'" />
            </div>`
         : platform
           ? `<div class="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-lg bg-white/5 border border-white/10">${platform.icon}</div>`
@@ -442,26 +423,17 @@ const BLOCK_TYPES = [
       return `
         <div class="block-card group relative glass border border-white/10 rounded-2xl p-4 transition-all hover:border-white/20 ${isSelected ? 'selected' : ''}"
           data-id="${block.id}" data-type="${block.type}">
-
-          <!-- Checkbox -->
           <div class="absolute top-4 left-4 z-10 ${selectedIds.size > 0 ? '' : 'opacity-0 group-hover:opacity-100'} transition-opacity">
             <input type="checkbox" ${isSelected ? 'checked' : ''}
               class="block-select w-4 h-4 rounded accent-neon-green cursor-pointer" data-id="${block.id}" />
           </div>
-
           <div class="flex items-center gap-3 pl-7">
-
-            <!-- Drag handle -->
             <div class="drag-handle cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-400 transition-colors shrink-0 touch-none">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/>
               </svg>
             </div>
-
-            <!-- Icon (circle) -->
             ${iconHtml}
-
-            <!-- Info -->
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap mb-0.5">
                 <span class="text-xs px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-400 font-medium capitalize">${block.type}</span>
@@ -485,15 +457,11 @@ const BLOCK_TYPES = [
                   </span>` : ''}
               </div>
             </div>
-
-            <!-- Toggle -->
             <label class="relative inline-flex items-center cursor-pointer shrink-0">
               <input type="checkbox" ${block.active ? 'checked' : ''}
                 class="sr-only peer block-toggle" data-id="${block.id}" />
               <div class="w-10 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-neon-green transition-colors"></div>
             </label>
-
-            <!-- 3-dot menu -->
             <div class="relative shrink-0">
               <button
                 class="block-menu-btn opacity-0 group-hover:opacity-100 transition-opacity p-2 glass rounded-lg border border-white/5 text-gray-500 hover:text-white hover:border-white/20 transition-all"
@@ -528,7 +496,6 @@ const BLOCK_TYPES = [
                 </button>
               </div>
             </div>
-
           </div>
         </div>
       `;
@@ -539,24 +506,20 @@ const BLOCK_TYPES = [
     updateBulkBar();
   }
 
-  // ── Close dropdowns on outside click ─────────────────────────────────────
   document.addEventListener('click', () => {
     document.querySelectorAll('.block-menu-dropdown').forEach(d => d.classList.add('hidden'));
   });
 
-  // ── Card listeners ────────────────────────────────────────────────────────
   function attachCardListeners() {
-    // Toggle active
     document.querySelectorAll('.block-toggle').forEach(toggle => {
       toggle.addEventListener('change', async (e: any) => {
         const id = e.target.dataset.id;
         const active = e.target.checked;
         try {
-          const res = await fetch(`/api/blocks/${id}`, {
+          await apiCall(`/api/blocks/${id}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ active }),
           });
-          if (!res.ok) throw new Error();
           const b = blocks.find((b: any) => b.id === id);
           if (b) b.active = active;
           toast.success(active ? 'Block activated' : 'Block deactivated');
@@ -567,7 +530,6 @@ const BLOCK_TYPES = [
       });
     });
 
-    // Select (bulk)
     document.querySelectorAll('.block-select').forEach(cb => {
       cb.addEventListener('change', (e: any) => {
         const id = e.target.dataset.id;
@@ -577,7 +539,6 @@ const BLOCK_TYPES = [
       });
     });
 
-    // 3-dot toggle
     document.querySelectorAll('.block-menu-btn').forEach(btn => {
       btn.addEventListener('click', (e: any) => {
         e.stopPropagation();
@@ -587,17 +548,12 @@ const BLOCK_TYPES = [
       });
     });
 
-    // Edit
     document.querySelectorAll('.block-edit-btn').forEach(btn => {
       btn.addEventListener('click', () => handleEditBlock((btn as HTMLElement).dataset.id!));
     });
-
-    // Duplicate
     document.querySelectorAll('.block-duplicate-btn').forEach(btn => {
       btn.addEventListener('click', () => handleDuplicateBlock((btn as HTMLElement).dataset.id!));
     });
-
-    // Delete
     document.querySelectorAll('.block-delete-btn').forEach(btn => {
       btn.addEventListener('click', () => handleDeleteBlock((btn as HTMLElement).dataset.id!));
     });
@@ -615,17 +571,40 @@ const BLOCK_TYPES = [
       dragClass: 'sortable-drag',
       onEnd: async () => {
         const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        const blockIds = Array.from(container.children)
+
+        // IDs visibles dans le DOM après le drag (peut être filtré)
+        const visibleIds = Array.from(container.children)
           .map((el: any) => el.dataset.id)
           .filter((id: any) => id && UUID_RE.test(id));
-        if (!blockIds.length) return;
+
+        if (!visibleIds.length) return;
+
+        // ─── FIX 2 : reorder stable sous filtre ───────────────────────────
+        // Si un filtre est actif, container.children ne contient qu'un sous-ensemble.
+        // On reconstruit l'ordre complet : blocs visibles (nouvel ordre) + blocs cachés (ordre conservé).
+        let blockIds: string[];
+        if (activeFilter === 'all' && !searchQuery) {
+          // Pas de filtre : visibleIds = ordre complet
+          blockIds = visibleIds;
+        } else {
+          // Filtre actif : les blocs non-filtrés gardent leur position relative,
+          // on les insère après les blocs filtrés (ou on peut les interleaver selon UX souhaitée).
+          const visibleSet  = new Set(visibleIds);
+          const hiddenIds   = blocks
+            .filter((b: any) => !visibleSet.has(b.id))
+            .map((b: any) => b.id);
+          blockIds = [...visibleIds, ...hiddenIds];
+        }
+
         try {
-          const res = await fetch('/api/blocks/reorder', {
+          await apiCall('/api/blocks/reorder', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ blockIds }),
           });
-          if (!res.ok) throw new Error();
-          blocks = blockIds.map((id: string) => blocks.find((b: any) => b.id === id)).filter(Boolean);
+          // Mettre à jour l'ordre local
+          blocks = blockIds
+            .map((id: string) => blocks.find((b: any) => b.id === id))
+            .filter(Boolean);
           toast.success('Order saved');
         } catch {
           toast.error('Failed to save order');
@@ -635,9 +614,8 @@ const BLOCK_TYPES = [
     });
   }
 
-  // ── Bulk actions ──────────────────────────────────────────────────────────
   function updateBulkBar() {
-    const bar = document.getElementById('bulk-bar');
+    const bar   = document.getElementById('bulk-bar');
     const count = document.getElementById('bulk-count');
     if (!bar || !count) return;
     if (selectedIds.size > 0) {
@@ -654,7 +632,7 @@ const BLOCK_TYPES = [
     const ids = [...selectedIds];
     const newActive = !ids.every(id => blocks.find((b: any) => b.id === id)?.active);
     try {
-      await Promise.all(ids.map(id => fetch(`/api/blocks/${id}`, {
+      await Promise.all(ids.map(id => apiCall(`/api/blocks/${id}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ active: newActive }),
       })));
@@ -668,14 +646,13 @@ const BLOCK_TYPES = [
     const ids = [...selectedIds];
     if (!confirm(`Delete ${ids.length} block${ids.length > 1 ? 's' : ''}? This cannot be undone.`)) return;
     try {
-      await Promise.all(ids.map(id => fetch(`/api/blocks/${id}`, { method: 'DELETE' })));
+      await Promise.all(ids.map(id => apiCall(`/api/blocks/${id}`, { method: 'DELETE' })));
       blocks = blocks.filter((b: any) => !ids.includes(b.id));
       selectedIds.clear(); renderBlocks();
       toast.success(`${ids.length} block${ids.length > 1 ? 's' : ''} deleted`);
     } catch { toast.error('Bulk delete failed'); }
   });
 
-  // ── Search & filter ───────────────────────────────────────────────────────
   document.getElementById('search-input')?.addEventListener('input', (e: any) => {
     searchQuery = e.target.value.toLowerCase().trim(); renderBlocks();
   });
@@ -696,43 +673,36 @@ const BLOCK_TYPES = [
   });
 
   // ── Quick-add URL ─────────────────────────────────────────────────────────
-  const quickInput   = document.getElementById('quick-add-input') as HTMLInputElement;
-  const detectZone   = document.getElementById('quick-detect-zone')!;
-  const platIconEl   = document.getElementById('quick-plat-icon')!;
-  const platLabelEl  = document.getElementById('quick-plat-label')!;
-  let   quickUrl     = '';
-  let   quickPlat: any = null;
+  const quickInput  = document.getElementById('quick-add-input') as HTMLInputElement;
+  const detectZone  = document.getElementById('quick-detect-zone')!;
+  const platIconEl  = document.getElementById('quick-plat-icon')!;
+  const platLabelEl = document.getElementById('quick-plat-label')!;
+  let quickUrl = ''; let quickPlat: any = null;
 
   quickInput?.addEventListener('input', () => {
     const val = quickInput.value.trim();
     if (val.startsWith('http')) {
-      quickUrl  = val;
-      quickPlat = detectPlatform(val);
+      quickUrl = val; quickPlat = detectPlatform(val);
       platIconEl.textContent  = quickPlat?.icon  ?? '🔗';
       platLabelEl.textContent = quickPlat?.label ?? 'Link detected';
-      detectZone.classList.remove('hidden');
-      detectZone.classList.add('flex');
+      detectZone.classList.remove('hidden'); detectZone.classList.add('flex');
     } else {
-      detectZone.classList.add('hidden');
-      detectZone.classList.remove('flex');
+      detectZone.classList.add('hidden'); detectZone.classList.remove('flex');
     }
   });
-
-  // Also trigger on paste
   quickInput?.addEventListener('paste', () => setTimeout(() => quickInput.dispatchEvent(new Event('input')), 0));
 
   document.getElementById('quick-add-confirm')?.addEventListener('click', async () => {
     if (!quickUrl) return;
     if (!canAddBlock) { toast.error('Block limit reached!'); return; }
-    const title   = getDefaultTitle(quickUrl, quickPlat);
+    const title = getDefaultTitle(quickUrl, quickPlat);
     const iconUrl = quickPlat?.defaultIcon ?? '';
     try {
-      const res = await fetch('/api/blocks', {
+      // FIX 1 : apiCall unwrap data.id correctement
+      const data = await apiCall('/api/blocks', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'link', title, config: { url: quickUrl, ...(iconUrl ? { icon_url: iconUrl } : {}) } }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       blocks.push({ id: data.id, type: 'link', title, config: { url: quickUrl, icon_url: iconUrl }, active: true, created_at: new Date().toISOString(), clicks: 0 });
       renderBlocks();
       toast.success(`${quickPlat?.label ?? 'Link'} added!`);
@@ -758,8 +728,6 @@ const BLOCK_TYPES = [
 
   function openTypeModal() {
     if (!canAddBlock) { toast.error('Block limit reached. Upgrade your plan!'); return; }
-
-    // Build platform grid
     const grid = document.getElementById('platform-grid')!;
     grid.innerHTML = PLATFORMS.slice(0, 8).map(p => `
       <button class="plat-btn flex flex-col items-center gap-1.5 p-2.5 glass border border-white/10 rounded-xl hover:border-neon-green/30 hover:bg-white/5 transition-all group"
@@ -768,7 +736,6 @@ const BLOCK_TYPES = [
         <span class="text-xs text-gray-400 group-hover:text-white transition-colors truncate w-full text-center">${p.label}</span>
       </button>
     `).join('');
-
     grid.querySelectorAll('.plat-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const plat = PLATFORMS.find(p => p.id === (btn as HTMLElement).dataset.pid)!;
@@ -776,13 +743,11 @@ const BLOCK_TYPES = [
         openEditModal('link', null, plat);
       });
     });
-
     openModal('type-modal');
   }
 
   document.getElementById('add-block-btn')?.addEventListener('click', openTypeModal);
   document.getElementById('empty-add-btn')?.addEventListener('click', openTypeModal);
-
   document.querySelectorAll('.block-type-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       closeModal('type-modal');
@@ -791,12 +756,12 @@ const BLOCK_TYPES = [
   });
 
   // ── Form ──────────────────────────────────────────────────────────────────
-  const INPUT_CLASS = 'w-full px-4 py-3 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none focus:ring-1 focus:ring-neon-green/20 transition-colors';
+  const IC = 'w-full px-4 py-3 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none focus:ring-1 focus:ring-neon-green/20 transition-colors';
 
   function openEditModal(type: string, block: any = null, suggestedPlat: any = null) {
     (document.getElementById('modal-title')!).textContent     = block ? `Edit ${type}` : `Add ${type}`;
     (document.getElementById('submit-text')!).textContent     = block ? 'Update Block' : 'Save Block';
-    (document.getElementById('block-id') as HTMLInputElement).value   = block?.id ?? '';
+    (document.getElementById('block-id')   as HTMLInputElement).value = block?.id ?? '';
     (document.getElementById('block-type') as HTMLInputElement).value = type;
 
     const val      = (key: string) => (block?.config?.[key] ?? '') as string;
@@ -804,76 +769,86 @@ const BLOCK_TYPES = [
     const iconVal  = block?.config?.icon_url ?? (suggestedPlat?.defaultIcon ?? '');
     const urlVal   = block?.config?.url ?? '';
 
-    // Icon preview widget
     const iconWidget = `
       <div class="space-y-1.5">
         <label class="text-sm font-medium text-gray-300 flex items-center gap-1.5">
-          Icon
-          <span class="text-xs text-gray-500 font-normal">optional — shown as circle</span>
+          Icon <span class="text-xs text-gray-500 font-normal">optional — shown as circle</span>
         </label>
         <div class="flex items-center gap-3">
           <div id="icon-preview-wrap"
             class="shrink-0 w-12 h-12 rounded-full overflow-hidden border-2 border-white/10 bg-white/5 flex items-center justify-center transition-all">
             ${iconVal
               ? `<img src="${iconVal}" class="w-full h-full object-cover" />`
-              : `<svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`
-            }
+              : `<svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`}
           </div>
-          <input type="url" id="field-icon-url" value="${iconVal}"
-            placeholder="https://example.com/icon.png"
-            class="${INPUT_CLASS} flex-1" />
+          <input type="url" id="field-icon-url" value="${iconVal}" placeholder="https://example.com/icon.png" class="${IC} flex-1" />
         </div>
         <p class="text-xs text-gray-600">Square image recommended (1:1).</p>
-      </div>
-    `;
+      </div>`;
 
+    // ─── FIX 1 : champs image/video/spacer maintenant complets ────────────
+    // L'ancien code n'avait pas de field-title pour image/video → config mal construite.
     const fieldHtml: Record<string, string> = {
       link: `
         <div class="space-y-1.5">
           <label class="text-sm font-medium text-gray-300">Title <span class="text-red-400">*</span></label>
-          <input type="text" id="field-title" value="${titleVal}" required maxlength="100" placeholder="My Twitch" class="${INPUT_CLASS}" />
+          <input type="text" id="field-title" value="${titleVal}" required maxlength="100" placeholder="My Twitch" class="${IC}" />
         </div>
         <div class="space-y-1.5">
           <label class="text-sm font-medium text-gray-300">URL <span class="text-red-400">*</span></label>
-          <input type="url" id="field-url" value="${urlVal}" required placeholder="https://twitch.tv/username" class="${INPUT_CLASS}" />
+          <input type="url" id="field-url" value="${urlVal}" required placeholder="https://twitch.tv/username" class="${IC}" />
         </div>
         ${iconWidget}`,
 
       heading: `
         <div class="space-y-1.5">
           <label class="text-sm font-medium text-gray-300">Heading Text <span class="text-red-400">*</span></label>
-          <input type="text" id="field-title" value="${titleVal}" required maxlength="100" placeholder="My Social Links" class="${INPUT_CLASS}" />
+          <input type="text" id="field-title" value="${titleVal}" required maxlength="100" placeholder="My Social Links" class="${IC}" />
         </div>`,
 
-      spacer: `<div class="py-4 text-center text-sm text-gray-500">No configuration needed.</div>`,
+      // spacer : aucun champ, le submit envoie juste type="spacer"
+      spacer: `
+        <div class="py-6 flex flex-col items-center gap-3 text-center">
+          <div class="text-3xl">—</div>
+          <p class="text-sm text-gray-400">A spacer adds blank space between blocks.</p>
+          <p class="text-xs text-gray-600">No configuration needed.</p>
+        </div>`,
 
       image: `
         <div class="space-y-1.5">
           <label class="text-sm font-medium text-gray-300">Image URL <span class="text-red-400">*</span></label>
-          <input type="url" id="field-url" value="${val('url')}" required placeholder="https://example.com/image.jpg" class="${INPUT_CLASS}" />
+          <input type="url" id="field-url" value="${val('url')}" required placeholder="https://example.com/image.jpg" class="${IC}" />
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-sm font-medium text-gray-300">Caption <span class="text-gray-500 font-normal text-xs ml-1">optional</span></label>
+          <input type="text" id="field-title" value="${titleVal}" maxlength="100" placeholder="My photo" class="${IC}" />
         </div>`,
 
       video: `
         <div class="space-y-1.5">
           <label class="text-sm font-medium text-gray-300">Video URL <span class="text-red-400">*</span></label>
-          <input type="url" id="field-url" value="${val('url')}" required placeholder="https://youtube.com/watch?v=…" class="${INPUT_CLASS}" />
+          <input type="url" id="field-url" value="${val('url')}" required placeholder="https://youtube.com/watch?v=…" class="${IC}" />
           <p class="text-xs text-gray-600">Supports YouTube, Vimeo, TikTok</p>
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-sm font-medium text-gray-300">Title <span class="text-gray-500 font-normal text-xs ml-1">optional</span></label>
+          <input type="text" id="field-title" value="${titleVal}" maxlength="100" placeholder="Watch my latest video" class="${IC}" />
         </div>`,
 
       social: `
         <div class="space-y-1.5">
           <label class="text-sm font-medium text-gray-300">Title <span class="text-gray-500 font-normal text-xs ml-1">Optional</span></label>
-          <input type="text" id="field-title" value="${titleVal}" maxlength="60" placeholder="Follow Me" class="${INPUT_CLASS}" />
+          <input type="text" id="field-title" value="${titleVal}" maxlength="60" placeholder="Follow Me" class="${IC}" />
         </div>
         <div class="space-y-1.5">
           <label class="text-sm font-medium text-gray-300">Social URLs <span class="text-red-400">*</span></label>
-          <textarea id="field-links" rows="3" required placeholder="https://twitter.com/user&#10;https://instagram.com/user" class="${INPUT_CLASS} resize-none">${block?.config?.links?.map((l: any) => l.url || l).join('\n') ?? ''}</textarea>
+          <textarea id="field-links" rows="3" required placeholder="https://twitter.com/user&#10;https://instagram.com/user" class="${IC} resize-none">${block?.config?.links?.map((l: any) => l.url || l).join('\n') ?? ''}</textarea>
           <p class="text-xs text-gray-600">One URL per line</p>
         </div>`,
     };
 
     const fields = document.getElementById('form-fields')!;
-    fields.innerHTML = fieldHtml[type] ?? '';
+    fields.innerHTML = fieldHtml[type] ?? `<div class="py-4 text-center text-sm text-gray-500">Type "${type}" not yet supported.</div>`;
     openModal('edit-modal');
     setTimeout(() => (fields.querySelector('input, textarea') as HTMLElement | null)?.focus(), 100);
 
@@ -888,11 +863,9 @@ const BLOCK_TYPES = [
           ? `<img src="${u}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='${emptyIcon.replace(/'/g, "\\'")}'" />`
           : emptyIcon;
       });
-
-      // Auto-suggest icon from URL field
       const urlField = document.getElementById('field-url') as HTMLInputElement | null;
       urlField?.addEventListener('blur', () => {
-        if (iconInput.value) return; // don't overwrite if user typed something
+        if (iconInput.value) return;
         const u = urlField.value.trim();
         if (!u) return;
         const plat = detectPlatform(u);
@@ -910,16 +883,16 @@ const BLOCK_TYPES = [
     if (isSaving) return;
 
     const type    = (document.getElementById('block-type') as HTMLInputElement).value;
-    const blockId = (document.getElementById('block-id') as HTMLInputElement).value ?? '';
+    const blockId = (document.getElementById('block-id')   as HTMLInputElement).value ?? '';
     const submitBtn  = document.getElementById('submit-btn');
     const submitText = document.getElementById('submit-text')!;
 
     let title: string | null = null;
     let config: any = {};
 
-    const titleEl   = document.getElementById('field-title')   as HTMLInputElement | null;
-    const urlEl     = document.getElementById('field-url')     as HTMLInputElement | null;
-    const linksEl   = document.getElementById('field-links')   as HTMLTextAreaElement | null;
+    const titleEl   = document.getElementById('field-title')    as HTMLInputElement | null;
+    const urlEl     = document.getElementById('field-url')      as HTMLInputElement | null;
+    const linksEl   = document.getElementById('field-links')    as HTMLTextAreaElement | null;
     const iconUrlEl = document.getElementById('field-icon-url') as HTMLInputElement | null;
 
     switch (type) {
@@ -927,9 +900,9 @@ const BLOCK_TYPES = [
         title = titleEl?.value?.trim() ?? null;
         const url     = urlEl?.value?.trim() ?? '';
         const iconUrl = iconUrlEl?.value?.trim() ?? '';
-        if (!title)                               { toast.error('Title is required'); return; }
-        if (!url || !url.startsWith('http'))      { toast.error('Valid URL required'); return; }
-        if (iconUrl && !iconUrl.startsWith('http')) { toast.error('Icon URL must start with https://'); return; }
+        if (!title)                                  { toast.error('Title is required'); return; }
+        if (!url || !url.startsWith('http'))         { toast.error('Valid URL required'); return; }
+        if (iconUrl && !iconUrl.startsWith('http'))  { toast.error('Icon URL must start with https://'); return; }
         config = { url, ...(iconUrl ? { icon_url: iconUrl } : {}) };
         break;
       }
@@ -937,22 +910,33 @@ const BLOCK_TYPES = [
         title = titleEl?.value?.trim() ?? null;
         if (!title) { toast.error('Heading text is required'); return; }
         break;
-      case 'spacer': break;
-      case 'image':
+      case 'spacer':
+        // Aucun champ requis — type seul suffit
+        break;
+      case 'image': {
+        const u = urlEl?.value?.trim() ?? '';
+        if (!u || !u.startsWith('http')) { toast.error('Valid image URL required'); return; }
+        title  = titleEl?.value?.trim() || null;
+        config = { url: u };
+        break;
+      }
       case 'video': {
         const u = urlEl?.value?.trim() ?? '';
-        if (!u || !u.startsWith('http')) { toast.error('Valid URL required'); return; }
+        if (!u || !u.startsWith('http')) { toast.error('Valid video URL required'); return; }
+        title  = titleEl?.value?.trim() || null;
         config = { url: u };
         break;
       }
       case 'social': {
         title = titleEl?.value?.trim() || null;
-        const raw = linksEl?.value?.trim() ?? '';
+        const raw   = linksEl?.value?.trim() ?? '';
         const links = raw.split('\n').map(u => u.trim()).filter(u => u.startsWith('http')).map(u => ({ url: u }));
         if (!links.length) { toast.error('At least one valid URL required'); return; }
         config = { links };
         break;
       }
+      default:
+        toast.error(`Unknown block type: ${type}`); return;
     }
 
     isSaving = true;
@@ -960,29 +944,39 @@ const BLOCK_TYPES = [
     submitText.textContent = blockId ? 'Updating…' : 'Saving…';
 
     try {
-      const res = await fetch(blockId ? `/api/blocks/${blockId}` : '/api/blocks', {
-        method: blockId ? 'PUT' : 'POST',
+      // FIX 1 + 4 : apiCall unwrap { success, data } → data.id est valide
+      const data = await apiCall(blockId ? `/api/blocks/${blockId}` : '/api/blocks', {
+        method:  blockId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, title: title ?? null, config }),
+        body:    JSON.stringify({ type, title: title ?? null, config }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        if (res.status === 403) toast.error('Block limit reached!');
-        else throw new Error(data.error || `HTTP ${res.status}`);
-        return;
-      }
 
       if (blockId) {
         const idx = blocks.findIndex((b: any) => b.id === blockId);
         if (idx !== -1) blocks[idx] = { ...blocks[idx], title, config, ...data };
       } else {
-        blocks.push({ id: data.id, type, title, config, active: true, created_at: new Date().toISOString(), clicks: 0, ...data });
+        // FIX 4 : le block apparaît immédiatement sans refresh
+        blocks.push({
+          id:         data.id,     // ← maintenant correctement défini
+          type,
+          title,
+          config,
+          active:     true,
+          created_at: new Date().toISOString(),
+          clicks:     0,
+          ...data,
+        });
       }
+
       closeModal('edit-modal');
       renderBlocks();
       toast.success(blockId ? 'Block updated!' : 'Block added!');
     } catch (err: any) {
-      toast.error(err.message || 'Failed to save block');
+      if (err.message?.includes('403') || err.message?.includes('limit')) {
+        toast.error('Block limit reached!');
+      } else {
+        toast.error(err.message || 'Failed to save block');
+      }
     } finally {
       isSaving = false;
       submitBtn?.removeAttribute('disabled');
@@ -990,7 +984,6 @@ const BLOCK_TYPES = [
     }
   });
 
-  // ── Edit / Duplicate / Delete ─────────────────────────────────────────────
   function handleEditBlock(id: string) {
     const block = blocks.find((b: any) => b.id === id);
     if (block) openEditModal(block.type, block, null);
@@ -1001,12 +994,10 @@ const BLOCK_TYPES = [
     if (!block) return;
     if (!canAddBlock) { toast.error('Block limit reached!'); return; }
     try {
-      const res = await fetch('/api/blocks', {
+      const data = await apiCall('/api/blocks', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: block.type, title: block.title ? `${block.title} (copy)` : null, config: block.config }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error);
       blocks.push({ ...block, id: data.id, title: block.title ? `${block.title} (copy)` : null, created_at: new Date().toISOString(), clicks: 0 });
       renderBlocks();
       toast.success('Block duplicated!');
@@ -1016,8 +1007,8 @@ const BLOCK_TYPES = [
   async function handleDeleteBlock(id: string) {
     if (!confirm('Delete this block? This cannot be undone.')) return;
     try {
-      const res = await fetch(`/api/blocks/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // FIX 3 : hard delete — l'API fait maintenant un DELETE Supabase direct
+      await apiCall(`/api/blocks/${id}`, { method: 'DELETE' });
       blocks = blocks.filter((b: any) => b.id !== id);
       selectedIds.delete(id);
       renderBlocks();
@@ -1025,7 +1016,6 @@ const BLOCK_TYPES = [
     } catch (err: any) { toast.error(err.message || 'Failed to delete'); }
   }
 
-  // ── Keyboard shortcuts ────────────────────────────────────────────────────
   document.addEventListener('keydown', (e: any) => {
     const tag = (document.activeElement as HTMLElement)?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
@@ -1033,6 +1023,5 @@ const BLOCK_TYPES = [
     if (e.key === 'Escape') { closeModal('type-modal'); closeModal('edit-modal'); }
   });
 
-  // ── Init ──────────────────────────────────────────────────────────────────
   renderBlocks();
 </script>
