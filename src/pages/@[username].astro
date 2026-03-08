@@ -685,7 +685,7 @@ function getSocialIconPath(url?: string): string {
       const p = new URLSearchParams(window.location.search);
 
       // Nettoie les UTMs : valeur vide = null (pas de pollution en base)
-      const utm = (key: string) => p.get(key)?.trim() || null;
+      const utm = (key) => p.get(key)?.trim() || null;
 
       fetch('/api/analytics/view', {
         method: 'POST',
@@ -883,12 +883,12 @@ function getSocialIconPath(url?: string): string {
     // querySelectorAll('[data-block-id]') attachait N listeners par block social
     // (un par icône) → chaque click pouvait générer plusieurs rows via bubbling.
     const _utmP      = new URLSearchParams(window.location.search);
-    const _clickSeen = new Map<string, number>(); // blockId → timestamp dernier click
+    const _clickSeen = new Map(); // blockId → timestamp dernier click
 
     document.addEventListener('click', (e) => {
       // Remonte jusqu'au premier ancêtre (ou self) portant data-block-id
-      const target = e.target as HTMLElement;
-      const el = target.closest('[data-block-id]') as HTMLElement | null;
+      const target = e.target;
+      const el = target.closest('[data-block-id]');
       if (!el) return;
 
       const blockId = el.dataset.blockId;
