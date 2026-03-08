@@ -39,7 +39,7 @@ export function getIP(request: Request): string {
 
 /** Hash anonymisé SHA-256 tronqué à 16 chars — jamais l'IP brute en base */
 export function hashIP(ip: string): string {
-  const salt = (process.env.ANALYTICS_SALT) || 'bioforge-analytics-v1'
+  const salt = (import.meta.env?.ANALYTICS_SALT ?? process.env?.ANALYTICS_SALT ?? 'bioforge-analytics-v1')
   return createHash('sha256').update(ip + salt).digest('hex').slice(0, 16)
 }
 

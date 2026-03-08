@@ -13,7 +13,6 @@ const supabase = createClient(
   import.meta.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
-// ── Validation ───────────────────────────────────────────────
 const schema = z.object({
   block_id:     z.string().uuid(),
   referrer:     z.string().max(500).nullable().optional(),
@@ -27,21 +26,29 @@ export const POST: APIRoute = async ({ request }) => {
   if (!request.headers.get('content-type')?.includes('application/json'))
     return new Response(null, { status: 415 })
 
-  // 2. Origin guard
+  // 2. Origin guard — accepte bioforge.click ET previews Vercel
   const origin = request.headers.get('origin') || request.headers.get('referer') || ''
-  if (import.meta.env.PROD && !origin.includes('bioforge.click'))
-    return new Response(null, { status: 403 })
+  if (import.meta.env.PROD) {
+    const allowed = origin.includes('bioforge.click') || origin.includes('.vercel.app')
+    if (!allowed) {
+      console.warn('[analytics/click] blocked origin:', origin)
+      return new Response(null, { status: 403 })
+    }
+  }
 
-  // 3. Parse body
+  // 3. Parse + validate
   let body: unknown
   try { body = await request.json() } catch {
     return new Response(null, { status: 400 })
   }
   const parsed = schema.safeParse(body)
-  if (!parsed.success) return new Response(null, { status: 400 })
+  if (!parsed.success) {
+    console.warn('[analytics/click] validation failed:', parsed.error.flatten())
+    return new Response(null, { status: 400 })
+  }
   const d = parsed.data
 
-  // 4. Bot check — les bots ne génèrent pas de clicks réels
+  // 4. Bot check
   const ua = request.headers.get('user-agent') || ''
   const { isBot, botName } = detectBot(ua)
   if (isBot) {
@@ -58,53 +65,70 @@ export const POST: APIRoute = async ({ request }) => {
     .is('deleted_at', null)
     .single()
 
-  if (blockError || !block)
-    return new Response(JSON.stringify({ ok: false }), { status: 200 })
-
-  // 6. IP + hash
-  const ip     = getIP(request)
-  const ipHash = hashIP(ip)
-
-  // 7. UA
-  const { browser, os, device_type, inferredReferrer } = parseUA(ua)
-
-  // 8. GeoIP (timeout 2s, silencieux si erreur)
-  const { country, city, is_vpn, is_hosting } = await resolveGeoIP(ip)
-
-  // 9. Referrer
-  const { domain: referrerDomain } = cleanReferrer(d.referrer)
-  const referrer = referrerDomain || inferredReferrer
-
-  // 10. Insert raw click
-  const { error: insertError } = await supabase.from('block_clicks').insert({
-    block_id:    d.block_id,
-    profile_id:  block.profile_id,
-    ip_hash:     ipHash,
-    country,
-    city,
-    is_vpn,
-    is_hosting,
-    device_type,
-    os,
-    browser,
-    referrer,
-    utm_source:   cleanUtm(d.utm_source),
-    utm_medium:   cleanUtm(d.utm_medium),
-    utm_campaign: cleanUtm(d.utm_campaign),
-  })
-
-  if (insertError) {
-    console.error('[analytics/click] insert:', insertError.message)
+  if (blockError || !block) {
+    console.error('[analytics/click] block not found:', d.block_id, blockError?.message)
     return new Response(JSON.stringify({ ok: false }), { status: 200 })
   }
 
-  // 11. Incrément compteur journalier
+  // 6. IP + hash + UA
+  const ip     = getIP(request)
+  const ipHash = hashIP(ip)
+  const { browser, os, device_type, inferredReferrer } = parseUA(ua)
+  const { domain: referrerDomain } = cleanReferrer(d.referrer)
+  const referrer = referrerDomain || inferredReferrer
+
+  // 7. ⚡ RPC d'abord — incrément compteur journalier (chemin critique)
   const today = new Date().toISOString().split('T')[0]
-  await supabase.rpc('increment_block_clicks', {
+  const { error: rpcError } = await supabase.rpc('increment_block_clicks', {
     p_block_id: d.block_id,
     p_date:     today,
   })
+  if (rpcError) console.error('[analytics/click] rpc error:', rpcError.message)
 
+  // 8. GeoIP + insert raw click (fire-and-forget, non-bloquant)
+  resolveGeoIP(ip).then(({ country, city, is_vpn, is_hosting }) => {
+    const payload: Record<string, unknown> = {
+      block_id:    d.block_id,
+      profile_id:  block.profile_id,
+      ip_hash:     ipHash,
+      country,
+      city,
+      device_type,
+      os,
+      browser,
+      referrer,
+      utm_source:   cleanUtm(d.utm_source),
+      utm_medium:   cleanUtm(d.utm_medium),
+      utm_campaign: cleanUtm(d.utm_campaign),
+      is_vpn,
+      is_hosting,
+    }
+    supabase.from('block_clicks').insert(payload)
+      .then(({ error }) => {
+        if (error) {
+          const { is_vpn: _v, is_hosting: _h, ...fallback } = payload
+          supabase.from('block_clicks').insert(fallback)
+            .then(({ error: e2 }) => {
+              if (e2) console.error('[analytics/click] insert fallback error:', e2.message)
+            })
+        }
+      })
+  }).catch(() => {
+    supabase.from('block_clicks').insert({
+      block_id:    d.block_id,
+      profile_id:  block.profile_id,
+      ip_hash:     ipHash,
+      device_type,
+      os,
+      browser,
+      referrer,
+      utm_source:   cleanUtm(d.utm_source),
+      utm_medium:   cleanUtm(d.utm_medium),
+      utm_campaign: cleanUtm(d.utm_campaign),
+    }).then(() => {})
+  })
+
+  // 9. Réponse immédiate
   return new Response(JSON.stringify({ ok: true }), {
     status: 200, headers: { 'Content-Type': 'application/json' },
   })
