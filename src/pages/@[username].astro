@@ -130,7 +130,7 @@ const pageTitle     = profile.display_name
 const pageDesc      = profile.bio
   ? `${profile.bio} — Retrouvez tous les liens de ${profile.display_name || profile.username} sur BioForge.`
   : `Retrouvez tous les liens de ${profile.display_name || profile.username} sur BioForge.`;
-const ogImage       = profile.avatar_url || `https://bioforge.click/og-default.png`;
+const ogImage       = profile.avatar_url || `https://bioforge.click/api/profile/og/${profile.username}.png`;
 
 // ==================== GOOGLE FONTS ====================
 const fontParam = encodeURIComponent(theme.font_family);
