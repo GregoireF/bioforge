@@ -7,6 +7,8 @@ import {
   detectBot, parseUA,
   resolveGeoIP, cleanReferrer, cleanUtm,
 } from '@/lib/analytics/helpers'
+import { checkRateLimit, rateLimitedResponse } from '@/lib/security/rate-limit'
+import { auditLog } from '@/lib/security/audit'
 
 const supabase = createClient(
   import.meta.env.PUBLIC_SUPABASE_URL,
@@ -66,6 +68,11 @@ export const POST: APIRoute = async ({ request }) => {
   // 5. IP + hash
   const ip     = getIP(request)
   const ipHash = hashIP(ip)
+
+  const { allowed } = await checkRateLimit('analytics_view', ipHash)
+  if (!allowed) {
+    return rateLimitedResponse(60)
+  }
 
   // 6. Déduplication 24h côté serveur (ip_hash + profile_id)
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()

@@ -7,6 +7,7 @@ import {
   detectBot, parseUA,
   resolveGeoIP, cleanReferrer, cleanUtm,
 } from '@/lib/analytics/helpers'
+import { checkRateLimit, rateLimitedResponse } from '@/lib/security/rate-limit'
 
 const supabase = createClient(
   import.meta.env.PUBLIC_SUPABASE_URL,
@@ -35,6 +36,7 @@ export const POST: APIRoute = async ({ request }) => {
   try { body = await request.json() } catch {
     return new Response(null, { status: 400 })
   }
+
   const parsed = schema.safeParse(body)
   if (!parsed.success) {
     console.warn('[analytics/click] validation failed:', parsed.error.flatten())
@@ -67,6 +69,9 @@ export const POST: APIRoute = async ({ request }) => {
   // 6. IP + hash + UA
   const ip     = getIP(request)
   const ipHash = hashIP(ip)
+
+  const { allowed } = await checkRateLimit('analytics_click', ipHash)
+  if (!allowed) return rateLimitedResponse(60)
   const { browser, os, device_type, inferredReferrer } = parseUA(ua)
   const { domain: referrerDomain } = cleanReferrer(d.referrer)
   const referrer = referrerDomain || inferredReferrer
