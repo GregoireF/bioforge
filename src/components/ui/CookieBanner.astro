@@ -1,9 +1,4 @@
 ---
-// src/components/CookieBanner.astro
-// Banner de consentement RGPD — affiché sur les pages de profil public.
-// Props : profileId (pour enregistrer le consentement côté serveur),
-//         primaryColor + bgColor pour s'adapter au thème du profil.
-
 interface Props {
   profileId:    string
   primaryColor: string
@@ -140,7 +135,6 @@ const { profileId, primaryColor, bgColor, textColor } = Astro.props
   const existing = getStoredConsent()
 
   if (existing !== null) {
-    // Consentement déjà enregistré — émet l'event immédiatement sans afficher le banner
     window.dispatchEvent(new CustomEvent('bf:consent', { detail: { analytics: existing.analytics } }))
   } else {
     showBanner()

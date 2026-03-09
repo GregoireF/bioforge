@@ -268,9 +268,6 @@ function getSocialIconPath(url?: string): string {
             </svg>
           )}
         </h1>
-        {profile.display_name && (
-          <p class="text-sm mb-3 font-mono" style={`color: ${tc}; opacity: 0.45;`}>@{profile.username}</p>
-        )}
         {profile.bio && (
           <p class="text-sm lg:text-base leading-relaxed max-w-sm mx-auto" style={`color: ${tc}; opacity: 0.75;`}>
             {profile.bio}
