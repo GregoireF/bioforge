@@ -129,7 +129,7 @@ const { profileId, primaryColor, bgColor, textColor } = Astro.props
     window.dispatchEvent(new CustomEvent('bf:consent', { detail: { analytics } }))
 
     // Enregistre côté serveur avec action explicite (Art. 7 RGPD — preuve)
-    fetch('/api/gdpr/consent', {
+    fetch('/api/rgpd/consent', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ profile_id: profileId, analytics, action, source: 'banner' }),
