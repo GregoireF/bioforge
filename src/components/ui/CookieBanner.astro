@@ -1,0 +1,150 @@
+---
+// Banner de consentement RGPD — affiché sur les pages de profil public.
+// Props : profileId (pour enregistrer le consentement côté serveur),
+//         primaryColor + bgColor pour s'adapter au thème du profil.
+
+interface Props {
+  profileId:    string
+  primaryColor: string
+  bgColor:      string
+  textColor:    string
+}
+
+const { profileId, primaryColor, bgColor, textColor } = Astro.props
+---
+
+<div
+  id="cookie-banner"
+  role="dialog"
+  aria-live="polite"
+  aria-label="Consentement cookies"
+  class="fixed bottom-0 left-0 right-0 z-[99999] px-4 pb-4 pt-0
+         translate-y-full opacity-0 transition-all duration-500 ease-out"
+>
+  <div
+    class="max-w-2xl mx-auto rounded-2xl p-5 shadow-2xl"
+    style={`
+      background: ${bgColor}F2;
+      border: 1px solid ${textColor}15;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    `}
+  >
+    <!-- Header -->
+    <div class="flex items-start gap-3 mb-3">
+      <div class="shrink-0 w-8 h-8 rounded-full flex items-center justify-center mt-0.5"
+        style={`background: ${primaryColor}20;`}>
+        <svg class="w-4 h-4" fill="none" stroke={primaryColor} viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+        </svg>
+      </div>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-semibold mb-1" style={`color: ${textColor};`}>
+          Respect de votre vie privée
+        </p>
+        <p class="text-xs leading-relaxed" style={`color: ${textColor}; opacity: 0.65;`}>
+          Cette page utilise des analytics anonymes (appareil, pays, source de visite) pour aider le créateur à comprendre son audience. Aucun cookie tiers, aucune publicité.
+          <a href="/privacy" target="_blank" class="underline ml-1 hover:opacity-100 transition-opacity"
+            style={`color: ${primaryColor};`}>Politique de confidentialité</a>
+        </p>
+      </div>
+    </div>
+
+    <!-- Boutons -->
+    <div class="flex items-center gap-2 justify-end flex-wrap">
+      <button
+        id="cookie-reject"
+        class="px-4 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-80 active:scale-95"
+        style={`
+          background: ${textColor}10;
+          border: 1px solid ${textColor}20;
+          color: ${textColor};
+          opacity: 0.7;
+        `}
+      >
+        Refuser
+      </button>
+
+      <button
+        id="cookie-accept"
+        class="px-5 py-2 rounded-xl text-xs font-bold transition-all hover:opacity-90 active:scale-95"
+        style={`background: ${primaryColor}; color: ${bgColor};`}
+      >
+        Accepter
+      </button>
+    </div>
+  </div>
+</div>
+
+<script define:vars={{ profileId, CONSENT_KEY: `bf_consent_${profileId}` }}>
+  const banner  = document.getElementById('cookie-banner')
+  const btnOk   = document.getElementById('cookie-accept')
+  const btnNo   = document.getElementById('cookie-reject')
+
+  // Vérifie si le consentement a déjà été donné (localStorage)
+  function getStoredConsent() {
+    try {
+      const raw = localStorage.getItem(CONSENT_KEY)
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      // Expire après 6 mois (RGPD recommande re-confirmation)
+      if (Date.now() - parsed.ts > 180 * 24 * 60 * 60 * 1000) {
+        localStorage.removeItem(CONSENT_KEY)
+        return null
+      }
+      return parsed
+    } catch { return null }
+  }
+
+  function storeConsent(analytics) {
+    try {
+      localStorage.setItem(CONSENT_KEY, JSON.stringify({
+        analytics,
+        ts: Date.now(),
+      }))
+    } catch {}
+  }
+
+  function hideBanner() {
+    if (!banner) return
+    banner.classList.add('translate-y-full', 'opacity-0')
+    banner.classList.remove('translate-y-0', 'opacity-100')
+  }
+
+  function showBanner() {
+    if (!banner) return
+    // Petit délai pour laisser la page se rendre
+    setTimeout(() => {
+      banner.classList.remove('translate-y-full', 'opacity-0')
+      banner.classList.add('translate-y-0', 'opacity-100')
+    }, 800)
+  }
+
+  async function recordConsent(analytics, action = analytics ? 'accept' : 'reject') {
+    storeConsent(analytics)
+    hideBanner()
+
+    window.dispatchEvent(new CustomEvent('bf:consent', { detail: { analytics } }))
+
+    // Enregistre côté serveur avec action explicite (Art. 7 RGPD — preuve)
+    fetch('/api/rgpd/consent', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ profile_id: profileId, analytics, action, source: 'banner' }),
+    }).catch(() => {})
+  }
+
+  // Init
+  const existing = getStoredConsent()
+
+  if (existing !== null) {
+    // Consentement déjà enregistré — émet l'event immédiatement sans afficher le banner
+    window.dispatchEvent(new CustomEvent('bf:consent', { detail: { analytics: existing.analytics } }))
+  } else {
+    showBanner()
+  }
+
+  btnOk?.addEventListener('click', () => recordConsent(true))
+  btnNo?.addEventListener('click', () => recordConsent(false))
+</script>
