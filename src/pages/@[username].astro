@@ -2,7 +2,7 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { getProfileByUsername, getActiveBlocks } from '@/lib/supabase/queries';
 import QRCode from 'qrcode';
-import CookieBanner from '@/components/CookieBanner.astro';
+import CookieBanner from '@/components/ui/CookieBanner.astro';
 
 // ==================== PARAMS ====================
 const { username } = Astro.params;
