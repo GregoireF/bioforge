@@ -2,6 +2,7 @@
 import BaseLayout from '@/layouts/BaseLayout.astro';
 import { getProfileByUsername, getActiveBlocks } from '@/lib/supabase/queries';
 import QRCode from 'qrcode';
+import CookieBanner from '@/components/ui/CookieBanner.astro';
 
 // ==================== PARAMS ====================
 const { username } = Astro.params;
@@ -467,9 +468,9 @@ function getSocialIconPath(url?: string): string {
     </div>
   </div>
 
-  <!-- ===== QR CODE FIXE ===== -->
+  <!-- ===== QR CODE FIXE (desktop uniquement) ===== -->
   {qrDataUrl && (
-    <div class="fixed bottom-6 right-6 z-50 group">
+    <div class="hidden lg:block fixed bottom-6 right-6 z-50 group">
       <div class="p-3 rounded-2xl shadow-2xl border transition-all group-hover:scale-105"
         style={`background: ${bg}CC; border-color: ${pc}30; backdrop-filter: blur(12px);`}>
         <img src={qrDataUrl} alt={`QR code du profil de ${profile.username}`} class="w-24 h-24 rounded-xl" />
@@ -647,6 +648,14 @@ function getSocialIconPath(url?: string): string {
     </div>
   </div>
 
+  <!-- ===== COOKIE BANNER (RGPD) ===== -->
+  <CookieBanner
+    profileId={profile.id}
+    primaryColor={pc}
+    bgColor={bg}
+    textColor={tc}
+  />
+
   <!-- ===== STYLES ===== -->
   <style>
     @keyframes fade-in-up {
@@ -678,15 +687,19 @@ function getSocialIconPath(url?: string): string {
 
     const { profileId, profileUrl, profileName, primaryColor: pc, bgColor: bg, textColor: tc, qrDataUrl } = JSON.parse(bridgeJson);
 
-    // ── View tracking ─────────────────────────────────────────────────────────
-    // Déduplication gérée côté serveur (ip_hash + profile_id, fenêtre 24h).
-    // On envoie systématiquement — l'API décide si c'est une vue unique ou non.
-    ;(() => {
-      const p = new URLSearchParams(window.location.search);
+    // ── View tracking (gated sur consentement RGPD) ──────────────────────────
+    // IMPORTANT : pas de listener bf:consent pour le view tracking.
+    // Raison : race condition — le CookieBanner dispatche l'événement au chargement
+    // si le consentement est déjà stocké, AVANT que ce listener soit enregistré.
+    // Solution : lire localStorage directement, puis écouter pour les nouvelles décisions.
 
-      // Nettoie les UTMs : valeur vide = null (pas de pollution en base)
-      const utm = (key) => p.get(key)?.trim() || null;
+    const _utmParams = new URLSearchParams(window.location.search);
+    const utm = (key) => _utmParams.get(key)?.trim() || null;
+    let _viewFired = false;
 
+    function fireViewTracking() {
+      if (_viewFired) return; // idempotent
+      _viewFired = true;
       fetch('/api/analytics/view', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -700,7 +713,20 @@ function getSocialIconPath(url?: string): string {
           utm_term:     utm('utm_term'),
         }),
       }).catch(() => {});
-    })();
+    }
+
+    // 1. Consentement déjà enregistré → fire immédiatement (pas de race condition)
+    try {
+      const _stored = JSON.parse(localStorage.getItem('bf_consent_analytics') || 'null');
+      if (_stored?.analytics === true) {
+        fireViewTracking();
+      }
+    } catch {}
+
+    // 2. Nouvelle décision depuis le banner → fire si accepté
+    window.addEventListener('bf:consent', (e) => {
+      if (e.detail?.analytics === true) fireViewTracking();
+    });
 
     // ── Dropdown 3-dot ───────────────────────────────────────────────────────
     function closeAllDropdowns() {
@@ -878,39 +904,54 @@ function getSocialIconPath(url?: string): string {
       window.open(`/report?url=${encodeURIComponent(currentShareUrl || profileUrl)}`, '_blank');
     });
 
-    // ── Analytics — clicks ───────────────────────────────────────────────────
-    // Event delegation sur document : 1 seul listener, pas de duplication.
-    // querySelectorAll('[data-block-id]') attachait N listeners par block social
-    // (un par icône) → chaque click pouvait générer plusieurs rows via bubbling.
-    const _utmP      = new URLSearchParams(window.location.search);
+    // ── Analytics — clicks (gated sur consentement RGPD) ───────────────────
+    // Même logique que le view tracking : lire localStorage directement,
+    // pas de race condition possible.
     const _clickSeen = new Map(); // blockId → timestamp dernier click
+    let   _clicksEnabled = false;
 
-    document.addEventListener('click', (e) => {
-      // Remonte jusqu'au premier ancêtre (ou self) portant data-block-id
-      const target = e.target;
-      const el = target.closest('[data-block-id]');
-      if (!el) return;
+    function attachClickTracking() {
+      if (_clicksEnabled) return;
+      _clicksEnabled = true;
 
-      const blockId = el.dataset.blockId;
-      if (!blockId) return;
+      document.addEventListener('click', (e) => {
+        const target = e.target;
+        const el = target.closest('[data-block-id]');
+        if (!el) return;
 
-      // Cooldown par block (1s) — évite le double-fire sur les in-app browsers
-      // qui peuvent émettre 2 events click sur un même tap
-      const now = Date.now();
-      if (_clickSeen.has(blockId) && now - (_clickSeen.get(blockId) ?? 0) < 1000) return;
-      _clickSeen.set(blockId, now);
+        const blockId = el.dataset.blockId;
+        if (!blockId) return;
 
-      fetch('/api/analytics/click', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          block_id:     blockId,
-          referrer:     document.referrer || null,
-          utm_source:   _utmP.get('utm_source'),
-          utm_medium:   _utmP.get('utm_medium'),
-          utm_campaign: _utmP.get('utm_campaign'),
-        }),
-      }).catch(() => {});
+        // Cooldown 1s par block — évite double-fire in-app browsers
+        const now = Date.now();
+        if (_clickSeen.has(blockId) && now - (_clickSeen.get(blockId) || 0) < 1000) return;
+        _clickSeen.set(blockId, now);
+
+        fetch('/api/analytics/click', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            block_id:     blockId,
+            referrer:     document.referrer || null,
+            utm_source:   utm('utm_source'),
+            utm_medium:   utm('utm_medium'),
+            utm_campaign: utm('utm_campaign'),
+          }),
+        }).catch(() => {});
+      });
+    }
+
+    // 1. Consentement déjà enregistré → activer immédiatement
+    try {
+      const _stored = JSON.parse(localStorage.getItem('bf_consent_analytics') || 'null');
+      if (_stored?.analytics === true) {
+        attachClickTracking();
+      }
+    } catch {}
+
+    // 2. Nouvelle décision depuis le banner → activer si accepté
+    window.addEventListener('bf:consent', (e) => {
+      if (e.detail?.analytics === true) attachClickTracking();
     });
 
   </script>
