@@ -1,4 +1,5 @@
 ---
+// src/components/CookieBanner.astro
 // Banner de consentement RGPD — affiché sur les pages de profil public.
 // Props : profileId (pour enregistrer le consentement côté serveur),
 //         primaryColor + bgColor pour s'adapter au thème du profil.
@@ -77,7 +78,7 @@ const { profileId, primaryColor, bgColor, textColor } = Astro.props
   </div>
 </div>
 
-<script define:vars={{ profileId, CONSENT_KEY: `bf_consent_${profileId}` }}>
+<script define:vars={{ profileId, CONSENT_KEY: 'bf_consent_analytics' }}>
   const banner  = document.getElementById('cookie-banner')
   const btnOk   = document.getElementById('cookie-accept')
   const btnNo   = document.getElementById('cookie-reject')
@@ -128,7 +129,7 @@ const { profileId, primaryColor, bgColor, textColor } = Astro.props
     window.dispatchEvent(new CustomEvent('bf:consent', { detail: { analytics } }))
 
     // Enregistre côté serveur avec action explicite (Art. 7 RGPD — preuve)
-    fetch('/api/rgpd/consent', {
+    fetch('/api/gdpr/consent', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ profile_id: profileId, analytics, action, source: 'banner' }),
