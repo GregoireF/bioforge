@@ -399,18 +399,19 @@ function getSocialIconPath(url?: string): string {
 
               return (
                 <div class={`block-dot-wrap group relative ${animClass}`} style={delay}>
+                  {/* Link button — icon absolute left, text always truly centered */}
                   <a href={url} target="_blank" rel="noopener noreferrer"
                     data-block-id={block.id}
-                    class={`flex items-center w-full ${theme.animations ? 'hover:scale-[1.02] active:scale-[0.98]' : ''} transition-transform`}
+                    class={`relative flex items-center justify-center w-full ${theme.animations ? 'hover:scale-[1.02] active:scale-[0.98]' : ''} transition-transform`}
                     style={btnStyle}>
                     {hasIcon && (
-                      <div class="shrink-0 w-9 h-9 rounded-full overflow-hidden mr-4 border-2"
+                      <div class="absolute left-4 top-1/2 -translate-y-1/2 shrink-0 w-9 h-9 rounded-full overflow-hidden border-2 z-10"
                         style={`border-color: ${bg}40;`}>
                         <img src={iconUrl} alt="" class="w-full h-full object-cover" loading="lazy" />
                       </div>
                     )}
-                    <span class={hasIcon ? 'flex-1 text-left' : 'flex-1 text-center'}>
-                      {block.title || 'Link'}
+                    <span class="text-center px-14 leading-tight">
+                      {(block.title || 'Link').trim()}
                     </span>
                   </a>
                   <!-- 3-dot button -->
