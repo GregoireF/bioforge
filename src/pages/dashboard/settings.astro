@@ -1,6 +1,7 @@
 ---
-// src/pages/dashboard/settings.astro — Settings v2
+// src/pages/dashboard/settings.astro — Settings v3 (RGPD)
 // OAuth only (no password/email change) · Tabs · Avatar upload · Sessions · Delete typed confirm
+// RGPD : export → /api/gdpr/export (Art.20) · delete → /api/gdpr/delete (Art.17) · consent withdrawal (Art.7)
 
 import DashboardLayout from '@/layouts/DashboardLayout.astro';
 import Card from '@/components/ui/Card.astro';
@@ -300,7 +301,7 @@ const bridge = JSON.stringify({
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
               </svg>
               Export my data (JSON)
-              <span class="ml-auto text-xs text-gray-600">profile + blocks</span>
+              <span class="ml-auto text-xs text-gray-600">Art. 20 RGPD</span>
             </button>
           </div>
         </div>
@@ -349,7 +350,7 @@ const bridge = JSON.stringify({
         {[
           { id: 'email_notifications', label: 'Weekly analytics report',          desc: 'Receive a summary every Monday',        checked: true  },
           { id: 'marketing_emails',    label: 'Tips & product updates',            desc: 'Growth tips and feature announcements', checked: false },
-          { id: 'profile_public',      label: 'Profile visible to search engines', desc: 'Allow indexing by Google, Bing…',       checked: true  },
+          { id: 'profile_public',      label: 'Profile visible to search engines', desc: 'Allow indexing by Google, Bing\u2026',       checked: true  },
         ].map(opt => (
           <label class="flex items-center justify-between p-3.5 glass rounded-xl cursor-pointer hover:bg-white/5 transition-colors border border-white/5">
             <div>
@@ -407,6 +408,40 @@ const bridge = JSON.stringify({
         </svg>
         Export JSON
       </button>
+    </div>
+
+    <!-- ── RGPD : Consentement analytics (Art. 7) ── -->
+    <div class="p-5 glass border border-white/10 rounded-2xl space-y-4">
+      <div class="flex items-start gap-4">
+        <div class="w-10 h-10 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center shrink-0">
+          <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+          </svg>
+        </div>
+        <div class="flex-1">
+          <h3 class="text-white font-semibold text-sm mb-1">Analytics Consent</h3>
+          <p class="text-xs text-gray-400 leading-relaxed">
+            Control whether your visits to creator pages are tracked. You can withdraw consent at any time —
+            this stops all future tracking and is recorded in our audit log (Art. 7 RGPD).
+          </p>
+        </div>
+      </div>
+      <div class="flex items-center justify-between p-4 bg-white/3 border border-white/8 rounded-xl">
+        <div>
+          <p id="consent-status-label" class="text-sm font-medium text-gray-400">Loading\u2026</p>
+          <p id="consent-status-date"  class="text-xs text-gray-500 mt-0.5"></p>
+        </div>
+        <div class="flex items-center gap-3">
+          <button id="consent-accept-btn"
+            class="hidden px-4 py-2 rounded-xl text-xs font-semibold bg-neon-green/20 border border-neon-green/30 text-neon-green hover:bg-neon-green/30 transition-all">
+            Accept Analytics
+          </button>
+          <button id="consent-withdraw-btn"
+            class="hidden px-4 py-2 rounded-xl text-xs font-semibold bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 hover:bg-yellow-500/20 transition-all">
+            Withdraw Consent
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Delete account -->
@@ -505,6 +540,7 @@ const bridge = JSON.stringify({
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('hidden', p.id !== `panel-${id}`));
     if (id === 'sessions') loadSessions();
+    if (id === 'danger')   loadConsentStatus(); // RGPD Art.7 — charge le statut consentement
   }
   document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => activateTab(b.dataset.tab)));
   activateTab('profile');
@@ -537,7 +573,7 @@ const bridge = JSON.stringify({
     fd.append('avatar', file);
     progressWrap?.classList.remove('hidden');
     if (progressBar) progressBar.style.width = '0%';
-    if (uploadStatus) { uploadStatus.textContent = 'Uploading…'; uploadStatus.classList.remove('hidden'); }
+    if (uploadStatus) { uploadStatus.textContent = 'Uploading\u2026'; uploadStatus.classList.remove('hidden'); }
     let pct = 0;
     const tick = setInterval(() => { pct = Math.min(pct + 10, 85); if (progressBar) progressBar.style.width = `${pct}%`; }, 80);
     try {
@@ -547,12 +583,12 @@ const bridge = JSON.stringify({
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `HTTP ${res.status}`); }
       const data = await res.json();
       if (avatarPreview && data.avatar_url) avatarPreview.src = data.avatar_url;
-      if (uploadStatus) uploadStatus.textContent = '✓ Avatar updated';
+      if (uploadStatus) uploadStatus.textContent = '\u2713 Avatar updated';
       toast.success('Avatar updated!');
     } catch (err) {
       clearInterval(tick);
       if (progressBar) progressBar.style.width = '0%';
-      if (uploadStatus) uploadStatus.textContent = '✗ Upload failed';
+      if (uploadStatus) uploadStatus.textContent = '\u2717 Upload failed';
       toast.error(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setTimeout(() => progressWrap?.classList.add('hidden'), 1500);
@@ -575,7 +611,7 @@ const bridge = JSON.stringify({
   bioTextarea?.addEventListener('input', updateBioCount);
   updateBioCount();
 
-  const suggestions = ['✨ Creating magic on the internet','🚀 Building the future, one link at a time','💡 Sharing ideas that matter','🎨 Digital creator & storyteller','🌍 Making connections worldwide','📸 Capturing moments, sharing stories','💻 Tech enthusiast & problem solver','🎯 Helping you reach your goals'];
+  const suggestions = ['\u2728 Creating magic on the internet','\ud83d\ude80 Building the future, one link at a time','\ud83d\udca1 Sharing ideas that matter','\ud83c\udfa8 Digital creator & storyteller','\ud83c\udf0d Making connections worldwide','\ud83d\udcf8 Capturing moments, sharing stories','\ud83d\udcbb Tech enthusiast & problem solver','\ud83c\udfaf Helping you reach your goals'];
   document.getElementById('bio-suggestions-btn')?.addEventListener('click', () => {
     const s = suggestions[Math.floor(Math.random() * suggestions.length)];
     if (bioTextarea) { bioTextarea.value = s; updateBioCount(); }
@@ -596,13 +632,13 @@ const bridge = JSON.stringify({
   async function checkUsername() {
     const val = document.getElementById('username')?.value?.trim() ?? '';
     if (!val) return;
-    if (!/^[a-z0-9_]{3,24}$/.test(val)) { showFeedback('3–24 chars · lowercase, numbers, underscores only', false); return; }
-    if (val === username) { showFeedback('✓ This is your current username', true); return; }
+    if (!/^[a-z0-9_]{3,24}$/.test(val)) { showFeedback('3\u201324 chars \u00b7 lowercase, numbers, underscores only', false); return; }
+    if (val === username) { showFeedback('\u2713 This is your current username', true); return; }
     try {
       const r = await fetch(`/api/profile/check-username?username=${encodeURIComponent(val)}`);
       const d = await r.json();
       const available = d.data?.available ?? false;
-      showFeedback(available ? '✓ Available!' : '✗ Already taken', available);
+      showFeedback(available ? '\u2713 Available!' : '\u2717 Already taken', available);
     } catch { showFeedback('Could not check availability', false); }
   }
 
@@ -614,7 +650,7 @@ const bridge = JSON.stringify({
     const btn = document.getElementById('save-profile-btn');
     const txt = document.getElementById('save-profile-text');
     btn?.setAttribute('disabled', '');
-    if (txt) txt.textContent = 'Saving…';
+    if (txt) txt.textContent = 'Saving\u2026';
     const fd   = new FormData(e.target);
     const data = {
       display_name: String(fd.get('display_name') ?? '').trim().slice(0, 60),
@@ -647,14 +683,6 @@ const bridge = JSON.stringify({
 
   // ==================== SOCIAL SHARE ====================
   const shareText = 'Check out my profile on BioForge!';
-  ({
-    'share-x':        () => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(profileUrl)}`, '_blank'),
-    'share-facebook': () => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(profileUrl)}`, '_blank'),
-    'share-linkedin': () => window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(profileUrl)}`, '_blank'),
-    'share-whatsapp': () => window.open(`https://wa.me/?text=${encodeURIComponent(`${shareText} ${profileUrl}`)}`, '_blank'),
-  } as Record<string, () => void>);
-
-  // Fix: iterate properly
   const shareHandlers = {
     'share-x':        () => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(profileUrl)}`, '_blank'),
     'share-facebook': () => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(profileUrl)}`, '_blank'),
@@ -682,18 +710,20 @@ const bridge = JSON.stringify({
     toast.success('QR code downloaded!');
   });
 
-  // ==================== EXPORT DATA ====================
+  // ==================== EXPORT DATA (RGPD Art.20) ====================
   async function exportData() {
     try {
-      const res = await fetch('/api/profile/export');
+      toast.info('Preparing your data export\u2026');
+      const res = await fetch('/api/rgpd/export', { method: 'POST' });
+      if (res.status === 429) { toast.error('Too many export requests. Try again later.'); return; }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement('a');
-      a.href = url; a.download = `bioforge-export-${username}-${Date.now()}.json`;
+      a.href = url; a.download = `bioforge-rgpd-export-${username}-${Date.now()}.json`;
       a.click(); URL.revokeObjectURL(url);
-      toast.success('Data exported!');
+      toast.success('Data exported! Check your downloads.');
     } catch (err) { toast.error(err instanceof Error ? err.message : 'Export failed'); }
   }
   document.getElementById('export-data-btn')?.addEventListener('click', exportData);
@@ -719,8 +749,8 @@ const bridge = JSON.stringify({
         const iconPath  = DEVICE_ICONS[s.device_type ?? 'desktop'] ?? DEVICE_ICONS.desktop;
         const browser   = String(s.browser ?? 'Unknown').replace(/[<>"]/g, '');
         const os        = String(s.os ?? '').replace(/[<>"]/g, '');
-        const ip        = String(s.ip ?? '—').replace(/[<>"]/g, '');
-        const lastSeen  = s.last_seen ? new Date(s.last_seen).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+        const ip        = String(s.ip ?? '\u2014').replace(/[<>"]/g, '');
+        const lastSeen  = s.last_seen ? new Date(s.last_seen).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '\u2014';
         const sid       = String(s.id ?? '').replace(/[<>"]/g, '');
         return `<div class="flex items-center gap-4 p-4 glass rounded-xl border ${isCurrent ? 'border-neon-green/25' : 'border-white/5'}">
           <div class="w-10 h-10 rounded-xl ${isCurrent ? 'bg-neon-green/10 border border-neon-green/20' : 'bg-white/5 border border-white/10'} flex items-center justify-center shrink-0">
@@ -728,10 +758,10 @@ const bridge = JSON.stringify({
           </div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-0.5">
-              <p class="text-sm font-medium text-white truncate">${browser}${os ? ` · ${os}` : ''}</p>
+              <p class="text-sm font-medium text-white truncate">${browser}${os ? ` \u00b7 ${os}` : ''}</p>
               ${isCurrent ? '<span class="text-xs text-neon-green bg-neon-green/10 px-2 py-0.5 rounded-full shrink-0">Current</span>' : ''}
             </div>
-            <p class="text-xs text-gray-500">IP: ${ip} · Last active: ${lastSeen}</p>
+            <p class="text-xs text-gray-500">IP: ${ip} \u00b7 Last active: ${lastSeen}</p>
           </div>
           ${!isCurrent ? `<button class="revoke-btn px-3 py-1.5 glass border border-red-500/20 rounded-lg text-xs text-red-400 hover:border-red-500/50 hover:bg-red-500/5 transition-all shrink-0" data-id="${sid}">Revoke</button>` : ''}
         </div>`;
@@ -763,7 +793,67 @@ const bridge = JSON.stringify({
     } catch { toast.error('Failed to revoke sessions'); }
   });
 
-  // ==================== DELETE ACCOUNT ====================
+  // ==================== RGPD : CONSENT MANAGEMENT (Art.7) ====================
+  // Lit localStorage — m\u00eame cl\u00e9 que CookieBanner : 'bf_consent_analytics'
+  const CONSENT_KEY = 'bf_consent_analytics';
+
+  function loadConsentStatus() {
+    const labelEl     = document.getElementById('consent-status-label');
+    const dateEl      = document.getElementById('consent-status-date');
+    const acceptBtn   = document.getElementById('consent-accept-btn');
+    const withdrawBtn = document.getElementById('consent-withdraw-btn');
+    if (!labelEl) return;
+
+    let stored = null;
+    try { stored = JSON.parse(localStorage.getItem(CONSENT_KEY) || 'null'); } catch {}
+
+    if (stored?.analytics === true) {
+      labelEl.textContent = '\u2713 Analytics accepted';
+      labelEl.className = 'text-sm font-medium text-neon-green';
+      if (dateEl && stored.timestamp) dateEl.textContent = `Since ${new Date(stored.timestamp).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+      acceptBtn?.classList.add('hidden');
+      withdrawBtn?.classList.remove('hidden');
+    } else if (stored?.analytics === false) {
+      labelEl.textContent = '\u2717 Analytics refused';
+      labelEl.className = 'text-sm font-medium text-gray-400';
+      if (dateEl && stored.timestamp) dateEl.textContent = `Since ${new Date(stored.timestamp).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+      acceptBtn?.classList.remove('hidden');
+      withdrawBtn?.classList.add('hidden');
+    } else {
+      labelEl.textContent = 'No consent recorded yet';
+      labelEl.className = 'text-sm font-medium text-gray-500';
+      if (dateEl) dateEl.textContent = "You haven't responded to the cookie banner yet.";
+      acceptBtn?.classList.remove('hidden');
+      withdrawBtn?.classList.add('hidden');
+    }
+  }
+
+  async function updateConsent(analytics) {
+    try {
+      // 1. localStorage — m\u00eame format que CookieBanner
+      localStorage.setItem(CONSENT_KEY, JSON.stringify({ analytics, timestamp: Date.now() }));
+      // 2. Audit serveur
+      await fetch('/api/rgpd/consent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          analytics,
+          action: analytics ? 'accept' : 'withdraw',
+          source: 'settings',
+          consent_text_version: 'v2',
+        }),
+      });
+      // 3. Synchronise le script analytics si la page publique est ouverte dans ce m\u00eame contexte
+      window.dispatchEvent(new CustomEvent('bf:consent', { detail: { analytics } }));
+      loadConsentStatus();
+      toast.success(analytics ? 'Analytics consent accepted' : 'Analytics consent withdrawn');
+    } catch { toast.error('Failed to update consent'); }
+  }
+
+  document.getElementById('consent-accept-btn')?.addEventListener('click',   () => updateConsent(true));
+  document.getElementById('consent-withdraw-btn')?.addEventListener('click', () => updateConsent(false));
+
+  // ==================== DELETE ACCOUNT (RGPD Art.17) ====================
   const deleteWrap  = document.getElementById('delete-confirm-wrap');
   const deleteInput = document.getElementById('delete-confirm-input');
   const deleteBtn   = document.getElementById('delete-confirm-btn');
@@ -783,11 +873,23 @@ const bridge = JSON.stringify({
   deleteBtn?.addEventListener('click', async () => {
     if (deleteInput?.value !== username) return;
     deleteBtn.setAttribute('disabled', '');
-    deleteBtn.textContent = 'Deleting…';
+    deleteBtn.textContent = 'Deleting\u2026';
     try {
-      const r = await fetch('/api/profile/delete', { method: 'POST' });
+      const r = await fetch('/api/rgpd/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // Champ requis par l'API RGPD (double protection c\u00f4t\u00e9 serveur)
+        body: JSON.stringify({ confirm: 'DELETE MY ACCOUNT' }),
+      });
       const d = await r.json().catch(() => ({}));
+      if (r.status === 429) {
+        toast.error('Too many deletion requests. Try again later.');
+        deleteBtn.removeAttribute('disabled');
+        deleteBtn.textContent = 'Permanently Delete My Account';
+        return;
+      }
       if (!r.ok) throw new Error(d.error || `HTTP ${r.status}`);
+      localStorage.removeItem(CONSENT_KEY); // nettoyage local
       toast.success('Account deleted. Goodbye!');
       setTimeout(() => { window.location.href = '/'; }, 2000);
     } catch (err) {
