@@ -5,7 +5,7 @@
 // Dépendances :
 //   npm install satori @resvg/resvg-js
 //
-// Usage : https://bioforge.click/api/profile/og/{username}.png
+// Usage       : https://bioforge.click/api/profile/og/{username}.png
 
 import type { APIRoute } from 'astro';
 import satori from 'satori';
@@ -16,22 +16,22 @@ import { createClient } from '@supabase/supabase-js';
 function getSupabase() {
   const url = import.meta.env.PUBLIC_SUPABASE_URL;
   const key = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    throw new Error('Supabase env vars missing');
-  }
+  if (!url || !key) throw new Error('Supabase env vars missing');
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// ── Sanitization ─────────────────────────────────────────────────────────────
 function sanitizeHex(val: unknown, fallback: string): string {
   return typeof val === 'string' && /^#[0-9A-Fa-f]{6}$/.test(val) ? val : fallback;
 }
 
+// ── Truncate text ────────────────────────────────────────────────────────────
 function truncate(str: string | null | undefined, max: number): string {
   if (!str) return '';
   return str.length > max ? str.slice(0, max - 1) + '…' : str;
 }
 
+// ── Hex → RGB ────────────────────────────────────────────────────────────────
 function hexToRgb(hex: string): [number, number, number] {
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
@@ -39,41 +39,55 @@ function hexToRgb(hex: string): [number, number, number] {
   return [r, g, b];
 }
 
+// ── Luminance (WCAG) ────────────────────────────────────────────────────────
 function isDark(hex: string): boolean {
   const [r, g, b] = hexToRgb(hex);
   const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return lum < 0.55;
 }
 
+// ── Color with alpha ────────────────────────────────────────────────────────
 function withAlpha(hex: string, alpha: number): string {
   const [r, g, b] = hexToRgb(hex);
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-// ── Fonts (Inter variable font – cached globally) ───────────────────────────
+// ── Font loader (Inter variable font – un seul fichier) ─────────────────────
 let interFont: ArrayBuffer | null = null;
 
 async function loadFonts() {
   if (interFont) return;
 
   try {
-    // URL valide mars 2026 – Inter variable (couvre 400 et 700)
-    const fontUrl =
-      'https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap';
+    // URL actuelle et valide pour Inter variable (latin subset) – 2026
+    const url =
+      'https://fonts.gstatic.com/s/inter/v18/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2';
 
-    const response = await fetch(fontUrl);
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Font fetch failed: ${response.status} ${response.statusText}`);
     }
 
-    interFont = await response.arrayBuffer();
-  } catch (err) {
-    console.error('[OG] Font loading failed:', err);
-    // On continue sans police custom → fallback système
+    const buffer = await response.arrayBuffer();
+
+    // Vérification signature pour détecter HTML ou contenu invalide
+    const view = new Uint8Array(buffer);
+    if (view.length < 4) throw new Error('Font buffer too small');
+    const sig = String.fromCharCode(view[0], view[1], view[2], view[3]);
+    if (!['wOFF', 'wOF2', 'OTTO', '\x00\x01\x00\x00'].some(s => sig.startsWith(s))) {
+      const preview = new TextDecoder().decode(view.subarray(0, Math.min(100, view.length)));
+      throw new Error(`Invalid font signature: ${sig} – preview: ${preview}`);
+    }
+
+    interFont = buffer;
+    console.log('[OG] Inter font loaded successfully');
+  } catch (err: any) {
+    console.error('[OG] Font loading failed:', err.message || err);
+    interFont = null; // → fallback système
   }
 }
 
-// ── Avatar → base64 ─────────────────────────────────────────────────────────
+// ── Avatar → base64 ──────────────────────────────────────────────────────────
 async function fetchAvatarBase64(url: string): Promise<string | null> {
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
@@ -87,7 +101,7 @@ async function fetchAvatarBase64(url: string): Promise<string | null> {
   }
 }
 
-// ── Route principale ────────────────────────────────────────────────────────
+// ── Main route ───────────────────────────────────────────────────────────────
 export const GET: APIRoute = async ({ params }) => {
   const { username } = params;
 
@@ -96,7 +110,6 @@ export const GET: APIRoute = async ({ params }) => {
   }
 
   try {
-    // 1. Profil
     const supabase = getSupabase();
     const { data: profile, error } = await supabase
       .from('profiles')
@@ -108,7 +121,6 @@ export const GET: APIRoute = async ({ params }) => {
       return ogFallback(username);
     }
 
-    // 2. Thème
     let bgColor = '#0a0a0a';
     let primary = '#00ff9d';
     let textColor = '#ffffff';
@@ -128,12 +140,11 @@ export const GET: APIRoute = async ({ params }) => {
       gradAngle = parseInt(raw.gradient_angle, 10) || 135;
     } catch {}
 
-    // 3. Assets
-    const avatarPromise = profile.avatar_url ? fetchAvatarBase64(profile.avatar_url) : Promise.resolve(null);
-    await Promise.all([loadFonts(), avatarPromise]);
-    const avatarB64 = await avatarPromise;
+    const [avatarB64] = await Promise.all([
+      profile.avatar_url ? fetchAvatarBase64(profile.avatar_url) : Promise.resolve(null),
+      loadFonts(),
+    ]);
 
-    // 4. Valeurs calculées
     const name = truncate(profile.display_name || `@${profile.username}`, 28);
     const handle = `@${profile.username}`;
     const bio = truncate(profile.bio || '', 90);
@@ -147,7 +158,6 @@ export const GET: APIRoute = async ({ params }) => {
       .charAt(0)
       .toUpperCase();
 
-    // 5. Satori
     const svg = await satori(
       {
         type: 'div',
@@ -158,14 +168,14 @@ export const GET: APIRoute = async ({ params }) => {
             display: 'flex',
             position: 'relative',
             overflow: 'hidden',
-            fontFamily: 'Inter, system-ui, sans-serif',
+            fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
             background: bgStyle === 'gradient'
               ? `linear-gradient(${gradAngle}deg, ${bgColor}, ${grad2})`
               : bgColor,
           },
           children: [
 
-            // Glows, barre, contenu principal... (inchangé)
+            // Glow top-left
             {
               type: 'div',
               props: {
@@ -181,6 +191,8 @@ export const GET: APIRoute = async ({ params }) => {
                 },
               },
             },
+
+            // Glow bottom-right
             {
               type: 'div',
               props: {
@@ -196,6 +208,8 @@ export const GET: APIRoute = async ({ params }) => {
                 },
               },
             },
+
+            // Left accent bar
             {
               type: 'div',
               props: {
@@ -209,6 +223,8 @@ export const GET: APIRoute = async ({ params }) => {
                 },
               },
             },
+
+            // Main content container
             {
               type: 'div',
               props: {
@@ -222,7 +238,8 @@ export const GET: APIRoute = async ({ params }) => {
                   gap: '64px',
                 },
                 children: [
-                  // LEFT - infos
+
+                  // Left: profile info
                   {
                     type: 'div',
                     props: {
@@ -233,6 +250,8 @@ export const GET: APIRoute = async ({ params }) => {
                         gap: '0px',
                       },
                       children: [
+
+                        // Name + verified badge
                         {
                           type: 'div',
                           props: {
@@ -287,6 +306,8 @@ export const GET: APIRoute = async ({ params }) => {
                             ],
                           },
                         },
+
+                        // Handle
                         {
                           type: 'div',
                           props: {
@@ -300,6 +321,8 @@ export const GET: APIRoute = async ({ params }) => {
                             children: handle,
                           },
                         },
+
+                        // Bio
                         ...(bio ? [{
                           type: 'div',
                           props: {
@@ -313,7 +336,11 @@ export const GET: APIRoute = async ({ params }) => {
                             children: bio,
                           },
                         }] : []),
+
+                        // Spacer
                         { type: 'div', props: { style: { flex: '1' } } },
+
+                        // URL pill
                         {
                           type: 'div',
                           props: {
@@ -332,7 +359,8 @@ export const GET: APIRoute = async ({ params }) => {
                                 type: 'div',
                                 props: {
                                   style: {
-                                    width: '8px', height: '8px',
+                                    width: '8px',
+                                    height: '8px',
                                     borderRadius: '50%',
                                     background: primary,
                                     flexShrink: '0',
@@ -358,7 +386,7 @@ export const GET: APIRoute = async ({ params }) => {
                     },
                   },
 
-                  // RIGHT - avatar + logo
+                  // Right: avatar + logo
                   {
                     type: 'div',
                     props: {
@@ -411,6 +439,8 @@ export const GET: APIRoute = async ({ params }) => {
                                 },
                           },
                         },
+
+                        // BioForge logo
                         {
                           type: 'div',
                           props: {
@@ -423,9 +453,14 @@ export const GET: APIRoute = async ({ params }) => {
                               {
                                 type: 'svg',
                                 props: {
-                                  width: '20', height: '20', viewBox: '0 0 24 24',
-                                  fill: 'none', stroke: primary,
-                                  strokeWidth: '2.2', strokeLinecap: 'round', strokeLinejoin: 'round',
+                                  width: '20',
+                                  height: '20',
+                                  viewBox: '0 0 24 24',
+                                  fill: 'none',
+                                  stroke: primary,
+                                  strokeWidth: '2.2',
+                                  strokeLinecap: 'round',
+                                  strokeLinejoin: 'round',
                                   children: {
                                     type: 'path',
                                     props: { d: 'M13 10V3L4 14h7v7l9-11h-7z' },
@@ -459,13 +494,10 @@ export const GET: APIRoute = async ({ params }) => {
       {
         width: 1200,
         height: 630,
-        fonts: interFont
-          ? [{ name: 'Inter', data: interFont, weight: 400, style: 'normal' }]
-          : [],
+        fonts: interFont ? [{ name: 'Inter', data: interFont, weight: 400, style: 'normal' }] : [],
       }
     );
 
-    // 6. PNG
     const resvg = new Resvg(svg, {
       fitTo: { mode: 'width', value: 1200 },
       shapeRendering: 2,
@@ -506,7 +538,7 @@ async function ogFallback(username: string): Promise<Response> {
             justifyContent: 'center',
             flexDirection: 'column',
             background: '#0a0a0a',
-            fontFamily: 'system-ui, sans-serif',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
             gap: '20px',
           },
           children: [
@@ -537,9 +569,7 @@ async function ogFallback(username: string): Promise<Response> {
       {
         width: 1200,
         height: 630,
-        fonts: interFont
-          ? [{ name: 'Inter', data: interFont, weight: 400, style: 'normal' }]
-          : [],
+        fonts: interFont ? [{ name: 'Inter', data: interFont, weight: 400, style: 'normal' }] : [],
       }
     );
 
@@ -553,16 +583,16 @@ async function ogFallback(username: string): Promise<Response> {
         'Cache-Control': 'public, max-age=300, s-maxage=300',
       },
     });
-  } catch (err) {
-    console.error('[OG fallback error]', err);
-    const tiny = new Uint8Array(
+  } catch (err: any) {
+    console.error('[OG fallback error]', err?.message || err);
+    const tinyPng = new Uint8Array(
       atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==')
         .split('')
         .map(c => c.charCodeAt(0))
     );
-    return new Response(tiny, {
+    return new Response(tinyPng, {
       status: 200,
-      headers: { 'Content-Type': 'image/png' },
+      headers: { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache' },
     });
   }
 }
