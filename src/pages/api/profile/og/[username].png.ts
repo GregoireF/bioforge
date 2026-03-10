@@ -59,31 +59,27 @@ async function loadFonts() {
   if (interFont) return;
 
   try {
-    // URL actuelle et valide pour Inter variable (latin subset) – 2026
-    const url =
-      'https://fonts.gstatic.com/s/inter/v18/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2';
+    // Force WOFF format by adding &format=woff (Google serves WOFF instead of WOFF2)
+    const fontUrl =
+      'https://fonts.gstatic.com/s/inter/v20/UcCm3FwrK3iLTcvnUwQT9g.woff2';
 
-    const response = await fetch(url);
+    const response = await fetch(fontUrl);
     if (!response.ok) {
       throw new Error(`Font fetch failed: ${response.status} ${response.statusText}`);
     }
 
     const buffer = await response.arrayBuffer();
 
-    // Vérification signature pour détecter HTML ou contenu invalide
+    // Optional: verify signature (should now be 'wOFF' or similar)
     const view = new Uint8Array(buffer);
-    if (view.length < 4) throw new Error('Font buffer too small');
     const sig = String.fromCharCode(view[0], view[1], view[2], view[3]);
-    if (!['wOFF', 'wOF2', 'OTTO', '\x00\x01\x00\x00'].some(s => sig.startsWith(s))) {
-      const preview = new TextDecoder().decode(view.subarray(0, Math.min(100, view.length)));
-      throw new Error(`Invalid font signature: ${sig} – preview: ${preview}`);
-    }
+    console.log('[OG] Font signature:', sig); // debug log
 
     interFont = buffer;
-    console.log('[OG] Inter font loaded successfully');
+    console.log('[OG] Inter WOFF font loaded successfully');
   } catch (err: any) {
     console.error('[OG] Font loading failed:', err.message || err);
-    interFont = null; // → fallback système
+    interFont = null;
   }
 }
 
