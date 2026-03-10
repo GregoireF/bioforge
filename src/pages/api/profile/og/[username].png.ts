@@ -61,7 +61,7 @@ async function loadFonts() {
   try {
     // Force WOFF format by adding &format=woff (Google serves WOFF instead of WOFF2)
     const fontUrl =
-      'https://fonts.gstatic.com/s/inter/v20/UcCm3FwrK3iLTcvnUwQT9g.woff2';
+      'https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuGKYAZ9hjp-Ek-_EeA.woff';
 
     const response = await fetch(fontUrl);
     if (!response.ok) {
