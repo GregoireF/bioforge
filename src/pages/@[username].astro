@@ -404,8 +404,7 @@ function getSocialIconPath(url?: string): string {
               const hasIcon = Boolean(iconUrl);
 
               return (
-                <div class={`block-dot-wrap group relative ${animClass}`} style={delay}
-                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
+                <div class={`block-dot-wrap group relative ${animClass}`} style={delay}>
                   {/* Link button — icon absolute left, text always truly centered */}
                   <a href={url} target="_blank" rel="noopener noreferrer"
                     data-block-id={block.id}
@@ -473,8 +472,8 @@ function getSocialIconPath(url?: string): string {
                   loading="lazy" />
               );
               return imgLink
-                ? <a href={imgLink} target="_blank" rel="noopener noreferrer" class={animClass} style={delay} data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>{img}</a>
-                : <div class={animClass} style={delay} data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>{img}</div>;
+                ? <a href={imgLink} target="_blank" rel="noopener noreferrer" class={animClass} style={delay}>{img}</a>
+                : <div class={animClass} style={delay}>{img}</div>;
             }
 
             // ── VIDEO ──
@@ -494,8 +493,7 @@ function getSocialIconPath(url?: string): string {
               }
               return (
                 <div class={`relative w-full overflow-hidden ${animClass}`}
-                  style={`padding-bottom: 56.25%; border-radius: ${br}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''} ${delay}`}
-                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
+                  style={`padding-bottom: 56.25%; border-radius: ${br}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''} ${delay}`}>
                   <iframe src={embedUrl} class="absolute inset-0 w-full h-full" frameborder="0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowfullscreen style={`border-radius: ${br}px;`}></iframe>
@@ -508,9 +506,7 @@ function getSocialIconPath(url?: string): string {
               const links = Array.isArray(block.config?.links) ? block.config.links : [];
               if (!links.length) return null;
               return (
-                <div class={`flex items-center justify-center gap-3 py-2 flex-wrap ${animClass}`}
-                  style={delay}
-                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
+                <div class={`flex items-center justify-center gap-3 py-2 flex-wrap ${animClass}`} style={delay}>
                   {links.map((link: any) => {
                     const url = typeof link === 'string' ? link : link?.url;
                     if (!url) return null;
@@ -876,7 +872,7 @@ function getSocialIconPath(url?: string): string {
   </style>
 
   <!-- ===== SCRIPT ===== -->
-  <script lang="ts" type="module" is:inline define:vars={{ bridgeJson: bridge, animPreset: theme.animation_preset, hasAnimations: theme.animations }}>
+  <script type="module" define:vars={{ bridgeJson: bridge, animPreset: theme.animation_preset, hasAnimations: theme.animations }}>
 
     const { profileId, profileUrl, profileName, primaryColor: pc, bgColor: bg, textColor: tc, qrDataUrl } = JSON.parse(bridgeJson);
 
@@ -933,33 +929,41 @@ function getSocialIconPath(url?: string): string {
     } catch {}
     window.addEventListener('bf:consent', (e) => { if (e.detail?.analytics === true) fireViewTracking(); });
 
-    // ── Visibility scheduling filter ─────────────────────────────────────────
+     // ── Visibility scheduling filter ─────────────────────────────────────────
     // Hide blocks whose show_from/show_until window has passed
     document.querySelectorAll('[data-show-from], [data-show-until]').forEach(el => {
+      if (!(el instanceof HTMLElement)) return;
+
       const from  = el.dataset.showFrom  ? new Date(el.dataset.showFrom).getTime()  : null;
       const until = el.dataset.showUntil ? new Date(el.dataset.showUntil).getTime() : null;
       const now   = Date.now();
+
       if ((from && now < from) || (until && now > until)) {
-        (el as HTMLElement).style.display = 'none';
+        el.style.display = 'none'
       }
     });
 
     // ── Countdown timers ─────────────────────────────────────────────────────
     function updateCountdowns() {
-      document.querySelectorAll('.countdown-units').forEach(el => {
-        const target = new Date((el as HTMLElement).dataset.target ?? '').getTime();
-        const diff   = target - Date.now();
-        const wrap   = el.closest('.countdown-block');
+      const now = Date.now();
+
+      document.querySelectorAll<HTMLElement>('.countdown-units').forEach(el => {
+        const target = el.dataset.target ? Date.parse(el.dataset.target) : 0;
+        const diff   = target - now;
+
+        const wrap = el.closest('.countdown-block') as HTMLElement | null;
         if (!wrap) return;
-        const done = wrap.querySelector('.countdown-done') as HTMLElement | null;
+
+        const done = wrap.querySelector<HTMLElement>('.countdown-done');
 
         if (diff <= 0) {
-          (el as HTMLElement).style.display = 'none';
+          el.style.display = 'none';
           done?.classList.remove('hidden');
           return;
         }
+
         done?.classList.add('hidden');
-        (el as HTMLElement).style.display = 'flex';
+        el.style.display = 'flex';
 
         const d = Math.floor(diff / 86400000);
         const h = Math.floor((diff % 86400000) / 3600000);
@@ -967,16 +971,19 @@ function getSocialIconPath(url?: string): string {
         const s = Math.floor((diff % 60000) / 1000);
 
         const pad = (n: number) => String(n).padStart(2, '0');
-        const days = wrap.querySelector('.countdown-days')  as HTMLElement | null;
-        const hrs  = wrap.querySelector('.countdown-hours') as HTMLElement | null;
-        const mins = wrap.querySelector('.countdown-mins')  as HTMLElement | null;
-        const secs = wrap.querySelector('.countdown-secs')  as HTMLElement | null;
+
+        const days = wrap.querySelector<HTMLElement>('.countdown-days');
+        const hrs  = wrap.querySelector<HTMLElement>('.countdown-hours');
+        const mins = wrap.querySelector<HTMLElement>('.countdown-mins');
+        const secs = wrap.querySelector<HTMLElement>('.countdown-secs');
+
         if (days) days.textContent = String(d);
         if (hrs)  hrs.textContent  = pad(h);
         if (mins) mins.textContent = pad(m);
         if (secs) secs.textContent = pad(s);
       });
     }
+
     updateCountdowns();
     setInterval(updateCountdowns, 1000);
 
