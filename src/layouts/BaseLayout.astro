@@ -5,10 +5,10 @@ import { getProfileByUsername, getActiveBlocks } from '@/lib/supabase/queries';
 import "../styles/global.css";
 
 const { username } = Astro.params;
-if (!username) return Astro.redirect('/404');
+if (!username) return Astro.redirect('/');
 
 const profileResult = await getProfileByUsername(username);
-if (!profileResult.success) return Astro.redirect('/404');
+if (!profileResult.success) return Astro.redirect('/');
 const profile = profileResult.data;
 
 
