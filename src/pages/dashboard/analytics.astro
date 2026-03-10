@@ -1,306 +1,540 @@
 ---
+// src/pages/dashboard/analytics.astro — Analytics v2
+// Powered by get_profile_analytics RPC + daily_clicks query
+// Sections: KPIs · Traffic chart · Device donut · Geo · Sources · Blocks
+
 import DashboardLayout from '@/layouts/DashboardLayout.astro';
 import Card from '@/components/ui/Card.astro';
 import Badge from '@/components/ui/Badge.astro';
 import Alert from '@/components/ui/Alert.astro';
 import { withAuth } from '@/lib/auth/auth';
-import { getAnalyticsSummary } from '@/lib/db/queries.server';
 import { getBlocks } from '@/lib/supabase/queries';
 import { createServerClient } from '@supabase/ssr';
 import { parse } from 'cookie';
 
-// Crée le client Supabase (obligatoire pour getAnalyticsSummary et getBlocks)
+// ==================== PERIOD ====================
+const allowedDays = [7, 30, 90] as const;
+type Period = typeof allowedDays[number];
+const rawDays = Number(Astro.url.searchParams.get('days') ?? 7);
+const days: Period = (allowedDays.includes(rawDays as Period) ? rawDays : 7) as Period;
+
+// ==================== SUPABASE CLIENT ====================
 const cookies = parse(Astro.request.headers.get('cookie') ?? '');
-const supabaseClient = createServerClient(
+const supabase = createServerClient(
   import.meta.env.PUBLIC_SUPABASE_URL!,
   import.meta.env.PUBLIC_SUPABASE_ANON_KEY!,
-  {
-    cookies: {
-      get: (key) => cookies[key],
-      set: () => {},
-      remove: () => {},
-    },
-  }
+  { cookies: { get: (k) => cookies[k], set: () => {}, remove: () => {} } }
 );
 
-// Auth
-const authResult = await withAuth({
-  cookies: Astro.cookies,
-  request: Astro.request,
-});
-
+// ==================== AUTH ====================
+const authResult = await withAuth({ cookies: Astro.cookies, request: Astro.request });
 if (!authResult.success || !authResult.data) {
-  console.error('[SSR AUTH] Auth échouée :', authResult);
   return Astro.redirect(authResult.redirect || '/signin?error=auth_failed');
 }
+const { profile } = authResult.data;
+const profileId = profile?.id;
 
-const { user, profile, planLimits } = authResult.data;
+if (!profileId) return Astro.redirect('/signin?error=no_profile');
 
-// Logs auth pour debug
-console.log('[SSR AUTH] profile.id reçu :', profile?.id ?? 'UNDEFINED');
-console.log('[SSR AUTH] Type de profile.id :', typeof profile?.id);
-
-// Fallback si profile.id absent (évite crash)
-const safeProfileId = profile?.id;
-if (!safeProfileId) {
-  console.error('[SSR] profile.id est undefined → stats désactivées');
-}
-
-// Analytics
-const days = 7;
-
-let analyticsResult;
-let blocksResult;
-
-if (safeProfileId) {
-  analyticsResult = await getAnalyticsSummary(supabaseClient, safeProfileId, days);
-  blocksResult = await getBlocks(safeProfileId);
-} else {
-  analyticsResult = { success: false, error: new Error('No profile ID') };
-  blocksResult = { success: false, error: new Error('No profile ID') };
-}
-
-// Fallback valeurs
-let analytics = {
-  summary: {
-    totalViews: 0,
-    totalClicks: 0,
-    clickRate: 0,
-    activeBlocks: 0
-  },
-  profileStats: [],
-  blockStats: [],
-  topBlocks: []
+// ==================== DATA FETCH ====================
+type AnalyticsRPC = {
+  total_views:     number;
+  clean_views:     number;
+  unique_visitors: number;
+  total_clicks:    number;
+  daily_views:     { date: string; views: number }[] | null;
+  devices:         Record<string, number> | null;
+  top_countries:   { country: string; views: number }[] | null;
+  top_referrers:   { referrer: string; views: number }[] | null;
+  top_blocks:      { block_id: string; title: string; type: string; clicks: number }[] | null;
+  bots:            Record<string, number> | null;
 };
 
-let blocks = [];
-let analyticsError = null;
+let rpcData: AnalyticsRPC | null = null;
+let rpcError: string | null = null;
+let dailyClicks: { date: string; clicks: number }[] = [];
+let blocks: any[] = [];
 
-if (analyticsResult.success) {
-  analytics = analyticsResult.data;
-  console.log('[SSR] Analytics OK → totalClicks :', analytics.summary.totalClicks);
-  console.log('[SSR] profileStats length :', analytics.profileStats?.length ?? 0);
-  console.log('[SSR] blockStats length :', analytics.blockStats?.length ?? 0);
+// 1. Main analytics RPC
+const { data: rpcRaw, error: rpcErr } = await supabase.rpc('get_profile_analytics', {
+  p_profile_id: profileId,
+  p_days: days,
+});
+if (rpcErr) {
+  rpcError = rpcErr.message;
 } else {
-  analyticsError = analyticsResult.error?.message ?? 'Erreur inconnue';
-  console.error('[SSR] Erreur analytics :', analyticsResult.error);
+  rpcData = rpcRaw as AnalyticsRPC;
 }
 
-if (blocksResult.success) {
-  blocks = blocksResult.data ?? [];
-  console.log('[SSR] Blocks chargés :', blocks.length);
-} else {
-  console.error('[SSR] Erreur blocks :', blocksResult.error);
+// 2. Daily clicks (for chart timeline — not in RPC)
+const since = new Date();
+since.setDate(since.getDate() - days);
+const { data: clickRows } = await supabase
+  .from('block_clicks')
+  .select('click_date')
+  .eq('profile_id', profileId)
+  .gte('click_date', since.toISOString().split('T')[0]);
+
+if (clickRows) {
+  const map = new Map<string, number>();
+  for (const row of clickRows) {
+    const d = row.click_date as string;
+    map.set(d, (map.get(d) ?? 0) + 1);
+  }
+  dailyClicks = Array.from(map.entries())
+    .map(([date, clicks]) => ({ date, clicks }))
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-// Prepare chart data
-const profileStats = analytics.profileStats ?? [];
-const blockStats = analytics.blockStats ?? [];
+// 3. All blocks (for table)
+const { data: blockRows } = await supabase
+  .from('blocks')
+  .select('id, type, title, active')
+  .eq('profile_id', profileId)
+  .is('deleted_at', null)
+  .order('position');
+blocks = blockRows ?? [];
 
-const chartLabels = profileStats.map(s => 
-  new Date(s.date).toLocaleDateString('fr-FR', { weekday: 'short', month: 'short', day: 'numeric' })
-) || [];
+// ==================== DERIVED METRICS ====================
+const summary = {
+  totalViews:     rpcData?.total_views     ?? 0,
+  cleanViews:     rpcData?.clean_views     ?? 0,
+  uniqueVisitors: rpcData?.unique_visitors ?? 0,
+  totalClicks:    rpcData?.total_clicks    ?? 0,
+  clickRate:      rpcData && rpcData.total_views > 0
+    ? ((rpcData.total_clicks / rpcData.total_views) * 100)
+    : 0,
+  botViews: Object.values(rpcData?.bots ?? {}).reduce((a, b) => a + b, 0),
+};
 
-const chartViews = profileStats.map(s => s.views ?? 0) || [];
+const topBlocks   = rpcData?.top_blocks    ?? [];
+const topCountries= rpcData?.top_countries ?? [];
+const devices     = rpcData?.devices       ?? {};
+const topReferrers= rpcData?.top_referrers ?? [];
 
-// Calcul clics par date
-const clicksByDate = new Map();
-blockStats.forEach(bs => {
-  const existing = clicksByDate.get(bs.date) ?? 0;
-  clicksByDate.set(bs.date, existing + (bs.clicks ?? 0));
+// ── Chart data ───────────────────────────────────────────────
+// Merge daily_views + daily_clicks on same date axis
+const allDates = new Set<string>();
+(rpcData?.daily_views ?? []).forEach(r => allDates.add(r.date));
+dailyClicks.forEach(r => allDates.add(r.date));
+
+const sortedDates = Array.from(allDates).sort();
+const viewsByDate  = new Map((rpcData?.daily_views ?? []).map(r => [r.date, r.views]));
+const clicksByDate = new Map(dailyClicks.map(r => [r.date, r.clicks]));
+
+const chartLabels = sortedDates.map(d =>
+  new Date(d + 'T12:00:00Z').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
+);
+const chartViews  = sortedDates.map(d => viewsByDate.get(d)  ?? 0);
+const chartClicks = sortedDates.map(d => clicksByDate.get(d) ?? 0);
+const chartRates  = sortedDates.map((d, i) => {
+  const v = chartViews[i];
+  const c = chartClicks[i];
+  return v > 0 ? parseFloat(((c / v) * 100).toFixed(1)) : 0;
 });
 
-const chartClicks = profileStats.map(s => clicksByDate.get(s.date) ?? 0) || [];
+// ── Device data ──────────────────────────────────────────────
+const deviceData = {
+  mobile:  devices['mobile']  ?? 0,
+  desktop: devices['desktop'] ?? 0,
+  tablet:  devices['tablet']  ?? 0,
+  unknown: devices['unknown'] ?? 0,
+};
 
-console.log('[SSR] chartData préparé :', {
-  labelsCount: chartLabels.length,
-  viewsSum: chartViews.reduce((a, b) => a + b, 0),
-  clicksSum: chartClicks.reduce((a, b) => a + b, 0)
-});
+// ── Referrer parsing ─────────────────────────────────────────
+const SOCIAL = ['twitter.com','x.com','instagram.com','tiktok.com','facebook.com','linkedin.com','youtube.com','pinterest.com','snapchat.com','reddit.com','discord.com','twitch.tv'];
+const SEARCH  = ['google.','bing.com','duckduckgo.com','yahoo.com','baidu.com','yandex.'];
 
-// Export pour define:vars
-const exportedChartData = { labels: chartLabels, views: chartViews, clicks: chartClicks };
+function classifyReferrer(ref: string | null): { label: string; category: 'direct'|'social'|'search'|'other' } {
+  if (!ref) return { label: 'Direct', category: 'direct' };
+  try {
+    const host = new URL(ref.includes('://') ? ref : `https://${ref}`).hostname.replace(/^www\./, '');
+    if (SOCIAL.some(s => host.includes(s))) return { label: host, category: 'social' };
+    if (SEARCH.some(s => host.includes(s)))  return { label: host, category: 'search' };
+    return { label: host, category: 'other' };
+  } catch {
+    return { label: ref.slice(0, 40), category: 'other' };
+  }
+}
+
+const parsedReferrers = topReferrers.map(r => ({
+  ...classifyReferrer(r.referrer),
+  views: r.views,
+}));
+
+// Aggregate by label
+const refAgg = new Map<string, { label: string; category: string; views: number }>();
+for (const r of parsedReferrers) {
+  const existing = refAgg.get(r.label);
+  if (existing) existing.views += r.views;
+  else refAgg.set(r.label, { ...r });
+}
+const aggregatedReferrers = Array.from(refAgg.values()).sort((a, b) => b.views - a.views).slice(0, 8);
+const maxReferrerViews = aggregatedReferrers[0]?.views ?? 1;
+
+// ── Country data ─────────────────────────────────────────────
+const maxCountryViews = topCountries[0]?.views ?? 1;
+
+// ── Country flags (ISO2 → emoji) ────────────────────────────
+function countryFlag(code: string): string {
+  if (!code || code.length !== 2) return '🌐';
+  return String.fromCodePoint(...[...code.toUpperCase()].map(c => 0x1F1E0 - 65 + c.charCodeAt(0)));
+}
+
+// ── Export for client script ─────────────────────────────────
+// ── Static lookup tables (moved out of JSX to avoid TS-generic parse errors) ──
+const CAT_COLORS: Record<string, string> = {
+  direct: '#00ff9d',
+  social: '#bf00ff',
+  search: '#00aaff',
+  other:  '#ff6b6b',
+};
+const CAT_ICONS: Record<string, string> = {
+  direct: 'M13 10V3L4 14h7v7l9-11h-7z',
+  social: 'M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z',
+  search: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z',
+  other:  'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.1-1.1',
+};
+
+const exportedChart = {
+  labels: chartLabels,
+  views:  chartViews,
+  clicks: chartClicks,
+  rates:  chartRates,
+};
+const exportedDevices = deviceData;
+const exportedDays    = days;
 ---
 
 <DashboardLayout title="Analytics">
-  <!-- Header -->
-  <div class="mb-6">
-    <h2 class="text-lg lg:text-xl font-semibold text-white mb-1">Analytics</h2>
-    <p class="text-sm text-gray-400">Track your performance and engagement</p>
+
+  <!-- ===== HEADER ===== -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+      <h2 class="text-xl font-semibold text-white mb-1 tracking-tight">Analytics</h2>
+      <p class="text-sm text-gray-400">Performance & engagement · last {days} days</p>
+    </div>
+
+    <!-- Period selector -->
+    <div class="flex items-center gap-1 p-1 glass rounded-2xl border border-white/10 w-fit">
+      {([7, 30, 90] as const).map(d => (
+        <a href={`?days=${d}`}
+          class={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+            days === d
+              ? 'bg-neon-green/15 text-neon-green border border-neon-green/30'
+              : 'text-gray-400 hover:text-white'
+          }`}>
+          {d}d
+        </a>
+      ))}
+    </div>
   </div>
 
-  <!-- Error Alert -->
-  {analyticsError && (
-    <Alert variant="danger" title="Error loading analytics">
-      <p>{analyticsError}</p>
-      <p class="text-sm mt-2">Please refresh the page. If the problem persists, contact support.</p>
+  <!-- Error -->
+  {rpcError && (
+    <Alert variant="danger" title="Analytics unavailable">
+      <p>{rpcError}</p>
     </Alert>
   )}
 
-  <!-- Summary Stats -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
+  <!-- ===== KPI CARDS (6) ===== -->
+  <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 mb-8">
+
     <!-- Total Views -->
-    <Card padding="md" hover={true}>
-      <div class="flex items-center justify-between mb-3">
-        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-green/20 to-neon-green/10 border border-neon-green/30 flex items-center justify-center">
-          <svg class="w-5 h-5 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+    <div class="p-5 glass rounded-2xl border border-neon-green/20 bg-neon-green/5">
+      <div class="flex items-start justify-between mb-3">
+        <div class="w-9 h-9 rounded-xl bg-neon-green/15 border border-neon-green/25 flex items-center justify-center">
+          <svg class="w-4 h-4 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
           </svg>
         </div>
+        {summary.botViews > 0 && (
+          <span class="text-xs text-yellow-400/70 bg-yellow-400/10 px-2 py-0.5 rounded-full border border-yellow-400/20">
+            {summary.botViews} bots filtrés
+          </span>
+        )}
       </div>
-      <div class="text-2xl lg:text-3xl font-bold text-white mb-1">
-        {analytics.summary.totalViews.toLocaleString()}
+      <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums">{summary.totalViews.toLocaleString('fr-FR')}</div>
+      <p class="text-xs text-gray-400 mt-1">Vues totales</p>
+    </div>
+
+    <!-- Unique Visitors -->
+    <div class="p-5 glass rounded-2xl border border-neon-blue/20 bg-neon-blue/5">
+      <div class="w-9 h-9 rounded-xl bg-neon-blue/15 border border-neon-blue/25 flex items-center justify-center mb-3">
+        <svg class="w-4 h-4 text-neon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
       </div>
-      <p class="text-xs lg:text-sm text-gray-400">Profile Views</p>
-    </Card>
+      <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums">{summary.uniqueVisitors.toLocaleString('fr-FR')}</div>
+      <p class="text-xs text-gray-400 mt-1">Visiteurs uniques</p>
+    </div>
+
+    <!-- Clean Views -->
+    <div class="p-5 glass rounded-2xl border border-white/10">
+      <div class="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mb-3">
+        <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+        </svg>
+      </div>
+      <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums">{summary.cleanViews.toLocaleString('fr-FR')}</div>
+      <p class="text-xs text-gray-400 mt-1">Vues nettes <span class="text-gray-600">(sans VPN/bots)</span></p>
+    </div>
 
     <!-- Total Clicks -->
-    <Card padding="md" hover={true}>
-      <div class="flex items-center justify-between mb-3">
-        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-purple/20 to-neon-purple/10 border border-neon-purple/30 flex items-center justify-center">
-          <svg class="w-5 h-5 text-neon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/>
-          </svg>
-        </div>
+    <div class="p-5 glass rounded-2xl border border-neon-purple/20 bg-neon-purple/5">
+      <div class="w-9 h-9 rounded-xl bg-neon-purple/15 border border-neon-purple/25 flex items-center justify-center mb-3">
+        <svg class="w-4 h-4 text-neon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/>
+        </svg>
       </div>
-      <div class="text-2xl lg:text-3xl font-bold text-white mb-1">
-        {analytics.summary.totalClicks.toLocaleString()}
-      </div>
-      <p class="text-xs lg:text-sm text-gray-400">Total Clicks</p>
-    </Card>
+      <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums">{summary.totalClicks.toLocaleString('fr-FR')}</div>
+      <p class="text-xs text-gray-400 mt-1">Clics sur liens</p>
+    </div>
 
     <!-- Click Rate -->
-    <Card padding="md" hover={true}>
-      <div class="flex items-center justify-between mb-3">
-        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-blue/20 to-neon-blue/10 border border-neon-blue/30 flex items-center justify-center">
-          <svg class="w-5 h-5 text-neon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-          </svg>
-        </div>
+    <div class="p-5 glass rounded-2xl border border-neon-pink/20 bg-neon-pink/5">
+      <div class="w-9 h-9 rounded-xl bg-neon-pink/15 border border-neon-pink/25 flex items-center justify-center mb-3">
+        <svg class="w-4 h-4 text-neon-pink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+        </svg>
       </div>
-      <div class="text-2xl lg:text-3xl font-bold text-white mb-1">
-        {analytics.summary.clickRate.toFixed(1)}%
-      </div>
-      <p class="text-xs lg:text-sm text-gray-400">Click Rate</p>
-    </Card>
+      <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums">{summary.clickRate.toFixed(1)}%</div>
+      <p class="text-xs text-gray-400 mt-1">Taux de clic</p>
+    </div>
 
-    <!-- Active Blocks -->
-    <Card padding="md" hover={true}>
-      <div class="flex items-center justify-between mb-3">
-        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-pink/20 to-neon-pink/10 border border-neon-pink/30 flex items-center justify-center">
-          <svg class="w-5 h-5 text-neon-pink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
-          </svg>
-        </div>
+    <!-- Avg views/day -->
+    <div class="p-5 glass rounded-2xl border border-white/10">
+      <div class="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mb-3">
+        <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
       </div>
-      <div class="text-2xl lg:text-3xl font-bold text-white mb-1">
-        {analytics.summary.activeBlocks}
+      <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums">
+        {days > 0 ? Math.round(summary.totalViews / days).toLocaleString('fr-FR') : 0}
       </div>
-      <p class="text-xs lg:text-sm text-gray-400">Active Blocks</p>
-    </Card>
+      <p class="text-xs text-gray-400 mt-1">Moy. vues / jour</p>
+    </div>
+
   </div>
 
-  <!-- Charts Section -->
-  <div class="grid lg:grid-cols-2 gap-6 lg:gap-8 mb-8">
-    <!-- Views & Clicks Chart -->
-    <Card title="Views & Clicks" description="Last 7 days">
-      <canvas id="traffic-chart" class="w-full" style="max-height: 300px;"></canvas>
-    </Card>
+  <!-- ===== TRAFFIC CHART + DEVICE ===== -->
+  <div class="grid lg:grid-cols-3 gap-6 mb-6">
 
-    <!-- Performance Chart -->
-    <Card title="Click Rate" description="Daily performance">
-      <canvas id="performance-chart" class="w-full" style="max-height: 300px;"></canvas>
-    </Card>
+    <!-- Traffic line chart (2/3 width) -->
+    <div class="lg:col-span-2">
+      <Card title="Vues & Clics" description={`Évolution sur ${days} jours`}>
+        {chartLabels.length === 0 ? (
+          <div class="flex flex-col items-center justify-center py-16 text-gray-500">
+            <svg class="w-10 h-10 mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+            <p class="text-sm">Aucune donnée sur cette période</p>
+          </div>
+        ) : (
+          <canvas id="traffic-chart" style="max-height: 260px;"></canvas>
+        )}
+      </Card>
+    </div>
+
+    <!-- Device donut (1/3 width) -->
+    <div>
+      <Card title="Appareils" description="Répartition des visites">
+        {(deviceData.mobile + deviceData.desktop + deviceData.tablet + deviceData.unknown) === 0 ? (
+          <div class="flex flex-col items-center justify-center py-16 text-gray-500">
+            <p class="text-sm">Aucune donnée</p>
+          </div>
+        ) : (
+          <div class="flex flex-col items-center gap-4">
+            <canvas id="device-chart" width="180" height="180" style="max-width: 180px;"></canvas>
+            <div class="w-full space-y-2">
+              {[
+                { key: 'mobile',  label: 'Mobile',  color: '#00ff9d', icon: 'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z' },
+                { key: 'desktop', label: 'Desktop', color: '#bf00ff', icon: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
+                { key: 'tablet',  label: 'Tablet',  color: '#00aaff', icon: 'M12 18h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
+              ].map(d => {
+                const val = deviceData[d.key as keyof typeof deviceData];
+                const total = deviceData.mobile + deviceData.desktop + deviceData.tablet + deviceData.unknown;
+                const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+                if (val === 0) return null;
+                return (
+                  <div class="flex items-center gap-2.5 text-sm">
+                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" style={`color: ${d.color}`} viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={d.icon}/>
+                    </svg>
+                    <span class="text-gray-300 flex-1">{d.label}</span>
+                    <span class="text-white font-semibold tabular-nums">{pct}%</span>
+                    <span class="text-gray-600 tabular-nums text-xs">({val})</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
+
   </div>
 
-  <!-- Top Performing Blocks -->
-  <Card title="Top Performing Blocks" description="Most clicked" class="mb-8">
-    {!analytics.topBlocks || analytics.topBlocks.length === 0 ? (
-      <div class="text-center py-12 text-gray-400">
-        <p>No analytics data yet</p>
-      </div>
-    ) : (
-      <div class="space-y-3">
-        {analytics.topBlocks.slice(0, 10).map((block, index) => {
-          const blockClicks = block.clicks || 0;
-          const ctr = analytics.summary.totalViews > 0 
-            ? ((blockClicks / analytics.summary.totalViews) * 100).toFixed(1) 
-            : '0.0';
-          
-          return (
-            <div class="flex items-center justify-between p-4 glass rounded-xl border border-white/10 hover:border-neon-green/30 transition-all">
-              <div class="flex items-center space-x-4 flex-1 min-w-0">
-                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-neon-green/20 to-neon-green/10 border border-neon-green/30 flex items-center justify-center flex-shrink-0 text-neon-green font-bold">
-                  {index + 1}
+  <!-- ===== GEO + REFERRERS ===== -->
+  <div class="grid lg:grid-cols-2 gap-6 mb-6">
+
+    <!-- Top Countries -->
+    <Card title="Pays" description="Origines géographiques">
+      {topCountries.length === 0 ? (
+        <div class="text-center py-10 text-gray-500 text-sm">Aucune donnée géo disponible</div>
+      ) : (
+        <div class="space-y-3">
+          {topCountries.slice(0, 8).map((c, i) => {
+            const pct = Math.round((c.views / maxCountryViews) * 100);
+            return (
+              <div class="flex items-center gap-3">
+                <span class="text-lg w-6 text-center shrink-0">{countryFlag(c.country ?? '')}</span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-sm text-white font-medium">{c.country || 'Unknown'}</span>
+                    <span class="text-xs text-gray-400 tabular-nums">{c.views.toLocaleString('fr-FR')}</span>
+                  </div>
+                  <div class="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                    <div class="h-full bg-neon-green/60 rounded-full transition-all"
+                      style={`width: ${pct}%;`}></div>
+                  </div>
+                </div>
+                {i === 0 && <span class="text-xs text-neon-green/70 shrink-0">🏆</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+
+    <!-- Traffic Sources -->
+    <Card title="Sources de trafic" description="D'où viennent tes visiteurs">
+      {aggregatedReferrers.length === 0 ? (
+        <div class="text-center py-10 text-gray-500 text-sm">Aucune donnée de source disponible</div>
+      ) : (
+        <div class="space-y-3">
+          {aggregatedReferrers.map(r => {
+            const pct = Math.round((r.views / maxReferrerViews) * 100);
+            const color = CAT_COLORS[r.category] ?? '#9ca3af';
+            return (
+              <div class="flex items-center gap-3">
+                <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                  style={`background: ${color}15; border: 1px solid ${color}30;`}>
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" style={`color: ${color}`} viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={CAT_ICONS[r.category] ?? CAT_ICONS.other}/>
+                  </svg>
                 </div>
                 <div class="flex-1 min-w-0">
-                  <div class="flex items-center space-x-2 mb-1">
-                    <Badge variant="default" size="sm">{block.type}</Badge>
-                    <h3 class="text-white font-semibold truncate">
-                      {block.title || 'Untitled'}
-                    </h3>
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-sm text-white font-medium truncate">{r.label}</span>
+                    <span class="text-xs text-gray-400 tabular-nums shrink-0 ml-2">{r.views.toLocaleString('fr-FR')}</span>
                   </div>
-                  <div class="flex items-center space-x-4 text-sm text-gray-400">
-                    <span>{blockClicks} clicks</span>
-                    <span>{ctr}% CTR</span>
+                  <div class="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                    <div class="h-full rounded-full transition-all"
+                      style={`width: ${pct}%; background: ${color}60;`}></div>
                   </div>
                 </div>
               </div>
-              <div class="text-right">
-                <div class="text-2xl font-bold text-neon-green">{blockClicks}</div>
-                <p class="text-xs text-gray-500">clicks</p>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+
+  </div>
+
+  <!-- ===== CLICK RATE CHART ===== -->
+  {chartLabels.length > 0 && (
+    <div class="mb-6"><Card title="Taux de clic quotidien" description="Clics / vues par jour">
+      <canvas id="rate-chart" style="max-height: 200px;"></canvas>
+    </Card></div>
+  )}
+
+  <!-- ===== TOP BLOCKS ===== -->
+  <div class="mb-6"><Card title="Top Blocks" description="Les liens les plus cliqués">
+    {topBlocks.length === 0 ? (
+      <div class="text-center py-12 text-gray-400">
+        <svg class="w-10 h-10 mx-auto mb-3 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/>
+        </svg>
+        <p class="text-sm">Aucun clic enregistré sur cette période</p>
+        <p class="text-xs text-gray-600 mt-1">Les données apparaîtront dès que des visiteurs cliquent sur tes liens</p>
+      </div>
+    ) : (
+      <div class="space-y-2">
+        {topBlocks.map((block, i) => {
+          const ctr = summary.totalViews > 0
+            ? ((block.clicks / summary.totalViews) * 100).toFixed(1)
+            : '0.0';
+          const maxClicks = topBlocks[0]?.clicks ?? 1;
+          const barPct = Math.round((block.clicks / maxClicks) * 100);
+          return (
+            <div class="flex items-center gap-4 p-3.5 glass rounded-xl border border-white/5 hover:border-neon-green/20 transition-all group">
+              <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0"
+                style={i === 0 ? 'background: rgba(0,255,157,0.15); color: #00ff9d; border: 1px solid rgba(0,255,157,0.3)' : 'background: rgba(255,255,255,0.05); color: #6b7280; border: 1px solid rgba(255,255,255,0.08)'}>
+                {i + 1}
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1.5">
+                  <Badge variant="default" size="sm">{block.type}</Badge>
+                  <span class="text-sm text-white font-medium truncate">{block.title || 'Untitled'}</span>
+                </div>
+                <div class="h-1 bg-white/5 rounded-full overflow-hidden">
+                  <div class="h-full bg-neon-green/50 rounded-full" style={`width: ${barPct}%;`}></div>
+                </div>
+              </div>
+              <div class="text-right shrink-0">
+                <div class="text-lg font-bold text-neon-green tabular-nums">{block.clicks.toLocaleString('fr-FR')}</div>
+                <div class="text-xs text-gray-500">{ctr}% CTR</div>
               </div>
             </div>
           );
         })}
       </div>
     )}
-  </Card>
+  </Card></div>
 
-  <!-- All Blocks Performance -->
-  <Card title="All Blocks Performance" description="Detailed breakdown">
+  <!-- ===== ALL BLOCKS TABLE ===== -->
+  <Card title="Tous les blocs" description="Performance détaillée">
     {blocks.length === 0 ? (
-      <div class="text-center py-12 text-gray-400">
-        <p>No blocks yet. <a href="/dashboard/blocks" class="text-neon-green hover:underline">Add your first block!</a></p>
+      <div class="text-center py-12 text-gray-400 text-sm">
+        <a href="/dashboard/blocks" class="text-neon-green hover:underline">Ajoute ton premier bloc</a>
       </div>
     ) : (
-      <div class="overflow-x-auto">
-        <table class="w-full">
+      <div class="overflow-x-auto -mx-1">
+        <table class="w-full text-sm">
           <thead>
-            <tr class="border-b border-white/10">
-              <th class="text-left py-3 px-4 text-sm font-semibold text-gray-400">Block</th>
-              <th class="text-right py-3 px-4 text-sm font-semibold text-gray-400">Clicks</th>
-              <th class="text-right py-3 px-4 text-sm font-semibold text-gray-400">CTR</th>
-              <th class="text-center py-3 px-4 text-sm font-semibold text-gray-400">Status</th>
+            <tr class="border-b border-white/8">
+              <th class="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Bloc</th>
+              <th class="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Clics</th>
+              <th class="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">CTR</th>
+              <th class="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Statut</th>
             </tr>
           </thead>
-          <tbody>
-            {blocks.map((block) => {
-              const blockClicks = analytics.topBlocks?.find(tb => tb.id === block.id)?.clicks || 0;
-              const ctr = analytics.summary.totalViews > 0 
-                ? ((blockClicks / analytics.summary.totalViews) * 100).toFixed(1) 
+          <tbody class="divide-y divide-white/5">
+            {blocks.map(block => {
+              const found = topBlocks.find(tb => tb.block_id === block.id);
+              const blockClicks = found?.clicks ?? 0;
+              const ctr = summary.totalViews > 0
+                ? ((blockClicks / summary.totalViews) * 100).toFixed(1)
                 : '0.0';
-              
               return (
-                <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+                <tr class="hover:bg-white/3 transition-colors">
                   <td class="py-3 px-4">
-                    <div class="flex items-center space-x-3">
+                    <div class="flex items-center gap-3">
                       <Badge variant="default" size="sm">{block.type}</Badge>
-                      <span class="text-white text-sm truncate">
-                        {block.title || 'Untitled'}
-                      </span>
+                      <span class="text-white">{block.title || 'Untitled'}</span>
                     </div>
                   </td>
                   <td class="py-3 px-4 text-right">
-                    <span class="text-white font-semibold">{blockClicks}</span>
+                    <span class={`font-semibold ${blockClicks > 0 ? 'text-neon-green' : 'text-gray-600'}`}>
+                      {blockClicks.toLocaleString('fr-FR')}
+                    </span>
                   </td>
-                  <td class="py-3 px-4 text-right">
-                    <span class="text-gray-400">{ctr}%</span>
-                  </td>
+                  <td class="py-3 px-4 text-right text-gray-400">{ctr}%</td>
                   <td class="py-3 px-4 text-center">
                     <Badge variant={block.active ? 'success' : 'default'} size="sm">
-                      {block.active ? 'Active' : 'Inactive'}
+                      {block.active ? 'Actif' : 'Inactif'}
                     </Badge>
                   </td>
                 </tr>
@@ -312,134 +546,217 @@ const exportedChartData = { labels: chartLabels, views: chartViews, clicks: char
     )}
   </Card>
 
-  <!-- Chart.js CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  
-  <!-- Charts Script -->
-  <script define:vars={{ chartData: exportedChartData, analytics }}>
-    window.addEventListener('load', function() {
-      console.log('📊 Chart.js loaded:', typeof Chart !== 'undefined');
-      console.log('📊 Chart data reçu :', chartData);
-      console.log('📊 Analytics reçu :', analytics);
-      console.log('📊 Total clics SSR :', analytics?.summary?.totalClicks ?? 'absent');
-      console.log('📊 Total vues SSR :', analytics?.summary?.totalViews ?? 'absent');
+  <!-- ===== SCRIPTS ===== -->
+  <div aria-hidden="true" class="contents">
+    <div id="chart-data" class="hidden"
+      data-chart={JSON.stringify(exportedChart)}
+      data-devices={JSON.stringify(exportedDevices)}
+      data-days={String(exportedDays)}>
+    </div>
+  </div>
 
-      if (typeof Chart === 'undefined') {
-        console.error('❌ Chart.js non chargé !');
-        return;
-      }
+  <script>
+    (async () => {
+      // Read bridge data
+      const el = document.getElementById('chart-data');
+      if (!el) return;
+      const exportedChart   = JSON.parse(el.dataset.chart   ?? '{}');
+      const exportedDevices = JSON.parse(el.dataset.devices ?? '{}');
+      const exportedDays    = Number(el.dataset.days ?? 7);
 
-      if (!chartData || !chartData.labels || chartData.labels.length === 0) {
-        console.warn('⚠️ No chart data available (labels vide)');
-        return;
-      }
+      // Dynamically load Chart.js from CDN then init
+      await new Promise((resolve, reject) => {
+        if (typeof Chart !== 'undefined') { resolve(); return; }
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
 
-      // Traffic Chart (Views & Clicks)
+      // Chart.js loaded above — init charts
+
+      Chart.defaults.color = '#9ca3af';
+      Chart.defaults.font.family = 'DM Sans, system-ui, sans-serif';
+
+      const GRID   = 'rgba(255,255,255,0.04)';
+      const GREEN  = '#00ff9d';
+      const PURPLE = '#bf00ff';
+      const BLUE   = '#00aaff';
+
+      // ── Traffic chart ──────────────────────────────────────
       const trafficCtx = document.getElementById('traffic-chart');
-      if (trafficCtx) {
+      if (trafficCtx && exportedChart.labels.length > 0) {
         new Chart(trafficCtx, {
           type: 'line',
           data: {
-            labels: chartData.labels || [],
+            labels: exportedChart.labels,
             datasets: [
               {
-                label: 'Views',
-                data: chartData.views || [],
-                borderColor: '#00ff9d',
-                backgroundColor: 'rgba(0, 255, 157, 0.1)',
+                label: 'Vues',
+                data: exportedChart.views,
+                borderColor: GREEN,
+                backgroundColor: GREEN + '18',
+                borderWidth: 2.5,
                 tension: 0.4,
                 fill: true,
-                borderWidth: 2,
+                pointRadius: exportedChart.labels.length > 14 ? 0 : 3,
+                pointHoverRadius: 5,
+                pointBackgroundColor: GREEN,
               },
               {
-                label: 'Clicks',
-                data: chartData.clicks || [],
-                borderColor: '#bf00ff',
-                backgroundColor: 'rgba(191, 0, 255, 0.1)',
+                label: 'Clics',
+                data: exportedChart.clicks,
+                borderColor: PURPLE,
+                backgroundColor: PURPLE + '18',
+                borderWidth: 2.5,
                 tension: 0.4,
                 fill: true,
-                borderWidth: 2,
-              }
-            ]
+                pointRadius: exportedChart.labels.length > 14 ? 0 : 3,
+                pointHoverRadius: 5,
+                pointBackgroundColor: PURPLE,
+              },
+            ],
           },
           options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
             plugins: {
-              legend: {
-                display: true,
-                labels: { color: '#9ca3af', font: { size: 11 } }
-              },
+              legend: { labels: { color: '#9ca3af', font: { size: 11 }, boxWidth: 12, padding: 16 } },
               tooltip: {
-                backgroundColor: 'rgba(17, 17, 17, 0.9)',
+                backgroundColor: 'rgba(10,10,10,0.95)',
                 titleColor: '#fff',
                 bodyColor: '#9ca3af',
-                borderColor: 'rgba(0, 255, 157, 0.3)',
-                borderWidth: 1
-              }
+                borderColor: GREEN + '40',
+                borderWidth: 1,
+                padding: 10,
+              },
             },
             scales: {
               y: {
                 beginAtZero: true,
-                ticks: { color: '#9ca3af', font: { size: 11 } },
-                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                ticks: { color: '#6b7280', font: { size: 10 }, maxTicksLimit: 6 },
+                grid: { color: GRID },
+                border: { display: false },
               },
               x: {
-                ticks: { color: '#9ca3af', font: { size: 11 } },
-                grid: { color: 'rgba(255, 255, 255, 0.05)' }
-              }
-            }
-          }
+                ticks: {
+                  color: '#6b7280',
+                  font: { size: 10 },
+                  maxTicksLimit: exportedDays === 7 ? 7 : exportedDays === 30 ? 10 : 15,
+                  maxRotation: 0,
+                },
+                grid: { display: false },
+                border: { display: false },
+              },
+            },
+          },
         });
-        console.log('📊 Traffic chart créé');
       }
 
-      // Performance Chart (Click Rate)
-      const perfCtx = document.getElementById('performance-chart');
-      if (perfCtx) {
-        const clickRates = (chartData.labels || []).map((_, index) => {
-          const views = chartData.views?.[index] || 0;
-          const clicks = chartData.clicks?.[index] || 0;
-          return views > 0 ? parseFloat(((clicks / views) * 100).toFixed(1)) : 0;
-        });
+      // ── Device donut ───────────────────────────────────────
+      const deviceCtx = document.getElementById('device-chart');
+      if (deviceCtx) {
+        const d = exportedDevices;
+        const total = d.mobile + d.desktop + d.tablet + d.unknown;
+        if (total > 0) {
+          const labels = [], data = [], colors = [];
+          if (d.mobile  > 0) { labels.push('Mobile');  data.push(d.mobile);  colors.push(GREEN); }
+          if (d.desktop > 0) { labels.push('Desktop'); data.push(d.desktop); colors.push(PURPLE); }
+          if (d.tablet  > 0) { labels.push('Tablet');  data.push(d.tablet);  colors.push(BLUE); }
+          if (d.unknown > 0) { labels.push('Autre');   data.push(d.unknown); colors.push('#374151'); }
 
-        new Chart(perfCtx, {
+          new Chart(deviceCtx, {
+            type: 'doughnut',
+            data: {
+              labels,
+              datasets: [{
+                data,
+                backgroundColor: colors.map(c => c + '33'),
+                borderColor: colors,
+                borderWidth: 2,
+                hoverBackgroundColor: colors.map(c => c + '55'),
+              }],
+            },
+            options: {
+              responsive: false,
+              cutout: '68%',
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  backgroundColor: 'rgba(10,10,10,0.95)',
+                  titleColor: '#fff',
+                  bodyColor: '#9ca3af',
+                  borderColor: GREEN + '40',
+                  borderWidth: 1,
+                  callbacks: {
+                    label: (ctx) => ` ${ctx.label}: ${ctx.parsed} (${Math.round((ctx.parsed / total) * 100)}%)`,
+                  },
+                },
+              },
+            },
+          });
+        }
+      }
+
+      // ── Click rate bar chart ───────────────────────────────
+      const rateCtx = document.getElementById('rate-chart');
+      if (rateCtx && exportedChart.labels.length > 0) {
+        new Chart(rateCtx, {
           type: 'bar',
           data: {
-            labels: chartData.labels || [],
+            labels: exportedChart.labels,
             datasets: [{
-              label: 'Click Rate (%)',
-              data: clickRates,
-              backgroundColor: 'rgba(0, 255, 157, 0.2)',
-              borderColor: '#00ff9d',
-              borderWidth: 2,
-            }]
+              label: 'Taux de clic (%)',
+              data: exportedChart.rates,
+              backgroundColor: GREEN + '25',
+              borderColor: GREEN + '80',
+              borderWidth: 1.5,
+              borderRadius: 4,
+            }],
           },
           options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-              legend: { display: false }
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: 'rgba(10,10,10,0.95)',
+                titleColor: '#fff',
+                bodyColor: '#9ca3af',
+                borderColor: GREEN + '40',
+                borderWidth: 1,
+                callbacks: { label: (ctx) => ` ${ctx.parsed.y}%` },
+              },
             },
             scales: {
               y: {
                 beginAtZero: true,
-                ticks: { 
-                  color: '#9ca3af', 
-                  font: { size: 11 },
-                  callback: (value) => value + '%'
+                ticks: {
+                  color: '#6b7280',
+                  font: { size: 10 },
+                  callback: (v) => v + '%',
+                  maxTicksLimit: 5,
                 },
-                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                grid: { color: GRID },
+                border: { display: false },
               },
               x: {
-                ticks: { color: '#9ca3af', font: { size: 11 } },
-                grid: { color: 'rgba(255, 255, 255, 0.05)' }
-              }
-            }
-          }
+                ticks: {
+                  color: '#6b7280',
+                  font: { size: 10 },
+                  maxRotation: 0,
+                  maxTicksLimit: exportedDays === 7 ? 7 : 10,
+                },
+                grid: { display: false },
+                border: { display: false },
+              },
+            },
+          },
         });
-        console.log('📊 Click Rate chart créé');
       }
-    });
+    })();
   </script>
+
 </DashboardLayout>
