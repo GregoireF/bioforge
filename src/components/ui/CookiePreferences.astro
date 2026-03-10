@@ -1,0 +1,68 @@
+<div
+ id="cookie-preferences"
+ class="fixed inset-0 z-[100000] hidden items-center justify-center p-4"
+>
+
+ <div class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+
+ <div class="relative max-w-md w-full rounded-2xl p-6 shadow-xl bg-white">
+
+  <h2 class="text-lg font-semibold mb-4">
+   Préférences cookies
+  </h2>
+
+  <label class="flex items-center justify-between">
+
+   <span class="text-sm">
+    Analytics anonymes
+   </span>
+
+   <input type="checkbox" id="pref-analytics" />
+
+  </label>
+
+  <div class="flex justify-end gap-2 mt-6">
+
+   <button id="pref-cancel" class="text-sm">
+    Annuler
+   </button>
+
+   <button
+    id="pref-save"
+    class="px-4 py-2 rounded-lg bg-black text-white text-sm"
+   >
+    Enregistrer
+   </button>
+
+  </div>
+
+ </div>
+
+</div>
+
+<script>
+const modal=document.getElementById('cookie-preferences')
+const save=document.getElementById('pref-save')
+const cancel=document.getElementById('pref-cancel')
+const analytics=document.getElementById('pref-analytics')
+
+document.addEventListener('bf:open-preferences',()=>{
+ modal?.classList.remove('hidden')
+})
+
+cancel?.addEventListener('click',()=>{
+ modal?.classList.add('hidden')
+})
+
+save?.addEventListener('click',()=>{
+
+ const enabled=analytics?.checked
+
+ window.dispatchEvent(new CustomEvent('bf:consent',{
+  detail:{analytics:enabled}
+ }))
+
+ modal?.classList.add('hidden')
+
+})
+</script>
