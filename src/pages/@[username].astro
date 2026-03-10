@@ -944,50 +944,6 @@ function getSocialIconPath(url?: string): string {
       }
     });
 
-    // ── Countdown timers ─────────────────────────────────────────────────────
-    function updateCountdowns() {
-      const now = Date.now();
-
-      document.querySelectorAll<HTMLElement>('.countdown-units').forEach(el => {
-        const target = el.dataset.target ? Date.parse(el.dataset.target) : 0;
-        const diff   = target - now;
-
-        const wrap = el.closest('.countdown-block') as HTMLElement | null;
-        if (!wrap) return;
-
-        const done = wrap.querySelector<HTMLElement>('.countdown-done');
-
-        if (diff <= 0) {
-          el.style.display = 'none';
-          done?.classList.remove('hidden');
-          return;
-        }
-
-        done?.classList.add('hidden');
-        el.style.display = 'flex';
-
-        const d = Math.floor(diff / 86400000);
-        const h = Math.floor((diff % 86400000) / 3600000);
-        const m = Math.floor((diff % 3600000) / 60000);
-        const s = Math.floor((diff % 60000) / 1000);
-
-        const pad = (n: number) => String(n).padStart(2, '0');
-
-        const days = wrap.querySelector<HTMLElement>('.countdown-days');
-        const hrs  = wrap.querySelector<HTMLElement>('.countdown-hours');
-        const mins = wrap.querySelector<HTMLElement>('.countdown-mins');
-        const secs = wrap.querySelector<HTMLElement>('.countdown-secs');
-
-        if (days) days.textContent = String(d);
-        if (hrs)  hrs.textContent  = pad(h);
-        if (mins) mins.textContent = pad(m);
-        if (secs) secs.textContent = pad(s);
-      });
-    }
-
-    updateCountdowns();
-    setInterval(updateCountdowns, 1000);
-
     // ── Dropdown 3-dot ───────────────────────────────────────────────────────
     function closeAllDropdowns() {
       document.querySelectorAll('.dot-dropdown').forEach(d => d.classList.add('hidden'));
