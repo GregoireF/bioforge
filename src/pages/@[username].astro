@@ -876,7 +876,7 @@ function getSocialIconPath(url?: string): string {
   </style>
 
   <!-- ===== SCRIPT ===== -->
-  <script type="module" define:vars={{ bridgeJson: bridge, animPreset: theme.animation_preset, hasAnimations: theme.animations }}>
+  <script lang="ts" type="module" is:inline define:vars={{ bridgeJson: bridge, animPreset: theme.animation_preset, hasAnimations: theme.animations }}>
 
     const { profileId, profileUrl, profileName, primaryColor: pc, bgColor: bg, textColor: tc, qrDataUrl } = JSON.parse(bridgeJson);
 
