@@ -3,25 +3,14 @@
 // Génère automatiquement une image OG 1200×630 par profil BioForge
 //
 // Dépendances à installer :
-//   npm install satori @resvg-js/resvg-wasm
+//   npm install satori @resvg/resvg-js
 //
 // Deploy path : src/pages/api/profile/og/[username].png.ts
 // Usage       : https://bioforge.click/api/profile/og/{username}.png
 
 import type { APIRoute } from 'astro';
 import satori from 'satori';
-import { Resvg, initWasm } from '@resvg-js/resvg-wasm';
-
-// ── WASM init (once per cold start) ─────────────────────────────────────────
-let wasmInitialized = false;
-async function ensureWasm() {
-  if (wasmInitialized) return;
-  // Load WASM binary from the package
-  const wasmModule = await import('@resvg-js/resvg-wasm/index_bg.wasm?url');
-  const response = await fetch(wasmModule.default);
-  await initWasm(response);
-  wasmInitialized = true;
-}
+import { Resvg } from '@resvg/resvg-js';
 
 // ── Supabase client (service role for server-side) ──────────────────────────
 import { createClient } from '@supabase/supabase-js';
@@ -141,7 +130,6 @@ export const GET: APIRoute = async ({ params }) => {
     const [avatarB64] = await Promise.all([
       profile.avatar_url ? fetchAvatarBase64(profile.avatar_url) : Promise.resolve(null),
       loadFonts(),
-      ensureWasm(),
     ]);
 
     // ── 4. Computed values ───────────────────────────────────────────────────
@@ -161,8 +149,6 @@ export const GET: APIRoute = async ({ params }) => {
       .toUpperCase();
 
     // ── 5. Satori JSX tree ──────────────────────────────────────────────────
-    // Note: satori uses React-like object syntax — no actual JSX here, it's
-    // a plain object tree passed as the first argument.
     const svg = await satori(
       {
         type: 'div',
@@ -504,7 +490,7 @@ export const GET: APIRoute = async ({ params }) => {
       }
     );
 
-    // ── 6. SVG → PNG via resvg-wasm ──────────────────────────────────────────
+    // ── 6. SVG → PNG via @resvg/resvg-js ─────────────────────────────────────
     const resvg = new Resvg(svg, {
       fitTo: { mode: 'width', value: 1200 },
       shapeRendering: 2, // geometricPrecision
@@ -532,7 +518,7 @@ export const GET: APIRoute = async ({ params }) => {
 // ── Fallback PNG: simple branded card when profile not found / error ──────────
 async function ogFallback(username: string): Promise<Response> {
   try {
-    await Promise.all([loadFonts(), ensureWasm()]);
+    await loadFonts();
 
     const svg = await satori(
       {
@@ -585,7 +571,9 @@ async function ogFallback(username: string): Promise<Response> {
       }
     );
 
-    const pngData = new Resvg(svg).render().asPng();
+    const resvg = new Resvg(svg);
+    const pngData = resvg.render().asPng();
+
     return new Response(pngData, {
       status: 200,
       headers: {

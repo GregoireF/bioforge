@@ -32,6 +32,9 @@ export default defineConfig({
         server: true
       })
     ],
+    optimizeDeps: {
+      exclude: ['@resvg-js/resvg-wasm']
+    },
     build: {
       sourcemap: true
     }
