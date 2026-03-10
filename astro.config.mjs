@@ -11,7 +11,7 @@ import playformInline from '@playform/inline';
 import min from 'astro-min';
 import compressor from 'astro-compressor';
 import purgecss from 'astro-purgecss';
-import vercel from '@astrojs/vercel';
+import vercel from '@astrojs/vercel/serverless';
 
 // https://astro.build/config
 export default defineConfig({
@@ -32,8 +32,12 @@ export default defineConfig({
         server: true
       })
     ],
+    ssr: {
+      noExternal: [],
+      external: ['@resvg/resvg-js']
+    },
     optimizeDeps: {
-      exclude: ['@resvg-js/resvg-wasm']
+      exclude: ['@resvg/resvg-js']
     },
     build: {
       sourcemap: true
