@@ -383,6 +383,9 @@ function getSocialIconPath(url?: string): string {
             const delay = `animation-delay: ${Math.min(index * 80, 500)}ms;`;
             const animClass = theme.animations ? 'anim-block' : '';
 
+            const showFrom = block.config?.show_from ?? null;
+            const showUntil = block.config?.show_until ?? null;
+
             // ── HEADING ──
             if (block.type === 'heading') return (
               <div class={animClass} style={`color: ${tc}; font-size: 18px; font-weight: 700; text-align: center; padding: 8px 0; ${delay}`}>
@@ -400,7 +403,7 @@ function getSocialIconPath(url?: string): string {
               const hasIcon = Boolean(iconUrl);
 
               return (
-                <div class={`block-dot-wrap group relative ${animClass}`} style={delay}>
+                <div class={`block-dot-wrap group relative ${animClass}`} style={delay} data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
                   {/* Link button — icon absolute left, text always truly centered */}
                   <a href={url} target="_blank" rel="noopener noreferrer"
                     data-block-id={block.id}
@@ -468,8 +471,8 @@ function getSocialIconPath(url?: string): string {
                   loading="lazy" />
               );
               return imgLink
-                ? <a href={imgLink} target="_blank" rel="noopener noreferrer" class={animClass} style={delay}>{img}</a>
-                : <div class={animClass} style={delay}>{img}</div>;
+                ? <a href={imgLink} target="_blank" rel="noopener noreferrer" class={animClass} style={delay} data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>{img}</a>
+                : <div class={animClass} style={delay} data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>{img}</div>;
             }
 
             // ── VIDEO ──
@@ -489,7 +492,7 @@ function getSocialIconPath(url?: string): string {
               }
               return (
                 <div class={`relative w-full overflow-hidden ${animClass}`}
-                  style={`padding-bottom: 56.25%; border-radius: ${br}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''} ${delay}`}>
+                  style={`padding-bottom: 56.25%; border-radius: ${br}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''} ${delay}`} data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
                   <iframe src={embedUrl} class="absolute inset-0 w-full h-full" frameborder="0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowfullscreen style={`border-radius: ${br}px;`}></iframe>
@@ -502,7 +505,7 @@ function getSocialIconPath(url?: string): string {
               const links = Array.isArray(block.config?.links) ? block.config.links : [];
               if (!links.length) return null;
               return (
-                <div class={`flex items-center justify-center gap-3 py-2 flex-wrap ${animClass}`} style={delay}>
+                <div class={`flex items-center justify-center gap-3 py-2 flex-wrap ${animClass}`} style={delay} ata-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
                   {links.map((link: any) => {
                     const url = typeof link === 'string' ? link : link?.url;
                     if (!url) return null;
@@ -516,6 +519,147 @@ function getSocialIconPath(url?: string): string {
                       </a>
                     );
                   })}
+                </div>
+              );
+            }
+
+            // ── COUNTDOWN ──
+            if (block.type === 'countdown') {
+              const targetDate = block.config?.target_date;
+              if (!targetDate) return null;
+              const blockLabel = block.title || block.config?.label || 'Prochain stream dans';
+              return (
+                <div class={`countdown-block ${animClass}`} style={`${delay} border-radius: ${br}px; overflow: hidden; ${theme.block_shadow ? `box-shadow: 0 6px 20px rgba(0,0,0,0.3);` : ''}`}
+                  data-target={targetDate}
+                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
+                  <div style={`background: linear-gradient(135deg, ${pc}18, ${pc}08); border: 1px solid ${pc}30; border-radius: ${br}px; padding: 20px 16px; text-align: center;`}>
+                    <p style={`color: ${tc}; opacity: 0.7; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px;`}>
+                      {blockLabel}
+                    </p>
+                    <div class="countdown-units" style="display: flex; align-items: center; justify-content: center; gap: 8px;"
+                      data-target={targetDate} data-pc={pc} data-bg={bg}>
+                      {['days','hours','mins','secs'].map(unit => (
+                        <div style="text-align: center;">
+                          <div class={`countdown-num countdown-${unit}`}
+                            style={`background: ${pc}20; border: 1px solid ${pc}40; border-radius: 10px; padding: 10px 14px; min-width: 56px; font-size: 28px; font-weight: 800; color: ${pc}; font-variant-numeric: tabular-nums; line-height: 1;`}>
+                            --
+                          </div>
+                          <div style={`font-size: 10px; color: ${tc}; opacity: 0.5; margin-top: 5px; text-transform: uppercase; letter-spacing: 0.06em;`}>
+                            {unit === 'days' ? 'Jours' : unit === 'hours' ? 'Heures' : unit === 'mins' ? 'Min' : 'Sec'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div class="countdown-done hidden" style={`color: ${tc}; opacity: 0.6; font-size: 14px; padding: 8px 0;`}>
+                      🎉 C'est maintenant !
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // ── SCHEDULE ──
+            if (block.type === 'schedule') {
+              const schedule: any[] = Array.isArray(block.config?.schedule) ? block.config.schedule : [];
+              if (!schedule.length) return null;
+              return (
+                <div class={`${animClass}`} style={`${delay} border: 1px solid ${pc}25; border-radius: ${br}px; overflow: hidden; ${theme.block_shadow ? `box-shadow: 0 6px 20px rgba(0,0,0,0.25);` : ''}`}
+                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
+                  {block.title && (
+                    <div style={`background: ${pc}15; border-bottom: 1px solid ${pc}20; padding: 10px 16px; display: flex; align-items: center; gap: 8px;`}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={pc} stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                      </svg>
+                      <span style={`color: ${pc}; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;`}>{block.title}</span>
+                    </div>
+                  )}
+                  <div style={`background: ${pc}08; padding: 4px 0;`}>
+                    {schedule.map((item: any) => (
+                      <div style={`display: flex; align-items: center; justify-content: space-between; padding: 9px 16px; border-bottom: 1px solid ${tc}08;`}>
+                        <span style={`color: ${tc}; font-size: 14px; font-weight: 600;`}>{item.day}</span>
+                        <span style={`color: ${pc}; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums;`}>{item.time}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+
+            // ── DONATION ──
+            if (block.type === 'donation') {
+              const donUrl    = block.config?.url;
+              if (!donUrl) return null;
+              const goalAmt   = Number(block.config?.goal_amount)   || 0;
+              const curAmt    = Number(block.config?.current_amount) || 0;
+              const pct       = goalAmt > 0 ? Math.min(100, Math.round((curAmt / goalAmt) * 100)) : 0;
+              const hasGoal   = goalAmt > 0;
+              const donLabel  = block.title || 'Soutiens-moi';
+              const PLAT_ICONS = {
+                kofi: '☕', patreon: '🎁', streamlabs: '🎛️', paypal: '💳', throne: '👑', other: '💸',
+              };
+              const platIcon = PLAT_ICONS[block.config?.donation_platform ?? ''] ?? '💸';
+              return (
+                <div class={`${animClass}`} style={delay}
+                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
+                  <a href={donUrl} target="_blank" rel="noopener noreferrer" data-block-id={block.id}
+                    class={`block ${theme.animations ? 'hover:scale-[1.02] active:scale-[0.98]' : ''} transition-transform`}
+                    style={`border-radius: ${br}px; overflow: hidden; ${theme.block_shadow ? `box-shadow: 0 6px 24px ${pc}30;` : ''}`}>
+                    <div style={`background: linear-gradient(135deg, ${pc}22, ${pc}10); border: 1px solid ${pc}35; border-radius: ${br}px; padding: 16px 20px;`}>
+                      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                          <span style="font-size: 22px; line-height: 1;">{platIcon}</span>
+                          <span style={`color: ${tc}; font-size: 15px; font-weight: 700;`}>{donLabel}</span>
+                        </div>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={pc} stroke-width="2.5">
+                          <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                      </div>
+                      {hasGoal && (
+                        <div>
+                          <div style={`height: 6px; background: ${tc}15; border-radius: 99px; overflow: hidden; margin-bottom: 6px;`}>
+                            <div style={`height: 100%; width: ${pct}%; background: linear-gradient(90deg, ${pc}, ${pc}cc); border-radius: 99px; transition: width 1s ease;`}></div>
+                          </div>
+                          <div style={`display: flex; justify-content: space-between; font-size: 11px; color: ${tc}; opacity: 0.55;`}>
+                            <span>{curAmt} € collectés</span>
+                            <span style={`color: ${pc}; font-weight: 700;`}>{pct}% · objectif {goalAmt} €</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </a>
+                </div>
+              );
+            }
+
+            // ── EMBED (Spotify / SoundCloud / Apple Music) ──
+            if (block.type === 'embed') {
+              const rawUrl = block.config?.url;
+              if (!rawUrl) return null;
+              const h = Math.min(500, Math.max(80, Number(block.config?.height) || 152));
+              // Build embed URL
+              let embedSrc = rawUrl;
+              try {
+                if (rawUrl.includes('spotify.com')) {
+                  // https://open.spotify.com/playlist/ID → https://open.spotify.com/embed/playlist/ID
+                  embedSrc = rawUrl.replace('open.spotify.com/', 'open.spotify.com/embed/');
+                  if (!embedSrc.includes('/embed/')) embedSrc = rawUrl; // fallback
+                } else if (rawUrl.includes('soundcloud.com')) {
+                  embedSrc = `https://w.soundcloud.com/player/?url=${encodeURIComponent(rawUrl)}&color=%2300ff9d&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false`;
+                }
+              } catch {}
+              return (
+                <div class={`${animClass}`}
+                  style={`${delay} border-radius: ${br}px; overflow: hidden; ${theme.block_shadow ? `box-shadow: 0 8px 24px rgba(0,0,0,0.3);` : ''}`}
+                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
+                  <iframe
+                    src={embedSrc}
+                    width="100%"
+                    height={String(h)}
+                    frameborder="0"
+                    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                    loading="lazy"
+                    style={`border-radius: ${br}px; display: block;`}
+                  ></iframe>
                 </div>
               );
             }
@@ -783,6 +927,66 @@ function getSocialIconPath(url?: string): string {
       if (_stored?.analytics === true) fireViewTracking();
     } catch {}
     window.addEventListener('bf:consent', (e) => { if (e.detail?.analytics === true) fireViewTracking(); });
+
+    // ── Visibility scheduling filter ─────────────────────────────────────────
+    // Hide blocks whose show_from/show_until window has passed
+    document
+    .querySelectorAll('[data-show-from], [data-show-until]')
+    .forEach(el => {
+      if (!(el instanceof HTMLElement)) return;
+
+      const from  = el.dataset.showFrom  ? new Date(el.dataset.showFrom).getTime()  : null;
+      const until = el.dataset.showUntil ? new Date(el.dataset.showUntil).getTime() : null;
+      const now   = Date.now();
+
+      if ((from && now < from) || (until && now > until)) {
+        el.style.display = 'none';
+      }
+    });
+
+    // ── Countdown timers ─────────────────────────────────────────────────────
+    function updateCountdowns() {
+      const now = Date.now();
+
+      document.querySelectorAll<HTMLElement>('.countdown-units').forEach(el => {
+        const target = el.dataset.target ? Date.parse(el.dataset.target) : 0;
+        const diff   = target - now;
+
+        const wrap = el.closest('.countdown-block') as HTMLElement | null;
+        if (!wrap) return;
+
+        const done = wrap.querySelector<HTMLElement>('.countdown-done');
+
+        if (diff <= 0) {
+          el.style.display = 'none';
+          done?.classList.remove('hidden');
+          return;
+        }
+
+        done?.classList.add('hidden');
+        el.style.display = 'flex';
+
+        const d = Math.floor(diff / 86400000);
+        const h = Math.floor((diff % 86400000) / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+
+        const pad = (n: number) => String(n).padStart(2, '0');
+
+        const days = wrap.querySelector<HTMLElement>('.countdown-days');
+        const hrs  = wrap.querySelector<HTMLElement>('.countdown-hours');
+        const mins = wrap.querySelector<HTMLElement>('.countdown-mins');
+        const secs = wrap.querySelector<HTMLElement>('.countdown-secs');
+
+        if (days) days.textContent = String(d);
+        if (hrs)  hrs.textContent  = pad(h);
+        if (mins) mins.textContent = pad(m);
+        if (secs) secs.textContent = pad(s);
+      });
+    }
+
+    updateCountdowns();
+    setInterval(updateCountdowns, 1000);
 
     // ── Dropdown 3-dot ───────────────────────────────────────────────────────
     function closeAllDropdowns() {
