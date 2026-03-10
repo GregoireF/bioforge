@@ -1,7 +1,16 @@
 ---
 // src/layouts/BaseLayout.astro
 import GlobalScripts from '@/components/ui/Global.astro';
+import { getProfileByUsername, getActiveBlocks } from '@/lib/supabase/queries';
 import "../styles/global.css";
+
+const { username } = Astro.params;
+if (!username) return Astro.redirect('/404');
+
+const profileResult = await getProfileByUsername(username);
+if (!profileResult.success) return Astro.redirect('/404');
+const profile = profileResult.data;
+
 
 interface Props {
   title:          string;
@@ -32,7 +41,7 @@ const baseUrl           = import.meta.env.PUBLIC_SITE_URL || "https://bioforge.c
 const canonicalUrl      = canonical || new URL(Astro.url.pathname, baseUrl).toString();
 const finalOgImage      = ogImage
   ? (ogImage.startsWith('http') ? ogImage : `${baseUrl}${ogImage}`)
-  : `${baseUrl}/og.png`;
+  : `https://bioforge.click/api/profile/og/${profile.username}.png`;
 
 const defaultJsonLd = {
   "@context": "https://schema.org",
