@@ -1,7 +1,7 @@
 ---
-// src/pages/dashboard/analytics.astro — Analytics v2
+// src/pages/dashboard/analytics.astro — Analytics v3
 // Powered by get_profile_analytics RPC + daily_clicks query
-// Sections: KPIs · Traffic chart · Device donut · Geo · Sources · Blocks
+// Redesigned: bento grid · animated KPIs · sparklines · tabbed insights
 
 import DashboardLayout from '@/layouts/DashboardLayout.astro';
 import Card from '@/components/ui/Card.astro';
@@ -33,7 +33,6 @@ if (!authResult.success || !authResult.data) {
 }
 const { profile } = authResult.data;
 const profileId = profile?.id;
-
 if (!profileId) return Astro.redirect('/signin?error=no_profile');
 
 // ==================== DATA FETCH ====================
@@ -55,23 +54,17 @@ let rpcError: string | null = null;
 let dailyClicks: { date: string; clicks: number }[] = [];
 let blocks: any[] = [];
 
-// 1. Main analytics RPC
 const { data: rpcRaw, error: rpcErr } = await supabase.rpc('get_profile_analytics', {
   p_profile_id: profileId,
   p_days: days,
 });
-if (rpcErr) {
-  rpcError = rpcErr.message;
-} else {
-  rpcData = rpcRaw as AnalyticsRPC;
-}
+if (rpcErr) { rpcError = rpcErr.message; }
+else { rpcData = rpcRaw as AnalyticsRPC; }
 
-// 2. Daily clicks (for chart timeline — not in RPC)
 const since = new Date();
 since.setDate(since.getDate() - days);
 const { data: clickRows } = await supabase
-  .from('block_clicks')
-  .select('click_date')
+  .from('block_clicks').select('click_date')
   .eq('profile_id', profileId)
   .gte('click_date', since.toISOString().split('T')[0]);
 
@@ -86,13 +79,9 @@ if (clickRows) {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-// 3. All blocks (for table)
 const { data: blockRows } = await supabase
-  .from('blocks')
-  .select('id, type, title, active')
-  .eq('profile_id', profileId)
-  .is('deleted_at', null)
-  .order('position');
+  .from('blocks').select('id, type, title, active')
+  .eq('profile_id', profileId).is('deleted_at', null).order('position');
 blocks = blockRows ?? [];
 
 // ==================== DERIVED METRICS ====================
@@ -102,129 +91,192 @@ const summary = {
   uniqueVisitors: rpcData?.unique_visitors ?? 0,
   totalClicks:    rpcData?.total_clicks    ?? 0,
   clickRate:      rpcData && rpcData.total_views > 0
-    ? ((rpcData.total_clicks / rpcData.total_views) * 100)
-    : 0,
+    ? ((rpcData.total_clicks / rpcData.total_views) * 100) : 0,
   botViews: Object.values(rpcData?.bots ?? {}).reduce((a, b) => a + b, 0),
+  avgPerDay: days > 0 ? Math.round((rpcData?.total_views ?? 0) / days) : 0,
 };
 
-const topBlocks   = rpcData?.top_blocks    ?? [];
-const topCountries= rpcData?.top_countries ?? [];
-const devices     = rpcData?.devices       ?? {};
-const topReferrers= rpcData?.top_referrers ?? [];
+const topBlocks    = rpcData?.top_blocks    ?? [];
+const topCountries = rpcData?.top_countries ?? [];
+const devices      = rpcData?.devices       ?? {};
+const topReferrers = rpcData?.top_referrers ?? [];
 
-// ── Chart data ───────────────────────────────────────────────
-// Merge daily_views + daily_clicks on same date axis
+// ── Chart data ──
 const allDates = new Set<string>();
 (rpcData?.daily_views ?? []).forEach(r => allDates.add(r.date));
 dailyClicks.forEach(r => allDates.add(r.date));
-
-const sortedDates = Array.from(allDates).sort();
+const sortedDates  = Array.from(allDates).sort();
 const viewsByDate  = new Map((rpcData?.daily_views ?? []).map(r => [r.date, r.views]));
 const clicksByDate = new Map(dailyClicks.map(r => [r.date, r.clicks]));
-
-const chartLabels = sortedDates.map(d =>
+const chartLabels  = sortedDates.map(d =>
   new Date(d + 'T12:00:00Z').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
 );
 const chartViews  = sortedDates.map(d => viewsByDate.get(d)  ?? 0);
 const chartClicks = sortedDates.map(d => clicksByDate.get(d) ?? 0);
-const chartRates  = sortedDates.map((d, i) => {
-  const v = chartViews[i];
-  const c = chartClicks[i];
+const chartRates  = sortedDates.map((_, i) => {
+  const v = chartViews[i], c = chartClicks[i];
   return v > 0 ? parseFloat(((c / v) * 100).toFixed(1)) : 0;
 });
 
-// ── Device data ──────────────────────────────────────────────
+// Sparkline SVG helper — tiny 32×16 path from data array
+function sparkline(data: number[], color: string): string {
+  if (!data.length) return '';
+  const max = Math.max(...data, 1);
+  const W = 80, H = 24;
+  const pts = data.map((v, i) => {
+    const x = (i / Math.max(data.length - 1, 1)) * W;
+    const y = H - (v / max) * H;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <polyline points="${pts}" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.8"/>
+  </svg>`;
+}
+const viewSparkline  = sparkline(chartViews,  '#00ff9d');
+const clickSparkline = sparkline(chartClicks, '#bf00ff');
+
+// ── Device ──
 const deviceData = {
   mobile:  devices['mobile']  ?? 0,
   desktop: devices['desktop'] ?? 0,
   tablet:  devices['tablet']  ?? 0,
   unknown: devices['unknown'] ?? 0,
 };
+const deviceTotal = deviceData.mobile + deviceData.desktop + deviceData.tablet + deviceData.unknown;
 
-// ── Referrer parsing ─────────────────────────────────────────
+// ── Referrer ──
 const SOCIAL = ['twitter.com','x.com','instagram.com','tiktok.com','facebook.com','linkedin.com','youtube.com','pinterest.com','snapchat.com','reddit.com','discord.com','twitch.tv'];
 const SEARCH  = ['google.','bing.com','duckduckgo.com','yahoo.com','baidu.com','yandex.'];
-
 function classifyReferrer(ref: string | null): { label: string; category: 'direct'|'social'|'search'|'other' } {
-  if (!ref) return { label: 'Direct', category: 'direct' };
+  if (!ref) return { label: 'Direct / liens', category: 'direct' };
   try {
     const host = new URL(ref.includes('://') ? ref : `https://${ref}`).hostname.replace(/^www\./, '');
     if (SOCIAL.some(s => host.includes(s))) return { label: host, category: 'social' };
     if (SEARCH.some(s => host.includes(s)))  return { label: host, category: 'search' };
     return { label: host, category: 'other' };
-  } catch {
-    return { label: ref.slice(0, 40), category: 'other' };
-  }
+  } catch { return { label: ref.slice(0, 40), category: 'other' }; }
 }
-
-const parsedReferrers = topReferrers.map(r => ({
-  ...classifyReferrer(r.referrer),
-  views: r.views,
-}));
-
-// Aggregate by label
+const parsedReferrers = topReferrers.map(r => ({ ...classifyReferrer(r.referrer), views: r.views }));
 const refAgg = new Map<string, { label: string; category: string; views: number }>();
 for (const r of parsedReferrers) {
-  const existing = refAgg.get(r.label);
-  if (existing) existing.views += r.views;
-  else refAgg.set(r.label, { ...r });
+  const e = refAgg.get(r.label);
+  if (e) e.views += r.views; else refAgg.set(r.label, { ...r });
 }
-const aggregatedReferrers = Array.from(refAgg.values()).sort((a, b) => b.views - a.views).slice(0, 8);
+const aggregatedReferrers = Array.from(refAgg.values()).sort((a, b) => b.views - a.views).slice(0, 6);
 const maxReferrerViews = aggregatedReferrers[0]?.views ?? 1;
+const maxCountryViews  = topCountries[0]?.views ?? 1;
 
-// ── Country data ─────────────────────────────────────────────
-const maxCountryViews = topCountries[0]?.views ?? 1;
-
-// ── Country flags (ISO2 → emoji) ────────────────────────────
 function countryFlag(code: string): string {
   if (!code || code.length !== 2) return '🌐';
   return String.fromCodePoint(...[...code.toUpperCase()].map(c => 0x1F1E0 - 65 + c.charCodeAt(0)));
 }
 
-// ── Export for client script ─────────────────────────────────
-// ── Static lookup tables (moved out of JSX to avoid TS-generic parse errors) ──
+// Static lookups — kept out of JSX to avoid TS-generic parse errors
 const CAT_COLORS: Record<string, string> = {
-  direct: '#00ff9d',
-  social: '#bf00ff',
-  search: '#00aaff',
-  other:  '#ff6b6b',
+  direct: '#00ff9d', social: '#bf00ff', search: '#00aaff', other: '#ff6b6b',
 };
-const CAT_ICONS: Record<string, string> = {
-  direct: 'M13 10V3L4 14h7v7l9-11h-7z',
-  social: 'M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z',
-  search: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z',
-  other:  'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.1-1.1',
+const CAT_LABELS: Record<string, string> = {
+  direct: 'Direct', social: 'Social', search: 'Recherche', other: 'Autre',
 };
 
-const exportedChart = {
-  labels: chartLabels,
-  views:  chartViews,
-  clicks: chartClicks,
-  rates:  chartRates,
-};
+// Bridge
+const exportedChart   = { labels: chartLabels, views: chartViews, clicks: chartClicks, rates: chartRates };
 const exportedDevices = deviceData;
 const exportedDays    = days;
 ---
 
 <DashboardLayout title="Analytics">
 
+<style>
+  /* ── Animations ── */
+  @keyframes countUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes barGrow {
+    from { width: 0 !important; }
+  }
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .kpi-value  { animation: countUp  0.5s ease both; }
+  .bar-fill   { animation: barGrow  0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .fade-slide { animation: fadeSlide 0.4s ease both; }
+
+  /* ── Bento grid ── */
+  .bento { display: grid; gap: 1rem; }
+  @media (min-width: 768px) {
+    .bento-main { grid-template-columns: 2fr 1fr; }
+    .bento-insights { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* ── KPI card glow ── */
+  .kpi-card { position: relative; overflow: hidden; }
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 0% 0%, var(--glow) 0%, transparent 65%);
+    opacity: 0.12;
+    pointer-events: none;
+  }
+
+  /* ── Tab system ── */
+  .insight-panel { display: none; }
+  .insight-panel.active { display: block; }
+
+  /* ── Rank badge ── */
+  .rank-1 { background: linear-gradient(135deg, #ffd70022, #ffd70011); border-color: #ffd70040; color: #ffd700; }
+  .rank-2 { background: rgba(192,192,192,0.1); border-color: rgba(192,192,192,0.2); color: #c0c0c0; }
+  .rank-3 { background: rgba(205,127,50,0.1);  border-color: rgba(205,127,50,0.2);  color: #cd7f32; }
+
+  /* ── Progress bar track ── */
+  .bar-track { background: rgba(255,255,255,0.04); border-radius: 9999px; overflow: hidden; height: 3px; }
+  .bar-fill  { height: 100%; border-radius: 9999px; }
+
+  /* ── Source badge ── */
+  .source-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 9999px;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  }
+
+  /* ── Scrollbar ── */
+  .scrollbar-none { scrollbar-width: none; }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+
+  /* ── Stagger delay helpers ── */
+  .d-0 { animation-delay: 0ms; }
+  .d-1 { animation-delay: 60ms; }
+  .d-2 { animation-delay: 120ms; }
+  .d-3 { animation-delay: 180ms; }
+  .d-4 { animation-delay: 240ms; }
+  .d-5 { animation-delay: 300ms; }
+</style>
+
   <!-- ===== HEADER ===== -->
-  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+  <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8 fade-slide">
     <div>
-      <h2 class="text-xl font-semibold text-white mb-1 tracking-tight">Analytics</h2>
-      <p class="text-sm text-gray-400">Performance & engagement · last {days} days</p>
+      <h2 class="text-xl font-semibold text-white tracking-tight mb-1">Analytics</h2>
+      <p class="text-sm text-gray-500">
+        Données sur <span class="text-gray-300 font-medium">{days} jours</span>
+        {summary.botViews > 0 && (
+          <span class="ml-2 text-xs text-yellow-500/70">· {summary.botViews} bots exclus</span>
+        )}
+      </p>
     </div>
 
-    <!-- Period selector -->
-    <div class="flex items-center gap-1 p-1 glass rounded-2xl border border-white/10 w-fit">
+    <!-- Period pills -->
+    <div class="flex items-center gap-1 p-1 rounded-xl border border-white/8 bg-white/3 w-fit self-start">
       {([7, 30, 90] as const).map(d => (
         <a href={`?days=${d}`}
-          class={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+          class={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
             days === d
-              ? 'bg-neon-green/15 text-neon-green border border-neon-green/30'
-              : 'text-gray-400 hover:text-white'
+              ? 'bg-neon-green text-black shadow-lg shadow-neon-green/20'
+              : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
           }`}>
-          {d}d
+          {d === 7 ? '7j' : d === 30 ? '30j' : '90j'}
         </a>
       ))}
     </div>
@@ -232,206 +284,261 @@ const exportedDays    = days;
 
   <!-- Error -->
   {rpcError && (
-    <Alert variant="danger" title="Analytics unavailable">
+    <Alert variant="danger" title="Données indisponibles">
       <p>{rpcError}</p>
     </Alert>
   )}
 
-  <!-- ===== KPI CARDS (6) ===== -->
-  <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 mb-8">
+  <!-- ===== KPI ROW ===== -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
 
-    <!-- Total Views -->
-    <div class="p-5 glass rounded-2xl border border-neon-green/20 bg-neon-green/5">
-      <div class="flex items-start justify-between mb-3">
-        <div class="w-9 h-9 rounded-xl bg-neon-green/15 border border-neon-green/25 flex items-center justify-center">
-          <svg class="w-4 h-4 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <!-- Views -->
+    <div class="kpi-card fade-slide d-0 p-5 glass rounded-2xl border border-white/8 cursor-default"
+      style="--glow: #00ff9d">
+      <div class="flex items-start justify-between mb-4">
+        <div class="w-8 h-8 rounded-lg bg-neon-green/10 border border-neon-green/20 flex items-center justify-center">
+          <svg class="w-3.5 h-3.5 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
           </svg>
         </div>
-        {summary.botViews > 0 && (
-          <span class="text-xs text-yellow-400/70 bg-yellow-400/10 px-2 py-0.5 rounded-full border border-yellow-400/20">
-            {summary.botViews} bots filtrés
+        <div set:html={viewSparkline} class="opacity-60 mt-1"></div>
+      </div>
+      <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">
+        {summary.totalViews.toLocaleString('fr-FR')}
+      </div>
+      <p class="text-xs text-gray-500 mt-1.5 font-medium">Vues totales</p>
+      <p class="text-xs text-gray-600 mt-0.5">{summary.avgPerDay.toLocaleString('fr-FR')}/j en moy.</p>
+    </div>
+
+    <!-- Unique visitors -->
+    <div class="kpi-card fade-slide d-1 p-5 glass rounded-2xl border border-white/8"
+      style="--glow: #00aaff">
+      <div class="flex items-start justify-between mb-4">
+        <div class="w-8 h-8 rounded-lg bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center">
+          <svg class="w-3.5 h-3.5 text-neon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+        </div>
+        <!-- Ratio badge -->
+        {summary.totalViews > 0 && (
+          <span class="text-xs text-neon-blue/70 bg-neon-blue/8 px-2 py-0.5 rounded-full border border-neon-blue/15 font-mono mt-1">
+            {Math.round((summary.uniqueVisitors / summary.totalViews) * 100)}%
           </span>
         )}
       </div>
-      <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums">{summary.totalViews.toLocaleString('fr-FR')}</div>
-      <p class="text-xs text-gray-400 mt-1">Vues totales</p>
+      <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">
+        {summary.uniqueVisitors.toLocaleString('fr-FR')}
+      </div>
+      <p class="text-xs text-gray-500 mt-1.5 font-medium">Visiteurs uniques</p>
+      <p class="text-xs text-gray-600 mt-0.5">{summary.cleanViews.toLocaleString('fr-FR')} vues nettes</p>
     </div>
 
-    <!-- Unique Visitors -->
-    <div class="p-5 glass rounded-2xl border border-neon-blue/20 bg-neon-blue/5">
-      <div class="w-9 h-9 rounded-xl bg-neon-blue/15 border border-neon-blue/25 flex items-center justify-center mb-3">
-        <svg class="w-4 h-4 text-neon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-        </svg>
+    <!-- Clicks -->
+    <div class="kpi-card fade-slide d-2 p-5 glass rounded-2xl border border-white/8"
+      style="--glow: #bf00ff">
+      <div class="flex items-start justify-between mb-4">
+        <div class="w-8 h-8 rounded-lg bg-neon-purple/10 border border-neon-purple/20 flex items-center justify-center">
+          <svg class="w-3.5 h-3.5 text-neon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/>
+          </svg>
+        </div>
+        <div set:html={clickSparkline} class="opacity-60 mt-1"></div>
       </div>
-      <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums">{summary.uniqueVisitors.toLocaleString('fr-FR')}</div>
-      <p class="text-xs text-gray-400 mt-1">Visiteurs uniques</p>
+      <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">
+        {summary.totalClicks.toLocaleString('fr-FR')}
+      </div>
+      <p class="text-xs text-gray-500 mt-1.5 font-medium">Clics sur liens</p>
+      <p class="text-xs text-gray-600 mt-0.5">sur {blocks.filter((b) => b.active).length} blocs actifs</p>
     </div>
 
-    <!-- Clean Views -->
-    <div class="p-5 glass rounded-2xl border border-white/10">
-      <div class="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mb-3">
-        <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-        </svg>
+    <!-- CTR -->
+    <div class="kpi-card fade-slide d-3 p-5 glass rounded-2xl border border-white/8"
+      style="--glow: #ff6b6b">
+      <div class="flex items-start justify-between mb-4">
+        <div class="w-8 h-8 rounded-lg bg-neon-pink/10 border border-neon-pink/20 flex items-center justify-center">
+          <svg class="w-3.5 h-3.5 text-neon-pink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+          </svg>
+        </div>
+        <!-- CTR quality pill -->
+        <span class={`text-xs px-2 py-0.5 rounded-full border font-mono mt-1 ${
+          summary.clickRate >= 10 ? 'text-neon-green/70 bg-neon-green/8 border-neon-green/15' :
+          summary.clickRate >= 5  ? 'text-yellow-400/70 bg-yellow-400/8 border-yellow-400/15' :
+          'text-gray-500 bg-white/5 border-white/10'
+        }`}>
+          {summary.clickRate >= 10 ? '🔥 Top' : summary.clickRate >= 5 ? '↗ Bien' : '· Faible'}
+        </span>
       </div>
-      <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums">{summary.cleanViews.toLocaleString('fr-FR')}</div>
-      <p class="text-xs text-gray-400 mt-1">Vues nettes <span class="text-gray-600">(sans VPN/bots)</span></p>
-    </div>
-
-    <!-- Total Clicks -->
-    <div class="p-5 glass rounded-2xl border border-neon-purple/20 bg-neon-purple/5">
-      <div class="w-9 h-9 rounded-xl bg-neon-purple/15 border border-neon-purple/25 flex items-center justify-center mb-3">
-        <svg class="w-4 h-4 text-neon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/>
-        </svg>
+      <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">
+        {summary.clickRate.toFixed(1)}<span class="text-lg text-gray-400">%</span>
       </div>
-      <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums">{summary.totalClicks.toLocaleString('fr-FR')}</div>
-      <p class="text-xs text-gray-400 mt-1">Clics sur liens</p>
-    </div>
-
-    <!-- Click Rate -->
-    <div class="p-5 glass rounded-2xl border border-neon-pink/20 bg-neon-pink/5">
-      <div class="w-9 h-9 rounded-xl bg-neon-pink/15 border border-neon-pink/25 flex items-center justify-center mb-3">
-        <svg class="w-4 h-4 text-neon-pink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-        </svg>
-      </div>
-      <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums">{summary.clickRate.toFixed(1)}%</div>
-      <p class="text-xs text-gray-400 mt-1">Taux de clic</p>
-    </div>
-
-    <!-- Avg views/day -->
-    <div class="p-5 glass rounded-2xl border border-white/10">
-      <div class="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mb-3">
-        <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-        </svg>
-      </div>
-      <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums">
-        {days > 0 ? Math.round(summary.totalViews / days).toLocaleString('fr-FR') : 0}
-      </div>
-      <p class="text-xs text-gray-400 mt-1">Moy. vues / jour</p>
+      <p class="text-xs text-gray-500 mt-1.5 font-medium">Taux de clic</p>
+      <p class="text-xs text-gray-600 mt-0.5">clics / vues</p>
     </div>
 
   </div>
 
-  <!-- ===== TRAFFIC CHART + DEVICE ===== -->
-  <div class="grid lg:grid-cols-3 gap-6 mb-6">
+  <!-- ===== MAIN BENTO: CHART + DEVICE ===== -->
+  <div class="bento bento-main mb-6">
 
-    <!-- Traffic line chart (2/3 width) -->
-    <div class="lg:col-span-2">
-      <Card title="Vues & Clics" description={`Évolution sur ${days} jours`}>
-        {chartLabels.length === 0 ? (
-          <div class="flex flex-col items-center justify-center py-16 text-gray-500">
-            <svg class="w-10 h-10 mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-            </svg>
-            <p class="text-sm">Aucune donnée sur cette période</p>
-          </div>
-        ) : (
-          <canvas id="traffic-chart" style="max-height: 260px;"></canvas>
-        )}
-      </Card>
+    <!-- Traffic chart — large -->
+    <div class="fade-slide d-2 p-5 glass rounded-2xl border border-white/8">
+      <div class="flex items-center justify-between mb-5">
+        <div>
+          <h3 class="text-sm font-semibold text-white">Trafic</h3>
+          <p class="text-xs text-gray-500 mt-0.5">Vues & clics · {days}j</p>
+        </div>
+        <!-- Legend -->
+        <div class="flex items-center gap-4">
+          <span class="flex items-center gap-1.5 text-xs text-gray-400">
+            <span class="w-3 h-0.5 bg-neon-green rounded-full inline-block"></span>Vues
+          </span>
+          <span class="flex items-center gap-1.5 text-xs text-gray-400">
+            <span class="w-3 h-0.5 bg-neon-purple rounded-full inline-block"></span>Clics
+          </span>
+        </div>
+      </div>
+      {chartLabels.length === 0 ? (
+        <div class="flex flex-col items-center justify-center h-52 text-gray-600">
+          <svg class="w-10 h-10 mb-3 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4v16"/>
+          </svg>
+          <p class="text-sm">Aucune donnée sur cette période</p>
+        </div>
+      ) : (
+        <canvas id="traffic-chart" style="max-height: 240px; width: 100%;"></canvas>
+      )}
     </div>
 
-    <!-- Device donut (1/3 width) -->
-    <div>
-      <Card title="Appareils" description="Répartition des visites">
-        {(deviceData.mobile + deviceData.desktop + deviceData.tablet + deviceData.unknown) === 0 ? (
-          <div class="flex flex-col items-center justify-center py-16 text-gray-500">
-            <p class="text-sm">Aucune donnée</p>
-          </div>
+    <!-- Right column: device + CTR mini chart -->
+    <div class="flex flex-col gap-4">
+
+      <!-- Device breakdown -->
+      <div class="fade-slide d-3 p-5 glass rounded-2xl border border-white/8 flex-1">
+        <h3 class="text-sm font-semibold text-white mb-4">Appareils</h3>
+        {deviceTotal === 0 ? (
+          <p class="text-sm text-gray-600 text-center py-6">Aucune donnée</p>
         ) : (
-          <div class="flex flex-col items-center gap-4">
-            <canvas id="device-chart" width="180" height="180" style="max-width: 180px;"></canvas>
-            <div class="w-full space-y-2">
-              {[
-                { key: 'mobile',  label: 'Mobile',  color: '#00ff9d', icon: 'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z' },
-                { key: 'desktop', label: 'Desktop', color: '#bf00ff', icon: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
-                { key: 'tablet',  label: 'Tablet',  color: '#00aaff', icon: 'M12 18h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
-              ].map(d => {
-                const val = deviceData[d.key as keyof typeof deviceData];
-                const total = deviceData.mobile + deviceData.desktop + deviceData.tablet + deviceData.unknown;
-                const pct = total > 0 ? Math.round((val / total) * 100) : 0;
-                if (val === 0) return null;
-                return (
-                  <div class="flex items-center gap-2.5 text-sm">
-                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" style={`color: ${d.color}`} viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={d.icon}/>
-                    </svg>
-                    <span class="text-gray-300 flex-1">{d.label}</span>
-                    <span class="text-white font-semibold tabular-nums">{pct}%</span>
-                    <span class="text-gray-600 tabular-nums text-xs">({val})</span>
+          <div class="space-y-3">
+            {[
+              { key: 'mobile',  label: 'Mobile',  color: '#00ff9d', icon: 'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z' },
+              { key: 'desktop', label: 'Desktop', color: '#bf00ff', icon: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
+              { key: 'tablet',  label: 'Tablet',  color: '#00aaff', icon: 'M12 18h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
+            ].map(dev => {
+              const val  = deviceData[dev.key as keyof typeof deviceData];
+              const pct  = deviceTotal > 0 ? Math.round((val / deviceTotal) * 100) : 0;
+              if (val === 0) return null;
+              return (
+                <div>
+                  <div class="flex items-center justify-between mb-1.5">
+                    <span class="flex items-center gap-2 text-xs text-gray-400">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" style={`color:${dev.color}`} viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={dev.icon}/>
+                      </svg>
+                      {dev.label}
+                    </span>
+                    <span class="text-xs font-semibold text-white tabular-nums">{pct}%</span>
                   </div>
-                );
-              })}
-            </div>
+                  <div class="bar-track">
+                    <div class="bar-fill" style={`width:${pct}%; background:${dev.color}; animation-delay:${300 + (pct * 3)}ms`}></div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
-      </Card>
-    </div>
+      </div>
 
+      <!-- CTR mini chart -->
+      {chartLabels.length > 0 && (
+        <div class="fade-slide d-4 p-5 glass rounded-2xl border border-white/8">
+          <h3 class="text-sm font-semibold text-white mb-1">Taux de clic / jour</h3>
+          <canvas id="rate-chart" style="max-height: 80px; width: 100%;"></canvas>
+        </div>
+      )}
+
+    </div>
   </div>
 
-  <!-- ===== GEO + REFERRERS ===== -->
-  <div class="grid lg:grid-cols-2 gap-6 mb-6">
+  <!-- ===== INSIGHTS: TABBED (Geo · Sources · Blocks) ===== -->
+  <div class="fade-slide d-3 p-5 glass rounded-2xl border border-white/8 mb-6">
 
-    <!-- Top Countries -->
-    <Card title="Pays" description="Origines géographiques">
+    <!-- Tab nav -->
+    <div class="flex items-center gap-1 mb-6 border-b border-white/8 pb-3 -mt-1 overflow-x-auto scrollbar-none">
+      {[
+        { id: 'geo',     label: 'Géographie', icon: 'M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064' },
+        { id: 'sources', label: 'Sources',    icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.1-1.1m-.757-4.9a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1' },
+        { id: 'blocks',  label: 'Top Blocks', icon: 'M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5' },
+      ].map((tab, i) => (
+        <button
+          class={`insight-tab flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${i === 0 ? 'text-white bg-white/8' : 'text-gray-500 hover:text-gray-300'}`}
+          data-tab={tab.id}>
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={tab.icon}/>
+          </svg>
+          {tab.label}
+        </button>
+      ))}
+    </div>
+
+    <!-- Panel: Geo -->
+    <div class="insight-panel active" id="panel-geo">
       {topCountries.length === 0 ? (
-        <div class="text-center py-10 text-gray-500 text-sm">Aucune donnée géo disponible</div>
+        <p class="text-sm text-gray-600 text-center py-8">Aucune donnée géographique</p>
       ) : (
         <div class="space-y-3">
-          {topCountries.slice(0, 8).map((c, i) => {
-            const pct = Math.round((c.views / maxCountryViews) * 100);
+          {topCountries.slice(0, 8).map((ctry, i) => {
+            const pct = Math.round((ctry.views / maxCountryViews) * 100);
+            const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
             return (
-              <div class="flex items-center gap-3">
-                <span class="text-lg w-6 text-center shrink-0">{countryFlag(c.country ?? '')}</span>
+              <div class="flex items-center gap-3 group">
+                <span class={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-bold border shrink-0 transition-all ${rankClass || 'text-gray-600 bg-white/3 border-white/8'}`}>
+                  {i < 3 ? (i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉') : i + 1}
+                </span>
+                <span class="text-base shrink-0">{countryFlag(ctry.country ?? '')}</span>
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center justify-between mb-1">
-                    <span class="text-sm text-white font-medium">{c.country || 'Unknown'}</span>
-                    <span class="text-xs text-gray-400 tabular-nums">{c.views.toLocaleString('fr-FR')}</span>
+                    <span class="text-sm text-white font-medium">{ctry.country || 'Unknown'}</span>
+                    <span class="text-xs text-gray-500 tabular-nums font-mono">{ctry.views.toLocaleString('fr-FR')}</span>
                   </div>
-                  <div class="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                    <div class="h-full bg-neon-green/60 rounded-full transition-all"
-                      style={`width: ${pct}%;`}></div>
+                  <div class="bar-track">
+                    <div class="bar-fill" style={`width:${pct}%; background: linear-gradient(90deg, #00ff9d80, #00ff9d30); animation-delay:${i * 60}ms`}></div>
                   </div>
                 </div>
-                {i === 0 && <span class="text-xs text-neon-green/70 shrink-0">🏆</span>}
               </div>
             );
           })}
         </div>
       )}
-    </Card>
+    </div>
 
-    <!-- Traffic Sources -->
-    <Card title="Sources de trafic" description="D'où viennent tes visiteurs">
+    <!-- Panel: Sources -->
+    <div class="insight-panel" id="panel-sources">
       {aggregatedReferrers.length === 0 ? (
-        <div class="text-center py-10 text-gray-500 text-sm">Aucune donnée de source disponible</div>
+        <p class="text-sm text-gray-600 text-center py-8">Aucune source identifiée</p>
       ) : (
         <div class="space-y-3">
-          {aggregatedReferrers.map(r => {
-            const pct = Math.round((r.views / maxReferrerViews) * 100);
+          {aggregatedReferrers.map((r, i) => {
+            const pct   = Math.round((r.views / maxReferrerViews) * 100);
             const color = CAT_COLORS[r.category] ?? '#9ca3af';
+            const label = CAT_LABELS[r.category] ?? r.category;
             return (
               <div class="flex items-center gap-3">
-                <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                  style={`background: ${color}15; border: 1px solid ${color}30;`}>
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" style={`color: ${color}`} viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={CAT_ICONS[r.category] ?? CAT_ICONS.other}/>
-                  </svg>
+                <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold text-gray-600 border border-white/8 bg-white/3">
+                  {i + 1}
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center justify-between mb-1">
-                    <span class="text-sm text-white font-medium truncate">{r.label}</span>
-                    <span class="text-xs text-gray-400 tabular-nums shrink-0 ml-2">{r.views.toLocaleString('fr-FR')}</span>
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span class="text-sm text-white font-medium truncate">{r.label}</span>
+                      <span class="source-badge shrink-0" style={`background:${color}15; color:${color}; border: 1px solid ${color}30;`}>
+                        {label}
+                      </span>
+                    </div>
+                    <span class="text-xs text-gray-500 tabular-nums font-mono ml-2 shrink-0">{r.views.toLocaleString('fr-FR')}</span>
                   </div>
-                  <div class="h-1.5 bg-white/5 rounded-full overflow-hidden">
-                    <div class="h-full rounded-full transition-all"
-                      style={`width: ${pct}%; background: ${color}60;`}></div>
+                  <div class="bar-track">
+                    <div class="bar-fill" style={`width:${pct}%; background:${color}70; animation-delay:${i * 60}ms`}></div>
                   </div>
                 </div>
               </div>
@@ -439,103 +546,107 @@ const exportedDays    = days;
           })}
         </div>
       )}
-    </Card>
+    </div>
+
+    <!-- Panel: Blocks -->
+    <div class="insight-panel" id="panel-blocks">
+      {topBlocks.length === 0 ? (
+        <div class="text-center py-8">
+          <p class="text-sm text-gray-600 mb-2">Aucun clic enregistré</p>
+          <a href="/dashboard/blocks" class="text-xs text-neon-green hover:underline">Ajouter des blocs →</a>
+        </div>
+      ) : (
+        <div class="space-y-2">
+          {topBlocks.map((block, i) => {
+            const ctr     = summary.totalViews > 0 ? ((block.clicks / summary.totalViews) * 100).toFixed(1) : '0.0';
+            const barPct  = Math.round((block.clicks / (topBlocks[0]?.clicks ?? 1)) * 100);
+            const isFirst = i === 0;
+            return (
+              <div class={`flex items-center gap-3 p-3 rounded-xl border transition-all ${isFirst ? 'border-neon-green/20 bg-neon-green/3' : 'border-white/5 hover:border-white/10'}`}>
+                <div class={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 border ${i < 3 ? ['rank-1','rank-2','rank-3'][i] : 'text-gray-600 bg-white/3 border-white/8'}`}>
+                  {i + 1}
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 mb-1">
+                    <Badge variant="default" size="sm">{block.type}</Badge>
+                    <span class="text-sm text-white font-medium truncate">{block.title || 'Untitled'}</span>
+                  </div>
+                  <div class="bar-track">
+                    <div class="bar-fill" style={`width:${barPct}%; background: ${isFirst ? '#00ff9d' : '#00ff9d50'}; animation-delay:${i * 50}ms`}></div>
+                  </div>
+                </div>
+                <div class="text-right shrink-0 pl-2">
+                  <div class={`text-sm font-bold tabular-nums ${isFirst ? 'text-neon-green' : 'text-white'}`}>
+                    {block.clicks.toLocaleString('fr-FR')}
+                  </div>
+                  <div class="text-xs text-gray-600">{ctr}%</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
 
   </div>
-
-  <!-- ===== CLICK RATE CHART ===== -->
-  {chartLabels.length > 0 && (
-    <div class="mb-6"><Card title="Taux de clic quotidien" description="Clics / vues par jour">
-      <canvas id="rate-chart" style="max-height: 200px;"></canvas>
-    </Card></div>
-  )}
-
-  <!-- ===== TOP BLOCKS ===== -->
-  <div class="mb-6"><Card title="Top Blocks" description="Les liens les plus cliqués">
-    {topBlocks.length === 0 ? (
-      <div class="text-center py-12 text-gray-400">
-        <svg class="w-10 h-10 mx-auto mb-3 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/>
-        </svg>
-        <p class="text-sm">Aucun clic enregistré sur cette période</p>
-        <p class="text-xs text-gray-600 mt-1">Les données apparaîtront dès que des visiteurs cliquent sur tes liens</p>
-      </div>
-    ) : (
-      <div class="space-y-2">
-        {topBlocks.map((block, i) => {
-          const ctr = summary.totalViews > 0
-            ? ((block.clicks / summary.totalViews) * 100).toFixed(1)
-            : '0.0';
-          const maxClicks = topBlocks[0]?.clicks ?? 1;
-          const barPct = Math.round((block.clicks / maxClicks) * 100);
-          return (
-            <div class="flex items-center gap-4 p-3.5 glass rounded-xl border border-white/5 hover:border-neon-green/20 transition-all group">
-              <div class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0"
-                style={i === 0 ? 'background: rgba(0,255,157,0.15); color: #00ff9d; border: 1px solid rgba(0,255,157,0.3)' : 'background: rgba(255,255,255,0.05); color: #6b7280; border: 1px solid rgba(255,255,255,0.08)'}>
-                {i + 1}
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 mb-1.5">
-                  <Badge variant="default" size="sm">{block.type}</Badge>
-                  <span class="text-sm text-white font-medium truncate">{block.title || 'Untitled'}</span>
-                </div>
-                <div class="h-1 bg-white/5 rounded-full overflow-hidden">
-                  <div class="h-full bg-neon-green/50 rounded-full" style={`width: ${barPct}%;`}></div>
-                </div>
-              </div>
-              <div class="text-right shrink-0">
-                <div class="text-lg font-bold text-neon-green tabular-nums">{block.clicks.toLocaleString('fr-FR')}</div>
-                <div class="text-xs text-gray-500">{ctr}% CTR</div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    )}
-  </Card></div>
 
   <!-- ===== ALL BLOCKS TABLE ===== -->
-  <Card title="Tous les blocs" description="Performance détaillée">
+  <div class="fade-slide d-4 p-5 glass rounded-2xl border border-white/8">
+    <div class="flex items-center justify-between mb-5">
+      <div>
+        <h3 class="text-sm font-semibold text-white">Tous les blocs</h3>
+        <p class="text-xs text-gray-500 mt-0.5">Performance complète · {blocks.length} bloc{blocks.length !== 1 ? 's' : ''}</p>
+      </div>
+      <a href="/dashboard/blocks" class="text-xs text-neon-green/70 hover:text-neon-green transition-colors">
+        Gérer →
+      </a>
+    </div>
     {blocks.length === 0 ? (
-      <div class="text-center py-12 text-gray-400 text-sm">
-        <a href="/dashboard/blocks" class="text-neon-green hover:underline">Ajoute ton premier bloc</a>
+      <div class="text-center py-10 text-gray-600 text-sm">
+        <a href="/dashboard/blocks" class="text-neon-green hover:underline">Ajouter des blocs</a>
       </div>
     ) : (
-      <div class="overflow-x-auto -mx-1">
-        <table class="w-full text-sm">
+      <div class="overflow-x-auto -mx-1 scrollbar-none">
+        <table class="w-full text-sm min-w-[500px]">
           <thead>
-            <tr class="border-b border-white/8">
-              <th class="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Bloc</th>
-              <th class="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Clics</th>
-              <th class="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">CTR</th>
-              <th class="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Statut</th>
+            <tr>
+              <th class="text-left pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5">Bloc</th>
+              <th class="text-right pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5">Clics</th>
+              <th class="text-right pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5">CTR</th>
+              <th class="text-center pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5">Statut</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-white/5">
-            {blocks.map(block => {
-              const found = topBlocks.find(tb => tb.block_id === block.id);
+          <tbody>
+            {blocks.map((block, i) => {
+              const found       = topBlocks.find((tb) => tb.block_id === block.id);
               const blockClicks = found?.clicks ?? 0;
-              const ctr = summary.totalViews > 0
-                ? ((blockClicks / summary.totalViews) * 100).toFixed(1)
-                : '0.0';
+              const ctr         = summary.totalViews > 0
+                ? ((blockClicks / summary.totalViews) * 100).toFixed(1) : '0.0';
+              const isTop       = !!found;
               return (
-                <tr class="hover:bg-white/3 transition-colors">
-                  <td class="py-3 px-4">
-                    <div class="flex items-center gap-3">
+                <tr class="group border-b border-white/4 last:border-0 hover:bg-white/2 transition-colors">
+                  <td class="py-3 px-2">
+                    <div class="flex items-center gap-2.5">
                       <Badge variant="default" size="sm">{block.type}</Badge>
-                      <span class="text-white">{block.title || 'Untitled'}</span>
+                      <span class="text-white font-medium truncate max-w-[200px]">
+                        {block.title || 'Untitled'}
+                      </span>
+                      {i === 0 && topBlocks.length > 0 && isTop && (
+                        <span class="text-xs text-yellow-400/70">★</span>
+                      )}
                     </div>
                   </td>
-                  <td class="py-3 px-4 text-right">
-                    <span class={`font-semibold ${blockClicks > 0 ? 'text-neon-green' : 'text-gray-600'}`}>
+                  <td class="py-3 px-2 text-right">
+                    <span class={`font-semibold tabular-nums ${blockClicks > 0 ? 'text-neon-green' : 'text-gray-700'}`}>
                       {blockClicks.toLocaleString('fr-FR')}
                     </span>
                   </td>
-                  <td class="py-3 px-4 text-right text-gray-400">{ctr}%</td>
-                  <td class="py-3 px-4 text-center">
-                    <Badge variant={block.active ? 'success' : 'default'} size="sm">
+                  <td class="py-3 px-2 text-right text-gray-500 tabular-nums">{ctr}%</td>
+                  <td class="py-3 px-2 text-center">
+                    <span class={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${block.active ? 'text-neon-green bg-neon-green/10' : 'text-gray-600 bg-white/5'}`}>
+                      <span class={`w-1.5 h-1.5 rounded-full ${block.active ? 'bg-neon-green' : 'bg-gray-600'}`}></span>
                       {block.active ? 'Actif' : 'Inactif'}
-                    </Badge>
+                    </span>
                   </td>
                 </tr>
               );
@@ -544,9 +655,9 @@ const exportedDays    = days;
         </table>
       </div>
     )}
-  </Card>
+  </div>
 
-  <!-- ===== SCRIPTS ===== -->
+  <!-- ===== DATA BRIDGE + SCRIPT ===== -->
   <div aria-hidden="true" class="contents">
     <div id="chart-data" class="hidden"
       data-chart={JSON.stringify(exportedChart)}
@@ -557,36 +668,28 @@ const exportedDays    = days;
 
   <script>
     (async () => {
-      // Read bridge data
       const el = document.getElementById('chart-data');
       if (!el) return;
       const exportedChart   = JSON.parse(el.dataset.chart   ?? '{}');
       const exportedDevices = JSON.parse(el.dataset.devices ?? '{}');
       const exportedDays    = Number(el.dataset.days ?? 7);
 
-      // Dynamically load Chart.js from CDN then init
       await new Promise((resolve, reject) => {
-        if (typeof Chart !== 'undefined') { resolve(); return; }
+        if (typeof Chart !== 'undefined') { resolve(null); return; }
         const s = document.createElement('script');
         s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
-        s.onload = resolve;
-        s.onerror = reject;
+        s.onload = resolve; s.onerror = reject;
         document.head.appendChild(s);
       });
 
-      // Chart.js loaded above — init charts
-
-      Chart.defaults.color = '#9ca3af';
       Chart.defaults.font.family = 'DM Sans, system-ui, sans-serif';
-
-      const GRID   = 'rgba(255,255,255,0.04)';
+      const GRID   = 'rgba(255,255,255,0.03)';
       const GREEN  = '#00ff9d';
       const PURPLE = '#bf00ff';
-      const BLUE   = '#00aaff';
 
-      // ── Traffic chart ──────────────────────────────────────
+      // ── Traffic chart ──────────────────────────────────────────────────
       const trafficCtx = document.getElementById('traffic-chart');
-      if (trafficCtx && exportedChart.labels.length > 0) {
+      if (trafficCtx && exportedChart.labels?.length > 0) {
         new Chart(trafficCtx, {
           type: 'line',
           data: {
@@ -596,25 +699,39 @@ const exportedDays    = days;
                 label: 'Vues',
                 data: exportedChart.views,
                 borderColor: GREEN,
-                backgroundColor: GREEN + '18',
-                borderWidth: 2.5,
+                backgroundColor: (ctx) => {
+                  const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height);
+                  gradient.addColorStop(0,   GREEN + '22');
+                  gradient.addColorStop(1,   GREEN + '00');
+                  return gradient;
+                },
+                borderWidth: 2,
                 tension: 0.4,
                 fill: true,
-                pointRadius: exportedChart.labels.length > 14 ? 0 : 3,
-                pointHoverRadius: 5,
-                pointBackgroundColor: GREEN,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                pointHoverBackgroundColor: GREEN,
+                pointHoverBorderColor: '#0a0a0a',
+                pointHoverBorderWidth: 2,
               },
               {
                 label: 'Clics',
                 data: exportedChart.clicks,
                 borderColor: PURPLE,
-                backgroundColor: PURPLE + '18',
-                borderWidth: 2.5,
+                backgroundColor: (ctx) => {
+                  const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height);
+                  gradient.addColorStop(0,   PURPLE + '22');
+                  gradient.addColorStop(1,   PURPLE + '00');
+                  return gradient;
+                },
+                borderWidth: 2,
                 tension: 0.4,
                 fill: true,
-                pointRadius: exportedChart.labels.length > 14 ? 0 : 3,
-                pointHoverRadius: 5,
-                pointBackgroundColor: PURPLE,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                pointHoverBackgroundColor: PURPLE,
+                pointHoverBorderColor: '#0a0a0a',
+                pointHoverBorderWidth: 2,
               },
             ],
           },
@@ -623,28 +740,33 @@ const exportedDays    = days;
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
             plugins: {
-              legend: { labels: { color: '#9ca3af', font: { size: 11 }, boxWidth: 12, padding: 16 } },
+              legend: { display: false },
               tooltip: {
-                backgroundColor: 'rgba(10,10,10,0.95)',
+                backgroundColor: '#111115',
                 titleColor: '#fff',
                 bodyColor: '#9ca3af',
-                borderColor: GREEN + '40',
+                borderColor: 'rgba(255,255,255,0.08)',
                 borderWidth: 1,
-                padding: 10,
+                padding: 12,
+                displayColors: true,
+                boxWidth: 8,
+                boxHeight: 8,
+                boxPadding: 4,
+                usePointStyle: true,
               },
             },
             scales: {
               y: {
                 beginAtZero: true,
-                ticks: { color: '#6b7280', font: { size: 10 }, maxTicksLimit: 6 },
+                ticks: { color: '#4b5563', font: { size: 10 }, maxTicksLimit: 5 },
                 grid: { color: GRID },
                 border: { display: false },
               },
               x: {
                 ticks: {
-                  color: '#6b7280',
+                  color: '#4b5563',
                   font: { size: 10 },
-                  maxTicksLimit: exportedDays === 7 ? 7 : exportedDays === 30 ? 10 : 15,
+                  maxTicksLimit: exportedDays === 7 ? 7 : exportedDays === 30 ? 10 : 12,
                   maxRotation: 0,
                 },
                 grid: { display: false },
@@ -655,65 +777,19 @@ const exportedDays    = days;
         });
       }
 
-      // ── Device donut ───────────────────────────────────────
-      const deviceCtx = document.getElementById('device-chart');
-      if (deviceCtx) {
-        const d = exportedDevices;
-        const total = d.mobile + d.desktop + d.tablet + d.unknown;
-        if (total > 0) {
-          const labels = [], data = [], colors = [];
-          if (d.mobile  > 0) { labels.push('Mobile');  data.push(d.mobile);  colors.push(GREEN); }
-          if (d.desktop > 0) { labels.push('Desktop'); data.push(d.desktop); colors.push(PURPLE); }
-          if (d.tablet  > 0) { labels.push('Tablet');  data.push(d.tablet);  colors.push(BLUE); }
-          if (d.unknown > 0) { labels.push('Autre');   data.push(d.unknown); colors.push('#374151'); }
-
-          new Chart(deviceCtx, {
-            type: 'doughnut',
-            data: {
-              labels,
-              datasets: [{
-                data,
-                backgroundColor: colors.map(c => c + '33'),
-                borderColor: colors,
-                borderWidth: 2,
-                hoverBackgroundColor: colors.map(c => c + '55'),
-              }],
-            },
-            options: {
-              responsive: false,
-              cutout: '68%',
-              plugins: {
-                legend: { display: false },
-                tooltip: {
-                  backgroundColor: 'rgba(10,10,10,0.95)',
-                  titleColor: '#fff',
-                  bodyColor: '#9ca3af',
-                  borderColor: GREEN + '40',
-                  borderWidth: 1,
-                  callbacks: {
-                    label: (ctx) => ` ${ctx.label}: ${ctx.parsed} (${Math.round((ctx.parsed / total) * 100)}%)`,
-                  },
-                },
-              },
-            },
-          });
-        }
-      }
-
-      // ── Click rate bar chart ───────────────────────────────
+      // ── Click rate mini bar chart ────────────────────────────────────────
       const rateCtx = document.getElementById('rate-chart');
-      if (rateCtx && exportedChart.labels.length > 0) {
+      if (rateCtx && exportedChart.labels?.length > 0) {
         new Chart(rateCtx, {
           type: 'bar',
           data: {
             labels: exportedChart.labels,
             datasets: [{
-              label: 'Taux de clic (%)',
               data: exportedChart.rates,
-              backgroundColor: GREEN + '25',
-              borderColor: GREEN + '80',
-              borderWidth: 1.5,
-              borderRadius: 4,
+              backgroundColor: GREEN + '30',
+              borderColor: GREEN + '70',
+              borderWidth: 1,
+              borderRadius: 3,
             }],
           },
           options: {
@@ -722,40 +798,43 @@ const exportedDays    = days;
             plugins: {
               legend: { display: false },
               tooltip: {
-                backgroundColor: 'rgba(10,10,10,0.95)',
+                backgroundColor: '#111115',
                 titleColor: '#fff',
                 bodyColor: '#9ca3af',
-                borderColor: GREEN + '40',
+                borderColor: 'rgba(255,255,255,0.08)',
                 borderWidth: 1,
                 callbacks: { label: (ctx) => ` ${ctx.parsed.y}%` },
               },
             },
             scales: {
               y: {
-                beginAtZero: true,
-                ticks: {
-                  color: '#6b7280',
-                  font: { size: 10 },
-                  callback: (v) => v + '%',
-                  maxTicksLimit: 5,
-                },
-                grid: { color: GRID },
-                border: { display: false },
+                display: false, beginAtZero: true,
+                grid: { display: false }, border: { display: false },
               },
               x: {
-                ticks: {
-                  color: '#6b7280',
-                  font: { size: 10 },
-                  maxRotation: 0,
-                  maxTicksLimit: exportedDays === 7 ? 7 : 10,
-                },
-                grid: { display: false },
-                border: { display: false },
+                display: false,
+                grid: { display: false }, border: { display: false },
               },
             },
           },
         });
       }
+
+      // ── Insight tabs ─────────────────────────────────────────────────────
+      document.querySelectorAll('.insight-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = btn.getAttribute('data-tab');
+          document.querySelectorAll('.insight-tab').forEach(b => {
+            b.classList.toggle('text-white', b === btn);
+            b.classList.toggle('bg-white/8', b === btn);
+            b.classList.toggle('text-gray-500', b !== btn);
+          });
+          document.querySelectorAll('.insight-panel').forEach(p => {
+            p.classList.toggle('active', p.id === `panel-${target}`);
+          });
+        });
+      });
+
     })();
   </script>
 
