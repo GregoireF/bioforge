@@ -518,16 +518,36 @@ const exportedDays    = days;
       ) : (
         <div>
           <!-- Choropleth map -->
-          <div class="relative rounded-xl overflow-hidden mb-5" style="background:#080c0a;">
-            <div id="world-map-loader" class="absolute inset-0 flex items-center justify-center">
+          <div class="relative rounded-xl overflow-hidden mb-5" id="map-container" style="background:#07100d;">
+            <!-- Loader -->
+            <div id="world-map-loader" class="absolute inset-0 flex items-center justify-center z-10">
               <div class="map-spinner"></div>
             </div>
-            <svg id="world-map" style="width:100%;height:280px;display:block;opacity:0;transition:opacity 0.4s;"></svg>
+            <!-- SVG map -->
+            <svg id="world-map" style="width:100%;height:340px;display:block;opacity:0;transition:opacity 0.5s;cursor:grab;"></svg>
             <!-- Tooltip -->
-            <div id="map-tooltip" class="pointer-events-none absolute hidden z-10
-              bg-black/90 border border-neon-green/20 text-white text-xs px-3 py-1.5 rounded-lg
-              backdrop-blur-sm shadow-lg shadow-neon-green/5 whitespace-nowrap">
+            <div id="map-tooltip" class="pointer-events-none absolute hidden z-20
+              bg-black/95 border border-neon-green/25 text-white text-xs px-3 py-2 rounded-lg
+              backdrop-blur-sm shadow-xl whitespace-nowrap">
             </div>
+            <!-- Zoom controls -->
+            <div class="absolute bottom-3 right-3 z-20 flex flex-col gap-1">
+              <button id="map-zoom-in"
+                class="w-7 h-7 rounded-lg glass border border-white/10 text-gray-400 hover:text-neon-green hover:border-neon-green/30 transition-all flex items-center justify-center text-base leading-none"
+                title="Zoom +">+</button>
+              <button id="map-zoom-out"
+                class="w-7 h-7 rounded-lg glass border border-white/10 text-gray-400 hover:text-neon-green hover:border-neon-green/30 transition-all flex items-center justify-center text-base leading-none"
+                title="Zoom −">−</button>
+              <button id="map-reset"
+                class="w-7 h-7 rounded-lg glass border border-white/10 text-gray-400 hover:text-neon-green hover:border-neon-green/30 transition-all flex items-center justify-center"
+                title="Reset">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+              </button>
+            </div>
+            <!-- Scale hint -->
+            <div class="absolute bottom-3 left-3 text-xs text-gray-700 select-none">Scroll · Glisser</div>
           </div>
 
           <!-- Country list -->
@@ -871,13 +891,15 @@ const exportedDays    = days;
 
       // ── D3 Choropleth World Map ─────────────────────────────────────────────
       const countriesData = JSON.parse(el.dataset.countries ?? '[]');
-      const mapSvgEl = document.getElementById('world-map');
-      const mapLoader = document.getElementById('world-map-loader');
+      const mapSvgEl   = document.getElementById('world-map');
+      const mapLoader  = document.getElementById('world-map-loader');
       const mapTooltip = document.getElementById('map-tooltip');
+      const btnZoomIn  = document.getElementById('map-zoom-in');
+      const btnZoomOut = document.getElementById('map-zoom-out');
+      const btnReset   = document.getElementById('map-reset');
 
-      if (mapSvgEl && countriesData.length > 0) {
-
-        // Load D3 + TopoJSON from CDN
+      if (mapSvgEl) {
+        // ── Load D3 + TopoJSON in parallel ──────────────────────────────────
         await Promise.all([
           new Promise((res, rej) => {
             if (window.d3) { res(null); return; }
@@ -895,164 +917,273 @@ const exportedDays    = days;
           }),
         ]);
 
-        // Fetch world topojson
-        const world = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json').then(r => r.json());
+        // ── Fetch 50m world data (more detail than 110m) ────────────────────
+        const world = await fetch(
+          'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json'
+        ).then(r => r.json());
 
-        // Build ISO numeric → views map (world-atlas uses numeric codes)
-        // ISO2 → numeric lookup
+        // ── ISO2 → numeric map ───────────────────────────────────────────────
         const ISO2_NUM = {
-          AF:'004',AL:'008',DZ:'012',AO:'024',AR:'032',AU:'036',AT:'040',AZ:'031',
-          BD:'050',BE:'056',BJ:'204',BO:'068',BR:'076',BG:'100',CA:'124',CL:'152',
-          CN:'156',CO:'170',CD:'180',CR:'188',HR:'191',CZ:'203',DK:'208',EG:'818',
-          ET:'231',FI:'246',FR:'250',DE:'276',GH:'288',GR:'300',HK:'344',HU:'348',
-          IN:'356',ID:'360',IR:'364',IQ:'368',IE:'372',IL:'376',IT:'380',CI:'384',
-          JP:'392',JO:'400',KZ:'398',KE:'404',KR:'410',KW:'414',LB:'422',LY:'434',
-          MA:'504',MX:'484',MM:'104',NL:'528',NZ:'554',NG:'566',NO:'578',PK:'586',
-          PE:'604',PH:'608',PL:'616',PT:'620',QA:'634',RO:'642',RU:'643',SA:'682',
-          SN:'686',SG:'702',SK:'703',SI:'705',SO:'706',ZA:'710',ES:'724',SE:'752',
-          CH:'756',SY:'760',TW:'158',TZ:'834',TH:'764',TN:'788',TR:'792',UA:'804',
-          AE:'784',GB:'826',US:'840',UY:'858',VE:'862',VN:'704',YE:'887',ZW:'716',
-          MG:'450',CM:'120',GN:'324',ML:'466',TD:'148',NE:'562',LK:'144',KH:'116',
-          MN:'496',IS:'352',LV:'428',LT:'440',EE:'233',RS:'688',BA:'070',MK:'807',
-          GE:'268',BY:'112',MD:'498',AM:'051',UZ:'860',TM:'795',KG:'417',TJ:'762',
-          LU:'442',CY:'196',MT:'470',MZ:'508',ZM:'894',MW:'454',UG:'800',
-          RW:'646',BI:'108',SS:'728',SD:'729',LR:'430',SL:'694',BF:'854',GW:'624',
-          GM:'270',CV:'132',ST:'678',GQ:'226',GA:'266',CG:'178',CF:'140',ER:'232',
-          DJ:'262',KM:'174',SC:'690',MU:'480',MR:'478',EH:'732',LI:'438',MC:'492',
-          SM:'674',VA:'336',AD:'020',ME:'499',XK:'383',
+          AF:'4',AL:'8',DZ:'12',AO:'24',AR:'32',AU:'36',AT:'40',AZ:'31',
+          BD:'50',BE:'56',BJ:'204',BO:'68',BR:'76',BG:'100',CA:'124',CL:'152',
+          CN:'156',CO:'170',CD:'180',CR:'188',HR:'191',CZ:'203',DK:'208',
+          EG:'818',ET:'231',FI:'246',FR:'250',DE:'276',GH:'288',GR:'300',
+          HK:'344',HU:'348',IN:'356',ID:'360',IR:'364',IQ:'368',IE:'372',
+          IL:'376',IT:'380',CI:'384',JP:'392',JO:'400',KZ:'398',KE:'404',
+          KR:'410',KW:'414',LB:'422',LY:'434',MA:'504',MX:'484',MM:'104',
+          NL:'528',NZ:'554',NG:'566',NO:'578',PK:'586',PE:'604',PH:'608',
+          PL:'616',PT:'620',QA:'634',RO:'642',RU:'643',SA:'682',SN:'686',
+          SG:'702',SK:'703',SI:'705',SO:'706',ZA:'710',ES:'724',SE:'752',
+          CH:'756',SY:'760',TW:'158',TZ:'834',TH:'764',TN:'788',TR:'792',
+          UA:'804',AE:'784',GB:'826',US:'840',UY:'858',VE:'862',VN:'704',
+          YE:'887',ZW:'716',MG:'450',CM:'120',GN:'324',ML:'466',TD:'148',
+          NE:'562',LK:'144',KH:'116',MN:'496',IS:'352',LV:'428',LT:'440',
+          EE:'233',RS:'688',BA:'70',MK:'807',GE:'268',BY:'112',MD:'498',
+          AM:'51',UZ:'860',TM:'795',KG:'417',TJ:'762',LU:'442',CY:'196',
+          MT:'470',MZ:'508',ZM:'894',MW:'454',UG:'800',RW:'646',BI:'108',
+          SS:'728',SD:'729',LR:'430',SL:'694',BF:'854',GW:'624',GM:'270',
+          CV:'132',GQ:'226',GA:'266',CG:'178',CF:'140',ER:'232',DJ:'262',
+          KM:'174',SC:'690',MU:'480',MR:'478',LI:'438',MC:'492',SM:'674',
+          VA:'336',AD:'20',ME:'499',XK:'383',
         };
 
-        const maxViews = countriesData[0]?.views ?? 1;
-        const viewsMap = new Map();
-        countriesData.forEach(c => {
-          const num = ISO2_NUM[c.country];
-          if (num) viewsMap.set(+num, c.views);
-        });
-        const nameMap = new Map();
-        countriesData.forEach(c => {
-          const num = ISO2_NUM[c.country];
-          if (num) nameMap.set(+num, c.country);
+        // Build views maps (numeric ID → data)
+        const maxViews  = countriesData.length > 0 ? countriesData[0].views : 1;
+        const viewsMap  = new Map();
+        const iso2Map   = new Map(); // num → ISO2
+        const labelMap  = new Map(); // num → display name
+
+        countriesData.forEach(row => {
+          const num = ISO2_NUM[row.country];
+          if (!num) return;
+          viewsMap.set(+num, row.views);
+          iso2Map.set(+num, row.country);
+          labelMap.set(+num, row.country);
         });
 
-        // Color scale: dark base → neon green
-        const colorScale = d3.scaleLog()
-          .domain([1, maxViews])
-          .range(['#0f2e1e', '#00ff9d'])
-          .clamp(true);
+        // ── Color scale ──────────────────────────────────────────────────────
+        // Log scale so small countries aren't invisible
+        const colorScale = maxViews > 1
+          ? d3.scaleSequentialLog()
+              .domain([1, maxViews])
+              .interpolator(d3.interpolate('#0f2a1a', '#00ff9d'))
+          : () => '#0f2a1a';
 
-        const W = mapSvgEl.clientWidth || 700;
-        const H = 280;
+        const W = mapSvgEl.clientWidth  || 720;
+        const H = 340;
 
         const svg = d3.select(mapSvgEl)
-          .attr('viewBox', `0 0 ${W} ${H}`)
-          .attr('preserveAspectRatio', 'xMidYMid meet');
+          .attr('width',  W)
+          .attr('height', H);
 
-        // Natural Earth projection
+        // ── Projection: Natural Earth ────────────────────────────────────────
         const projection = d3.geoNaturalEarth1()
-          .scale(W / 6.3)
-          .translate([W / 2, H / 2 + 10]);
+          .scale(W / 6.1)
+          .translate([W / 2, H / 2 + 15]);
 
-        const path = d3.geoPath().projection(projection);
+        const pathGen = d3.geoPath().projection(projection);
+
+        // ── Zoom group (all map content goes here) ───────────────────────────
+        const g = svg.append('g').attr('class', 'map-root');
 
         // Background sphere
-        svg.append('path')
+        g.append('path')
           .datum({ type: 'Sphere' })
-          .attr('d', path)
-          .attr('fill', '#06090a')
-          .attr('stroke', 'none');
+          .attr('d', pathGen)
+          .attr('fill', '#060d0a')
+          .attr('stroke', 'rgba(0,255,157,0.04)')
+          .attr('stroke-width', 0.8);
 
-        // Graticule (subtle grid lines)
-        const graticule = d3.geoGraticule().step([30, 30]);
-        svg.append('path')
+        // Graticule
+        const graticule = d3.geoGraticule().step([20, 20]);
+        g.append('path')
           .datum(graticule())
-          .attr('d', path)
+          .attr('d', pathGen)
           .attr('fill', 'none')
-          .attr('stroke', 'rgba(255,255,255,0.03)')
-          .attr('stroke-width', 0.5);
+          .attr('stroke', 'rgba(255,255,255,0.025)')
+          .attr('stroke-width', 0.4);
 
-        // Countries
+        // Country fills
         const countries = topojson.feature(world, world.objects.countries);
-        svg.selectAll('.country')
+        g.selectAll('.country')
           .data(countries.features)
           .join('path')
           .attr('class', 'country')
-          .attr('d', path)
+          .attr('d', pathGen)
           .attr('fill', d => {
             const v = viewsMap.get(+d.id);
-            return v ? colorScale(v) : '#141a18';
+            return v ? colorScale(v) : '#101f16';
           })
-          .attr('stroke', '#1a2420')
-          .attr('stroke-width', 0.4)
-          .on('mousemove', function(event, d) {
-            const views = viewsMap.get(+d.id);
-            if (!views || !mapTooltip) return;
-            const name = nameMap.get(+d.id) || '—';
-            const rect = mapSvgEl.getBoundingClientRect();
-            mapTooltip.innerHTML = `<span style="color:#00ff9d;font-weight:600">${name}</span>&nbsp;&nbsp;<span style="color:#6b7280">${views.toLocaleString('fr-FR')} vues</span>`;
-            mapTooltip.style.left = (event.clientX - rect.left + 12) + 'px';
-            mapTooltip.style.top  = (event.clientY - rect.top - 32) + 'px';
-            mapTooltip.classList.remove('hidden');
-          })
-          .on('mouseleave', function() {
-            if (mapTooltip) mapTooltip.classList.add('hidden');
-          });
+          .attr('stroke', '#0c1a12')
+          .attr('stroke-width', 0.4);
 
-        // Country borders
-        svg.append('path')
+        // Country borders (mesh)
+        g.append('path')
           .datum(topojson.mesh(world, world.objects.countries, (a, b) => a !== b))
-          .attr('d', path)
+          .attr('d', pathGen)
           .attr('fill', 'none')
-          .attr('stroke', '#1e2e26')
-          .attr('stroke-width', 0.6);
+          .attr('stroke', 'rgba(0,255,157,0.07)')
+          .attr('stroke-width', 0.5);
 
-        // Pulse dots on top countries
-        countriesData.slice(0, 5).forEach(ctry => {
-          const num = ISO2_NUM[ctry.country];
+        // ── Pulse dots on top countries ──────────────────────────────────────
+        const dotsGroup = g.append('g').attr('class', 'dots');
+        countriesData.slice(0, 6).forEach((row, idx) => {
+          const num  = ISO2_NUM[row.country];
           if (!num) return;
           const feat = countries.features.find(f => +f.id === +num);
           if (!feat) return;
-          const centroid = path.centroid(feat);
-          if (!centroid || isNaN(centroid[0])) return;
-          const r = 2 + (ctry.views / maxViews) * 5;
-          // Glow halo
-          svg.append('circle')
-            .attr('cx', centroid[0]).attr('cy', centroid[1])
-            .attr('r', r + 4)
-            .attr('fill', 'rgba(0,255,157,0.08)')
+          const cen  = pathGen.centroid(feat);
+          if (!cen || isNaN(cen[0]) || isNaN(cen[1])) return;
+
+          const intensity = row.views / maxViews;
+          const r = 2.5 + intensity * 5.5;
+
+          // Outer glow
+          dotsGroup.append('circle')
+            .attr('cx', cen[0]).attr('cy', cen[1])
+            .attr('r', r + 6).attr('fill', `rgba(0,255,157,${0.06 + intensity * 0.08})`)
             .attr('pointer-events', 'none');
-          // Dot
-          svg.append('circle')
-            .attr('cx', centroid[0]).attr('cy', centroid[1])
+
+          // Core dot
+          dotsGroup.append('circle')
+            .attr('cx', cen[0]).attr('cy', cen[1])
             .attr('r', r)
-            .attr('fill', '#00ff9d')
-            .attr('opacity', 0.85)
+            .attr('fill', idx === 0 ? '#00ff9d' : `rgba(0,255,157,${0.5 + intensity * 0.4})`)
+            .attr('stroke', idx === 0 ? 'rgba(0,255,157,0.4)' : 'none')
+            .attr('stroke-width', 1.5)
             .attr('pointer-events', 'none');
         });
 
-        // Reveal map + hide loader
-        mapSvgEl.style.opacity = '1';
-        if (mapLoader) mapLoader.style.display = 'none';
+        // ── Hover interaction ────────────────────────────────────────────────
+        // Invisible overlay for hover detection (on top of everything)
+        g.selectAll('.country-hit')
+          .data(countries.features)
+          .join('path')
+          .attr('class', 'country-hit')
+          .attr('d', pathGen)
+          .attr('fill', 'transparent')
+          .attr('stroke', 'none')
+          .attr('cursor', d => viewsMap.has(+d.id) ? 'pointer' : 'default')
+          .on('mousemove', function(event, d) {
+            const views = viewsMap.get(+d.id);
+            if (!views || !mapTooltip) return;
+            const iso2  = iso2Map.get(+d.id) || '';
+            const name  = labelMap.get(+d.id) || iso2;
+            const pct   = ((views / maxViews) * 100).toFixed(0);
+            const rect  = mapSvgEl.getBoundingClientRect();
+            mapTooltip.innerHTML =
+              `<span style="color:#00ff9d;font-weight:700">${iso2} — ${name}</span>` +
+              `<span style="color:#4b5563;margin:0 6px">·</span>` +
+              `<span style="color:#e5e7eb">${views.toLocaleString('fr-FR')} vues</span>` +
+              `<span style="color:#374151;margin-left:6px">${pct}%</span>`;
+            let tx = event.clientX - rect.left + 14;
+            let ty = event.clientY - rect.top - 38;
+            // Keep tooltip inside bounds
+            if (tx + 240 > W) tx = tx - 260;
+            if (ty < 4) ty = event.clientY - rect.top + 18;
+            mapTooltip.style.left = tx + 'px';
+            mapTooltip.style.top  = ty + 'px';
+            mapTooltip.classList.remove('hidden');
 
-        // Country row hover → highlight on map
+            // Highlight country fill
+            d3.select(this.parentNode).selectAll('.country')
+              .filter(fd => fd === d)
+              .attr('fill', v => {
+                const val = viewsMap.get(+v.id);
+                return val ? d3.color(colorScale(val)).brighter(0.8).formatHex() : '#1e3525';
+              });
+          })
+          .on('mouseleave', function(event, d) {
+            if (mapTooltip) mapTooltip.classList.add('hidden');
+            // Restore fill
+            d3.select(this.parentNode).selectAll('.country')
+              .filter(fd => fd === d)
+              .attr('fill', fd => {
+                const v = viewsMap.get(+fd.id);
+                return v ? colorScale(v) : '#101f16';
+              });
+          });
+
+        // ── D3 Zoom behaviour ────────────────────────────────────────────────
+        const initialScale     = 1;
+        const initialTransform = d3.zoomIdentity;
+
+        const zoom = d3.zoom()
+          .scaleExtent([0.9, 12])
+          .translateExtent([[-W * 0.5, -H * 0.5], [W * 1.5, H * 1.5]])
+          .filter(event => {
+            // Allow wheel zoom + drag; disable dblclick default
+            if (event.type === 'dblclick') return false;
+            return true;
+          })
+          .on('zoom', (event) => {
+            g.attr('transform', event.transform);
+            // Thin strokes at high zoom
+            const k = event.transform.k;
+            g.selectAll('.country').attr('stroke-width', Math.max(0.2, 0.4 / k));
+            g.selectAll('.country-hit').attr('d', pathGen); // keep hit areas
+            mapSvgEl.style.cursor = event.sourceEvent?.buttons ? 'grabbing' : 'grab';
+          });
+
+        svg.call(zoom);
+
+        // ── Zoom control buttons ─────────────────────────────────────────────
+        const smoothZoom = (factor) => {
+          svg.transition().duration(300)
+            .call(zoom.scaleBy, factor);
+        };
+        btnZoomIn?.addEventListener('click',  () => smoothZoom(1.6));
+        btnZoomOut?.addEventListener('click', () => smoothZoom(0.625));
+        btnReset?.addEventListener('click',   () => {
+          svg.transition().duration(450)
+            .call(zoom.transform, d3.zoomIdentity);
+        });
+
+        // ── Country-list row hover → zoom map to country ─────────────────────
         document.querySelectorAll('.country-row').forEach(row => {
           row.addEventListener('mouseenter', () => {
             const iso2 = row.getAttribute('data-iso');
-            const num = ISO2_NUM[iso2];
+            const num  = ISO2_NUM[iso2];
             if (!num) return;
-            svg.selectAll('.country')
-              .classed('highlighted', d => +d.id === +num);
+            const feat = countries.features.find(f => +f.id === +num);
+            if (!feat) return;
+
+            // Highlight
+            g.selectAll('.country')
+              .classed('highlighted', fd => +fd.id === +num);
+
+            // Zoom to country bounds
+            const bounds  = pathGen.bounds(feat);
+            const dx = bounds[1][0] - bounds[0][0];
+            const dy = bounds[1][1] - bounds[0][1];
+            const cx = (bounds[0][0] + bounds[1][0]) / 2;
+            const cy = (bounds[0][1] + bounds[1][1]) / 2;
+            const scale = Math.max(1.2, Math.min(8, 0.85 / Math.max(dx / W, dy / H)));
+            const t = d3.zoomIdentity
+              .translate(W / 2 - scale * cx, H / 2 - scale * cy)
+              .scale(scale);
+            svg.transition().duration(550).ease(d3.easeCubicOut)
+              .call(zoom.transform, t);
           });
           row.addEventListener('mouseleave', () => {
-            svg.selectAll('.country').classed('highlighted', false);
+            g.selectAll('.country').classed('highlighted', false);
+            // Smooth reset
+            svg.transition().duration(450).ease(d3.easeCubicOut)
+              .call(zoom.transform, d3.zoomIdentity);
           });
         });
 
-        // Responsive resize
+        // ── Reveal ───────────────────────────────────────────────────────────
+        mapSvgEl.style.opacity = '1';
+        if (mapLoader) mapLoader.style.display = 'none';
+
+        // ── Responsive resize ────────────────────────────────────────────────
         const ro = new ResizeObserver(() => {
           const nW = mapSvgEl.clientWidth;
-          projection.scale(nW / 6.3).translate([nW / 2, H / 2 + 10]);
-          svg.attr('viewBox', `0 0 ${nW} ${H}`);
-          svg.selectAll('.country').attr('d', path);
+          if (!nW) return;
+          projection.scale(nW / 6.1).translate([nW / 2, H / 2 + 15]);
+          svg.attr('width', nW);
+          g.selectAll('path').attr('d', pathGen);
         });
         ro.observe(mapSvgEl);
 
