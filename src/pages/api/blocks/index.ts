@@ -11,7 +11,7 @@ import type { BlockInsert } from '@/lib/db/queries.server'
 // FIX 1 : title est optionnel/nullable — spacer, image, video n'en ont pas forcément.
 // FIX 2 : on retire le .min(1) qui rejetait les titres vides envoyés comme "".
 const createBlockSchema = z.object({
-  type:   z.enum(['link', 'heading', 'spacer', 'image', 'video', 'social']),
+  type:   z.enum(['link', 'heading', 'spacer', 'image', 'video', 'social', 'countdown', 'schedule', 'donation', 'embed']),
   title:  z.string().max(100).nullable().optional(),
   config: z.record(z.string(), z.unknown()).optional(),
   active: z.boolean().optional(),
