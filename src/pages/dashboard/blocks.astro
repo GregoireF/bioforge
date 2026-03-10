@@ -36,9 +36,10 @@ const [blocksResult, analyticsResult] = await Promise.all([
   safeProfileId ? getAnalyticsSummary(supabase, safeProfileId, 7) : Promise.resolve({ success: false, data: null }),
 ]);
 
-const rawBlocks = (blocksResult.success ? blocksResult.data : []) ?? [];
-const blocks    = rawBlocks.filter((b: any) => !b.deleted_at);
-const topBlocks = analyticsResult.success ? (analyticsResult.data?.topBlocks ?? []) : [];
+const rawBlocks  = (blocksResult.success ? blocksResult.data : []) ?? [];
+const blocks     = rawBlocks.filter((b: any) => !b.deleted_at);
+const topBlocks  = analyticsResult.success ? (analyticsResult.data?.topBlocks ?? []) : [];
+const totalViews = analyticsResult.success ? (analyticsResult.data?.totalViews ?? 0) : 0;
 
 const clicksMap = new Map<string, number>();
 topBlocks.forEach((b: any) => clicksMap.set(b.id, safeNum(b.clicks)));
@@ -55,9 +56,18 @@ const safeBridgeBlocks = blocks
     position:   safeNum(b.position),
     created_at: escapeHtml(b.created_at),
     clicks:     clicksMap.get(b.id) ?? 0,
+    is_pinned:  Boolean(b.is_pinned ?? b.config?.is_pinned),
     config: {
-      url:      escapeHtml(b.config?.url),
-      icon_url: escapeHtml(b.config?.icon_url),
+      url:               escapeHtml(b.config?.url),
+      icon_url:          escapeHtml(b.config?.icon_url),
+      show_from:         escapeHtml(b.config?.show_from),
+      show_until:        escapeHtml(b.config?.show_until),
+      target_date:       escapeHtml(b.config?.target_date),
+      goal_amount:       safeNum(b.config?.goal_amount),
+      current_amount:    safeNum(b.config?.current_amount),
+      donation_platform: escapeHtml(b.config?.donation_platform),
+      height:            safeNum(b.config?.height),
+      schedule:          Array.isArray(b.config?.schedule) ? b.config.schedule : [],
       links: Array.isArray(b.config?.links)
         ? b.config.links.map((l: any) => ({ url: escapeHtml(l?.url ?? l) }))
         : [],
@@ -73,15 +83,21 @@ const blocksError = blocksResult.success ? null : (blocksResult.error?.message ?
 const bridge = JSON.stringify({
   blocks: safeBridgeBlocks, blockCount, blockLimit, canAddBlock,
   profileId: escapeHtml(safeProfileId),
+  totalViews,
 });
 
+// All block types incl. new streamer types
 const BLOCK_TYPES = [
-  { type: 'link',    emoji: '🔗', label: 'Link',    desc: 'Clickable link' },
-  { type: 'heading', emoji: '📝', label: 'Heading', desc: 'Section title'  },
-  { type: 'spacer',  emoji: '—',  label: 'Spacer',  desc: 'Add spacing'    },
-  { type: 'image',   emoji: '🖼️', label: 'Image',   desc: 'Display image'  },
-  { type: 'video',   emoji: '🎥', label: 'Video',   desc: 'Embed video'    },
-  { type: 'social',  emoji: '👥', label: 'Social',  desc: 'Social icons'   },
+  { type: 'link',      emoji: '🔗', label: 'Link',        desc: 'Clickable link button'   },
+  { type: 'social',    emoji: '👥', label: 'Social',      desc: 'Social icon grid'         },
+  { type: 'heading',   emoji: '📝', label: 'Heading',     desc: 'Section title'            },
+  { type: 'spacer',    emoji: '—',  label: 'Spacer',      desc: 'Blank space'              },
+  { type: 'image',     emoji: '🖼️', label: 'Image',       desc: 'Display an image'         },
+  { type: 'video',     emoji: '🎥', label: 'Video',       desc: 'Embed YouTube / Vimeo'    },
+  { type: 'countdown', emoji: '⏱️', label: 'Countdown',   desc: 'Next stream timer'        },
+  { type: 'schedule',  emoji: '📅', label: 'Schedule',    desc: 'Weekly stream schedule'   },
+  { type: 'donation',  emoji: '💸', label: 'Donation',    desc: 'Ko-fi / Patreon CTA'      },
+  { type: 'embed',     emoji: '🎵', label: 'Music Embed', desc: 'Spotify / SoundCloud'     },
 ];
 ---
 
@@ -159,7 +175,7 @@ const BLOCK_TYPES = [
       <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
       </svg>
-      <input type="url" id="quick-add-input" placeholder="Paste a URL to add a link instantly…"
+      <input type="url" id="quick-add-input" placeholder="Paste a URL to instantly add a link…"
         class="flex-1 bg-transparent text-white text-sm placeholder-gray-600 focus:outline-none min-w-0" />
       <div id="quick-detect-zone" class="hidden items-center gap-2 shrink-0">
         <span id="quick-plat-icon" class="text-lg leading-none"></span>
@@ -177,6 +193,24 @@ const BLOCK_TYPES = [
     </div>
   </div>
 
+  <!-- ===== STREAMER KIT ===== -->
+  <div class="mb-6">
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-2">
+        <span class="text-base">🎮</span>
+        <p class="text-sm font-semibold text-white">Streamer Kit</p>
+        <span class="text-xs px-2 py-0.5 rounded-full bg-neon-green/15 text-neon-green border border-neon-green/25 font-medium">Quick Start</span>
+      </div>
+      <button id="kit-toggle-btn" class="text-xs text-gray-500 hover:text-gray-300 transition-colors flex items-center gap-1">
+        <span id="kit-toggle-label">Afficher</span>
+        <svg id="kit-chevron" class="w-3.5 h-3.5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+        </svg>
+      </button>
+    </div>
+    <div id="kit-grid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
+  </div>
+
   <!-- ===== SEARCH + FILTER ===== -->
   <div class="flex flex-col sm:flex-row gap-3 mb-5">
     <div class="relative flex-1">
@@ -186,7 +220,7 @@ const BLOCK_TYPES = [
       <input type="text" id="search-input" placeholder="Search blocks…"
         class="w-full pl-9 pr-4 py-2.5 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/40 focus:outline-none transition-colors" />
     </div>
-    <div class="flex items-center gap-2 overflow-x-auto pb-0.5">
+    <div class="flex items-center gap-2 overflow-x-auto pb-0.5 scrollbar-none">
       <button class="filter-btn active shrink-0 px-3 py-2 rounded-xl text-xs font-medium transition-all" data-filter="all">All</button>
       {BLOCK_TYPES.map(t => (
         <button class="filter-btn shrink-0 px-3 py-2 rounded-xl text-xs font-medium transition-all" data-filter={t.type}>
@@ -206,7 +240,7 @@ const BLOCK_TYPES = [
           </svg>
         </div>
         <h3 class="text-lg font-semibold text-white mb-2">No blocks yet</h3>
-        <p class="text-sm text-gray-400 mb-6 max-w-xs">Paste a URL above or click Add Block to get started.</p>
+        <p class="text-sm text-gray-400 mb-6 max-w-xs">Paste a URL above, use a Streamer Kit template, or click Add Block to get started.</p>
         {canAddBlock && (
           <button id="empty-add-btn"
             class="flex items-center gap-2 px-6 py-3 bg-neon-green text-black text-sm font-semibold rounded-xl hover:bg-neon-green/90 active:scale-[0.98] transition-all">
@@ -230,7 +264,7 @@ const BLOCK_TYPES = [
   <!-- ===== TYPE SELECTION MODAL ===== -->
   <div id="type-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
     <div id="type-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
-    <div class="relative glass border border-white/10 rounded-2xl p-6 w-full max-w-lg shadow-2xl">
+    <div class="relative glass border border-white/10 rounded-2xl p-6 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto scrollbar-none">
       <div class="flex items-center justify-between mb-5">
         <h3 class="text-white font-semibold">Add Block</h3>
         <button id="type-close" class="text-gray-500 hover:text-white transition-colors">
@@ -261,7 +295,7 @@ const BLOCK_TYPES = [
   <!-- ===== EDIT MODAL ===== -->
   <div id="edit-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
     <div id="edit-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
-    <div class="relative glass border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+    <div class="relative glass border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl max-h-[92vh] overflow-y-auto scrollbar-none">
       <div class="flex items-center justify-between mb-5">
         <h3 class="text-white font-semibold" id="modal-title">Add Block</h3>
         <button id="edit-close" class="text-gray-500 hover:text-white transition-colors">
@@ -274,6 +308,41 @@ const BLOCK_TYPES = [
         <input type="hidden" id="block-id" />
         <input type="hidden" id="block-type" />
         <div id="form-fields" class="space-y-4"></div>
+
+        <!-- Scheduled visibility (all types except spacer) -->
+        <div id="schedule-visibility-section" class="hidden">
+          <div class="border-t border-white/10 pt-4">
+            <button type="button" id="visibility-toggle"
+              class="w-full flex items-center justify-between text-sm text-gray-400 hover:text-white transition-colors">
+              <span class="flex items-center gap-2">
+                <svg class="w-4 h-4 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                Visibilité planifiée
+                <span class="text-xs px-1.5 py-0.5 rounded bg-white/5 text-gray-500">optionnel</span>
+              </span>
+              <svg id="vis-chevron" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </button>
+            <div id="visibility-panel" class="hidden mt-3 space-y-3">
+              <p class="text-xs text-gray-600">Laisser vide pour toujours afficher.</p>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="space-y-1.5">
+                  <label class="text-xs font-medium text-gray-400">Afficher à partir de</label>
+                  <input type="datetime-local" id="field-show-from"
+                    class="w-full px-3 py-2 glass border border-white/10 rounded-xl text-white text-sm focus:border-neon-green/50 focus:outline-none transition-colors" />
+                </div>
+                <div class="space-y-1.5">
+                  <label class="text-xs font-medium text-gray-400">Masquer après</label>
+                  <input type="datetime-local" id="field-show-until"
+                    class="w-full px-3 py-2 glass border border-white/10 rounded-xl text-white text-sm focus:border-neon-green/50 focus:outline-none transition-colors" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="flex gap-3 pt-1">
           <button type="submit" id="submit-btn"
             class="flex-1 flex items-center justify-center gap-2 py-2.5 bg-neon-green text-black text-sm font-semibold rounded-xl hover:bg-neon-green/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none">
@@ -300,9 +369,25 @@ const BLOCK_TYPES = [
   #type-modal.open, #edit-modal.open { display: flex; }
   .block-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
   .block-card.selected { border-color: rgba(0,255,157,0.4) !important; background: rgba(0,255,157,0.03); }
+  .block-card.pinned-card { border-color: rgba(251,191,36,0.35) !important; }
   .block-card.sortable-ghost { opacity: 0.4; }
   .block-card.sortable-drag  { box-shadow: 0 20px 60px rgba(0,0,0,0.5); transform: rotate(1deg); }
   .block-menu-dropdown { backdrop-filter: blur(16px); background: rgba(12,12,18,0.96); }
+  .scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+  /* New type badges */
+  .badge-countdown { background: rgba(251,191,36,0.12); color: rgb(251,191,36); border-color: rgba(251,191,36,0.3); }
+  .badge-schedule  { background: rgba(99,179,237,0.12); color: rgb(99,179,237); border-color: rgba(99,179,237,0.3); }
+  .badge-donation  { background: rgba(248,113,113,0.12); color: rgb(248,113,113); border-color: rgba(248,113,113,0.3); }
+  .badge-embed     { background: rgba(167,139,250,0.12); color: rgb(167,139,250); border-color: rgba(167,139,250,0.3); }
+  .badge-scheduled { background: rgba(251,191,36,0.08); color: rgba(251,191,36,0.8); border-color: rgba(251,191,36,0.2); }
+  /* Progress bar */
+  .progress-bar { background: linear-gradient(90deg, #00ff9d, #00e88a); border-radius: 99px; }
+  /* Pin tab */
+  .pin-tab { position: absolute; top: -1px; left: 14px; width: 2px; height: 8px; background: rgb(251,191,36); border-radius: 0 0 2px 2px; }
+  /* Kit card */
+  .kit-card { transition: transform 0.15s ease, border-color 0.15s ease; }
+  .kit-card:hover { transform: translateY(-2px); }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
@@ -312,7 +397,7 @@ const BLOCK_TYPES = [
 
   // ── Bridge ────────────────────────────────────────────────────────────────
   const raw = JSON.parse(document.getElementById('server-data')?.dataset.bridge ?? '{}');
-  let { blocks, blockCount, blockLimit, canAddBlock, profileId } = raw;
+  let { blocks, blockCount, blockLimit, canAddBlock, profileId, totalViews } = raw;
 
   // ── State ─────────────────────────────────────────────────────────────────
   let selectedIds: Set<string> = new Set();
@@ -321,33 +406,33 @@ const BLOCK_TYPES = [
   let isSaving     = false;
   let sortable: any = null;
 
-  // ─── FIX 1 + 4 : helper central qui unwrap { success, data } ─────────────
-  // wrapApiHandler retourne toujours { success: true, data: {...} }
-  // L'ancien code lisait data.id => undefined. On lit maintenant json.data.id.
+  // ── Central API helper ────────────────────────────────────────────────────
   async function apiCall(url: string, options: RequestInit = {}) {
     const res  = await fetch(url, options);
     const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(json.error?.message ?? json.error ?? `HTTP ${res.status}`);
-    }
-    // wrapApiHandler envelope : { success, data } — on retourne data directement
+    if (!res.ok) throw new Error(json.error?.message ?? json.error ?? `HTTP ${res.status}`);
     return json.data ?? json;
   }
 
   // ── Platform registry ─────────────────────────────────────────────────────
   const PLATFORMS = [
-    { id: 'twitch',    label: 'Twitch',    icon: '🟣', match: ['twitch.tv'],                     defaultIcon: 'https://bioforge.click/social/twitch.png' },
-    { id: 'youtube',   label: 'YouTube',   icon: '🔴', match: ['youtube.com', 'youtu.be'],        defaultIcon: 'https://bioforge.click/social/youtube.png' },
-    { id: 'tiktok',    label: 'TikTok',    icon: '⬛', match: ['tiktok.com'],                     defaultIcon: 'https://bioforge.click/social/tiktok.png' },
-    { id: 'instagram', label: 'Instagram', icon: '📸', match: ['instagram.com'],                  defaultIcon: 'https://bioforge.click/social/instagram.png' },
-    { id: 'twitter',   label: 'X',         icon: '🐦', match: ['twitter.com', 'x.com'],           defaultIcon: 'https://bioforge.click/social/x.png' },
-    { id: 'discord',   label: 'Discord',   icon: '💬', match: ['discord.com', 'discord.gg'],      defaultIcon: 'https://bioforge.click/social/discord.png' },
-    { id: 'kick',      label: 'Kick',      icon: '🟢', match: ['kick.com'],                       defaultIcon: 'https://bioforge.click/social/kick.png' },
-    { id: 'spotify',   label: 'Spotify',   icon: '🎵', match: ['spotify.com', 'open.spotify.com'],defaultIcon: 'https://bioforge.click/social/spotify.png' },
-    { id: 'github',    label: 'GitHub',    icon: '🐙', match: ['github.com'],                     defaultIcon: 'https://bioforge.click/social/github.png' },
-    { id: 'linkedin',  label: 'LinkedIn',  icon: '💼', match: ['linkedin.com'],                   defaultIcon: 'https://www.linkedin.com/favicon.ico' },
-    { id: 'patreon',   label: 'Patreon',   icon: '🎁', match: ['patreon.com'],                    defaultIcon: 'https://c5.patreon.com/external/favicon/favicon.ico' },
-    { id: 'snapchat',  label: 'Snapchat',  icon: '👻', match: ['snapchat.com'],                   defaultIcon: 'https://bioforge.click/social/snapchat.png' },
+    { id: 'twitch',         label: 'Twitch',         icon: '🟣', match: ['twitch.tv'],                       defaultIcon: 'https://bioforge.click/social/twitch.png'        },
+    { id: 'youtube',        label: 'YouTube',         icon: '🔴', match: ['youtube.com','youtu.be'],           defaultIcon: 'https://bioforge.click/social/youtube.png'       },
+    { id: 'tiktok',         label: 'TikTok',          icon: '⬛', match: ['tiktok.com'],                       defaultIcon: 'https://bioforge.click/social/tiktok.png'        },
+    { id: 'instagram',      label: 'Instagram',       icon: '📸', match: ['instagram.com'],                    defaultIcon: 'https://bioforge.click/social/instagram.png'     },
+    { id: 'twitter',        label: 'X / Twitter',     icon: '🐦', match: ['twitter.com','x.com'],              defaultIcon: 'https://bioforge.click/social/x.png'             },
+    { id: 'discord',        label: 'Discord',         icon: '💬', match: ['discord.com','discord.gg'],         defaultIcon: 'https://bioforge.click/social/discord.png'       },
+    { id: 'kick',           label: 'Kick',            icon: '🟢', match: ['kick.com'],                         defaultIcon: 'https://bioforge.click/social/kick.png'          },
+    { id: 'spotify',        label: 'Spotify',         icon: '🎵', match: ['spotify.com','open.spotify.com'],   defaultIcon: 'https://bioforge.click/social/spotify.png'       },
+    { id: 'github',         label: 'GitHub',          icon: '🐙', match: ['github.com'],                       defaultIcon: 'https://bioforge.click/social/github.png'        },
+    { id: 'linkedin',       label: 'LinkedIn',        icon: '💼', match: ['linkedin.com'],                     defaultIcon: 'https://www.linkedin.com/favicon.ico'            },
+    { id: 'patreon',        label: 'Patreon',         icon: '🎁', match: ['patreon.com'],                      defaultIcon: 'https://c5.patreon.com/external/favicon/favicon.ico' },
+    { id: 'kofi',           label: 'Ko-fi',           icon: '☕', match: ['ko-fi.com'],                        defaultIcon: 'https://storage.ko-fi.com/cdn/nav-logo-stroke.png' },
+    { id: 'streamlabs',     label: 'Streamlabs',      icon: '🎛️', match: ['streamlabs.com','streamlabs.link'], defaultIcon: 'https://bioforge.click/social/streamlabs.png'    },
+    { id: 'streamelements', label: 'StreamElements',  icon: '⚡', match: ['streamelements.com'],               defaultIcon: 'https://bioforge.click/social/streamelements.png' },
+    { id: 'throne',         label: 'Throne',          icon: '👑', match: ['throne.com'],                       defaultIcon: 'https://bioforge.click/social/throne.png'        },
+    { id: 'snapchat',       label: 'Snapchat',        icon: '👻', match: ['snapchat.com'],                     defaultIcon: 'https://bioforge.click/social/snapchat.png'      },
+    { id: 'facebook',       label: 'Facebook',        icon: '📘', match: ['facebook.com'],                     defaultIcon: 'https://bioforge.click/social/facebook.png'      },
   ];
 
   function detectPlatform(url: string) {
@@ -364,11 +449,19 @@ const BLOCK_TYPES = [
   }
 
   const BLOCK_EMOJI: Record<string, string> = {
-    link: '🔗', heading: '📝', spacer: '—', image: '🖼️', video: '🎥', social: '👥'
+    link:'🔗', heading:'📝', spacer:'—', image:'🖼️', video:'🎥',
+    social:'👥', countdown:'⏱️', schedule:'📅', donation:'💸', embed:'🎵',
+  };
+  const TYPE_BADGE: Record<string, string> = {
+    countdown:'badge-countdown', schedule:'badge-schedule',
+    donation:'badge-donation',   embed:'badge-embed',
   };
 
   function isNew(createdAt: string): boolean {
     return !!createdAt && Date.now() - new Date(createdAt).getTime() < 86_400_000;
+  }
+  function isScheduled(block: any): boolean {
+    return !!(block.config?.show_from || block.config?.show_until);
   }
 
   function getFiltered() {
@@ -379,7 +472,113 @@ const BLOCK_TYPES = [
     });
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Streamer Kit ──────────────────────────────────────────────────────────
+  const STREAMER_KITS = [
+    {
+      id: 'gaming', label: '🎮 Gaming', desc: 'Twitch · Discord · Countdown · Ko-fi', color: '#7c3aed',
+      blocks: [
+        { type: 'link',      title: 'Live sur Twitch',    config: { url: 'https://twitch.tv/', icon_url: 'https://bioforge.click/social/twitch.png' } },
+        { type: 'link',      title: 'Rejoins le Discord', config: { url: 'https://discord.gg/', icon_url: 'https://bioforge.click/social/discord.png' } },
+        { type: 'countdown', title: 'Prochain stream',    config: { target_date: '', label: 'Prochain stream dans' } },
+        { type: 'schedule',  title: 'Planning stream',    config: { schedule: [] } },
+        { type: 'donation',  title: 'Soutiens-moi ☕',   config: { donation_platform: 'kofi', url: 'https://ko-fi.com/', goal_amount: 0 } },
+      ],
+    },
+    {
+      id: 'irl', label: '📱 IRL / Lifestyle', desc: 'Instagram · TikTok · Patreon', color: '#ec4899',
+      blocks: [
+        { type: 'link',     title: 'Mon Instagram', config: { url: 'https://instagram.com/', icon_url: 'https://bioforge.click/social/instagram.png' } },
+        { type: 'link',     title: 'Mon TikTok',    config: { url: 'https://tiktok.com/',    icon_url: 'https://bioforge.click/social/tiktok.png' } },
+        { type: 'social',   title: 'Mes réseaux',   config: { links: [] } },
+        { type: 'donation', title: 'Me soutenir',   config: { donation_platform: 'patreon', url: 'https://patreon.com/', goal_amount: 0 } },
+      ],
+    },
+    {
+      id: 'music', label: '🎵 Music / DJ', desc: 'Spotify embed · SoundCloud · Merch', color: '#10b981',
+      blocks: [
+        { type: 'embed',  title: 'Ma playlist Spotify', config: { url: 'https://open.spotify.com/playlist/', height: 152 } },
+        { type: 'link',   title: 'Mon SoundCloud',      config: { url: 'https://soundcloud.com/', icon_url: '' } },
+        { type: 'link',   title: 'Achète mon merch 👑', config: { url: 'https://throne.com/', icon_url: 'https://bioforge.click/social/throne.png' } },
+        { type: 'social', title: 'Mes réseaux',         config: { links: [] } },
+      ],
+    },
+    {
+      id: 'art', label: '🎨 Art / Creator', desc: 'Portfolio · Ko-fi · Commissions', color: '#f59e0b',
+      blocks: [
+        { type: 'link',     title: 'Mon Portfolio',     config: { url: 'https://', icon_url: '' } },
+        { type: 'donation', title: 'Commissions ✦ Ouvertes', config: { donation_platform: 'kofi', url: 'https://ko-fi.com/', goal_amount: 0 } },
+        { type: 'link',     title: 'Voir mes œuvres',   config: { url: 'https://instagram.com/', icon_url: 'https://bioforge.click/social/instagram.png' } },
+        { type: 'social',   title: 'Mes réseaux',       config: { links: [] } },
+      ],
+    },
+  ];
+
+  function renderStreamerKit() {
+    const grid = document.getElementById('kit-grid');
+    if (!grid) return;
+    grid.innerHTML = STREAMER_KITS.map(kit => `
+      <button class="kit-card group text-left glass border border-white/10 rounded-2xl p-4 hover:border-white/20 w-full"
+        style="" data-kit="${kit.id}">
+        <div class="flex items-start justify-between mb-3">
+          <div class="text-2xl leading-none">${kit.label.split(' ')[0]}</div>
+          <span class="text-xs px-2 py-0.5 rounded-full border font-medium"
+            style="background:${kit.color}18;color:${kit.color};border-color:${kit.color}30">
+            ${kit.blocks.length} blocks
+          </span>
+        </div>
+        <p class="text-sm font-semibold text-white mb-1">${kit.label.split(' ').slice(1).join(' ')}</p>
+        <p class="text-xs text-gray-500 mb-4">${kit.desc}</p>
+        <div class="flex items-center gap-1.5 text-xs font-semibold transition-all group-hover:gap-2"
+          style="color:${kit.color};opacity:0.8">
+          Utiliser ce kit
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+          </svg>
+        </div>
+      </button>
+    `).join('');
+    grid.querySelectorAll('[data-kit]').forEach(btn => {
+      btn.addEventListener('click', () => handleKitClick((btn as HTMLElement).dataset.kit!));
+    });
+  }
+
+  async function handleKitClick(kitId: string) {
+    const kit = STREAMER_KITS.find(k => k.id === kitId);
+    if (!kit) return;
+    if (!confirm(`Ajouter le kit "${kit.label}" ? Cela va créer ${kit.blocks.length} blocks sur ton profil.`)) return;
+    let added = 0;
+    for (const bd of kit.blocks) {
+      if (blockLimit !== -1 && (blockCount + added) >= blockLimit) {
+        toast.error(`Limite atteinte après ${added} blocks. Upgrade pour plus !`);
+        break;
+      }
+      try {
+        const data = await apiCall('/api/blocks', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: bd.type, title: bd.title, config: bd.config }),
+        });
+        blocks.push({ id: data.id, ...bd, active: true, created_at: new Date().toISOString(), clicks: 0, is_pinned: false });
+        added++;
+      } catch {}
+    }
+    renderBlocks();
+    toast.success(`${added} blocks ajoutés depuis le kit ${kit.label} !`);
+  }
+
+  // Kit toggle
+  let kitVisible = false;
+  document.getElementById('kit-toggle-btn')?.addEventListener('click', () => {
+    kitVisible = !kitVisible;
+    const grid    = document.getElementById('kit-grid')!;
+    const lbl     = document.getElementById('kit-toggle-label')!;
+    const chev    = document.getElementById('kit-chevron')!;
+    grid.classList.toggle('hidden', !kitVisible);
+    lbl.textContent = kitVisible ? 'Masquer' : 'Afficher';
+    chev.style.transform = kitVisible ? 'rotate(180deg)' : '';
+    if (kitVisible) renderStreamerKit();
+  });
+
+  // ── Render blocks ─────────────────────────────────────────────────────────
   function renderBlocks() {
     const container  = document.getElementById('sortable-blocks');
     const noResults  = document.getElementById('no-results');
@@ -404,25 +603,62 @@ const BLOCK_TYPES = [
     }
     noResults?.classList.add('hidden');
 
-    container.innerHTML = filtered.map((block: any) => {
+    // Pinned first
+    const sorted = [...filtered].sort((a: any, b: any) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0));
+
+    container.innerHTML = sorted.map((block: any) => {
       const isSelected = selectedIds.has(block.id);
       const clicks     = block.clicks ?? 0;
       const newBadge   = isNew(block.created_at);
+      const scheduled  = isScheduled(block);
+      const isPinned   = block.is_pinned ?? false;
       const iconUrl    = block.config?.icon_url || '';
       const platform   = block.type === 'link' ? detectPlatform(block.config?.url || '') : null;
+      const typeBadge  = TYPE_BADGE[block.type] ?? '';
+      const ctr        = (totalViews > 0 && clicks > 0) ? ((clicks / totalViews) * 100).toFixed(1) : null;
 
       const iconHtml = iconUrl
         ? `<div class="shrink-0 w-9 h-9 rounded-full overflow-hidden border border-white/10 bg-white/5">
              <img src="${iconUrl}" class="w-full h-full object-cover" loading="lazy"
-               onerror="this.parentElement.innerHTML='<span class=\'flex items-center justify-center w-full h-full text-base\'>${BLOCK_EMOJI[block.type] ?? '📌'}</span>'" />
+               onerror="this.parentElement.innerHTML='<span class=\\'flex items-center justify-center w-full h-full text-base\\'>${BLOCK_EMOJI[block.type] ?? '📌'}</span>'" />
            </div>`
         : platform
           ? `<div class="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-lg bg-white/5 border border-white/10">${platform.icon}</div>`
           : `<div class="shrink-0 w-9 h-9 flex items-center justify-center text-xl">${BLOCK_EMOJI[block.type] ?? '📌'}</div>`;
 
+      // Block-type-specific extra info
+      let extraHtml = '';
+      if (block.type === 'donation' && block.config?.goal_amount > 0) {
+        const pct = Math.min(100, Math.round((block.config.current_amount / block.config.goal_amount) * 100));
+        extraHtml = `
+          <div class="mt-2 pl-7">
+            <div class="flex items-center justify-between text-xs text-gray-500 mb-1.5">
+              <span>${block.config.current_amount ?? 0} / ${block.config.goal_amount} €</span>
+              <span class="font-semibold text-neon-green">${pct}%</span>
+            </div>
+            <div class="h-1.5 w-full rounded-full bg-white/5">
+              <div class="progress-bar h-full" style="width:${pct}%"></div>
+            </div>
+          </div>`;
+      } else if (block.type === 'countdown' && block.config?.target_date) {
+        const diff  = new Date(block.config.target_date).getTime() - Date.now();
+        const text  = diff > 0
+          ? `dans ${Math.floor(diff/86400000)}j ${Math.floor((diff%86400000)/3600000)}h`
+          : 'Terminé';
+        extraHtml = `<div class="mt-1 pl-7 text-xs ${diff > 0 ? 'text-yellow-400/70' : 'text-gray-500'}">⏱ ${text}</div>`;
+      } else if (block.type === 'schedule' && block.config?.schedule?.length) {
+        const days = block.config.schedule.map((s: any) => `${s.day?.slice(0,3)} ${s.time}`).join(' · ');
+        extraHtml = `<div class="mt-1 pl-7 text-xs text-blue-400/70">📅 ${days}</div>`;
+      } else if (block.type === 'embed' && block.config?.url) {
+        const domain = (() => { try { return new URL(block.config.url).hostname.replace('www.',''); } catch { return ''; } })();
+        extraHtml = `<div class="mt-1 pl-7 text-xs text-purple-400/70">🎵 ${domain}</div>`;
+      }
+
       return `
-        <div class="block-card group relative glass border border-white/10 rounded-2xl p-4 transition-all hover:border-white/20 ${isSelected ? 'selected' : ''}"
+        <div class="block-card group relative glass border border-white/10 rounded-2xl p-4 transition-all hover:border-white/20
+          ${isSelected ? 'selected' : ''} ${isPinned ? 'pinned-card' : ''}"
           data-id="${block.id}" data-type="${block.type}">
+          ${isPinned ? '<div class="pin-tab"></div>' : ''}
           <div class="absolute top-4 left-4 z-10 ${selectedIds.size > 0 ? '' : 'opacity-0 group-hover:opacity-100'} transition-opacity">
             <input type="checkbox" ${isSelected ? 'checked' : ''}
               class="block-select w-4 h-4 rounded accent-neon-green cursor-pointer" data-id="${block.id}" />
@@ -435,13 +671,15 @@ const BLOCK_TYPES = [
             </div>
             ${iconHtml}
             <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 flex-wrap mb-0.5">
-                <span class="text-xs px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-400 font-medium capitalize">${block.type}</span>
+              <div class="flex items-center gap-1.5 flex-wrap mb-0.5">
+                <span class="text-xs px-2 py-0.5 rounded-full border font-medium capitalize ${typeBadge || 'bg-white/5 border-white/10 text-gray-400'}">${block.type}</span>
                 ${block.title
                   ? `<span class="text-sm font-semibold text-white truncate max-w-[160px]">${block.title}</span>`
                   : `<span class="text-sm text-gray-600 italic">No title</span>`}
-                ${newBadge ? `<span class="text-xs px-1.5 py-0.5 rounded-full bg-neon-green/15 text-neon-green font-medium border border-neon-green/25">New</span>` : ''}
-                ${platform ? `<span class="text-xs px-1.5 py-0.5 rounded-full bg-white/5 text-gray-500 border border-white/10">${platform.label}</span>` : ''}
+                ${isPinned   ? '<span title="Épinglé" class="text-xs leading-none">📌</span>' : ''}
+                ${newBadge   ? '<span class="text-xs px-1.5 py-0.5 rounded-full bg-neon-green/15 text-neon-green font-medium border border-neon-green/25">New</span>' : ''}
+                ${scheduled  ? '<span class="text-xs px-1.5 py-0.5 rounded-full border badge-scheduled font-medium">⏰ Planifié</span>' : ''}
+                ${platform   ? `<span class="text-xs px-1.5 py-0.5 rounded-full bg-white/5 text-gray-500 border border-white/10">${platform.label}</span>` : ''}
               </div>
               <div class="flex items-center gap-3 text-xs">
                 <span class="${block.active ? 'text-neon-green' : 'text-gray-600'} flex items-center gap-1">
@@ -449,11 +687,11 @@ const BLOCK_TYPES = [
                   ${block.active ? 'Active' : 'Inactive'}
                 </span>
                 ${clicks > 0 ? `
-                  <span class="flex items-center gap-1 text-neon-blue">
+                  <span class="flex items-center gap-1 text-blue-400">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/>
                     </svg>
-                    ${clicks.toLocaleString('fr-FR')} clicks
+                    ${clicks.toLocaleString('fr-FR')} clicks${ctr ? ` <span class="text-gray-500">(${ctr}%)</span>` : ''}
                   </span>` : ''}
               </div>
             </div>
@@ -463,42 +701,36 @@ const BLOCK_TYPES = [
               <div class="w-10 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-neon-green transition-colors"></div>
             </label>
             <div class="relative shrink-0">
-              <button
-                class="block-menu-btn opacity-0 group-hover:opacity-100 transition-opacity p-2 glass rounded-lg border border-white/5 text-gray-500 hover:text-white hover:border-white/20 transition-all"
+              <button class="block-menu-btn opacity-0 group-hover:opacity-100 transition-opacity p-2 glass rounded-lg border border-white/5 text-gray-500 hover:text-white hover:border-white/20 transition-all"
                 data-id="${block.id}" aria-label="Options">
                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <circle cx="12" cy="5" r="1.5"/>
-                  <circle cx="12" cy="12" r="1.5"/>
-                  <circle cx="12" cy="19" r="1.5"/>
+                  <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
                 </svg>
               </button>
-              <div
-                class="block-menu-dropdown hidden absolute right-0 top-full mt-1 w-40 rounded-xl shadow-2xl z-30 py-1 border border-white/10 overflow-hidden"
+              <div class="block-menu-dropdown hidden absolute right-0 top-full mt-1 w-44 rounded-xl shadow-2xl z-30 py-1 border border-white/10 overflow-hidden"
                 data-id="${block.id}">
                 <button class="block-edit-btn w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors text-left" data-id="${block.id}">
-                  <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                  </svg>
+                  <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                   Edit
                 </button>
+                <button class="block-pin-btn w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors text-left" data-id="${block.id}" data-pinned="${isPinned}">
+                  <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+                  ${isPinned ? 'Désépingler' : 'Épingler en haut'}
+                </button>
                 <button class="block-duplicate-btn w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors text-left" data-id="${block.id}">
-                  <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-                  </svg>
+                  <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                   Duplicate
                 </button>
                 <div class="my-1 border-t border-white/10"></div>
                 <button class="block-delete-btn w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-400 hover:bg-red-500/5 transition-colors text-left" data-id="${block.id}">
-                  <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                  </svg>
+                  <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                   Delete
                 </button>
               </div>
             </div>
           </div>
-        </div>
-      `;
+          ${extraHtml}
+        </div>`;
     }).join('');
 
     attachCardListeners();
@@ -513,23 +745,15 @@ const BLOCK_TYPES = [
   function attachCardListeners() {
     document.querySelectorAll('.block-toggle').forEach(toggle => {
       toggle.addEventListener('change', async (e: any) => {
-        const id = e.target.dataset.id;
-        const active = e.target.checked;
+        const id = e.target.dataset.id; const active = e.target.checked;
         try {
-          await apiCall(`/api/blocks/${id}`, {
-            method: 'PUT', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ active }),
-          });
+          await apiCall(`/api/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active }) });
           const b = blocks.find((b: any) => b.id === id);
           if (b) b.active = active;
-          toast.success(active ? 'Block activated' : 'Block deactivated');
-        } catch {
-          e.target.checked = !active;
-          toast.error('Failed to update block');
-        }
+          toast.success(active ? 'Block activé' : 'Block désactivé');
+        } catch { e.target.checked = !active; toast.error('Failed to update'); }
       });
     });
-
     document.querySelectorAll('.block-select').forEach(cb => {
       cb.addEventListener('change', (e: any) => {
         const id = e.target.dataset.id;
@@ -538,7 +762,6 @@ const BLOCK_TYPES = [
         updateBulkBar();
       });
     });
-
     document.querySelectorAll('.block-menu-btn').forEach(btn => {
       btn.addEventListener('click', (e: any) => {
         e.stopPropagation();
@@ -547,125 +770,93 @@ const BLOCK_TYPES = [
         document.querySelector(`.block-menu-dropdown[data-id="${id}"]`)?.classList.toggle('hidden');
       });
     });
+    document.querySelectorAll('.block-edit-btn').forEach(btn =>
+      btn.addEventListener('click', () => handleEditBlock((btn as HTMLElement).dataset.id!)));
+    document.querySelectorAll('.block-pin-btn').forEach(btn =>
+      btn.addEventListener('click', () => handlePinBlock((btn as HTMLElement).dataset.id!)));
+    document.querySelectorAll('.block-duplicate-btn').forEach(btn =>
+      btn.addEventListener('click', () => handleDuplicateBlock((btn as HTMLElement).dataset.id!)));
+    document.querySelectorAll('.block-delete-btn').forEach(btn =>
+      btn.addEventListener('click', () => handleDeleteBlock((btn as HTMLElement).dataset.id!)));
+  }
 
-    document.querySelectorAll('.block-edit-btn').forEach(btn => {
-      btn.addEventListener('click', () => handleEditBlock((btn as HTMLElement).dataset.id!));
-    });
-    document.querySelectorAll('.block-duplicate-btn').forEach(btn => {
-      btn.addEventListener('click', () => handleDuplicateBlock((btn as HTMLElement).dataset.id!));
-    });
-    document.querySelectorAll('.block-delete-btn').forEach(btn => {
-      btn.addEventListener('click', () => handleDeleteBlock((btn as HTMLElement).dataset.id!));
-    });
+  // ── Pin ───────────────────────────────────────────────────────────────────
+  async function handlePinBlock(id: string) {
+    const block = blocks.find((b: any) => b.id === id);
+    if (!block) return;
+    const newPinned = !block.is_pinned;
+    try {
+      await apiCall(`/api/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ is_pinned: newPinned }) });
+      block.is_pinned = newPinned;
+      renderBlocks();
+      toast.success(newPinned ? '📌 Block épinglé' : 'Block désépinglé');
+    } catch { toast.error('Failed to update pin'); }
   }
 
   // ── Sortable ──────────────────────────────────────────────────────────────
   function initSortable() {
     const container = document.getElementById('sortable-blocks');
     if (!container) return;
-
-    // Sortable CDN peut ne pas être encore chargé au premier appel :
-    // le <script> Astro est un ES module (defer implicite) qui s'exécute
-    // avant que window.Sortable soit défini. On réessaie jusqu'à ce qu'il soit prêt.
-    if (!(window as any).Sortable) {
-      setTimeout(initSortable, 30);
-      return;
-    }
-
+    if (!(window as any).Sortable) { setTimeout(initSortable, 30); return; }
     sortable?.destroy();
     sortable = new (window as any).Sortable(container, {
-      animation: 200,
-      handle: '.drag-handle',
-      ghostClass: 'sortable-ghost',
-      dragClass: 'sortable-drag',
+      animation: 200, handle: '.drag-handle',
+      ghostClass: 'sortable-ghost', dragClass: 'sortable-drag',
       onEnd: async () => {
         const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-        // IDs visibles dans le DOM après le drag (peut être filtré)
         const visibleIds = Array.from(container.children)
           .map((el: any) => el.dataset.id)
           .filter((id: any) => id && UUID_RE.test(id));
-
         if (!visibleIds.length) return;
-
-        // ─── FIX 2 : reorder stable sous filtre ───────────────────────────
-        // Si un filtre est actif, container.children ne contient qu'un sous-ensemble.
-        // On reconstruit l'ordre complet : blocs visibles (nouvel ordre) + blocs cachés (ordre conservé).
         let blockIds: string[];
         if (activeFilter === 'all' && !searchQuery) {
-          // Pas de filtre : visibleIds = ordre complet
           blockIds = visibleIds;
         } else {
-          // Filtre actif : les blocs non-filtrés gardent leur position relative,
-          // on les insère après les blocs filtrés (ou on peut les interleaver selon UX souhaitée).
-          const visibleSet  = new Set(visibleIds);
-          const hiddenIds   = blocks
-            .filter((b: any) => !visibleSet.has(b.id))
-            .map((b: any) => b.id);
-          blockIds = [...visibleIds, ...hiddenIds];
+          const vs = new Set(visibleIds);
+          blockIds = [...visibleIds, ...blocks.filter((b: any) => !vs.has(b.id)).map((b: any) => b.id)];
         }
-
         try {
-          await apiCall('/api/blocks/reorder', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ blockIds }),
-          });
-          // Mettre à jour l'ordre local
-          blocks = blockIds
-            .map((id: string) => blocks.find((b: any) => b.id === id))
-            .filter(Boolean);
-          toast.success('Order saved');
-        } catch {
-          toast.error('Failed to save order');
-          renderBlocks();
-        }
+          await apiCall('/api/blocks/reorder', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ blockIds }) });
+          blocks = blockIds.map((id: string) => blocks.find((b: any) => b.id === id)).filter(Boolean);
+          toast.success('Ordre sauvegardé');
+        } catch { toast.error('Failed to save order'); renderBlocks(); }
       },
     });
   }
 
   function updateBulkBar() {
-    const bar   = document.getElementById('bulk-bar');
-    const count = document.getElementById('bulk-count');
-    if (!bar || !count) return;
-    if (selectedIds.size > 0) {
-      bar.classList.remove('hidden'); bar.classList.add('flex');
-      count.textContent = `${selectedIds.size} selected`;
-    } else {
-      bar.classList.add('hidden'); bar.classList.remove('flex');
-    }
+    const bar = document.getElementById('bulk-bar');
+    const cnt = document.getElementById('bulk-count');
+    if (!bar || !cnt) return;
+    if (selectedIds.size > 0) { bar.classList.remove('hidden'); bar.classList.add('flex'); cnt.textContent = `${selectedIds.size} selected`; }
+    else { bar.classList.add('hidden'); bar.classList.remove('flex'); }
   }
 
   document.getElementById('bulk-cancel-btn')?.addEventListener('click', () => { selectedIds.clear(); renderBlocks(); });
-
   document.getElementById('bulk-toggle-btn')?.addEventListener('click', async () => {
     const ids = [...selectedIds];
     const newActive = !ids.every(id => blocks.find((b: any) => b.id === id)?.active);
     try {
-      await Promise.all(ids.map(id => apiCall(`/api/blocks/${id}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ active: newActive }),
-      })));
+      await Promise.all(ids.map(id => apiCall(`/api/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active: newActive }) })));
       ids.forEach(id => { const b = blocks.find((b: any) => b.id === id); if (b) b.active = newActive; });
       selectedIds.clear(); renderBlocks();
-      toast.success(`${ids.length} block${ids.length > 1 ? 's' : ''} ${newActive ? 'activated' : 'deactivated'}`);
+      toast.success(`${ids.length} block${ids.length > 1 ? 's' : ''} ${newActive ? 'activés' : 'désactivés'}`);
     } catch { toast.error('Bulk toggle failed'); }
   });
-
   document.getElementById('bulk-delete-btn')?.addEventListener('click', async () => {
     const ids = [...selectedIds];
-    if (!confirm(`Delete ${ids.length} block${ids.length > 1 ? 's' : ''}? This cannot be undone.`)) return;
+    if (!confirm(`Supprimer ${ids.length} block${ids.length > 1 ? 's' : ''} ? Action irréversible.`)) return;
     try {
-      await Promise.all(ids.map(id => apiCall(`/api/blocks/${id}`, { method: 'DELETE' })));
+      await Promise.all(ids.map(id => apiCall(`/api/blocks/${id}`, { method:'DELETE' })));
       blocks = blocks.filter((b: any) => !ids.includes(b.id));
       selectedIds.clear(); renderBlocks();
-      toast.success(`${ids.length} block${ids.length > 1 ? 's' : ''} deleted`);
+      toast.success(`${ids.length} block${ids.length > 1 ? 's' : ''} supprimés`);
     } catch { toast.error('Bulk delete failed'); }
   });
 
   document.getElementById('search-input')?.addEventListener('input', (e: any) => {
     searchQuery = e.target.value.toLowerCase().trim(); renderBlocks();
   });
-
   document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       activeFilter = (btn as HTMLElement).dataset.filter!;
@@ -673,7 +864,6 @@ const BLOCK_TYPES = [
       renderBlocks();
     });
   });
-
   document.getElementById('clear-search-btn')?.addEventListener('click', () => {
     searchQuery = ''; activeFilter = 'all';
     (document.getElementById('search-input') as HTMLInputElement).value = '';
@@ -681,7 +871,7 @@ const BLOCK_TYPES = [
     renderBlocks();
   });
 
-  // ── Quick-add URL ─────────────────────────────────────────────────────────
+  // ── Quick-add ─────────────────────────────────────────────────────────────
   const quickInput  = document.getElementById('quick-add-input') as HTMLInputElement;
   const detectZone  = document.getElementById('quick-detect-zone')!;
   const platIconEl  = document.getElementById('quick-plat-icon')!;
@@ -693,7 +883,7 @@ const BLOCK_TYPES = [
     if (val.startsWith('http')) {
       quickUrl = val; quickPlat = detectPlatform(val);
       platIconEl.textContent  = quickPlat?.icon  ?? '🔗';
-      platLabelEl.textContent = quickPlat?.label ?? 'Link detected';
+      platLabelEl.textContent = quickPlat?.label ?? 'Link détecté';
       detectZone.classList.remove('hidden'); detectZone.classList.add('flex');
     } else {
       detectZone.classList.add('hidden'); detectZone.classList.remove('flex');
@@ -702,24 +892,19 @@ const BLOCK_TYPES = [
   quickInput?.addEventListener('paste', () => setTimeout(() => quickInput.dispatchEvent(new Event('input')), 0));
 
   document.getElementById('quick-add-confirm')?.addEventListener('click', async () => {
-    if (!quickUrl) return;
-    if (!canAddBlock) { toast.error('Block limit reached!'); return; }
+    if (!quickUrl || !canAddBlock) { if (!canAddBlock) toast.error('Block limit reached!'); return; }
     const title = getDefaultTitle(quickUrl, quickPlat);
     const iconUrl = quickPlat?.defaultIcon ?? '';
     try {
-      // FIX 1 : apiCall unwrap data.id correctement
-      const data = await apiCall('/api/blocks', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'link', title, config: { url: quickUrl, ...(iconUrl ? { icon_url: iconUrl } : {}) } }),
-      });
-      blocks.push({ id: data.id, type: 'link', title, config: { url: quickUrl, icon_url: iconUrl }, active: true, created_at: new Date().toISOString(), clicks: 0 });
+      const data = await apiCall('/api/blocks', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ type:'link', title, config:{ url: quickUrl, ...(iconUrl ? { icon_url: iconUrl } : {}) } }) });
+      blocks.push({ id: data.id, type:'link', title, config:{ url: quickUrl, icon_url: iconUrl }, active:true, created_at: new Date().toISOString(), clicks:0, is_pinned:false });
       renderBlocks();
-      toast.success(`${quickPlat?.label ?? 'Link'} added!`);
+      toast.success(`${quickPlat?.label ?? 'Link'} ajouté !`);
       quickInput.value = '';
       detectZone.classList.add('hidden'); detectZone.classList.remove('flex');
     } catch (err: any) { toast.error(err.message || 'Failed to add'); }
   });
-
   document.getElementById('quick-add-cancel')?.addEventListener('click', () => {
     quickInput.value = '';
     detectZone.classList.add('hidden'); detectZone.classList.remove('flex');
@@ -736,20 +921,17 @@ const BLOCK_TYPES = [
   document.getElementById('cancel-btn')?.addEventListener('click',    () => closeModal('edit-modal'));
 
   function openTypeModal() {
-    if (!canAddBlock) { toast.error('Block limit reached. Upgrade your plan!'); return; }
+    if (!canAddBlock) { toast.error('Block limit reached. Upgrade!'); return; }
     const grid = document.getElementById('platform-grid')!;
     grid.innerHTML = PLATFORMS.slice(0, 8).map(p => `
-      <button class="plat-btn flex flex-col items-center gap-1.5 p-2.5 glass border border-white/10 rounded-xl hover:border-neon-green/30 hover:bg-white/5 transition-all group"
-        data-pid="${p.id}">
+      <button class="plat-btn flex flex-col items-center gap-1.5 p-2.5 glass border border-white/10 rounded-xl hover:border-neon-green/30 hover:bg-white/5 transition-all group" data-pid="${p.id}">
         <span class="text-xl leading-none">${p.icon}</span>
         <span class="text-xs text-gray-400 group-hover:text-white transition-colors truncate w-full text-center">${p.label}</span>
-      </button>
-    `).join('');
+      </button>`).join('');
     grid.querySelectorAll('.plat-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const plat = PLATFORMS.find(p => p.id === (btn as HTMLElement).dataset.pid)!;
-        closeModal('type-modal');
-        openEditModal('link', null, plat);
+        closeModal('type-modal'); openEditModal('link', null, plat);
       });
     });
     openModal('type-modal');
@@ -758,18 +940,39 @@ const BLOCK_TYPES = [
   document.getElementById('add-block-btn')?.addEventListener('click', openTypeModal);
   document.getElementById('empty-add-btn')?.addEventListener('click', openTypeModal);
   document.querySelectorAll('.block-type-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      closeModal('type-modal');
-      openEditModal((btn as HTMLElement).dataset.type!, null, null);
-    });
+    btn.addEventListener('click', () => { closeModal('type-modal'); openEditModal((btn as HTMLElement).dataset.type!, null, null); });
   });
 
   // ── Form ──────────────────────────────────────────────────────────────────
   const IC = 'w-full px-4 py-3 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none focus:ring-1 focus:ring-neon-green/20 transition-colors';
+  const DAYS_FR = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
+
+  function buildScheduleWidget(existing: any[]) {
+    return `<div id="schedule-rows" class="space-y-2">${DAYS_FR.map(day => {
+      const found = existing.find((s: any) => s.day === day);
+      return `<div class="flex items-center gap-3">
+        <label class="flex items-center gap-2 cursor-pointer w-28 shrink-0">
+          <input type="checkbox" class="sch-day-cb w-4 h-4 rounded accent-neon-green" data-day="${day}" ${found ? 'checked' : ''} />
+          <span class="text-sm text-gray-300">${day}</span>
+        </label>
+        <input type="time" class="sch-time-input flex-1 px-3 py-1.5 glass border border-white/10 rounded-lg text-white text-sm focus:border-neon-green/40 focus:outline-none transition-colors ${!found ? 'opacity-30' : ''}"
+          data-day="${day}" value="${found?.time ?? '20:00'}" ${!found ? 'disabled' : ''} />
+      </div>`;
+    }).join('')}</div>`;
+  }
+
+  const DONATION_PLATFORMS = [
+    { id:'kofi',    label:'Ko-fi',   icon:'☕' },
+    { id:'patreon', label:'Patreon', icon:'🎁' },
+    { id:'streamlabs', label:'Streamlabs', icon:'🎛️' },
+    { id:'paypal',  label:'PayPal',  icon:'💳' },
+    { id:'throne',  label:'Throne',  icon:'👑' },
+    { id:'other',   label:'Autre',   icon:'💸' },
+  ];
 
   function openEditModal(type: string, block: any = null, suggestedPlat: any = null) {
-    (document.getElementById('modal-title')!).textContent     = block ? `Edit ${type}` : `Add ${type}`;
-    (document.getElementById('submit-text')!).textContent     = block ? 'Update Block' : 'Save Block';
+    (document.getElementById('modal-title')!).textContent = block ? `Modifier ${type}` : `Ajouter ${type}`;
+    (document.getElementById('submit-text')!).textContent = block ? 'Update Block' : 'Save Block';
     (document.getElementById('block-id')   as HTMLInputElement).value = block?.id ?? '';
     (document.getElementById('block-type') as HTMLInputElement).value = type;
 
@@ -777,120 +980,175 @@ const BLOCK_TYPES = [
     const titleVal = block?.title ?? (suggestedPlat?.label ?? '');
     const iconVal  = block?.config?.icon_url ?? (suggestedPlat?.defaultIcon ?? '');
     const urlVal   = block?.config?.url ?? '';
+    const donPlatVal = val('donation_platform') || 'kofi';
 
     const iconWidget = `
       <div class="space-y-1.5">
-        <label class="text-sm font-medium text-gray-300 flex items-center gap-1.5">
-          Icon <span class="text-xs text-gray-500 font-normal">optional — shown as circle</span>
-        </label>
+        <label class="text-sm font-medium text-gray-300 flex items-center gap-1.5">Icon <span class="text-xs text-gray-500">optionnel</span></label>
         <div class="flex items-center gap-3">
-          <div id="icon-preview-wrap"
-            class="shrink-0 w-12 h-12 rounded-full overflow-hidden border-2 border-white/10 bg-white/5 flex items-center justify-center transition-all">
-            ${iconVal
-              ? `<img src="${iconVal}" class="w-full h-full object-cover" />`
-              : `<svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`}
+          <div id="icon-preview-wrap" class="shrink-0 w-12 h-12 rounded-full overflow-hidden border-2 border-white/10 bg-white/5 flex items-center justify-center">
+            ${iconVal ? `<img src="${iconVal}" class="w-full h-full object-cover" />` : `<svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`}
           </div>
           <input type="url" id="field-icon-url" value="${iconVal}" placeholder="https://example.com/icon.png" class="${IC} flex-1" />
         </div>
-        <p class="text-xs text-gray-600">Square image recommended (1:1).</p>
       </div>`;
 
-    // ─── FIX 1 : champs image/video/spacer maintenant complets ────────────
-    // L'ancien code n'avait pas de field-title pour image/video → config mal construite.
     const fieldHtml: Record<string, string> = {
       link: `
-        <div class="space-y-1.5">
-          <label class="text-sm font-medium text-gray-300">Title <span class="text-red-400">*</span></label>
-          <input type="text" id="field-title" value="${titleVal}" required maxlength="100" placeholder="My Twitch" class="${IC}" />
-        </div>
-        <div class="space-y-1.5">
-          <label class="text-sm font-medium text-gray-300">URL <span class="text-red-400">*</span></label>
-          <input type="url" id="field-url" value="${urlVal}" required placeholder="https://twitch.tv/username" class="${IC}" />
-        </div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Titre <span class="text-red-400">*</span></label>
+          <input type="text" id="field-title" value="${titleVal}" required maxlength="100" placeholder="Mon Twitch" class="${IC}" /></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">URL <span class="text-red-400">*</span></label>
+          <input type="url" id="field-url" value="${urlVal}" required placeholder="https://twitch.tv/username" class="${IC}" /></div>
         ${iconWidget}`,
 
       heading: `
-        <div class="space-y-1.5">
-          <label class="text-sm font-medium text-gray-300">Heading Text <span class="text-red-400">*</span></label>
-          <input type="text" id="field-title" value="${titleVal}" required maxlength="100" placeholder="My Social Links" class="${IC}" />
-        </div>`,
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Texte <span class="text-red-400">*</span></label>
+          <input type="text" id="field-title" value="${titleVal}" required maxlength="100" placeholder="Mes liens sociaux" class="${IC}" /></div>`,
 
-      // spacer : aucun champ, le submit envoie juste type="spacer"
       spacer: `
         <div class="py-6 flex flex-col items-center gap-3 text-center">
           <div class="text-3xl">—</div>
-          <p class="text-sm text-gray-400">A spacer adds blank space between blocks.</p>
-          <p class="text-xs text-gray-600">No configuration needed.</p>
+          <p class="text-sm text-gray-400">Ajoute de l'espace entre les blocks.</p>
         </div>`,
 
       image: `
-        <div class="space-y-1.5">
-          <label class="text-sm font-medium text-gray-300">Image URL <span class="text-red-400">*</span></label>
-          <input type="url" id="field-url" value="${val('url')}" required placeholder="https://example.com/image.jpg" class="${IC}" />
-        </div>
-        <div class="space-y-1.5">
-          <label class="text-sm font-medium text-gray-300">Caption <span class="text-gray-500 font-normal text-xs ml-1">optional</span></label>
-          <input type="text" id="field-title" value="${titleVal}" maxlength="100" placeholder="My photo" class="${IC}" />
-        </div>`,
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">URL image <span class="text-red-400">*</span></label>
+          <input type="url" id="field-url" value="${val('url')}" required placeholder="https://example.com/image.jpg" class="${IC}" /></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Légende <span class="text-gray-500 text-xs">optionnel</span></label>
+          <input type="text" id="field-title" value="${titleVal}" maxlength="100" placeholder="Ma photo" class="${IC}" /></div>`,
 
       video: `
-        <div class="space-y-1.5">
-          <label class="text-sm font-medium text-gray-300">Video URL <span class="text-red-400">*</span></label>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">URL vidéo <span class="text-red-400">*</span></label>
           <input type="url" id="field-url" value="${val('url')}" required placeholder="https://youtube.com/watch?v=…" class="${IC}" />
-          <p class="text-xs text-gray-600">Supports YouTube, Vimeo, TikTok</p>
-        </div>
-        <div class="space-y-1.5">
-          <label class="text-sm font-medium text-gray-300">Title <span class="text-gray-500 font-normal text-xs ml-1">optional</span></label>
-          <input type="text" id="field-title" value="${titleVal}" maxlength="100" placeholder="Watch my latest video" class="${IC}" />
-        </div>`,
+          <p class="text-xs text-gray-600">YouTube, Vimeo, TikTok</p></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Titre <span class="text-gray-500 text-xs">optionnel</span></label>
+          <input type="text" id="field-title" value="${titleVal}" maxlength="100" placeholder="Ma dernière vidéo" class="${IC}" /></div>`,
 
       social: `
-        <div class="space-y-1.5">
-          <label class="text-sm font-medium text-gray-300">Title <span class="text-gray-500 font-normal text-xs ml-1">Optional</span></label>
-          <input type="text" id="field-title" value="${titleVal}" maxlength="60" placeholder="Follow Me" class="${IC}" />
-        </div>
-        <div class="space-y-1.5">
-          <label class="text-sm font-medium text-gray-300">Social URLs <span class="text-red-400">*</span></label>
-          <textarea id="field-links" rows="3" required placeholder="https://twitter.com/user&#10;https://instagram.com/user" class="${IC} resize-none">${block?.config?.links?.map((l: any) => l.url || l).join('\n') ?? ''}</textarea>
-          <p class="text-xs text-gray-600">One URL per line</p>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Titre <span class="text-gray-500 text-xs">optionnel</span></label>
+          <input type="text" id="field-title" value="${titleVal}" maxlength="60" placeholder="Mes réseaux" class="${IC}" /></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">URLs <span class="text-red-400">*</span></label>
+          <textarea id="field-links" rows="4" required placeholder="https://twitter.com/user&#10;https://instagram.com/user&#10;https://twitch.tv/user" class="${IC} resize-none">${block?.config?.links?.map((l: any) => l.url || l).join('\n') ?? ''}</textarea>
+          <p class="text-xs text-gray-600">Un URL par ligne — icônes détectées automatiquement</p></div>`,
+
+      countdown: `
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Label <span class="text-red-400">*</span></label>
+          <input type="text" id="field-title" value="${titleVal || 'Prochain stream dans'}" required maxlength="60" placeholder="Prochain stream dans" class="${IC}" /></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Date & heure cible <span class="text-red-400">*</span></label>
+          <input type="datetime-local" id="field-countdown-date" value="${val('target_date')}" required class="${IC}" /></div>
+        <div class="p-3 rounded-xl bg-yellow-400/5 border border-yellow-400/15 text-xs text-yellow-300/70">
+          ⏱ Le timer disparaît automatiquement quand la date est dépassée.</div>`,
+
+      schedule: `
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Titre <span class="text-gray-500 text-xs">optionnel</span></label>
+          <input type="text" id="field-title" value="${titleVal || 'Planning stream'}" maxlength="60" placeholder="Planning stream" class="${IC}" /></div>
+        <div class="space-y-2"><label class="text-sm font-medium text-gray-300">Jours & horaires <span class="text-red-400">*</span></label>
+          <div class="p-3 glass border border-white/10 rounded-xl">${buildScheduleWidget(block?.config?.schedule ?? [])}</div>
+          <p class="text-xs text-gray-600">Timezone du visiteur détecté automatiquement</p></div>`,
+
+      donation: `
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Titre <span class="text-red-400">*</span></label>
+          <input type="text" id="field-title" value="${titleVal || 'Soutiens-moi ☕'}" required maxlength="80" placeholder="Soutiens-moi ☕" class="${IC}" /></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Plateforme</label>
+          <div class="grid grid-cols-3 gap-2" id="don-platform-grid">
+            ${DONATION_PLATFORMS.map(p => `
+              <button type="button" class="don-plat-btn flex flex-col items-center gap-1 p-2.5 glass border rounded-xl text-xs font-medium transition-all
+                ${p.id === donPlatVal ? 'border-neon-green/50 bg-neon-green/5 text-white' : 'border-white/10 text-gray-400 hover:border-white/20'}" data-plat="${p.id}">
+                <span class="text-lg leading-none">${p.icon}</span><span>${p.label}</span>
+              </button>`).join('')}
+          </div>
+          <input type="hidden" id="field-donation-platform" value="${donPlatVal}" /></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">URL de don <span class="text-red-400">*</span></label>
+          <input type="url" id="field-url" value="${val('url')}" required placeholder="https://ko-fi.com/monpseudo" class="${IC}" /></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Objectif <span class="text-gray-500 text-xs">€</span></label>
+            <input type="number" id="field-goal" value="${val('goal_amount') || ''}" min="0" max="99999" placeholder="500" class="${IC}" /></div>
+          <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Collecté <span class="text-gray-500 text-xs">€</span></label>
+            <input type="number" id="field-current" value="${val('current_amount') || ''}" min="0" max="99999" placeholder="0" class="${IC}" /></div>
         </div>`,
+
+      embed: `
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Titre <span class="text-gray-500 text-xs">optionnel</span></label>
+          <input type="text" id="field-title" value="${titleVal || ''}" maxlength="80" placeholder="Ma playlist du moment" class="${IC}" /></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">URL à embedder <span class="text-red-400">*</span></label>
+          <input type="url" id="field-url" value="${val('url')}" required placeholder="https://open.spotify.com/playlist/…" class="${IC}" />
+          <p class="text-xs text-gray-600">Spotify, SoundCloud, Apple Music</p></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Hauteur (px)</label>
+          <input type="number" id="field-embed-height" value="${val('height') || 152}" min="80" max="500" placeholder="152" class="${IC}" /></div>
+        <div class="p-3 rounded-xl bg-purple-500/5 border border-purple-500/15 text-xs text-purple-300/70">
+          🎵 Spotify : Partager → Copier le lien de la playlist ou de l'album.</div>`,
     };
 
     const fields = document.getElementById('form-fields')!;
-    fields.innerHTML = fieldHtml[type] ?? `<div class="py-4 text-center text-sm text-gray-500">Type "${type}" not yet supported.</div>`;
-    openModal('edit-modal');
-    setTimeout(() => (fields.querySelector('input, textarea') as HTMLElement | null)?.focus(), 100);
+    fields.innerHTML = fieldHtml[type] ?? `<div class="py-4 text-center text-sm text-gray-500">Type "${type}" non supporté.</div>`;
 
-    // Live icon preview
+    // Visibility section visibility
+    document.getElementById('schedule-visibility-section')!.classList.toggle('hidden', type === 'spacer');
+    const showFrom  = document.getElementById('field-show-from')  as HTMLInputElement | null;
+    const showUntil = document.getElementById('field-show-until') as HTMLInputElement | null;
+    if (showFrom  && block?.config?.show_from)  showFrom.value  = block.config.show_from.slice(0,16);
+    if (showUntil && block?.config?.show_until) showUntil.value = block.config.show_until.slice(0,16);
+
+    openModal('edit-modal');
+    setTimeout(() => (fields.querySelector('input:not([type="checkbox"]):not([type="time"]):not([type="hidden"]), textarea') as HTMLElement|null)?.focus(), 100);
+
+    // Donation platform pills
+    if (type === 'donation') {
+      document.querySelectorAll('.don-plat-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = (btn as HTMLElement).dataset.plat!;
+          (document.getElementById('field-donation-platform') as HTMLInputElement).value = id;
+          document.querySelectorAll('.don-plat-btn').forEach(b => {
+            b.classList.toggle('border-neon-green/50', b === btn);
+            b.classList.toggle('bg-neon-green/5', b === btn);
+            b.classList.toggle('text-white', b === btn);
+            b.classList.toggle('border-white/10', b !== btn);
+            b.classList.toggle('text-gray-400', b !== btn);
+          });
+        });
+      });
+    }
+
+    // Schedule day checkboxes
+    if (type === 'schedule') {
+      document.querySelectorAll('.sch-day-cb').forEach(cb => {
+        cb.addEventListener('change', (e: any) => {
+          const ti = document.querySelector(`.sch-time-input[data-day="${e.target.dataset.day}"]`) as HTMLInputElement;
+          if (ti) { ti.disabled = !e.target.checked; ti.classList.toggle('opacity-30', !e.target.checked); }
+        });
+      });
+    }
+
+    // Visibility accordion
+    document.getElementById('visibility-toggle')?.addEventListener('click', () => {
+      const panel = document.getElementById('visibility-panel');
+      panel?.classList.toggle('hidden');
+      const ch = document.getElementById('vis-chevron');
+      if (ch) ch.style.transform = panel?.classList.contains('hidden') ? '' : 'rotate(180deg)';
+    });
+
+    // Icon live preview
     const iconInput = document.getElementById('field-icon-url') as HTMLInputElement | null;
     const iconWrap  = document.getElementById('icon-preview-wrap');
     if (iconInput && iconWrap) {
-      const emptyIcon = `<svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`;
+      const empty = `<svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`;
       iconInput.addEventListener('input', () => {
         const u = iconInput.value.trim();
-        iconWrap.innerHTML = u
-          ? `<img src="${u}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='${emptyIcon.replace(/'/g, "\\'")}'" />`
-          : emptyIcon;
+        iconWrap.innerHTML = u ? `<img src="${u}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='${empty.replace(/'/g,"\\'")}'"/>` : empty;
       });
       const urlField = document.getElementById('field-url') as HTMLInputElement | null;
       urlField?.addEventListener('blur', () => {
         if (iconInput.value) return;
-        const u = urlField.value.trim();
-        if (!u) return;
-        const plat = detectPlatform(u);
-        if (plat?.defaultIcon) {
-          iconInput.value = plat.defaultIcon;
-          iconWrap.innerHTML = `<img src="${plat.defaultIcon}" class="w-full h-full object-cover" />`;
-        }
+        const plat = detectPlatform(urlField.value.trim());
+        if (plat?.defaultIcon) { iconInput.value = plat.defaultIcon; iconWrap.innerHTML = `<img src="${plat.defaultIcon}" class="w-full h-full object-cover" />`; }
       });
     }
   }
 
-  // ── Form submit ───────────────────────────────────────────────────────────
+  // ── Form submit ────────────────────────────────────────────────────────────
   document.getElementById('block-form')?.addEventListener('submit', async (e: any) => {
     e.preventDefault();
     if (isSaving) return;
-
     const type    = (document.getElementById('block-type') as HTMLInputElement).value;
     const blockId = (document.getElementById('block-id')   as HTMLInputElement).value ?? '';
     const submitBtn  = document.getElementById('submit-btn');
@@ -903,89 +1161,111 @@ const BLOCK_TYPES = [
     const urlEl     = document.getElementById('field-url')      as HTMLInputElement | null;
     const linksEl   = document.getElementById('field-links')    as HTMLTextAreaElement | null;
     const iconUrlEl = document.getElementById('field-icon-url') as HTMLInputElement | null;
+    const showFrom  = (document.getElementById('field-show-from')  as HTMLInputElement | null)?.value?.trim() || null;
+    const showUntil = (document.getElementById('field-show-until') as HTMLInputElement | null)?.value?.trim() || null;
+    const vis       = (k: string, v: any) => v ? { [k]: v } : {};
 
     switch (type) {
       case 'link': {
         title = titleEl?.value?.trim() ?? null;
-        const url     = urlEl?.value?.trim() ?? '';
-        const iconUrl = iconUrlEl?.value?.trim() ?? '';
-        if (!title)                                  { toast.error('Title is required'); return; }
-        if (!url || !url.startsWith('http'))         { toast.error('Valid URL required'); return; }
-        if (iconUrl && !iconUrl.startsWith('http'))  { toast.error('Icon URL must start with https://'); return; }
-        config = { url, ...(iconUrl ? { icon_url: iconUrl } : {}) };
+        const url = urlEl?.value?.trim() ?? '';
+        const ico = iconUrlEl?.value?.trim() ?? '';
+        if (!title) { toast.error('Le titre est requis'); return; }
+        if (!url || !url.startsWith('http')) { toast.error('URL valide requise'); return; }
+        if (ico && !ico.startsWith('http')) { toast.error("L'icône doit commencer par https://"); return; }
+        config = { url, ...(ico ? { icon_url: ico } : {}), ...vis('show_from', showFrom), ...vis('show_until', showUntil) };
         break;
       }
       case 'heading':
         title = titleEl?.value?.trim() ?? null;
-        if (!title) { toast.error('Heading text is required'); return; }
+        if (!title) { toast.error('Le texte est requis'); return; }
         break;
-      case 'spacer':
-        // Aucun champ requis — type seul suffit
-        break;
+      case 'spacer': break;
       case 'image': {
         const u = urlEl?.value?.trim() ?? '';
-        if (!u || !u.startsWith('http')) { toast.error('Valid image URL required'); return; }
-        title  = titleEl?.value?.trim() || null;
-        config = { url: u };
+        if (!u || !u.startsWith('http')) { toast.error('URL image valide requise'); return; }
+        title = titleEl?.value?.trim() || null;
+        config = { url: u, ...vis('show_from', showFrom), ...vis('show_until', showUntil) };
         break;
       }
       case 'video': {
         const u = urlEl?.value?.trim() ?? '';
-        if (!u || !u.startsWith('http')) { toast.error('Valid video URL required'); return; }
-        title  = titleEl?.value?.trim() || null;
-        config = { url: u };
+        if (!u || !u.startsWith('http')) { toast.error('URL vidéo valide requise'); return; }
+        title = titleEl?.value?.trim() || null;
+        config = { url: u, ...vis('show_from', showFrom), ...vis('show_until', showUntil) };
         break;
       }
       case 'social': {
         title = titleEl?.value?.trim() || null;
-        const raw   = linksEl?.value?.trim() ?? '';
-        const links = raw.split('\n').map(u => u.trim()).filter(u => u.startsWith('http')).map(u => ({ url: u }));
-        if (!links.length) { toast.error('At least one valid URL required'); return; }
-        config = { links };
+        const links = (linksEl?.value?.trim() ?? '').split('\n').map(u => u.trim()).filter(u => u.startsWith('http')).map(u => ({ url: u }));
+        if (!links.length) { toast.error('Au moins un URL valide requis'); return; }
+        config = { links, ...vis('show_from', showFrom), ...vis('show_until', showUntil) };
         break;
       }
-      default:
-        toast.error(`Unknown block type: ${type}`); return;
+      case 'countdown': {
+        title = titleEl?.value?.trim() ?? null;
+        const d = (document.getElementById('field-countdown-date') as HTMLInputElement)?.value;
+        if (!title) { toast.error('Le label est requis'); return; }
+        if (!d)     { toast.error('La date cible est requise'); return; }
+        config = { target_date: d, label: title };
+        break;
+      }
+      case 'schedule': {
+        title = titleEl?.value?.trim() || 'Planning stream';
+        const schedule: any[] = [];
+        document.querySelectorAll('.sch-day-cb').forEach((cb: any) => {
+          if (cb.checked) {
+            const time = (document.querySelector(`.sch-time-input[data-day="${cb.dataset.day}"]`) as HTMLInputElement)?.value ?? '20:00';
+            schedule.push({ day: cb.dataset.day, time });
+          }
+        });
+        if (!schedule.length) { toast.error('Coche au moins un jour'); return; }
+        config = { schedule };
+        break;
+      }
+      case 'donation': {
+        title = titleEl?.value?.trim() ?? null;
+        const u    = urlEl?.value?.trim() ?? '';
+        const plat = (document.getElementById('field-donation-platform') as HTMLInputElement)?.value || 'other';
+        const goal = parseFloat((document.getElementById('field-goal')    as HTMLInputElement)?.value || '0') || 0;
+        const cur  = parseFloat((document.getElementById('field-current') as HTMLInputElement)?.value || '0') || 0;
+        if (!title) { toast.error('Le titre est requis'); return; }
+        if (!u || !u.startsWith('http')) { toast.error("L'URL de don est requise"); return; }
+        config = { url: u, donation_platform: plat, goal_amount: goal, current_amount: cur };
+        break;
+      }
+      case 'embed': {
+        title = titleEl?.value?.trim() || null;
+        const u = urlEl?.value?.trim() ?? '';
+        const h = parseInt((document.getElementById('field-embed-height') as HTMLInputElement)?.value || '152');
+        if (!u || !u.startsWith('http')) { toast.error('URL valide requise'); return; }
+        config = { url: u, height: Math.min(500, Math.max(80, h || 152)) };
+        break;
+      }
+      default: toast.error(`Type inconnu: ${type}`); return;
     }
 
     isSaving = true;
-    submitBtn?.setAttribute('disabled', '');
-    submitText.textContent = blockId ? 'Updating…' : 'Saving…';
+    submitBtn?.setAttribute('disabled','');
+    submitText.textContent = blockId ? 'Modification…' : 'Sauvegarde…';
 
     try {
-      // FIX 1 + 4 : apiCall unwrap { success, data } → data.id est valide
       const data = await apiCall(blockId ? `/api/blocks/${blockId}` : '/api/blocks', {
-        method:  blockId ? 'PUT' : 'POST',
+        method: blockId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ type, title: title ?? null, config }),
+        body: JSON.stringify({ type, title: title ?? null, config }),
       });
-
       if (blockId) {
         const idx = blocks.findIndex((b: any) => b.id === blockId);
         if (idx !== -1) blocks[idx] = { ...blocks[idx], title, config, ...data };
       } else {
-        // FIX 4 : le block apparaît immédiatement sans refresh
-        blocks.push({
-          id:         data.id,     // ← maintenant correctement défini
-          type,
-          title,
-          config,
-          active:     true,
-          created_at: new Date().toISOString(),
-          clicks:     0,
-          ...data,
-        });
+        blocks.push({ id: data.id, type, title, config, active: true, is_pinned: false, created_at: new Date().toISOString(), clicks: 0, ...data });
       }
-
       closeModal('edit-modal');
       renderBlocks();
-      toast.success(blockId ? 'Block updated!' : 'Block added!');
+      toast.success(blockId ? 'Block modifié !' : 'Block ajouté !');
     } catch (err: any) {
-      if (err.message?.includes('403') || err.message?.includes('limit')) {
-        toast.error('Block limit reached!');
-      } else {
-        toast.error(err.message || 'Failed to save block');
-      }
+      toast.error(err.message?.includes('limit') ? 'Block limit reached!' : (err.message || 'Failed to save'));
     } finally {
       isSaving = false;
       submitBtn?.removeAttribute('disabled');
@@ -1000,28 +1280,24 @@ const BLOCK_TYPES = [
 
   async function handleDuplicateBlock(id: string) {
     const block = blocks.find((b: any) => b.id === id);
-    if (!block) return;
-    if (!canAddBlock) { toast.error('Block limit reached!'); return; }
+    if (!block || !canAddBlock) { if (!canAddBlock) toast.error('Block limit reached!'); return; }
     try {
-      const data = await apiCall('/api/blocks', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: block.type, title: block.title ? `${block.title} (copy)` : null, config: block.config }),
-      });
-      blocks.push({ ...block, id: data.id, title: block.title ? `${block.title} (copy)` : null, created_at: new Date().toISOString(), clicks: 0 });
+      const data = await apiCall('/api/blocks', { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ type: block.type, title: block.title ? `${block.title} (copy)` : null, config: block.config }) });
+      blocks.push({ ...block, id: data.id, title: block.title ? `${block.title} (copy)` : null, created_at: new Date().toISOString(), clicks: 0, is_pinned: false });
       renderBlocks();
-      toast.success('Block duplicated!');
+      toast.success('Block dupliqué !');
     } catch (err: any) { toast.error(err.message || 'Failed to duplicate'); }
   }
 
   async function handleDeleteBlock(id: string) {
-    if (!confirm('Delete this block? This cannot be undone.')) return;
+    if (!confirm('Supprimer ce block ? Action irréversible.')) return;
     try {
-      // FIX 3 : hard delete — l'API fait maintenant un DELETE Supabase direct
       await apiCall(`/api/blocks/${id}`, { method: 'DELETE' });
       blocks = blocks.filter((b: any) => b.id !== id);
       selectedIds.delete(id);
       renderBlocks();
-      toast.success('Block deleted');
+      toast.success('Block supprimé');
     } catch (err: any) { toast.error(err.message || 'Failed to delete'); }
   }
 
