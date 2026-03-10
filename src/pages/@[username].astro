@@ -1,5 +1,5 @@
 ---
-import BaseLayout from '@/layouts/BaseLayout.astro';
+import ProfileLayout from '@/layouts/ProfileLayout.astro';
 import { getProfileByUsername, getActiveBlocks } from '@/lib/supabase/queries';
 import QRCode from 'qrcode';
 import CookieBanner from '@/components/ui/CookieBanner.astro';
@@ -259,7 +259,7 @@ function getSocialIconPath(url?: string): string {
 }
 ---
 
-<BaseLayout title={pageTitle}>
+<ProfileLayout title={pageTitle}>
 
   <!-- ===== SEO HEAD ===== -->
   <meta name="description" content={pageDesc} slot="head" />
@@ -951,4 +951,4 @@ function getSocialIconPath(url?: string): string {
 
   </script>
 
-</BaseLayout>
+</ProfileLayout>

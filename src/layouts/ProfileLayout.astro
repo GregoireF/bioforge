@@ -1,0 +1,276 @@
+---
+import GlobalScripts from '@/components/ui/Global.astro';
+import "../styles/global.css";
+import { getProfileByUsername, getActiveBlocks } from '@/lib/supabase/queries';
+
+// ==================== PARAMS ====================
+const { username } = Astro.params;
+if (!username) return Astro.redirect('/404');
+
+// ==================== PROFILE ====================
+const profileResult = await getProfileByUsername(username);
+if (!profileResult.success) return Astro.redirect('/404');
+const profile = profileResult.data;
+
+const blocksResult = await getActiveBlocks(profile.id);
+const blocks = blocksResult.success ? blocksResult.data : [];
+
+// ==================== SANITIZATION ====================
+function sanitizeHex(val: unknown, fallback: string): string {
+  return typeof val === 'string' && /^#[0-9A-Fa-f]{6}$/.test(val) ? val : fallback;
+}
+function sanitizeInt(val: unknown, min: number, max: number, fallback: number): number {
+  const n = parseInt(String(val));
+  return isFinite(n) && n >= min && n <= max ? n : fallback;
+}
+
+// ── Font allowlist — union appearance v2 + legacy ────────────────────────────
+const ALLOWED_FONTS = [
+  // appearance v2
+  'Exo 2','Orbitron','Rajdhani','Bebas Neue','Audiowide','Russo One',
+  'Space Grotesk','DM Sans','Quicksand','Figtree',
+  // legacy (old profiles)
+  'Inter','Poppins','Roboto','Montserrat','Open Sans','Lato','Geist','Afacad',
+];
+
+// ==================== THEME ====================
+const DEFAULT_THEME = {
+  preset:           'dark',
+  background_color: '#0a0a0a',
+  primary_color:    '#00ff9d',
+  text_color:       '#ffffff',
+  // Background
+  background_style: 'solid',
+  gradient_color_2: '#1a1a2e',
+  gradient_angle:   135,
+  gradient_type:    'linear',
+  pattern:          'none',
+  pattern_opacity:  15,
+  // Button
+  button_style:     'filled',
+  border_radius:    14,
+  block_shadow:     true,
+  // Typography
+  font_family:      'Exo 2',
+  // Profile
+  avatar_shape:     'circle',
+  spacing:          'normal',
+  // Effects
+  animations:       true,
+  animation_preset: 'fade',
+};
+
+let theme = { ...DEFAULT_THEME };
+
+if (profile.theme) {
+  try {
+    const raw = typeof profile.theme === 'string' ? JSON.parse(profile.theme) : profile.theme;
+    theme = {
+      ...DEFAULT_THEME,
+      ...raw,
+      background_color: sanitizeHex(raw.background_color, DEFAULT_THEME.background_color),
+      primary_color:    sanitizeHex(raw.primary_color,    DEFAULT_THEME.primary_color),
+      text_color:       sanitizeHex(raw.text_color,       DEFAULT_THEME.text_color),
+      gradient_color_2: sanitizeHex(raw.gradient_color_2, DEFAULT_THEME.gradient_color_2),
+      font_family:      ALLOWED_FONTS.includes(raw.font_family) ? raw.font_family : DEFAULT_THEME.font_family,
+      border_radius:    sanitizeInt(raw.border_radius,  0, 32,  DEFAULT_THEME.border_radius),
+      gradient_angle:   sanitizeInt(raw.gradient_angle, 0, 360, DEFAULT_THEME.gradient_angle),
+      pattern_opacity:  sanitizeInt(raw.pattern_opacity, 5, 60, DEFAULT_THEME.pattern_opacity),
+      gradient_type:    ['linear','radial'].includes(raw.gradient_type) ? raw.gradient_type : 'linear',
+      background_style: ['solid','gradient','blur'].includes(raw.background_style) ? raw.background_style : 'solid',
+      button_style:     ['filled','outline','glass','gradient','neon','minimal','shadow'].includes(raw.button_style) ? raw.button_style : 'filled',
+      pattern:          ['none','dots','grid','waves','noise','mesh'].includes(raw.pattern) ? raw.pattern : 'none',
+      avatar_shape:     ['circle','square','hex','ring'].includes(raw.avatar_shape) ? raw.avatar_shape : 'circle',
+      spacing:          ['compact','normal','spacious'].includes(raw.spacing) ? raw.spacing : 'normal',
+      animation_preset: ['none','fade','slide','bounce','stagger'].includes(raw.animation_preset) ? raw.animation_preset : 'fade',
+      block_shadow:     typeof raw.block_shadow === 'boolean' ? raw.block_shadow : true,
+      animations:       typeof raw.animations   === 'boolean' ? raw.animations   : true,
+    };
+  } catch { /* keep defaults */ }
+}
+
+const fontParam = encodeURIComponent(theme.font_family);
+const fontUrl   = `https://fonts.googleapis.com/css2?family=${fontParam}:wght@400;500;600;700&display=swap`;
+
+const {
+  title,
+  description,
+  ogImage    = `https://bioforge.click/api/profile/og/${profile.username}.png`,
+  ogUrl,
+  noindex       = false,
+  canonical,
+  twitterHandle = "@BioForgeApp",
+  jsonLd:         pageJsonLd,
+} = Astro.props;
+
+const siteName          = "BioForge";
+const defaultDesc       = "BioForge — Lien en bio premium pour streamers, créateurs de contenu et communautés gaming.";
+const finalDescription  = description || defaultDesc;
+const baseUrl           = import.meta.env.PUBLIC_SITE_URL || "https://bioforge.click";
+const canonicalUrl      = canonical || new URL(Astro.url.pathname, baseUrl).toString();
+const finalOgImage      = ogImage
+  ? (ogImage.startsWith('http') ? ogImage : `${baseUrl}${ogImage}`)
+  : `${baseUrl}/og.png`;
+
+const defaultJsonLd = {
+  "@context": "https://schema.org",
+  "@type":    "Person",
+  name:       siteName,
+  url:        baseUrl,
+  logo:       `${baseUrl}/logo-512.png`,
+  sameAs: [
+    "https://twitter.com/BioForgeApp",
+  ],
+};
+
+// ==================== SEO DATA ====================
+const profileUrl = `https://bioforge.click/@${profile.username}`;
+const pageTitle  = profile.display_name
+  ? `${profile.display_name} (@${profile.username}) — BioForge`
+  : `@${profile.username} — BioForge`;
+const pageDesc   = profile.bio
+  ? `${profile.bio} — Retrouvez tous les liens de ${profile.display_name || profile.username} sur BioForge.`
+  : `Retrouvez tous les liens de ${profile.display_name || profile.username} sur BioForge.`;
+const finalJsonLd = pageJsonLd || defaultJsonLd;
+---
+<!DOCTYPE html>
+<html lang="fr" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="generator" content={Astro.generator} />
+
+    <!-- ═══════ FAVICONS ═══════ -->
+    <link rel="icon" type="image/x-icon"  href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+
+    <!-- ═══════ SEO ═══════ -->
+    <title>{title} | {siteName}</title>
+    <meta name="description" content={finalDescription} />
+    <link rel="canonical" href={canonicalUrl} />
+    {noindex
+      ? <meta name="robots" content="noindex, nofollow" />
+      : <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    }
+
+    <!-- ═══════ OPEN GRAPH ═══════ -->
+     <meta property="og:type"         content="profile"   slot="head" />
+    <meta property="og:url"          content={profileUrl} slot="head" />
+    <meta property="og:title"        content={pageTitle}  slot="head" />
+    <meta property="og:description"  content={pageDesc}   slot="head" />
+    <meta property="og:image"        content={ogImage}    slot="head" />
+    <meta property="og:image:alt"    content={`Profil ${profile.username} sur BioForge`} slot="head" />
+    <meta property="og:image:type"   content="image/png"  slot="head" />
+    <meta property="og:image:width"  content="1200"       slot="head" />
+    <meta property="og:image:height" content="630"        slot="head" />
+    <meta property="og:site_name"    content="BioForge"   slot="head" />
+    <meta property="og:locale"       content="fr_FR" />
+
+    <!-- ═══════ TWITTER / X ═══════ -->
+    <meta name="twitter:card"        content="summary_large_image" slot="head" />
+    <meta name="twitter:title"       content={pageTitle}  slot="head" />
+    <meta name="twitter:description" content={pageDesc}   slot="head" />
+    <meta name="twitter:image"       content={ogImage}    slot="head" />
+    <meta name="twitter:site"        content={twitterHandle} />
+    <meta name="twitter:creator"     content={twitterHandle} />
+
+    <!-- ═══════ DISCOVERY ═══════ -->
+    <link rel="sitemap" type="application/xml" href="/sitemap-index.xml" />
+
+    <!-- ═══════ FONTS — Clash Display + DM Sans ═══════ -->
+
+    <!-- Clash Display — Fontshare (headings / display) -->
+    <link rel="dns-prefetch" href="https://api.fontshare.com" />
+    <link rel="preconnect"   href="https://api.fontshare.com" crossorigin />
+    <link
+      rel="preload"
+      as="style"
+      href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap"
+    />
+
+    <!-- DM Sans — Google Fonts (body) -->
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href={fontUrl} />
+
+    <!-- ═══════ STRUCTURED DATA ═══════ -->
+    <!-- JSON-LD -->
+  <script type="application/ld+json" slot="head" set:html={JSON.stringify({
+    "@context":    "https://schema.org",
+    "@type":       "Person",
+    "name":        profile.display_name || profile.username,
+    "url":         profileUrl,
+    "image":       profile.avatar_url || null,
+    "description": profile.bio || null,
+    "sameAs":      blocks
+      .filter((b: any) => b.type === 'social' && Array.isArray(b.config?.links))
+      .flatMap((b: any) => b.config.links.map((l: any) => typeof l === 'string' ? l : l?.url))
+      .filter(Boolean),
+  })} />
+
+    <!-- ═══════ THEME ═══════ -->
+    <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+  </head>
+
+  <body class="min-h-screen bg-dark-900 text-white font-sans antialiased">
+
+    <slot />
+
+    <GlobalScripts title={title} />
+
+    <!-- ═══════ LOADING SCREEN ═══════ -->
+    <div id="loading-screen" class="fixed inset-0 bg-[#0a0a0a] z-[9999] flex items-center justify-center" aria-hidden="true">
+      <div class="text-center">
+        <div class="inline-flex items-center gap-2 mb-4">
+          <svg class="w-10 h-10 text-neon-green" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M12 2L2 7L12 12L22 7L12 2Z"   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 17L12 22L22 17"             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2 12L12 17L22 12"             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="text-2xl font-display font-bold text-neon-green tracking-widest">BIOFORGE</span>
+        </div>
+        <div class="w-48 h-0.5 bg-white/10 rounded-full overflow-hidden mx-auto">
+          <div id="loading-bar" class="h-full bg-gradient-to-r from-neon-green to-neon-blue rounded-full w-0"></div>
+        </div>
+      </div>
+    </div>
+
+    <script is:inline>
+      (function () {
+        var screen = document.getElementById('loading-screen');
+        var bar    = document.getElementById('loading-bar');
+        if (!screen || !bar) return;
+
+        // Barre de progression rapide
+        var pct = 0;
+        var tick = setInterval(function () {
+          pct = Math.min(pct + Math.random() * 15, 90);
+          bar.style.width = pct + '%';
+        }, 80);
+
+        window.addEventListener('load', function () {
+          clearInterval(tick);
+          bar.style.transition = 'width 0.2s ease';
+          bar.style.width = '100%';
+          setTimeout(function () {
+            screen.style.transition = 'opacity 0.4s ease';
+            screen.style.opacity    = '0';
+            setTimeout(function () {
+              screen.style.display = 'none';
+            }, 400);
+          }, 150);
+        });
+      })();
+    </script>
+
+  </body>
+</html>
