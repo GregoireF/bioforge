@@ -1,16 +1,7 @@
 ---
 // src/layouts/BaseLayout.astro
 import GlobalScripts from '@/components/ui/Global.astro';
-import { getProfileByUsername, getActiveBlocks } from '@/lib/supabase/queries';
 import "../styles/global.css";
-
-const { username } = Astro.params;
-if (!username) return Astro.redirect('/');
-
-const profileResult = await getProfileByUsername(username);
-if (!profileResult.success) return Astro.redirect('/');
-const profile = profileResult.data;
-
 
 interface Props {
   title:          string;
@@ -41,7 +32,7 @@ const baseUrl           = import.meta.env.PUBLIC_SITE_URL || "https://bioforge.c
 const canonicalUrl      = canonical || new URL(Astro.url.pathname, baseUrl).toString();
 const finalOgImage      = ogImage
   ? (ogImage.startsWith('http') ? ogImage : `${baseUrl}${ogImage}`)
-  : `https://bioforge.click/api/profile/og/${profile.username}.png`;
+  : `${baseUrl}/og.png`;
 
 const defaultJsonLd = {
   "@context": "https://schema.org",
@@ -83,8 +74,7 @@ const finalJsonLd = pageJsonLd || defaultJsonLd;
     <meta property="og:title"       content={title} />
     <meta property="og:description" content={finalDescription} />
     <meta property="og:url"         content={ogUrl || canonicalUrl} />
-    <meta property="og:image"       content=`https://bioforge.click/api/profile/og/${profile.username}.png` />
-    <meta property="og:image:secure_url" content=`https://bioforge.click/api/profile/og/${profile.username}.png` />
+    <meta property="og:image"       content={finalOgImage} />
     <meta property="og:image:width"  content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt"    content={`${title} – BioForge`} />
@@ -97,7 +87,6 @@ const finalJsonLd = pageJsonLd || defaultJsonLd;
     <meta name="twitter:site"        content={twitterHandle} />
     <meta name="twitter:creator"     content={twitterHandle} />
     <meta name="twitter:image"       content={finalOgImage} />
-    <meta property="snapchat:sticker" content=`https://bioforge.click/api/profile/og/${profile.username}.png` />
 
     <!-- ═══════ DISCOVERY ═══════ -->
     <link rel="sitemap" type="application/xml" href="/sitemap-index.xml" />
