@@ -989,45 +989,74 @@ function getSocialIconPath(url?: string): string {
 
     // ── Dropdown 3-dot ───────────────────────────────────────────────────────
     function closeAllDropdowns() {
-      document.querySelectorAll('.dot-dropdown').forEach(d => d.classList.add('hidden'));
-      document.querySelectorAll('.block-dot-wrap').forEach(el => el.classList.remove('z-50'));
+      document
+        .querySelectorAll<HTMLElement>('.dot-dropdown')
+        .forEach(d => d.classList.add('hidden'));
+
+      document
+        .querySelectorAll<HTMLElement>('.block-dot-wrap')
+        .forEach(el => el.classList.remove('z-50'));
     }
+
     document.addEventListener('click', closeAllDropdowns);
     document.addEventListener('scroll', closeAllDropdowns, { passive: true });
 
-    document.querySelectorAll('.block-dot-btn').forEach(btn => {
+    document.querySelectorAll<HTMLElement>('.block-dot-btn').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
-        const dropdown = document.querySelector(`.dot-dropdown[data-id="${btn.dataset.id}"]`);
+
+        const id = btn.dataset.id;
+        if (!id) return;
+
+        const dropdown = document.querySelector<HTMLElement>(`.dot-dropdown[data-id="${id}"]`);
         if (!dropdown) return;
+
         const isOpen = !dropdown.classList.contains('hidden');
+
         closeAllDropdowns();
+
         if (!isOpen) {
           dropdown.classList.remove('hidden');
-          btn.closest('.block-dot-wrap')?.classList.add('z-50');
+          btn.closest<HTMLElement>('.block-dot-wrap')?.classList.add('z-50');
         }
       });
     });
 
-    document.querySelectorAll('.dot-copy-btn').forEach(btn => {
+    document.querySelectorAll<HTMLElement>('.dot-copy-btn').forEach(btn => {
       btn.addEventListener('click', async e => {
         e.stopPropagation();
+
+        const url = btn.dataset.url;
+        if (!url) return;
+
         try {
-          await navigator.clipboard.writeText(btn.dataset.url);
-          const span = btn.querySelector('span') ?? btn;
+          await navigator.clipboard.writeText(url);
+
+          const span = btn.querySelector<HTMLElement>('span') ?? btn;
           const orig = span.textContent;
+
           span.textContent = 'Copié ✓';
-          setTimeout(() => { span.textContent = orig; }, 2000);
+
+          setTimeout(() => {
+            span.textContent = orig;
+          }, 2000);
         } catch {}
+
         closeAllDropdowns();
       });
     });
 
-    document.querySelectorAll('.dot-share-btn').forEach(btn => {
+    document.querySelectorAll<HTMLElement>('.dot-share-btn').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
+
         closeAllDropdowns();
-        openShareModal(btn.dataset.title, btn.dataset.url, btn.dataset.icon);
+
+        openShareModal(
+          btn.dataset.title ?? '',
+          btn.dataset.url ?? '',
+          btn.dataset.icon ?? ''
+        );
       });
     });
 
