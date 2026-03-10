@@ -386,7 +386,6 @@ function getSocialIconPath(url?: string): string {
             // Visibility scheduling — compute data-attr strings for each wrapper
             const showFrom  = block.config?.show_from  ?? null;
             const showUntil = block.config?.show_until ?? null;
-            const visData   = `${showFrom ? ` data-show-from="${escapeHtml(showFrom)}"` : ''}${showUntil ? ` data-show-until="${escapeHtml(showUntil)}"` : ''}`;
 
             // ── HEADING ──
             if (block.type === 'heading') return (
@@ -600,7 +599,7 @@ function getSocialIconPath(url?: string): string {
               const pct       = goalAmt > 0 ? Math.min(100, Math.round((curAmt / goalAmt) * 100)) : 0;
               const hasGoal   = goalAmt > 0;
               const donLabel  = block.title || 'Soutiens-moi';
-              const PLAT_ICONS: Record<string,string> = {
+              const PLAT_ICONS = {
                 kofi: '☕', patreon: '🎁', streamlabs: '🎛️', paypal: '💳', throne: '👑', other: '💸',
               };
               const platIcon = PLAT_ICONS[block.config?.donation_platform ?? ''] ?? '💸';
