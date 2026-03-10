@@ -59,7 +59,7 @@ async function loadFonts() {
   try {
     // URL valide mars 2026 – Inter variable (couvre 400 et 700)
     const fontUrl =
-      'https://fonts.gstatic.com/s/inter/v18/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2';
+      'https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap';
 
     const response = await fetch(fontUrl);
     if (!response.ok) {
