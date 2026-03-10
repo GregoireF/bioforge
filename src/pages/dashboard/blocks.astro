@@ -261,33 +261,44 @@ const BLOCK_TYPES = [
     </div>
   </div>
 
-  <!-- ===== TYPE SELECTION MODAL ===== -->
+  <!-- ===== TYPE SELECTION MODAL — Linktree-style ===== -->
   <div id="type-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
     <div id="type-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
-    <div class="relative glass border border-white/10 rounded-2xl p-6 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto scrollbar-none">
-      <div class="flex items-center justify-between mb-5">
-        <h3 class="text-white font-semibold">Add Block</h3>
-        <button id="type-close" class="text-gray-500 hover:text-white transition-colors">
+    <div class="relative glass border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[88vh] overflow-hidden flex flex-col">
+
+      <!-- Modal header -->
+      <div class="flex items-center justify-between px-5 py-4 border-b border-white/8 shrink-0">
+        <h3 class="text-white font-semibold text-base">Ajouter un block</h3>
+        <button id="type-close" class="text-gray-500 hover:text-white transition-colors p-1">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
           </svg>
         </button>
       </div>
-      <div id="platform-suggestions" class="mb-5">
-        <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-3">Popular platforms</p>
-        <div class="grid grid-cols-4 gap-2" id="platform-grid"></div>
-        <div class="my-4 border-t border-white/10"></div>
+
+      <!-- Search bar -->
+      <div class="px-5 py-3 border-b border-white/8 shrink-0">
+        <div class="relative">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
+          </svg>
+          <input type="text" id="type-search" placeholder="Colle ou recherche un lien, une plateforme…"
+            class="w-full pl-9 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/40 focus:outline-none transition-colors" />
+        </div>
       </div>
-      <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-3">Block types</p>
-      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {BLOCK_TYPES.map(t => (
-          <button class="block-type-btn p-4 glass border border-white/10 rounded-xl hover:border-neon-green/40 hover:bg-white/5 active:scale-[0.97] transition-all text-left"
-            data-type={t.type}>
-            <div class="text-2xl mb-2">{t.emoji}</div>
-            <h4 class="text-white text-sm font-semibold mb-0.5">{t.label}</h4>
-            <p class="text-xs text-gray-500">{t.desc}</p>
-          </button>
-        ))}
+
+      <!-- Body: sidebar + content -->
+      <div class="flex flex-1 min-h-0 overflow-hidden">
+        <!-- Left sidebar -->
+        <nav class="w-40 shrink-0 border-r border-white/8 py-2 overflow-y-auto scrollbar-none bg-black/20">
+          <!-- populated by JS -->
+          <div id="type-nav"></div>
+        </nav>
+
+        <!-- Right panel -->
+        <div class="flex-1 overflow-y-auto scrollbar-none p-4" id="type-panel">
+          <!-- populated by JS -->
+        </div>
       </div>
     </div>
   </div>
@@ -885,6 +896,15 @@ const BLOCK_TYPES = [
       platIconEl.textContent  = quickPlat?.icon  ?? '🔗';
       platLabelEl.textContent = quickPlat?.label ?? 'Link détecté';
       detectZone.classList.remove('hidden'); detectZone.classList.add('flex');
+    } else if (val.length > 1) {
+      // Non-URL text → open type modal with search pre-filled
+      quickInput.value = '';
+      detectZone.classList.add('hidden'); detectZone.classList.remove('flex');
+      openTypeModal();
+      setTimeout(() => {
+        const searchEl = document.getElementById('type-search') as HTMLInputElement;
+        if (searchEl) { searchEl.value = val; searchEl.dispatchEvent(new Event('input')); }
+      }, 50);
     } else {
       detectZone.classList.add('hidden'); detectZone.classList.remove('flex');
     }
@@ -920,28 +940,232 @@ const BLOCK_TYPES = [
   document.getElementById('edit-close')?.addEventListener('click',    () => closeModal('edit-modal'));
   document.getElementById('cancel-btn')?.addEventListener('click',    () => closeModal('edit-modal'));
 
-  function openTypeModal() {
-    if (!canAddBlock) { toast.error('Block limit reached. Upgrade!'); return; }
-    const grid = document.getElementById('platform-grid')!;
-    grid.innerHTML = PLATFORMS.slice(0, 8).map(p => `
-      <button class="plat-btn flex flex-col items-center gap-1.5 p-2.5 glass border border-white/10 rounded-xl hover:border-neon-green/30 hover:bg-white/5 transition-all group" data-pid="${p.id}">
-        <span class="text-xl leading-none">${p.icon}</span>
-        <span class="text-xs text-gray-400 group-hover:text-white transition-colors truncate w-full text-center">${p.label}</span>
+  // ── Type modal — categorized (Linktree-style) ────────────────────────────
+  const TYPE_CATEGORIES = [
+    {
+      id: 'suggested',
+      label: '⭐ Suggéré',
+      items: [
+        { kind: 'platform', id: 'twitch' },
+        { kind: 'platform', id: 'youtube' },
+        { kind: 'platform', id: 'tiktok' },
+        { kind: 'platform', id: 'instagram' },
+        { kind: 'platform', id: 'discord' },
+        { kind: 'platform', id: 'kick' },
+        { kind: 'block',    type: 'countdown', emoji: '⏱️', label: 'Countdown',    desc: 'Timer live vers ton prochain stream' },
+        { kind: 'block',    type: 'donation',  emoji: '💸', label: 'Donation',     desc: 'Ko-fi, Patreon, Streamlabs…' },
+      ],
+    },
+    {
+      id: 'stream',
+      label: '🎮 Stream',
+      items: [
+        { kind: 'platform', id: 'twitch' },
+        { kind: 'platform', id: 'youtube' },
+        { kind: 'platform', id: 'kick' },
+        { kind: 'block',    type: 'countdown', emoji: '⏱️', label: 'Countdown',   desc: 'Timer vers le prochain stream' },
+        { kind: 'block',    type: 'schedule',  emoji: '📅', label: 'Planning',     desc: 'Jours et horaires de stream' },
+        { kind: 'platform', id: 'streamlabs' },
+        { kind: 'platform', id: 'streamelements' },
+      ],
+    },
+    {
+      id: 'social',
+      label: '👥 Social',
+      items: [
+        { kind: 'platform', id: 'twitter' },
+        { kind: 'platform', id: 'instagram' },
+        { kind: 'platform', id: 'tiktok' },
+        { kind: 'platform', id: 'discord' },
+        { kind: 'platform', id: 'facebook' },
+        { kind: 'platform', id: 'snapchat' },
+        { kind: 'platform', id: 'linkedin' },
+        { kind: 'block',    type: 'social',    emoji: '👥', label: 'Icônes sociales', desc: 'Grille d\'icônes de tous tes réseaux' },
+      ],
+    },
+    {
+      id: 'money',
+      label: '💰 Gagner',
+      items: [
+        { kind: 'platform', id: 'kofi' },
+        { kind: 'platform', id: 'patreon' },
+        { kind: 'platform', id: 'throne' },
+        { kind: 'platform', id: 'streamlabs' },
+        { kind: 'block',    type: 'donation',  emoji: '💸', label: 'Donation CTA', desc: 'Bouton don avec barre de progression' },
+      ],
+    },
+    {
+      id: 'media',
+      label: '🎵 Médias',
+      items: [
+        { kind: 'platform', id: 'spotify' },
+        { kind: 'block',    type: 'embed',  emoji: '🎵', label: 'Music Embed',  desc: 'Spotify, SoundCloud, Apple Music' },
+        { kind: 'block',    type: 'video',  emoji: '🎥', label: 'Vidéo',        desc: 'YouTube, Vimeo, TikTok' },
+        { kind: 'block',    type: 'image',  emoji: '🖼️', label: 'Image',        desc: 'Afficher une image' },
+      ],
+    },
+    {
+      id: 'links',
+      label: '🔗 Liens',
+      items: [
+        { kind: 'platform', id: 'github' },
+        { kind: 'block',    type: 'link',    emoji: '🔗', label: 'Lien',         desc: 'Bouton lien cliquable' },
+        { kind: 'block',    type: 'heading', emoji: '📝', label: 'Titre',         desc: 'Séparateur titre de section' },
+        { kind: 'block',    type: 'spacer',  emoji: '—',  label: 'Spacer',        desc: 'Espace blanc' },
+      ],
+    },
+    {
+      id: 'all',
+      label: '··· Voir tout',
+      items: [
+        ...PLATFORMS.map(p => ({ kind: 'platform' as const, id: p.id })),
+        { kind: 'block' as const, type: 'link',      emoji: '🔗', label: 'Lien',          desc: 'Bouton lien cliquable' },
+        { kind: 'block' as const, type: 'social',    emoji: '👥', label: 'Icônes sociales',desc: 'Grille d\'icônes' },
+        { kind: 'block' as const, type: 'countdown', emoji: '⏱️', label: 'Countdown',      desc: 'Timer stream' },
+        { kind: 'block' as const, type: 'schedule',  emoji: '📅', label: 'Planning',        desc: 'Jours et horaires' },
+        { kind: 'block' as const, type: 'donation',  emoji: '💸', label: 'Donation',        desc: 'CTA don' },
+        { kind: 'block' as const, type: 'embed',     emoji: '🎵', label: 'Music Embed',     desc: 'Spotify / SoundCloud' },
+        { kind: 'block' as const, type: 'video',     emoji: '🎥', label: 'Vidéo',           desc: 'YouTube / Vimeo' },
+        { kind: 'block' as const, type: 'image',     emoji: '🖼️', label: 'Image',           desc: 'Image' },
+        { kind: 'block' as const, type: 'heading',   emoji: '📝', label: 'Titre',           desc: 'Section title' },
+        { kind: 'block' as const, type: 'spacer',    emoji: '—',  label: 'Spacer',          desc: 'Espace' },
+      ],
+    },
+  ];
+
+  let activeCatId  = 'suggested';
+  let typeSearch   = '';
+
+  function renderTypeModal() {
+    const nav   = document.getElementById('type-nav')!;
+    const panel = document.getElementById('type-panel')!;
+
+    // Sidebar nav
+    nav.innerHTML = TYPE_CATEGORIES.map(cat => `
+      <button class="type-nav-btn w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium transition-all text-left rounded-lg mx-1 my-0.5
+        ${cat.id === activeCatId ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white hover:bg-white/5'}"
+        data-cat="${cat.id}" style="width: calc(100% - 8px);">
+        ${cat.label}
       </button>`).join('');
-    grid.querySelectorAll('.plat-btn').forEach(btn => {
+    nav.querySelectorAll('.type-nav-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        const plat = PLATFORMS.find(p => p.id === (btn as HTMLElement).dataset.pid)!;
-        closeModal('type-modal'); openEditModal('link', null, plat);
+        activeCatId = (btn as HTMLElement).dataset.cat!;
+        typeSearch  = '';
+        const inp = document.getElementById('type-search') as HTMLInputElement;
+        if (inp) inp.value = '';
+        renderTypeModal();
       });
     });
-    openModal('type-modal');
+
+    // Panel content
+    const cat = TYPE_CATEGORIES.find(c => c.id === activeCatId)!;
+    let items = cat.items;
+
+    // Search filter
+    if (typeSearch) {
+      const q = typeSearch.toLowerCase();
+      items = TYPE_CATEGORIES.flatMap(c => c.items).filter(item => {
+        if (item.kind === 'platform') {
+          const p = PLATFORMS.find(p => p.id === item.id);
+          return p?.label.toLowerCase().includes(q) || p?.id.includes(q);
+        }
+        return (item as any).label?.toLowerCase().includes(q) || (item as any).type?.includes(q);
+      });
+      // Deduplicate
+      const seen = new Set<string>();
+      items = items.filter(item => {
+        const key = item.kind === 'platform' ? `plat:${item.id}` : `block:${(item as any).type}`;
+        if (seen.has(key)) return false;
+        seen.add(key); return true;
+      });
+    }
+
+    if (!items.length) {
+      panel.innerHTML = `<div class="flex flex-col items-center justify-center py-12 text-center"><p class="text-sm text-gray-500">Aucun résultat pour "${typeSearch}"</p></div>`;
+      return;
+    }
+
+    // Group into platforms vs blocks
+    const platforms = items.filter(i => i.kind === 'platform');
+    const blockItems = items.filter(i => i.kind === 'block');
+
+    let html = '';
+
+    if (platforms.length) {
+      html += `<div class="mb-5">
+        <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-3 px-1">Plateformes</p>
+        <div class="space-y-1.5">`;
+      platforms.forEach(item => {
+        const p = PLATFORMS.find(pl => pl.id === item.id);
+        if (!p) return;
+        html += `
+          <button class="type-plat-row w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+            hover:bg-white/6 active:bg-white/10 transition-all group text-left" data-pid="${p.id}">
+            <div class="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-lg bg-white/5 border border-white/10 group-hover:border-white/20 transition-colors">${p.icon}</div>
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-semibold text-white">${p.label}</p>
+              <p class="text-xs text-gray-500 truncate">${p.match[0]}</p>
+            </div>
+            <svg class="w-4 h-4 text-gray-600 group-hover:text-neon-green transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </button>`;
+      });
+      html += `</div></div>`;
+    }
+
+    if (blockItems.length) {
+      html += `<div>
+        <p class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-3 px-1">Types de block</p>
+        <div class="grid grid-cols-2 gap-2">`;
+      blockItems.forEach((item: any) => {
+        html += `
+          <button class="type-block-card p-3.5 glass border border-white/10 rounded-xl hover:border-neon-green/40 hover:bg-white/5 active:scale-[0.97] transition-all text-left group"
+            data-type="${item.type}">
+            <div class="text-xl mb-2 leading-none">${item.emoji}</div>
+            <p class="text-white text-sm font-semibold mb-0.5 group-hover:text-neon-green transition-colors">${item.label}</p>
+            <p class="text-xs text-gray-500 leading-tight">${item.desc}</p>
+          </button>`;
+      });
+      html += `</div></div>`;
+    }
+
+    panel.innerHTML = html;
+
+    // Attach listeners
+    panel.querySelectorAll('.type-plat-row').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const plat = PLATFORMS.find(p => p.id === (btn as HTMLElement).dataset.pid)!;
+        closeModal('type-modal');
+        openEditModal('link', null, plat);
+      });
+    });
+    panel.querySelectorAll('.type-block-card').forEach(btn => {
+      btn.addEventListener('click', () => {
+        closeModal('type-modal');
+        openEditModal((btn as HTMLElement).dataset.type!, null, null);
+      });
+    });
   }
+
+  function openTypeModal() {
+    if (!canAddBlock) { toast.error('Block limit reached. Upgrade!'); return; }
+    activeCatId = 'suggested';
+    typeSearch  = '';
+    openModal('type-modal');
+    renderTypeModal();
+    setTimeout(() => (document.getElementById('type-search') as HTMLInputElement)?.focus(), 80);
+  }
+
+  // Type search handler
+  document.getElementById('type-search')?.addEventListener('input', (e: any) => {
+    typeSearch  = e.target.value.trim();
+    if (typeSearch) activeCatId = 'all';
+    renderTypeModal();
+  });
 
   document.getElementById('add-block-btn')?.addEventListener('click', openTypeModal);
   document.getElementById('empty-add-btn')?.addEventListener('click', openTypeModal);
-  document.querySelectorAll('.block-type-btn').forEach(btn => {
-    btn.addEventListener('click', () => { closeModal('type-modal'); openEditModal((btn as HTMLElement).dataset.type!, null, null); });
-  });
 
   // ── Form ──────────────────────────────────────────────────────────────────
   const IC = 'w-full px-4 py-3 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none focus:ring-1 focus:ring-neon-green/20 transition-colors';
