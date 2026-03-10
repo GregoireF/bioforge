@@ -1112,58 +1112,22 @@ ${blurOverlay}
     if (genBtn) genBtn.disabled = true;
 
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      // ── Appel serveur → Groq via /api/ai/theme ──────────────────────────
+      const response = await fetch('/api/ai/theme', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 600,
-          messages: [{
-            role: 'user',
-            content: `Tu es un designer expert en identité visuelle pour pages de liens (style Linktree).
-Génère un thème complet pour ce profil: "${prompt}"
-
-Réponds UNIQUEMENT avec un JSON valide (aucun texte avant/après), format exact:
-{
-  "background_color": "#xxxxxx",
-  "primary_color": "#xxxxxx",
-  "text_color": "#xxxxxx",
-  "gradient_color_2": "#xxxxxx",
-  "background_style": "solid|gradient|blur",
-  "gradient_type": "linear|radial",
-  "gradient_angle": 0-360,
-  "pattern": "none|dots|grid|waves|noise|mesh",
-  "button_style": "filled|outline|glass|gradient|neon|minimal",
-  "border_radius": 0-32,
-  "font_family": "Exo 2|Orbitron|Rajdhani|Bebas Neue|Audiowide|Russo One|Quicksand|Figtree",
-  "animation_preset": "none|fade|slide|bounce|stagger",
-  "avatar_shape": "circle|square|hex|ring",
-  "reasoning": "Explication courte en français (max 80 mots) de tes choix de design"
-}`
-          }]
-        })
+        body: JSON.stringify({ prompt })
       });
 
-      const data = await response.json();
-      const raw  = data.content?.[0]?.text ?? '';
-      const clean = raw.replace(/```json|```/g, '').trim();
-      const parsed = JSON.parse(clean);
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${response.status}`);
+      }
 
-      aiSuggestedTheme = {
-        background_color:  /^#[0-9A-Fa-f]{6}$/.test(parsed.background_color)  ? parsed.background_color  : '#0a0a0a',
-        primary_color:     /^#[0-9A-Fa-f]{6}$/.test(parsed.primary_color)     ? parsed.primary_color     : '#00ff9d',
-        text_color:        /^#[0-9A-Fa-f]{6}$/.test(parsed.text_color)        ? parsed.text_color        : '#ffffff',
-        gradient_color_2:  /^#[0-9A-Fa-f]{6}$/.test(parsed.gradient_color_2)  ? parsed.gradient_color_2  : '#1a1a2e',
-        background_style:  ['solid','gradient','blur'].includes(parsed.background_style) ? parsed.background_style : 'solid',
-        gradient_type:     ['linear','radial'].includes(parsed.gradient_type)  ? parsed.gradient_type     : 'linear',
-        gradient_angle:    Number.isFinite(+parsed.gradient_angle)             ? +parsed.gradient_angle   : 135,
-        pattern:           ['none','dots','grid','waves','noise','mesh'].includes(parsed.pattern) ? parsed.pattern : 'none',
-        button_style:      ['filled','outline','glass','gradient','neon','minimal'].includes(parsed.button_style) ? parsed.button_style : 'filled',
-        border_radius:     Number.isFinite(+parsed.border_radius)              ? Math.min(Math.max(+parsed.border_radius,0),32) : 14,
-        font_family:       ['Exo 2','Orbitron','Rajdhani','Bebas Neue','Audiowide','Russo One','Quicksand','Figtree'].includes(parsed.font_family) ? parsed.font_family : 'Exo 2',
-        animation_preset:  ['none','fade','slide','bounce','stagger'].includes(parsed.animation_preset) ? parsed.animation_preset : 'fade',
-        avatar_shape:      ['circle','square','hex','ring'].includes(parsed.avatar_shape) ? parsed.avatar_shape : 'circle',
-      };
+      const data = await response.json();
+      if (!data.theme) throw new Error('Réponse invalide du serveur');
+
+      aiSuggestedTheme = data.theme;
 
       // Show palette
       const paletteEl = document.getElementById('ai-palette');
@@ -1178,7 +1142,7 @@ Réponds UNIQUEMENT avec un JSON valide (aucun texte avant/après), format exact
       }
 
       const reasonEl = document.getElementById('ai-reasoning');
-      if (reasonEl) reasonEl.textContent = parsed.reasoning ?? '';
+      if (reasonEl) reasonEl.textContent = data.theme.reasoning ?? '';
 
       thinkingEl?.classList.add('hidden');
       resultEl?.classList.remove('hidden');
