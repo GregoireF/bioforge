@@ -50,22 +50,27 @@ function withAlpha(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-// ── Fonts (Inter – cached globally) ─────────────────────────────────────────
-let interRegular: ArrayBuffer | null = null;
-let interBold: ArrayBuffer | null = null;
+// ── Fonts (Inter variable font – cached globally) ───────────────────────────
+let interFont: ArrayBuffer | null = null;
 
 async function loadFonts() {
-  if (interRegular && interBold) return;
+  if (interFont) return;
 
-  const [reg, bold] = await Promise.all([
-    fetch('https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfAZJhiI2B.woff')
-      .then(r => r.arrayBuffer()),
-    fetch('https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuFuYAZJhiI2B.woff')
-      .then(r => r.arrayBuffer()),
-  ]);
+  try {
+    // URL valide mars 2026 – Inter variable (couvre 400 et 700)
+    const fontUrl =
+      'https://fonts.gstatic.com/s/inter/v18/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2';
 
-  interRegular = reg;
-  interBold = bold;
+    const response = await fetch(fontUrl);
+    if (!response.ok) {
+      throw new Error(`Font fetch failed: ${response.status} ${response.statusText}`);
+    }
+
+    interFont = await response.arrayBuffer();
+  } catch (err) {
+    console.error('[OG] Font loading failed:', err);
+    // On continue sans police custom → fallback système
+  }
 }
 
 // ── Avatar → base64 ─────────────────────────────────────────────────────────
@@ -91,7 +96,7 @@ export const GET: APIRoute = async ({ params }) => {
   }
 
   try {
-    // 1. Récupération profil
+    // 1. Profil
     const supabase = getSupabase();
     const { data: profile, error } = await supabase
       .from('profiles')
@@ -103,7 +108,7 @@ export const GET: APIRoute = async ({ params }) => {
       return ogFallback(username);
     }
 
-    // 2. Parsing thème
+    // 2. Thème
     let bgColor = '#0a0a0a';
     let primary = '#00ff9d';
     let textColor = '#ffffff';
@@ -121,19 +126,12 @@ export const GET: APIRoute = async ({ params }) => {
       grad2 = sanitizeHex(raw.gradient_color_2, grad2);
       bgStyle = ['solid', 'gradient'].includes(raw.background_style) ? raw.background_style : 'solid';
       gradAngle = parseInt(raw.gradient_angle, 10) || 135;
-    } catch {
-      // defaults déjà définis
-    }
+    } catch {}
 
-    // 3. Chargement assets en parallèle
+    // 3. Assets
     const avatarPromise = profile.avatar_url ? fetchAvatarBase64(profile.avatar_url) : Promise.resolve(null);
     await Promise.all([loadFonts(), avatarPromise]);
     const avatarB64 = await avatarPromise;
-
-    // Sécurité fonts
-    if (!interRegular || !interBold) {
-      throw new Error('Fonts failed to load');
-    }
 
     // 4. Valeurs calculées
     const name = truncate(profile.display_name || `@${profile.username}`, 28);
@@ -149,7 +147,7 @@ export const GET: APIRoute = async ({ params }) => {
       .charAt(0)
       .toUpperCase();
 
-    // 5. Arbre Satori
+    // 5. Satori
     const svg = await satori(
       {
         type: 'div',
@@ -160,14 +158,14 @@ export const GET: APIRoute = async ({ params }) => {
             display: 'flex',
             position: 'relative',
             overflow: 'hidden',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'Inter, system-ui, sans-serif',
             background: bgStyle === 'gradient'
               ? `linear-gradient(${gradAngle}deg, ${bgColor}, ${grad2})`
               : bgColor,
           },
           children: [
 
-            // Glow haut-gauche
+            // Glows, barre, contenu principal... (inchangé)
             {
               type: 'div',
               props: {
@@ -183,8 +181,6 @@ export const GET: APIRoute = async ({ params }) => {
                 },
               },
             },
-
-            // Glow bas-droite
             {
               type: 'div',
               props: {
@@ -200,8 +196,6 @@ export const GET: APIRoute = async ({ params }) => {
                 },
               },
             },
-
-            // Barre latérale gauche
             {
               type: 'div',
               props: {
@@ -215,8 +209,6 @@ export const GET: APIRoute = async ({ params }) => {
                 },
               },
             },
-
-            // Contenu principal
             {
               type: 'div',
               props: {
@@ -230,8 +222,7 @@ export const GET: APIRoute = async ({ params }) => {
                   gap: '64px',
                 },
                 children: [
-
-                  // ── LEFT: Profile info ────────────────────────────────────
+                  // LEFT - infos
                   {
                     type: 'div',
                     props: {
@@ -242,8 +233,6 @@ export const GET: APIRoute = async ({ params }) => {
                         gap: '0px',
                       },
                       children: [
-
-                        // Name row (name + verified badge)
                         {
                           type: 'div',
                           props: {
@@ -298,8 +287,6 @@ export const GET: APIRoute = async ({ params }) => {
                             ],
                           },
                         },
-
-                        // Handle
                         {
                           type: 'div',
                           props: {
@@ -313,8 +300,6 @@ export const GET: APIRoute = async ({ params }) => {
                             children: handle,
                           },
                         },
-
-                        // Bio
                         ...(bio ? [{
                           type: 'div',
                           props: {
@@ -328,11 +313,7 @@ export const GET: APIRoute = async ({ params }) => {
                             children: bio,
                           },
                         }] : []),
-
-                        // Spacer
                         { type: 'div', props: { style: { flex: '1' } } },
-
-                        // URL pill
                         {
                           type: 'div',
                           props: {
@@ -377,7 +358,7 @@ export const GET: APIRoute = async ({ params }) => {
                     },
                   },
 
-                  // ── RIGHT: Avatar ─────────────────────────────────────────
+                  // RIGHT - avatar + logo
                   {
                     type: 'div',
                     props: {
@@ -390,7 +371,6 @@ export const GET: APIRoute = async ({ params }) => {
                         flexShrink: '0',
                       },
                       children: [
-                        // Avatar circle with glow ring
                         {
                           type: 'div',
                           props: {
@@ -431,8 +411,6 @@ export const GET: APIRoute = async ({ params }) => {
                                 },
                           },
                         },
-
-                        // BioForge logo wordmark
                         {
                           type: 'div',
                           props: {
@@ -481,14 +459,13 @@ export const GET: APIRoute = async ({ params }) => {
       {
         width: 1200,
         height: 630,
-        fonts: [
-          { name: 'Inter', data: interRegular, weight: 400, style: 'normal' },
-          { name: 'Inter', data: interBold, weight: 700, style: 'normal' },
-        ],
+        fonts: interFont
+          ? [{ name: 'Inter', data: interFont, weight: 400, style: 'normal' }]
+          : [],
       }
     );
 
-    // 6. SVG → PNG
+    // 6. PNG
     const resvg = new Resvg(svg, {
       fitTo: { mode: 'width', value: 1200 },
       shapeRendering: 2,
@@ -496,7 +473,7 @@ export const GET: APIRoute = async ({ params }) => {
       imageRendering: 0,
     });
 
-    const pngData = resvg.render().asPng(); // Uint8Array
+    const pngData = resvg.render().asPng();
 
     return new Response(pngData, {
       status: 200,
@@ -512,14 +489,10 @@ export const GET: APIRoute = async ({ params }) => {
   }
 };
 
-// ── Fallback simple ─────────────────────────────────────────────────────────
+// ── Fallback ────────────────────────────────────────────────────────────────
 async function ogFallback(username: string): Promise<Response> {
   try {
     await loadFonts();
-
-    if (!interRegular || !interBold) {
-      throw new Error('Fonts missing in fallback');
-    }
 
     const svg = await satori(
       {
@@ -533,7 +506,7 @@ async function ogFallback(username: string): Promise<Response> {
             justifyContent: 'center',
             flexDirection: 'column',
             background: '#0a0a0a',
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: 'system-ui, sans-serif',
             gap: '20px',
           },
           children: [
@@ -541,23 +514,21 @@ async function ogFallback(username: string): Promise<Response> {
               type: 'div',
               props: {
                 style: {
-                  fontSize: '28px',
-                  fontWeight: '700',
+                  fontSize: '48px',
+                  fontWeight: 'bold',
                   color: '#00ff9d',
-                  letterSpacing: '1px',
                 },
-                children: '⚡ BioForge',
+                children: 'BioForge',
               },
             },
             {
               type: 'div',
               props: {
                 style: {
-                  fontSize: '20px',
-                  fontWeight: '400',
-                  color: 'rgba(255,255,255,0.4)',
+                  fontSize: '28px',
+                  color: 'rgba(255,255,255,0.6)',
                 },
-                children: username ? `@${username}` : 'bioforge.click',
+                children: username ? `@${username}` : 'profil introuvable',
               },
             },
           ],
@@ -566,15 +537,14 @@ async function ogFallback(username: string): Promise<Response> {
       {
         width: 1200,
         height: 630,
-        fonts: [
-          { name: 'Inter', data: interRegular, weight: 400, style: 'normal' },
-          { name: 'Inter', data: interBold, weight: 700, style: 'normal' },
-        ],
+        fonts: interFont
+          ? [{ name: 'Inter', data: interFont, weight: 400, style: 'normal' }]
+          : [],
       }
     );
 
     const resvg = new Resvg(svg);
-    const pngData = resvg.render().asPng(); // Uint8Array
+    const pngData = resvg.render().asPng();
 
     return new Response(pngData, {
       status: 200,
@@ -583,17 +553,16 @@ async function ogFallback(username: string): Promise<Response> {
         'Cache-Control': 'public, max-age=300, s-maxage=300',
       },
     });
-  } catch {
-    // 1×1 transparent PNG en Uint8Array
-    const tinyPng = new Uint8Array(
+  } catch (err) {
+    console.error('[OG fallback error]', err);
+    const tiny = new Uint8Array(
       atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==')
         .split('')
         .map(c => c.charCodeAt(0))
     );
-
-    return new Response(tinyPng, {
+    return new Response(tiny, {
       status: 200,
-      headers: { 'Content-Type': 'image/png', 'Cache-Control': 'no-cache' },
+      headers: { 'Content-Type': 'image/png' },
     });
   }
 }
