@@ -1,5 +1,5 @@
 ---
-import BaseLayout from '@/layouts/BaseLayout.astro';
+import ProfileLayout from '@/layouts/ProfileLayout.astro';
 import { getProfileByUsername, getActiveBlocks } from '@/lib/supabase/queries';
 import QRCode from 'qrcode';
 import CookieBanner from '@/components/ui/CookieBanner.astro';
@@ -264,7 +264,7 @@ const BADGE_COLORS: Record<string, string> = {
 };
 ---
 
-<BaseLayout title={pageTitle}>
+<ProfileLayout title={pageTitle}>
 
   <!-- ===== SEO HEAD ===== -->
   <meta name="description" content={pageDesc} slot="head" />
@@ -570,7 +570,13 @@ const BADGE_COLORS: Record<string, string> = {
 
             // ── SCHEDULE ──
             if (block.type === 'schedule') {
-              const schedule: any[] = Array.isArray(block.config?.schedule) ? block.config.schedule : [];
+              const rawSched: any[] = Array.isArray(block.config?.schedule) ? block.config.schedule : [];
+              if (!rawSched.length) return null;
+              // Normalize: old format {day,time} → new format {day,slots:[]}
+              const schedule = rawSched.map((s: any) => ({
+                day:   s.day,
+                slots: Array.isArray(s.slots) && s.slots.length ? s.slots : [s.time ?? ''],
+              })).filter((s: any) => s.day && s.slots.some((t: string) => t));
               if (!schedule.length) return null;
               return (
                 <div class={`${animClass}`} style={`${delay} border: 1px solid ${pc}25; border-radius: ${br}px; overflow: hidden; ${theme.block_shadow ? `box-shadow: 0 6px 20px rgba(0,0,0,0.25);` : ''}`}
@@ -585,9 +591,13 @@ const BADGE_COLORS: Record<string, string> = {
                   )}
                   <div style={`background: ${pc}08; padding: 4px 0;`}>
                     {schedule.map((item: any) => (
-                      <div style={`display: flex; align-items: center; justify-content: space-between; padding: 9px 16px; border-bottom: 1px solid ${tc}08;`}>
-                        <span style={`color: ${tc}; font-size: 14px; font-weight: 600;`}>{item.day}</span>
-                        <span style={`color: ${pc}; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums;`}>{item.time}</span>
+                      <div style={`display: flex; align-items: flex-start; justify-content: space-between; padding: 9px 16px; border-bottom: 1px solid ${tc}08; gap: 12px;`}>
+                        <span style={`color: ${tc}; font-size: 14px; font-weight: 600; flex-shrink: 0;`}>{item.day}</span>
+                        <div style="display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end;">
+                          {item.slots.filter((t: string) => t).map((slot: string) => (
+                            <span style={`color: ${pc}; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; background: ${pc}15; border: 1px solid ${pc}30; border-radius: 6px; padding: 2px 8px;`}>{slot}</span>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -771,7 +781,7 @@ const BADGE_COLORS: Record<string, string> = {
                   data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
                   <div style={`background: ${pc}10; border-bottom: 1px solid ${pc}20; padding: 12px 16px;`}>
                     <p style={`color: ${tc}; font-size: 15px; font-weight: 700;`}>{question}</p>
-                    <p style={`color: ${tc}; opacity: 0.45; font-size: 11px; margin-top: 2px;`}>{totalVotes} vote{totalVotes !== 1 ? 's' : ''}</p>
+                    <p class="poll-total" style={`color: ${tc}; opacity: 0.45; font-size: 11px; margin-top: 2px;`}>{totalVotes} vote{totalVotes !== 1 ? 's' : ''}</p>
                   </div>
                   <div class="poll-options" style={`padding: 10px 12px; background: ${pc}06; display: flex; flex-direction: column; gap: 8px;`}>
                     {options.map((opt: any, i: number) => {
@@ -1441,25 +1451,32 @@ const BADGE_COLORS: Record<string, string> = {
       try { voted = JSON.parse(localStorage.getItem(votedKey) || '[]'); } catch {}
       const hasVoted     = voted.length > 0;
 
-      function renderPollBars() {
-        const total = options.reduce((s, o) => s + (o.votes || 0), 0);
+      function getTotalVotes() {
+        return options.reduce((s, o) => s + (o.votes || 0), 0);
+      }
+
+      function renderPollBars(highlightIndex = -1) {
+        const total = getTotalVotes();
+        // Update counter
+        const counterEl = pollEl.querySelector('.poll-total');
+        if (counterEl) counterEl.textContent = `${total} vote${total !== 1 ? 's' : ''}`;
+
         pollEl.querySelectorAll('.poll-opt-btn').forEach((btn, i) => {
           const opt = options[i];
-          const pct = total > 0 ? Math.round((opt.votes / total) * 100) : 0;
-          const bar = btn.querySelector('.poll-bar');
+          const pct = total > 0 ? Math.round(((opt.votes || 0) / total) * 100) : 0;
+          const bar   = btn.querySelector('.poll-bar');
           const pctEl = btn.querySelector('.poll-pct');
-          if (bar)   bar.style.width = `${pct}%`;
+          if (bar)   { bar.style.width = `${pct}%`; bar.style.transition = 'width 0.6s ease'; }
           if (pctEl) pctEl.textContent = `${pct}%`;
           if (voted.includes(i)) {
             btn.style.borderColor = 'rgba(0,255,157,0.5)';
             btn.style.background  = 'rgba(0,255,157,0.08)';
           }
+          if (i === highlightIndex) {
+            btn.style.transform = 'scale(1.01)';
+            setTimeout(() => { btn.style.transform = ''; }, 300);
+          }
         });
-        // Update total
-        const totalEl = pollEl.querySelector('p:last-child');
-        if (totalEl && totalEl.textContent.includes('vote')) {
-          totalEl.textContent = `${total} vote${total !== 1 ? 's' : ''}`;
-        }
       }
 
       if (hasVoted) {
@@ -1472,24 +1489,32 @@ const BADGE_COLORS: Record<string, string> = {
           if (!allowMulti && hasVoted) return;
           if (voted.includes(i)) return;
 
+          // Optimistic update
           voted.push(i);
           options[i].votes = (options[i].votes || 0) + 1;
-
           try { localStorage.setItem(votedKey, JSON.stringify(voted)); } catch {}
 
           if (!allowMulti) {
             pollEl.querySelectorAll('.poll-opt-btn').forEach(b => { b.classList.add('voted'); b.style.cursor = 'default'; });
           }
+          renderPollBars(i);
 
-          renderPollBars();
-
-          // Persist vote to API (best-effort)
+          // Persist vote to API + sync real counts from DB
           if (blockId) {
-            fetch(`/api/blocks/${blockId}/vote`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ option_index: i }),
-            }).catch(() => {});
+            try {
+              const res  = await fetch(`/api/blocks/${blockId}/vote`, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ option_index: i }),
+              });
+              if (res.ok) {
+                const json = await res.json();
+                if (json.success && Array.isArray(json.data?.options)) {
+                  options = json.data.options; // sync real counts from DB
+                  renderPollBars();
+                }
+              }
+            } catch {}
           }
         });
       });
@@ -1551,3 +1576,4 @@ const BADGE_COLORS: Record<string, string> = {
     });
 
   </script>
+</ProfileLayout>
