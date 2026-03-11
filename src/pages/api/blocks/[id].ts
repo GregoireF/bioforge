@@ -11,12 +11,23 @@ const supabaseServer = createClient(
   import.meta.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+// ── Enum central — en sync avec index.ts, blocks.astro, [username].astro ──
+const BLOCK_TYPES = [
+  'link', 'heading', 'spacer', 'image', 'video', 'social',
+  'countdown', 'schedule', 'donation', 'embed',
+  'text', 'banner', 'product', 'poll', 'twitch_live',
+  'newsletter', 'vcard', 'merch_grid',
+] as const
+
 // ---------------- VALIDATION ----------------
 const updateBlockSchema = z.object({
-  type:   z.enum(['link', 'heading', 'spacer', 'image', 'video', 'social']).optional(),
-  title:  z.string().min(1).max(100).optional(),
-  config: z.record(z.string(), z.unknown()).optional(),
-  active: z.boolean().optional(),
+  type:      z.enum(BLOCK_TYPES).optional(),
+  // FIX : .min(1) retiré — les titres vides ("") et null sont valides (spacer, twitch_live…)
+  title:     z.string().max(100).nullable().optional(),
+  config:    z.record(z.string(), z.unknown()).optional(),
+  active:    z.boolean().optional(),
+  is_pinned: z.boolean().optional(),
+  position:  z.number().int().min(0).optional(),
 }).strip();
 
 // ---------------- GET ----------------
@@ -55,7 +66,10 @@ export const PUT: APIRoute = async (context) => {
   const { id } = context.params;
   if (!id) return error('Missing block ID', 400);
 
-  const body   = await context.request.json();
+  let body: unknown;
+  try { body = await context.request.json(); }
+  catch { return error('Invalid JSON', 400); }
+
   const parsed = updateBlockSchema.safeParse(body);
   if (!parsed.success)                       return error('Validation failed', 400, parsed.error.flatten());
   if (Object.keys(parsed.data).length === 0) return error('Empty update', 400);
@@ -74,9 +88,7 @@ export const PUT: APIRoute = async (context) => {
   return success(data);
 };
 
-// ---------------- DELETE (hard delete) ----------------
-// Remplace le soft delete (deleted_at) qui causait des erreurs côté front.
-// Le service role key bypass RLS — le guard profile_id suffit.
+// ---------------- DELETE ----------------
 export const DELETE: APIRoute = async (context) => {
   const authResult = await withAuth(context);
   if (!authResult.success || !authResult.data)
