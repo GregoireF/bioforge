@@ -18,7 +18,7 @@ BioForge is a premium link-in-bio platform specifically designed for streamers a
 - **Frontend**: [Astro](https://astro.build) (SSR) + TypeScript + TailwindCSS
 - **Backend**: [Supabase](https://supabase.com) (PostgreSQL + Auth + Storage)
 - **Deployment**: [Vercel](https://vercel.com) (recommended)
-- **Package Manager**: pnpm
+- **Package Manager**: bun
 
 ## 📋 Prerequisites
 
