@@ -383,8 +383,7 @@ function getSocialIconPath(url?: string): string {
             const delay = `animation-delay: ${Math.min(index * 80, 500)}ms;`;
             const animClass = theme.animations ? 'anim-block' : '';
 
-            // Visibility scheduling — compute data-attr strings for each wrapper
-            const showFrom  = block.config?.show_from  ?? null;
+            const showFrom = block.config?.show_from ?? null;
             const showUntil = block.config?.show_until ?? null;
 
             // ── HEADING ──
@@ -404,8 +403,7 @@ function getSocialIconPath(url?: string): string {
               const hasIcon = Boolean(iconUrl);
 
               return (
-                <div class={`block-dot-wrap group relative ${animClass}`} style={delay}
-                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
+                <div class={`block-dot-wrap group relative ${animClass}`} style={delay} data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
                   {/* Link button — icon absolute left, text always truly centered */}
                   <a href={url} target="_blank" rel="noopener noreferrer"
                     data-block-id={block.id}
@@ -494,8 +492,7 @@ function getSocialIconPath(url?: string): string {
               }
               return (
                 <div class={`relative w-full overflow-hidden ${animClass}`}
-                  style={`padding-bottom: 56.25%; border-radius: ${br}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''} ${delay}`}
-                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
+                  style={`padding-bottom: 56.25%; border-radius: ${br}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''} ${delay}`} data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
                   <iframe src={embedUrl} class="absolute inset-0 w-full h-full" frameborder="0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowfullscreen style={`border-radius: ${br}px;`}></iframe>
@@ -508,9 +505,7 @@ function getSocialIconPath(url?: string): string {
               const links = Array.isArray(block.config?.links) ? block.config.links : [];
               if (!links.length) return null;
               return (
-                <div class={`flex items-center justify-center gap-3 py-2 flex-wrap ${animClass}`}
-                  style={delay}
-                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
+                <div class={`flex items-center justify-center gap-3 py-2 flex-wrap ${animClass}`} style={delay} ata-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
                   {links.map((link: any) => {
                     const url = typeof link === 'string' ? link : link?.url;
                     if (!url) return null;
@@ -685,46 +680,7 @@ function getSocialIconPath(url?: string): string {
                 </div>
               );
             }
-
-            // ── BANNER ──
-            if (block.type === 'banner') {
-              const badge    = block.config?.badge || block.config?.badge_preset || 'LIVE';
-              const message  = block.config?.message || block.title || '';
-              const url      = block.config?.url || null;
-              const urlLabel = block.config?.url_label || 'Voir →';
-              const preset   = (block.config?.badge_preset || badge).toUpperCase();
-              // Color map for badge presets
-              const BADGE_COLORS: Record<string, string> = {
-                LIVE:'#ef4444', NEW:'#22c55e', HOT:'#f97316', SOON:'#8b5cf6', SALE:'#eab308',
-              };
-              const badgeColor = BADGE_COLORS[preset] ?? pc;
-              const isLive     = preset === 'LIVE';
-              const WrapTag    = url ? 'a' : 'div';
-              return (
-                <div class={animClass} style={delay}
-                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
-                  {url ? (
-                    <a href={url} target="_blank" rel="noopener noreferrer" data-block-id={block.id}
-                      class={`banner-block group flex items-center gap-3 justify-between ${theme.animations ? 'hover:scale-[1.01]' : ''} transition-transform`}
-                      style={`display: flex; align-items: center; gap: 12px; justify-content: space-between; padding: 13px 16px; border-radius: ${br}px; background: linear-gradient(135deg, ${badgeColor}14, ${badgeColor}06); border: 1px solid ${badgeColor}35; ${theme.block_shadow ? `box-shadow: 0 4px 20px ${badgeColor}20;` : ''}`}>
-                      <div style="display: flex; align-items: center; gap: 10px;">
-                        <span class={isLive ? 'banner-live-dot' : ''} style={`display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${badgeColor}; flex-shrink: 0;`}></span>
-                        <span style={`color: ${badgeColor}; font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; background: ${badgeColor}20; padding: 2px 7px; border-radius: 4px;`}>{badge.toUpperCase()}</span>
-                        <span style={`color: ${tc}; font-size: 14px; font-weight: 600;`}>{message}</span>
-                      </div>
-                      <span style={`color: ${badgeColor}; font-size: 12px; font-weight: 700; white-space: nowrap; flex-shrink: 0;`}>{urlLabel}</span>
-                    </a>
-                  ) : (
-                    <div style={`display: flex; align-items: center; gap: 12px; padding: 13px 16px; border-radius: ${br}px; background: linear-gradient(135deg, ${badgeColor}14, ${badgeColor}06); border: 1px solid ${badgeColor}35;`}>
-                      <span class={isLive ? 'banner-live-dot' : ''} style={`display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${badgeColor}; flex-shrink: 0;`}></span>
-                      <span style={`color: ${badgeColor}; font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; background: ${badgeColor}20; padding: 2px 7px; border-radius: 4px;`}>{badge.toUpperCase()}</span>
-                      <span style={`color: ${tc}; font-size: 14px; font-weight: 600;`}>{message}</span>
-                    </div>
-                  )}
-                </div>
-              );
-            }
-
+            
             // ── PRODUCT ──
             if (block.type === 'product') {
               const url      = block.config?.url || '#';
@@ -788,49 +744,6 @@ function getSocialIconPath(url?: string): string {
                       );
                     })}
                   </div>
-                </div>
-              );
-            }
-
-            // ── TWITCH LIVE ──
-            if (block.type === 'twitch_live') {
-              const channel = block.config?.channel || '';
-              if (!channel) return null;
-              const showChat      = block.config?.show_chat ?? false;
-              const offlineMsg    = block.config?.offline_message || `${channel} n'est pas en live pour le moment`;
-              const parentDomain  = 'bioforge.click';
-              const playerSrc     = `https://player.twitch.tv/?channel=${encodeURIComponent(channel)}&parent=${parentDomain}&autoplay=false&muted=true`;
-              const chatSrc       = `https://www.twitch.tv/embed/${encodeURIComponent(channel)}/chat?parent=${parentDomain}&darkpopout`;
-              return (
-                <div class={animClass} style={`${delay} border-radius: ${br}px; overflow: hidden; border: 1px solid rgba(145,70,255,0.35); ${theme.block_shadow ? `box-shadow: 0 8px 24px rgba(145,70,255,0.15);` : ''}`}
-                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
-                  {/* Header */}
-                  <div style={`display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(145,70,255,0.12); border-bottom: 1px solid rgba(145,70,255,0.2);`}>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                      <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #9146ff;" class="twitch-live-dot"></span>
-                      <span style="color: #bf8fff; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;">Twitch</span>
-                      <span style={`color: ${tc}; font-size: 13px; font-weight: 600;`}>{channel}</span>
-                    </div>
-                    <a href={`https://twitch.tv/${channel}`} target="_blank" rel="noopener noreferrer"
-                      style="color: #9146ff; font-size: 11px; font-weight: 700; text-decoration: none;"
-                      data-block-id={block.id}>
-                      Ouvrir →
-                    </a>
-                  </div>
-                  {/* Player */}
-                  <div style="position: relative; width: 100%; padding-bottom: 56.25%; background: #0e0e10;">
-                    <iframe src={playerSrc}
-                      style="position: absolute; inset: 0; width: 100%; height: 100%; border: none;"
-                      allowfullscreen></iframe>
-                  </div>
-                  {/* Chat (optional) */}
-                  {showChat && (
-                    <iframe src={chatSrc}
-                      style="width: 100%; height: 300px; border: none; border-top: 1px solid rgba(145,70,255,0.2);"
-                      title="Twitch Chat"></iframe>
-                  )}
-                  {/* Offline message */}
-                  <div style={`padding: 8px 14px; background: rgba(0,0,0,0.2); text-align: center; color: ${tc}; opacity: 0.4; font-size: 11px;`}>{offlineMsg}</div>
                 </div>
               );
             }
@@ -1126,30 +1039,6 @@ function getSocialIconPath(url?: string): string {
       filter: drop-shadow(0 0 8px var(--pc, #00ff9d));
     }
 
-    /* ── Banner live pulse ── */
-    @keyframes live-pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50%       { opacity: 0.5; transform: scale(0.8); }
-    }
-    .banner-live-dot { animation: live-pulse 1.6s ease-in-out infinite; }
-
-    /* ── Twitch live dot ── */
-    @keyframes twitch-pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(145,70,255,0.6); }
-      50%       { box-shadow: 0 0 0 5px rgba(145,70,255,0); }
-    }
-    .twitch-live-dot { animation: twitch-pulse 2s ease-in-out infinite; }
-
-    /* ── Poll options ── */
-    .poll-opt-btn:hover { border-color: rgba(var(--pc-r,0), var(--pc-g,255), var(--pc-b,157), 0.5) !important; }
-    .poll-opt-btn.voted { cursor: default; }
-
-    /* ── Newsletter input focus ── */
-    .newsletter-email-input:focus { border-color: rgba(0,255,157,0.5) !important; }
-
-    /* ── vCard button ── */
-    .vcard-btn { width: 100%; cursor: pointer; }
-
     /* ── Share modal ── */
     #share-modal.open { display: flex; }
 
@@ -1219,50 +1108,19 @@ function getSocialIconPath(url?: string): string {
 
     // ── Visibility scheduling filter ─────────────────────────────────────────
     // Hide blocks whose show_from/show_until window has passed
-    document.querySelectorAll('[data-show-from], [data-show-until]').forEach(el => {
+    document
+    .querySelectorAll('[data-show-from], [data-show-until]')
+    .forEach(el => {
+      if (!(el instanceof HTMLElement)) return;
+
       const from  = el.dataset.showFrom  ? new Date(el.dataset.showFrom).getTime()  : null;
       const until = el.dataset.showUntil ? new Date(el.dataset.showUntil).getTime() : null;
       const now   = Date.now();
+
       if ((from && now < from) || (until && now > until)) {
-        (el as HTMLElement).style.display = 'none';
+        el.style.display = 'none';
       }
     });
-
-    // ── Countdown timers ─────────────────────────────────────────────────────
-    function updateCountdowns() {
-      document.querySelectorAll('.countdown-units').forEach(el => {
-        const target = new Date((el as HTMLElement).dataset.target ?? '').getTime();
-        const diff   = target - Date.now();
-        const wrap   = el.closest('.countdown-block');
-        if (!wrap) return;
-        const done = wrap.querySelector('.countdown-done') as HTMLElement | null;
-
-        if (diff <= 0) {
-          (el as HTMLElement).style.display = 'none';
-          done?.classList.remove('hidden');
-          return;
-        }
-        done?.classList.add('hidden');
-        (el as HTMLElement).style.display = 'flex';
-
-        const d = Math.floor(diff / 86400000);
-        const h = Math.floor((diff % 86400000) / 3600000);
-        const m = Math.floor((diff % 3600000) / 60000);
-        const s = Math.floor((diff % 60000) / 1000);
-
-        const pad = (n: number) => String(n).padStart(2, '0');
-        const days = wrap.querySelector('.countdown-days')  as HTMLElement | null;
-        const hrs  = wrap.querySelector('.countdown-hours') as HTMLElement | null;
-        const mins = wrap.querySelector('.countdown-mins')  as HTMLElement | null;
-        const secs = wrap.querySelector('.countdown-secs')  as HTMLElement | null;
-        if (days) days.textContent = String(d);
-        if (hrs)  hrs.textContent  = pad(h);
-        if (mins) mins.textContent = pad(m);
-        if (secs) secs.textContent = pad(s);
-      });
-    }
-    updateCountdowns();
-    setInterval(updateCountdowns, 1000);
 
     // ── Dropdown 3-dot ───────────────────────────────────────────────────────
     function closeAllDropdowns() {
