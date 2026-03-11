@@ -383,7 +383,8 @@ function getSocialIconPath(url?: string): string {
             const delay = `animation-delay: ${Math.min(index * 80, 500)}ms;`;
             const animClass = theme.animations ? 'anim-block' : '';
 
-            const showFrom = block.config?.show_from ?? null;
+            // Visibility scheduling — compute data-attr strings for each wrapper
+            const showFrom  = block.config?.show_from  ?? null;
             const showUntil = block.config?.show_until ?? null;
 
             // ── HEADING ──
@@ -403,7 +404,8 @@ function getSocialIconPath(url?: string): string {
               const hasIcon = Boolean(iconUrl);
 
               return (
-                <div class={`block-dot-wrap group relative ${animClass}`} style={delay} data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
+                <div class={`block-dot-wrap group relative ${animClass}`} style={delay}
+                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
                   {/* Link button — icon absolute left, text always truly centered */}
                   <a href={url} target="_blank" rel="noopener noreferrer"
                     data-block-id={block.id}
@@ -492,7 +494,8 @@ function getSocialIconPath(url?: string): string {
               }
               return (
                 <div class={`relative w-full overflow-hidden ${animClass}`}
-                  style={`padding-bottom: 56.25%; border-radius: ${br}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''} ${delay}`} data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
+                  style={`padding-bottom: 56.25%; border-radius: ${br}px; ${theme.block_shadow ? 'box-shadow: 0 8px 24px rgba(0,0,0,0.3);' : ''} ${delay}`}
+                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
                   <iframe src={embedUrl} class="absolute inset-0 w-full h-full" frameborder="0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowfullscreen style={`border-radius: ${br}px;`}></iframe>
@@ -505,7 +508,9 @@ function getSocialIconPath(url?: string): string {
               const links = Array.isArray(block.config?.links) ? block.config.links : [];
               if (!links.length) return null;
               return (
-                <div class={`flex items-center justify-center gap-3 py-2 flex-wrap ${animClass}`} style={delay} ata-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
+                <div class={`flex items-center justify-center gap-3 py-2 flex-wrap ${animClass}`}
+                  style={delay}
+                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
                   {links.map((link: any) => {
                     const url = typeof link === 'string' ? link : link?.url;
                     if (!url) return null;
@@ -660,6 +665,266 @@ function getSocialIconPath(url?: string): string {
                     loading="lazy"
                     style={`border-radius: ${br}px; display: block;`}
                   ></iframe>
+                </div>
+              );
+            }
+
+            // ── TEXT ──
+            if (block.type === 'text') {
+              const content   = block.config?.content || '';
+              if (!content) return null;
+              const align     = block.config?.align    || 'center';
+              const textSize  = block.config?.text_size || 'md';
+              const fontSize  = textSize === 'sm' ? '13px' : textSize === 'lg' ? '18px' : '15px';
+              const lineH     = textSize === 'sm' ? '1.6' : textSize === 'lg' ? '1.7' : '1.65';
+              return (
+                <div class={animClass} style={`${delay} text-align: ${align}; color: ${tc}; opacity: 0.85; font-size: ${fontSize}; line-height: ${lineH}; padding: 4px 0;`}
+                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
+                  {block.title && <p style={`font-weight: 700; font-size: calc(${fontSize} + 2px); margin-bottom: 6px; opacity: 1; color: ${tc};`}>{block.title}</p>}
+                  <p style="white-space: pre-wrap;">{content}</p>
+                </div>
+              );
+            }
+
+            // ── BANNER ──
+            if (block.type === 'banner') {
+              const badge    = block.config?.badge || block.config?.badge_preset || 'LIVE';
+              const message  = block.config?.message || block.title || '';
+              const url      = block.config?.url || null;
+              const urlLabel = block.config?.url_label || 'Voir →';
+              const preset   = (block.config?.badge_preset || badge).toUpperCase();
+              // Color map for badge presets
+              const BADGE_COLORS: Record<string, string> = {
+                LIVE:'#ef4444', NEW:'#22c55e', HOT:'#f97316', SOON:'#8b5cf6', SALE:'#eab308',
+              };
+              const badgeColor = BADGE_COLORS[preset] ?? pc;
+              const isLive     = preset === 'LIVE';
+              const WrapTag    = url ? 'a' : 'div';
+              return (
+                <div class={animClass} style={delay}
+                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
+                  {url ? (
+                    <a href={url} target="_blank" rel="noopener noreferrer" data-block-id={block.id}
+                      class={`banner-block group flex items-center gap-3 justify-between ${theme.animations ? 'hover:scale-[1.01]' : ''} transition-transform`}
+                      style={`display: flex; align-items: center; gap: 12px; justify-content: space-between; padding: 13px 16px; border-radius: ${br}px; background: linear-gradient(135deg, ${badgeColor}14, ${badgeColor}06); border: 1px solid ${badgeColor}35; ${theme.block_shadow ? `box-shadow: 0 4px 20px ${badgeColor}20;` : ''}`}>
+                      <div style="display: flex; align-items: center; gap: 10px;">
+                        <span class={isLive ? 'banner-live-dot' : ''} style={`display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${badgeColor}; flex-shrink: 0;`}></span>
+                        <span style={`color: ${badgeColor}; font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; background: ${badgeColor}20; padding: 2px 7px; border-radius: 4px;`}>{badge.toUpperCase()}</span>
+                        <span style={`color: ${tc}; font-size: 14px; font-weight: 600;`}>{message}</span>
+                      </div>
+                      <span style={`color: ${badgeColor}; font-size: 12px; font-weight: 700; white-space: nowrap; flex-shrink: 0;`}>{urlLabel}</span>
+                    </a>
+                  ) : (
+                    <div style={`display: flex; align-items: center; gap: 12px; padding: 13px 16px; border-radius: ${br}px; background: linear-gradient(135deg, ${badgeColor}14, ${badgeColor}06); border: 1px solid ${badgeColor}35;`}>
+                      <span class={isLive ? 'banner-live-dot' : ''} style={`display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${badgeColor}; flex-shrink: 0;`}></span>
+                      <span style={`color: ${badgeColor}; font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; background: ${badgeColor}20; padding: 2px 7px; border-radius: 4px;`}>{badge.toUpperCase()}</span>
+                      <span style={`color: ${tc}; font-size: 14px; font-weight: 600;`}>{message}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
+            // ── PRODUCT ──
+            if (block.type === 'product') {
+              const url      = block.config?.url || '#';
+              const imageUrl = block.config?.image_url || null;
+              const price    = block.config?.price || null;
+              const currency = block.config?.currency || '€';
+              const ctaLabel = block.config?.cta_label || 'Acheter →';
+              const curSym   = currency === 'EUR' ? '€' : currency === 'USD' ? '$' : currency === 'GBP' ? '£' : currency;
+              return (
+                <div class={animClass} style={delay}
+                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
+                  <a href={url} target="_blank" rel="noopener noreferrer" data-block-id={block.id}
+                    class={`block ${theme.animations ? 'hover:scale-[1.02] active:scale-[0.98]' : ''} transition-transform`}
+                    style={`border-radius: ${br}px; overflow: hidden; border: 1px solid ${tc}15; background: ${pc}08; ${theme.block_shadow ? `box-shadow: 0 6px 20px rgba(0,0,0,0.25);` : ''}`}>
+                    {imageUrl && (
+                      <div style={`width: 100%; aspect-ratio: 16/7; overflow: hidden; background: ${tc}08;`}>
+                        <img src={imageUrl} alt={block.title || 'Product'} style="width: 100%; height: 100%; object-fit: cover;" loading="lazy" />
+                      </div>
+                    )}
+                    <div style={`padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px;`}>
+                      <div style="flex: 1; min-width: 0;">
+                        <p style={`color: ${tc}; font-size: 15px; font-weight: 700; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;`}>{block.title || 'Produit'}</p>
+                        {price && <p style={`color: ${pc}; font-size: 16px; font-weight: 800;`}>{price} {curSym}</p>}
+                      </div>
+                      <span style={`flex-shrink: 0; background: ${pc}; color: ${bg}; padding: 8px 16px; border-radius: ${Math.min(br, 12)}px; font-size: 13px; font-weight: 700;`}>{ctaLabel}</span>
+                    </div>
+                  </a>
+                </div>
+              );
+            }
+
+            // ── POLL ──
+            if (block.type === 'poll') {
+              const question = block.config?.question || block.title || '';
+              const options  = Array.isArray(block.config?.options) ? block.config.options : [];
+              if (!question || !options.length) return null;
+              const totalVotes = options.reduce((s: number, o: any) => s + (o.votes ?? 0), 0);
+              return (
+                <div class={`poll-block ${animClass}`}
+                  style={`${delay} border-radius: ${br}px; overflow: hidden; border: 1px solid ${pc}25; ${theme.block_shadow ? `box-shadow: 0 6px 20px rgba(0,0,0,0.2);` : ''}`}
+                  data-block-id={block.id}
+                  data-options={JSON.stringify(options)}
+                  data-allow-multiple={String(block.config?.allow_multiple ?? false)}
+                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
+                  <div style={`background: ${pc}10; border-bottom: 1px solid ${pc}20; padding: 12px 16px;`}>
+                    <p style={`color: ${tc}; font-size: 15px; font-weight: 700;`}>{question}</p>
+                    <p style={`color: ${tc}; opacity: 0.45; font-size: 11px; margin-top: 2px;`}>{totalVotes} vote{totalVotes !== 1 ? 's' : ''}</p>
+                  </div>
+                  <div class="poll-options" style={`padding: 10px 12px; background: ${pc}06; display: flex; flex-direction: column; gap: 8px;`}>
+                    {options.map((opt: any, i: number) => {
+                      const pct = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0;
+                      return (
+                        <button class="poll-opt-btn" data-index={String(i)}
+                          style={`position: relative; width: 100%; text-align: left; padding: 10px 14px; border-radius: ${Math.min(br, 10)}px; border: 1px solid ${pc}30; background: ${pc}08; cursor: pointer; overflow: hidden; transition: all 0.2s;`}>
+                          <div class="poll-bar" style={`position: absolute; inset: 0; background: ${pc}20; border-radius: ${Math.min(br, 10)}px; width: ${pct}%; transition: width 0.5s ease; pointer-events: none;`}></div>
+                          <div style="position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                            <span style={`color: ${tc}; font-size: 14px; font-weight: 600;`}>{opt.text}</span>
+                            <span class="poll-pct" style={`color: ${pc}; font-size: 12px; font-weight: 700; flex-shrink: 0;`}>{pct}%</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            }
+
+            // ── TWITCH LIVE ──
+            if (block.type === 'twitch_live') {
+              const channel = block.config?.channel || '';
+              if (!channel) return null;
+              const showChat      = block.config?.show_chat ?? false;
+              const offlineMsg    = block.config?.offline_message || `${channel} n'est pas en live pour le moment`;
+              const parentDomain  = 'bioforge.click';
+              const playerSrc     = `https://player.twitch.tv/?channel=${encodeURIComponent(channel)}&parent=${parentDomain}&autoplay=false&muted=true`;
+              const chatSrc       = `https://www.twitch.tv/embed/${encodeURIComponent(channel)}/chat?parent=${parentDomain}&darkpopout`;
+              return (
+                <div class={animClass} style={`${delay} border-radius: ${br}px; overflow: hidden; border: 1px solid rgba(145,70,255,0.35); ${theme.block_shadow ? `box-shadow: 0 8px 24px rgba(145,70,255,0.15);` : ''}`}
+                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
+                  {/* Header */}
+                  <div style={`display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(145,70,255,0.12); border-bottom: 1px solid rgba(145,70,255,0.2);`}>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                      <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #9146ff;" class="twitch-live-dot"></span>
+                      <span style="color: #bf8fff; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;">Twitch</span>
+                      <span style={`color: ${tc}; font-size: 13px; font-weight: 600;`}>{channel}</span>
+                    </div>
+                    <a href={`https://twitch.tv/${channel}`} target="_blank" rel="noopener noreferrer"
+                      style="color: #9146ff; font-size: 11px; font-weight: 700; text-decoration: none;"
+                      data-block-id={block.id}>
+                      Ouvrir →
+                    </a>
+                  </div>
+                  {/* Player */}
+                  <div style="position: relative; width: 100%; padding-bottom: 56.25%; background: #0e0e10;">
+                    <iframe src={playerSrc}
+                      style="position: absolute; inset: 0; width: 100%; height: 100%; border: none;"
+                      allowfullscreen></iframe>
+                  </div>
+                  {/* Chat (optional) */}
+                  {showChat && (
+                    <iframe src={chatSrc}
+                      style="width: 100%; height: 300px; border: none; border-top: 1px solid rgba(145,70,255,0.2);"
+                      title="Twitch Chat"></iframe>
+                  )}
+                  {/* Offline message */}
+                  <div style={`padding: 8px 14px; background: rgba(0,0,0,0.2); text-align: center; color: ${tc}; opacity: 0.4; font-size: 11px;`}>{offlineMsg}</div>
+                </div>
+              );
+            }
+
+            // ── NEWSLETTER ──
+            if (block.type === 'newsletter') {
+              const actionUrl   = block.config?.action_url || block.config?.url || '#';
+              const placeholder = block.config?.nl_placeholder || 'ton@email.com';
+              const ctaLabel    = block.config?.nl_cta    || "S'abonner";
+              const successMsg  = block.config?.nl_success || 'Merci ! Vérifie ta boîte mail 📬';
+              return (
+                <div class={animClass} style={delay}
+                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
+                  <div style={`border-radius: ${br}px; border: 1px solid ${pc}28; background: ${pc}08; padding: 18px 16px; ${theme.block_shadow ? `box-shadow: 0 6px 20px rgba(0,0,0,0.2);` : ''}`}>
+                    {block.title && <p style={`color: ${tc}; font-size: 15px; font-weight: 700; margin-bottom: 10px; text-align: center;`}>{block.title}</p>}
+                    <form class="newsletter-form" data-action={actionUrl} data-success={successMsg} novalidate>
+                      <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="email" name="email" required
+                          placeholder={placeholder}
+                          class="newsletter-email-input"
+                          style={`flex: 1; min-width: 0; padding: 11px 14px; border-radius: ${Math.min(br, 12)}px; background: ${bg}80; border: 1px solid ${tc}20; color: ${tc}; font-size: 14px; outline: none; transition: border-color 0.2s;`} />
+                        <button type="submit"
+                          style={`flex-shrink: 0; padding: 11px 16px; border-radius: ${Math.min(br, 12)}px; background: ${pc}; color: ${bg}; font-size: 13px; font-weight: 700; border: none; cursor: pointer; transition: opacity 0.2s; white-space: nowrap;`}>
+                          {ctaLabel}
+                        </button>
+                      </div>
+                      <p class="newsletter-msg" style="display: none; text-align: center; margin-top: 8px; font-size: 13px;"></p>
+                    </form>
+                  </div>
+                </div>
+              );
+            }
+
+            // ── VCARD ──
+            if (block.type === 'vcard') {
+              const firstName = block.config?.first_name || '';
+              const lastName  = block.config?.last_name  || '';
+              const email     = block.config?.email    || '';
+              const phone     = block.config?.phone    || '';
+              const website   = block.config?.website  || '';
+              const company   = block.config?.company  || '';
+              const role      = block.config?.role     || '';
+              const fullName  = [firstName, lastName].filter(Boolean).join(' ');
+              if (!fullName) return null;
+              const vcardData = `BEGIN:VCARD\r\nVERSION:3.0\r\nN:${lastName};${firstName};;;\r\nFN:${fullName}\r\n${email ? `EMAIL:${email}\r\n` : ''}${phone ? `TEL:${phone}\r\n` : ''}${website ? `URL:${website}\r\n` : ''}${company ? `ORG:${company}\r\n` : ''}${role ? `TITLE:${role}\r\n` : ''}END:VCARD`;
+              return (
+                <div class={animClass} style={delay}
+                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
+                  <button class={`vcard-btn ${theme.animations ? 'hover:scale-[1.02] active:scale-[0.98]' : ''} transition-transform`}
+                    data-vcard={vcardData}
+                    data-filename={`${fullName.replace(/\s+/g,'-').toLowerCase()}.vcf`}
+                    style={`${btnBase} background: ${pc}10; border: 1.5px solid ${pc}35; color: ${pc}; display: flex; align-items: center; justify-content: center; gap: 10px;`}>
+                    <svg style="width: 18px; height: 18px; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                    </svg>
+                    {block.title || 'Télécharger mon contact'}
+                  </button>
+                </div>
+              );
+            }
+
+            // ── MERCH GRID ──
+            if (block.type === 'merch_grid') {
+              const items = Array.isArray(block.config?.items) ? block.config.items.filter((it: any) => it.title && it.url) : [];
+              if (!items.length) return null;
+              const cols  = items.length === 1 ? '1fr' : items.length === 2 ? '1fr 1fr' : '1fr 1fr 1fr';
+              return (
+                <div class={animClass} style={delay}
+                  data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
+                  {block.title && (
+                    <p style={`color: ${tc}; font-size: 14px; font-weight: 700; text-align: center; margin-bottom: 10px; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.06em;`}>{block.title}</p>
+                  )}
+                  <div style={`display: grid; grid-template-columns: ${cols}; gap: 10px;`}>
+                    {items.map((item: any) => {
+                      const curSym = item.currency === 'EUR' ? '€' : item.currency === 'USD' ? '$' : item.currency === 'GBP' ? '£' : (item.currency || '€');
+                      return (
+                        <a href={item.url} target="_blank" rel="noopener noreferrer" data-block-id={block.id}
+                          class={`${theme.animations ? 'hover:scale-[1.03] active:scale-[0.97]' : ''} transition-transform`}
+                          style={`display: block; border-radius: ${Math.min(br, 14)}px; overflow: hidden; border: 1px solid ${tc}12; background: ${pc}06; text-decoration: none; ${theme.block_shadow ? `box-shadow: 0 4px 12px rgba(0,0,0,0.2);` : ''}`}>
+                          {item.image_url ? (
+                            <div style="aspect-ratio: 1; overflow: hidden; background: rgba(255,255,255,0.03);">
+                              <img src={item.image_url} alt={item.title} style="width: 100%; height: 100%; object-fit: cover;" loading="lazy" />
+                            </div>
+                          ) : (
+                            <div style={`aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 28px; background: ${pc}10;`}>🛍️</div>
+                          )}
+                          <div style="padding: 8px 10px;">
+                            <p style={`color: ${tc}; font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;`}>{item.title}</p>
+                            {item.price && <p style={`color: ${pc}; font-size: 13px; font-weight: 800; margin-top: 2px;`}>{item.price}{curSym}</p>}
+                          </div>
+                        </a>
+                      );
+                    })}
+                  </div>
                 </div>
               );
             }
@@ -861,6 +1126,30 @@ function getSocialIconPath(url?: string): string {
       filter: drop-shadow(0 0 8px var(--pc, #00ff9d));
     }
 
+    /* ── Banner live pulse ── */
+    @keyframes live-pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.5; transform: scale(0.8); }
+    }
+    .banner-live-dot { animation: live-pulse 1.6s ease-in-out infinite; }
+
+    /* ── Twitch live dot ── */
+    @keyframes twitch-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(145,70,255,0.6); }
+      50%       { box-shadow: 0 0 0 5px rgba(145,70,255,0); }
+    }
+    .twitch-live-dot { animation: twitch-pulse 2s ease-in-out infinite; }
+
+    /* ── Poll options ── */
+    .poll-opt-btn:hover { border-color: rgba(var(--pc-r,0), var(--pc-g,255), var(--pc-b,157), 0.5) !important; }
+    .poll-opt-btn.voted { cursor: default; }
+
+    /* ── Newsletter input focus ── */
+    .newsletter-email-input:focus { border-color: rgba(0,255,157,0.5) !important; }
+
+    /* ── vCard button ── */
+    .vcard-btn { width: 100%; cursor: pointer; }
+
     /* ── Share modal ── */
     #share-modal.open { display: flex; }
 
@@ -930,19 +1219,50 @@ function getSocialIconPath(url?: string): string {
 
     // ── Visibility scheduling filter ─────────────────────────────────────────
     // Hide blocks whose show_from/show_until window has passed
-    document
-    .querySelectorAll('[data-show-from], [data-show-until]')
-    .forEach(el => {
-      if (!(el instanceof HTMLElement)) return;
-
+    document.querySelectorAll('[data-show-from], [data-show-until]').forEach(el => {
       const from  = el.dataset.showFrom  ? new Date(el.dataset.showFrom).getTime()  : null;
       const until = el.dataset.showUntil ? new Date(el.dataset.showUntil).getTime() : null;
       const now   = Date.now();
-
       if ((from && now < from) || (until && now > until)) {
-        el.style.display = 'none';
+        (el as HTMLElement).style.display = 'none';
       }
     });
+
+    // ── Countdown timers ─────────────────────────────────────────────────────
+    function updateCountdowns() {
+      document.querySelectorAll('.countdown-units').forEach(el => {
+        const target = new Date((el as HTMLElement).dataset.target ?? '').getTime();
+        const diff   = target - Date.now();
+        const wrap   = el.closest('.countdown-block');
+        if (!wrap) return;
+        const done = wrap.querySelector('.countdown-done') as HTMLElement | null;
+
+        if (diff <= 0) {
+          (el as HTMLElement).style.display = 'none';
+          done?.classList.remove('hidden');
+          return;
+        }
+        done?.classList.add('hidden');
+        (el as HTMLElement).style.display = 'flex';
+
+        const d = Math.floor(diff / 86400000);
+        const h = Math.floor((diff % 86400000) / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const days = wrap.querySelector('.countdown-days')  as HTMLElement | null;
+        const hrs  = wrap.querySelector('.countdown-hours') as HTMLElement | null;
+        const mins = wrap.querySelector('.countdown-mins')  as HTMLElement | null;
+        const secs = wrap.querySelector('.countdown-secs')  as HTMLElement | null;
+        if (days) days.textContent = String(d);
+        if (hrs)  hrs.textContent  = pad(h);
+        if (mins) mins.textContent = pad(m);
+        if (secs) secs.textContent = pad(s);
+      });
+    }
+    updateCountdowns();
+    setInterval(updateCountdowns, 1000);
 
     // ── Dropdown 3-dot ───────────────────────────────────────────────────────
     function closeAllDropdowns() {
@@ -1108,6 +1428,127 @@ function getSocialIconPath(url?: string): string {
       if (_stored?.analytics === true) attachClickTracking();
     } catch {}
     window.addEventListener('bf:consent', e => { if (e.detail?.analytics === true) attachClickTracking(); });
+
+    // ── Poll voting ──────────────────────────────────────────────────────────
+    const POLL_STORAGE_KEY = (blockId) => `bf_poll_${blockId}`;
+
+    document.querySelectorAll('.poll-block').forEach(pollEl => {
+      const blockId      = pollEl.dataset.blockId;
+      const allowMulti   = pollEl.dataset.allowMultiple === 'true';
+      let options        = JSON.parse(pollEl.dataset.options || '[]');
+      const votedKey     = POLL_STORAGE_KEY(blockId);
+      let voted          = [];
+      try { voted = JSON.parse(localStorage.getItem(votedKey) || '[]'); } catch {}
+      const hasVoted     = voted.length > 0;
+
+      function renderPollBars() {
+        const total = options.reduce((s, o) => s + (o.votes || 0), 0);
+        pollEl.querySelectorAll('.poll-opt-btn').forEach((btn, i) => {
+          const opt = options[i];
+          const pct = total > 0 ? Math.round((opt.votes / total) * 100) : 0;
+          const bar = btn.querySelector('.poll-bar');
+          const pctEl = btn.querySelector('.poll-pct');
+          if (bar)   bar.style.width = `${pct}%`;
+          if (pctEl) pctEl.textContent = `${pct}%`;
+          if (voted.includes(i)) {
+            btn.style.borderColor = 'rgba(0,255,157,0.5)';
+            btn.style.background  = 'rgba(0,255,157,0.08)';
+          }
+        });
+        // Update total
+        const totalEl = pollEl.querySelector('p:last-child');
+        if (totalEl && totalEl.textContent.includes('vote')) {
+          totalEl.textContent = `${total} vote${total !== 1 ? 's' : ''}`;
+        }
+      }
+
+      if (hasVoted) {
+        pollEl.querySelectorAll('.poll-opt-btn').forEach(btn => { btn.classList.add('voted'); btn.style.cursor = 'default'; });
+        renderPollBars();
+      }
+
+      pollEl.querySelectorAll('.poll-opt-btn').forEach((btn, i) => {
+        btn.addEventListener('click', async () => {
+          if (!allowMulti && hasVoted) return;
+          if (voted.includes(i)) return;
+
+          voted.push(i);
+          options[i].votes = (options[i].votes || 0) + 1;
+
+          try { localStorage.setItem(votedKey, JSON.stringify(voted)); } catch {}
+
+          if (!allowMulti) {
+            pollEl.querySelectorAll('.poll-opt-btn').forEach(b => { b.classList.add('voted'); b.style.cursor = 'default'; });
+          }
+
+          renderPollBars();
+
+          // Persist vote to API (best-effort)
+          if (blockId) {
+            fetch(`/api/blocks/${blockId}/vote`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ option_index: i }),
+            }).catch(() => {});
+          }
+        });
+      });
+    });
+
+    // ── vCard download ───────────────────────────────────────────────────────
+    document.querySelectorAll('.vcard-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const vcardData = btn.dataset.vcard;
+        const filename  = btn.dataset.filename || 'contact.vcf';
+        if (!vcardData) return;
+        const blob = new Blob([vcardData], { type: 'text/vcard;charset=utf-8' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+    });
+
+    // ── Newsletter form submit ───────────────────────────────────────────────
+    document.querySelectorAll('.newsletter-form').forEach(form => {
+      const msgEl    = form.querySelector('.newsletter-msg');
+      const inputEl  = form.querySelector('.newsletter-email-input');
+      const submitEl = form.querySelector('button[type="submit"]');
+      const successMsg = form.dataset.success || 'Merci ! Vérifie ta boîte mail 📬';
+      const actionUrl  = form.dataset.action;
+
+      form.addEventListener('submit', async e => {
+        e.preventDefault();
+        const email = inputEl?.value?.trim() ?? '';
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          if (msgEl) { msgEl.style.display = 'block'; msgEl.style.color = '#f87171'; msgEl.textContent = 'Adresse email invalide.'; }
+          return;
+        }
+        if (submitEl) { submitEl.disabled = true; submitEl.style.opacity = '0.6'; }
+
+        try {
+          // Try JSON first, fall back to form-encoded for Mailchimp etc.
+          const body = new URLSearchParams({ EMAIL: email, email: email });
+          await fetch(actionUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body.toString(),
+            mode: 'no-cors', // Most providers need no-cors
+          });
+          // Always show success (no-cors means we can't read the response)
+          if (inputEl) inputEl.value = '';
+          if (msgEl) { msgEl.style.display = 'block'; msgEl.style.color = '#4ade80'; msgEl.textContent = successMsg; }
+        } catch {
+          if (msgEl) { msgEl.style.display = 'block'; msgEl.style.color = '#f87171'; msgEl.textContent = 'Erreur. Réessaie plus tard.'; }
+        } finally {
+          if (submitEl) { submitEl.disabled = false; submitEl.style.opacity = '1'; }
+        }
+      });
+    });
 
   </script>
 
