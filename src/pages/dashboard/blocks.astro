@@ -71,6 +71,52 @@ const safeBridgeBlocks = blocks
       links: Array.isArray(b.config?.links)
         ? b.config.links.map((l: any) => ({ url: escapeHtml(l?.url ?? l) }))
         : [],
+      // text
+      content:    escapeHtml(b.config?.content),
+      align:      ['left','center','right'].includes(b.config?.align) ? b.config.align : 'center',
+      text_size:  ['sm','md','lg'].includes(b.config?.text_size) ? b.config.text_size : 'md',
+      // banner
+      badge:        escapeHtml(b.config?.badge),
+      badge_preset: escapeHtml(b.config?.badge_preset),
+      message:      escapeHtml(b.config?.message),
+      url_label:    escapeHtml(b.config?.url_label),
+      // product
+      image_url: escapeHtml(b.config?.image_url),
+      price:     escapeHtml(b.config?.price),
+      currency:  escapeHtml(b.config?.currency),
+      cta_label: escapeHtml(b.config?.cta_label),
+      // poll
+      question:       escapeHtml(b.config?.question),
+      options:        Array.isArray(b.config?.options) ? b.config.options.map((o: any) => ({ text: escapeHtml(o?.text), votes: safeNum(o?.votes) })) : [],
+      allow_multiple: Boolean(b.config?.allow_multiple),
+      // twitch_live
+      channel:         escapeHtml(b.config?.channel),
+      show_chat:       Boolean(b.config?.show_chat),
+      offline_message: escapeHtml(b.config?.offline_message),
+      // newsletter
+      provider:        escapeHtml(b.config?.provider),
+      action_url:      escapeHtml(b.config?.action_url),
+      nl_placeholder:  escapeHtml(b.config?.nl_placeholder),
+      nl_cta:          escapeHtml(b.config?.nl_cta),
+      nl_success:      escapeHtml(b.config?.nl_success),
+      // vcard
+      first_name: escapeHtml(b.config?.first_name),
+      last_name:  escapeHtml(b.config?.last_name),
+      email:      escapeHtml(b.config?.email),
+      phone:      escapeHtml(b.config?.phone),
+      website:    escapeHtml(b.config?.website),
+      company:    escapeHtml(b.config?.company),
+      role:       escapeHtml(b.config?.role),
+      // merch_grid
+      items: Array.isArray(b.config?.items)
+        ? b.config.items.slice(0,3).map((it: any) => ({
+            title:     escapeHtml(it?.title),
+            price:     escapeHtml(it?.price),
+            image_url: escapeHtml(it?.image_url),
+            url:       escapeHtml(it?.url),
+            currency:  escapeHtml(it?.currency),
+          }))
+        : [],
     },
   }));
 
@@ -83,6 +129,7 @@ const blocksError = blocksResult.success ? null : (blocksResult.error?.message ?
 const bridge = JSON.stringify({
   blocks: safeBridgeBlocks, blockCount, blockLimit, canAddBlock,
   profileId: escapeHtml(safeProfileId),
+  username:  escapeHtml(profile?.username ?? ''),
   totalViews,
 });
 
@@ -94,10 +141,18 @@ const BLOCK_TYPES = [
   { type: 'spacer',    emoji: '—',  label: 'Spacer',      desc: 'Blank space'              },
   { type: 'image',     emoji: '🖼️', label: 'Image',       desc: 'Display an image'         },
   { type: 'video',     emoji: '🎥', label: 'Video',       desc: 'Embed YouTube / Vimeo'    },
-  { type: 'countdown', emoji: '⏱️', label: 'Countdown',   desc: 'Next stream timer'        },
-  { type: 'schedule',  emoji: '📅', label: 'Schedule',    desc: 'Weekly stream schedule'   },
-  { type: 'donation',  emoji: '💸', label: 'Donation',    desc: 'Ko-fi / Patreon CTA'      },
-  { type: 'embed',     emoji: '🎵', label: 'Music Embed', desc: 'Spotify / SoundCloud'     },
+  { type: 'countdown',   emoji: '⏱️', label: 'Countdown',    desc: 'Next stream timer'        },
+  { type: 'schedule',   emoji: '📅', label: 'Schedule',     desc: 'Weekly stream schedule'   },
+  { type: 'donation',   emoji: '💸', label: 'Donation',     desc: 'Ko-fi / Patreon CTA'      },
+  { type: 'embed',      emoji: '🎵', label: 'Music Embed',  desc: 'Spotify / SoundCloud'     },
+  { type: 'text',       emoji: '📄', label: 'Text',         desc: 'Paragraph / description'  },
+  { type: 'banner',     emoji: '📢', label: 'Banner',       desc: 'LIVE / NEW announcement'  },
+  { type: 'product',    emoji: '🛍️', label: 'Product',      desc: 'Product card with price'  },
+  { type: 'poll',       emoji: '📊', label: 'Poll',         desc: 'Interactive vote options' },
+  { type: 'twitch_live',emoji: '🟣', label: 'Twitch Live',  desc: 'Channel embed + badge'    },
+  { type: 'newsletter', emoji: '📧', label: 'Newsletter',   desc: 'Email capture form'       },
+  { type: 'vcard',      emoji: '👤', label: 'vCard',        desc: 'Download my contact'      },
+  { type: 'merch_grid', emoji: '🛒', label: 'Merch Grid',   desc: 'Grid of products / items' },
 ];
 ---
 
@@ -128,6 +183,15 @@ const BLOCK_TYPES = [
         </button>
         <button id="bulk-cancel-btn" class="px-3 py-2 text-xs text-gray-500 hover:text-white transition-colors">Cancel</button>
       </div>
+      <button id="preview-toggle-btn"
+        class="hidden lg:flex items-center gap-2 px-4 py-2.5 glass border border-white/10 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:border-white/25 transition-all"
+        title="Aperçu du profil">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+        </svg>
+        Aperçu
+      </button>
       <button id="add-block-btn"
         class={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.98]
           ${canAddBlock ? 'bg-neon-green text-black hover:bg-neon-green/90' : 'glass border border-white/10 text-gray-400 cursor-not-allowed opacity-60'}`}
@@ -250,7 +314,7 @@ const BLOCK_TYPES = [
             Add Your First Block
           </button>
         )}
-        <p class="text-xs text-gray-600 mt-4">Tip: press <kbd class="px-1.5 py-0.5 glass rounded text-gray-400 font-mono text-xs">N</kbd> to add a block</p>
+        <p class="text-xs text-gray-600 mt-4">Tip: <kbd class="px-1.5 py-0.5 glass rounded text-gray-400 font-mono text-xs">N</kbd> ajouter · <kbd class="px-1.5 py-0.5 glass rounded text-gray-400 font-mono text-xs">P</kbd> aperçu</p>
       </div>
     ) : (
       <div class="space-y-2" id="sortable-blocks"></div>
@@ -261,7 +325,79 @@ const BLOCK_TYPES = [
     </div>
   </div>
 
-  <!-- ===== TYPE SELECTION MODAL — Linktree-style ===== -->
+    <div id="no-results" class="hidden flex-col items-center justify-center py-16 text-center">
+      <p class="text-sm text-gray-500 mb-2">No blocks match your search</p>
+      <button id="clear-search-btn" class="text-xs text-neon-green hover:underline">Clear filters</button>
+    </div>
+  </div>
+
+  <!-- ===== ARCHIVED BLOCKS SECTION ===== -->
+  <div id="archive-section" class="hidden mt-8">
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-2">
+        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12a2 2 0 002 2h8a2 2 0 002-2L19 8m-9 4v4m4-4v4"/>
+        </svg>
+        <p class="text-sm font-semibold text-gray-400">Corbeille</p>
+        <span id="archive-count" class="text-xs px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-500 font-medium"></span>
+      </div>
+      <button id="archive-clear-btn" class="text-xs text-red-400 hover:text-red-300 transition-colors">Vider la corbeille</button>
+    </div>
+    <div id="archive-list" class="space-y-2"></div>
+  </div>
+
+  <!-- ===== PREVIEW PANEL (desktop, fixed right) ===== -->
+  <div id="preview-panel"
+    class="hidden lg:hidden fixed top-0 right-0 h-screen w-[340px] z-40 border-l border-white/8 flex flex-col"
+    style="background: #09090b;">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-white/8 shrink-0">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-neon-green animate-pulse"></span>
+        <span class="text-xs font-semibold text-white">Aperçu live</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="preview-refresh-btn"
+          class="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all"
+          title="Actualiser">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+        </button>
+        <button id="preview-open-btn"
+          class="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all"
+          title="Ouvrir dans un onglet">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+          </svg>
+        </button>
+        <button id="preview-close-btn"
+          class="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <!-- Phone frame -->
+    <div class="flex-1 flex items-start justify-center pt-6 pb-4 overflow-hidden">
+      <div class="relative" style="width: 220px;">
+        <!-- Phone outline -->
+        <div class="absolute inset-0 rounded-[2rem] border-2 border-white/15 pointer-events-none z-10"
+          style="box-shadow: 0 0 0 6px rgba(255,255,255,0.03); margin: -4px;"></div>
+        <!-- Notch -->
+        <div class="absolute top-2 left-1/2 -translate-x-1/2 w-16 h-4 rounded-full bg-black z-20"></div>
+        <iframe id="preview-iframe"
+          src=""
+          class="w-full rounded-[2rem] border-0 overflow-hidden"
+          style="height: 440px; pointer-events: none;"
+          loading="lazy"
+          sandbox="allow-scripts allow-same-origin"></iframe>
+      </div>
+    </div>
+    <div class="shrink-0 px-4 py-2 border-t border-white/5 text-center">
+      <p id="preview-url-label" class="text-xs text-gray-600 font-mono truncate"></p>
+    </div>
+  </div>
   <div id="type-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
     <div id="type-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
     <div class="relative glass border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[88vh] overflow-hidden flex flex-col">
@@ -387,11 +523,19 @@ const BLOCK_TYPES = [
   .scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
   .scrollbar-none::-webkit-scrollbar { display: none; }
   /* New type badges */
-  .badge-countdown { background: rgba(251,191,36,0.12); color: rgb(251,191,36); border-color: rgba(251,191,36,0.3); }
-  .badge-schedule  { background: rgba(99,179,237,0.12); color: rgb(99,179,237); border-color: rgba(99,179,237,0.3); }
-  .badge-donation  { background: rgba(248,113,113,0.12); color: rgb(248,113,113); border-color: rgba(248,113,113,0.3); }
-  .badge-embed     { background: rgba(167,139,250,0.12); color: rgb(167,139,250); border-color: rgba(167,139,250,0.3); }
-  .badge-scheduled { background: rgba(251,191,36,0.08); color: rgba(251,191,36,0.8); border-color: rgba(251,191,36,0.2); }
+  .badge-countdown   { background: rgba(251,191,36,0.12);  color: rgb(251,191,36);  border-color: rgba(251,191,36,0.3); }
+  .badge-schedule    { background: rgba(99,179,237,0.12);  color: rgb(99,179,237);  border-color: rgba(99,179,237,0.3); }
+  .badge-donation    { background: rgba(248,113,113,0.12); color: rgb(248,113,113); border-color: rgba(248,113,113,0.3); }
+  .badge-embed       { background: rgba(167,139,250,0.12); color: rgb(167,139,250); border-color: rgba(167,139,250,0.3); }
+  .badge-text        { background: rgba(148,163,184,0.10); color: rgb(148,163,184); border-color: rgba(148,163,184,0.25); }
+  .badge-banner      { background: rgba(251,113,133,0.12); color: rgb(251,113,133); border-color: rgba(251,113,133,0.3); }
+  .badge-product     { background: rgba(52,211,153,0.12);  color: rgb(52,211,153);  border-color: rgba(52,211,153,0.3); }
+  .badge-poll        { background: rgba(56,189,248,0.12);  color: rgb(56,189,248);  border-color: rgba(56,189,248,0.3); }
+  .badge-twitch      { background: rgba(145,70,255,0.15);  color: rgb(169,112,255); border-color: rgba(145,70,255,0.35); }
+  .badge-newsletter  { background: rgba(251,191,36,0.10);  color: rgb(251,191,36);  border-color: rgba(251,191,36,0.25); }
+  .badge-vcard       { background: rgba(99,179,237,0.10);  color: rgb(99,179,237);  border-color: rgba(99,179,237,0.25); }
+  .badge-merch       { background: rgba(248,113,113,0.10); color: rgb(248,113,113); border-color: rgba(248,113,113,0.25); }
+  .badge-scheduled   { background: rgba(251,191,36,0.08);  color: rgba(251,191,36,0.8); border-color: rgba(251,191,36,0.2); }
   /* Progress bar */
   .progress-bar { background: linear-gradient(90deg, #00ff9d, #00e88a); border-radius: 99px; }
   /* Pin tab */
@@ -399,6 +543,27 @@ const BLOCK_TYPES = [
   /* Kit card */
   .kit-card { transition: transform 0.15s ease, border-color 0.15s ease; }
   .kit-card:hover { transform: translateY(-2px); }
+  /* Preview panel slide in */
+  #preview-panel.open { display: flex !important; }
+  .with-preview { padding-right: 340px; }
+  /* Preview refresh spin */
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .preview-loading svg { animation: spin 0.8s linear infinite; }
+  /* Inline edit */
+  .block-title-editable[contenteditable="true"] {
+    outline: none; border-bottom: 1px solid rgba(0,255,157,0.5);
+    padding-bottom: 1px; cursor: text; min-width: 40px;
+  }
+  /* Copy quick btn */
+  .block-copy-btn { opacity: 0; transition: opacity 0.15s; }
+  .block-card:hover .block-copy-btn { opacity: 1; }
+  /* Archive card */
+  .archive-card { opacity: 0.6; }
+  .archive-card:hover { opacity: 1; }
+  /* OG fetch loader */
+  #og-loading { transition: opacity 0.2s; }
+  /* Keyboard shortcut hint */
+  kbd { font-family: monospace; }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
@@ -408,7 +573,8 @@ const BLOCK_TYPES = [
 
   // ── Bridge ────────────────────────────────────────────────────────────────
   const raw = JSON.parse(document.getElementById('server-data')?.dataset.bridge ?? '{}');
-  let { blocks, blockCount, blockLimit, canAddBlock, profileId, totalViews } = raw;
+  let { blocks, blockCount, blockLimit, canAddBlock, profileId, username, totalViews } = raw;
+  const profileUrl = username ? `/@${username}` : null;
 
   // ── State ─────────────────────────────────────────────────────────────────
   let selectedIds: Set<string> = new Set();
@@ -462,10 +628,15 @@ const BLOCK_TYPES = [
   const BLOCK_EMOJI: Record<string, string> = {
     link:'🔗', heading:'📝', spacer:'—', image:'🖼️', video:'🎥',
     social:'👥', countdown:'⏱️', schedule:'📅', donation:'💸', embed:'🎵',
+    text:'📄', banner:'📢', product:'🛍️', poll:'📊',
+    twitch_live:'🟣', newsletter:'📧', vcard:'👤', merch_grid:'🛒',
   };
   const TYPE_BADGE: Record<string, string> = {
     countdown:'badge-countdown', schedule:'badge-schedule',
     donation:'badge-donation',   embed:'badge-embed',
+    text:'badge-text',     banner:'badge-banner',   product:'badge-product',
+    poll:'badge-poll',     twitch_live:'badge-twitch', newsletter:'badge-newsletter',
+    vcard:'badge-vcard',   merch_grid:'badge-merch',
   };
 
   function isNew(createdAt: string): boolean {
@@ -483,7 +654,224 @@ const BLOCK_TYPES = [
     });
   }
 
-  // ── Streamer Kit ──────────────────────────────────────────────────────────
+  const BLOCK_EMOJI2 = BLOCK_EMOJI; // alias kept for archive section below
+
+  // ── Archive (soft delete) ─────────────────────────────────────────────────
+  let archivedBlocks: any[] = [];
+
+  function renderArchive() {
+    const section = document.getElementById('archive-section');
+    const list    = document.getElementById('archive-list');
+    const count   = document.getElementById('archive-count');
+    if (!section || !list) return;
+    if (!archivedBlocks.length) { section.classList.add('hidden'); return; }
+    section.classList.remove('hidden');
+    if (count) count.textContent = String(archivedBlocks.length);
+    list.innerHTML = archivedBlocks.map(b => `
+      <div class="archive-card group flex items-center gap-3 glass border border-white/8 rounded-xl px-4 py-3 transition-all"
+        data-id="${b.id}">
+        <span class="text-lg shrink-0">${BLOCK_EMOJI[b.type] ?? '📌'}</span>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-gray-400 truncate">${b.title || b.type}</p>
+          <p class="text-xs text-gray-600">${b.type}</p>
+        </div>
+        <button class="archive-restore-btn shrink-0 px-3 py-1.5 glass border border-white/10 rounded-lg text-xs text-gray-400 hover:text-neon-green hover:border-neon-green/30 transition-all" data-id="${b.id}">
+          Restaurer
+        </button>
+        <button class="archive-perm-delete-btn shrink-0 p-1.5 text-gray-600 hover:text-red-400 transition-colors" data-id="${b.id}" title="Supprimer définitivement">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>`).join('');
+
+    list.querySelectorAll('.archive-restore-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = (btn as HTMLElement).dataset.id!;
+        const b  = archivedBlocks.find((x: any) => x.id === id);
+        if (!b) return;
+        try {
+          await apiCall(`/api/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active: false }) });
+          archivedBlocks = archivedBlocks.filter((x: any) => x.id !== id);
+          blocks.push({ ...b, active: false });
+          renderBlocks(); renderArchive();
+          toast.success('Block restauré !');
+        } catch { toast.error('Restore failed'); }
+      });
+    });
+    list.querySelectorAll('.archive-perm-delete-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = (btn as HTMLElement).dataset.id!;
+        if (!confirm('Supprimer définitivement ?')) return;
+        try {
+          await apiCall(`/api/blocks/${id}`, { method:'DELETE' });
+          archivedBlocks = archivedBlocks.filter((x: any) => x.id !== id);
+          renderArchive();
+          toast.success('Supprimé définitivement');
+        } catch { toast.error('Delete failed'); }
+      });
+    });
+  }
+
+  document.getElementById('archive-clear-btn')?.addEventListener('click', async () => {
+    if (!archivedBlocks.length) return;
+    if (!confirm(`Supprimer définitivement ${archivedBlocks.length} block(s) archivé(s) ?`)) return;
+    try {
+      await Promise.all(archivedBlocks.map(b => apiCall(`/api/blocks/${b.id}`, { method:'DELETE' })));
+      archivedBlocks = [];
+      renderArchive();
+      toast.success('Corbeille vidée');
+    } catch { toast.error('Failed'); }
+  });
+
+  // ── Live preview panel ────────────────────────────────────────────────────
+  const previewPanel   = document.getElementById('preview-panel');
+  const previewIframe  = document.getElementById('preview-iframe') as HTMLIFrameElement | null;
+  const previewUrlLbl  = document.getElementById('preview-url-label');
+  let previewOpen      = false;
+  let previewDebounce: ReturnType<typeof setTimeout> | null = null;
+
+  function openPreview() {
+    if (!profileUrl || !previewPanel) return;
+    previewOpen = true;
+    previewPanel.classList.add('open');
+    document.querySelector('.max-w-5xl, [class*="max-w-"]')?.classList.add('with-preview');
+    loadPreview();
+    if (previewUrlLbl) previewUrlLbl.textContent = `bioforge.click${profileUrl}`;
+  }
+  function closePreview() {
+    previewOpen = false;
+    previewPanel?.classList.remove('open');
+    document.querySelector('.with-preview')?.classList.remove('with-preview');
+  }
+  function loadPreview() {
+    if (!previewIframe || !profileUrl) return;
+    const btn = document.getElementById('preview-refresh-btn');
+    btn?.classList.add('preview-loading');
+    previewIframe.src = profileUrl + '?preview=1&t=' + Date.now();
+    previewIframe.onload = () => btn?.classList.remove('preview-loading');
+  }
+  function schedulePreviewRefresh() {
+    if (!previewOpen) return;
+    if (previewDebounce) clearTimeout(previewDebounce);
+    previewDebounce = setTimeout(loadPreview, 1200);
+  }
+
+  document.getElementById('preview-toggle-btn')?.addEventListener('click', () => {
+    previewOpen ? closePreview() : openPreview();
+  });
+  document.getElementById('preview-close-btn')?.addEventListener('click', closePreview);
+  document.getElementById('preview-refresh-btn')?.addEventListener('click', loadPreview);
+  document.getElementById('preview-open-btn')?.addEventListener('click', () => {
+    if (profileUrl) window.open(profileUrl, '_blank');
+  });
+
+  // ── OG auto-fetch (via microlink.io free tier) ────────────────────────────
+  let ogFetchController: AbortController | null = null;
+
+  async function fetchOgMeta(url: string): Promise<{ title: string; image: string } | null> {
+    try {
+      ogFetchController?.abort();
+      ogFetchController = new AbortController();
+      const res = await fetch(
+        `https://api.microlink.io/?url=${encodeURIComponent(url)}&screenshot=false`,
+        { signal: ogFetchController.signal }
+      );
+      const json = await res.json();
+      if (json.status !== 'success') return null;
+      return {
+        title: json.data?.title ?? '',
+        image: json.data?.image?.url ?? json.data?.logo?.url ?? '',
+      };
+    } catch { return null; }
+  }
+
+  function showOgLoader(show: boolean) {
+    const el = document.getElementById('og-loading');
+    if (el) el.style.opacity = show ? '1' : '0';
+  }
+
+  // Attach OG fetch when URL field changes in edit modal
+  function attachOgFetch() {
+    const urlField   = document.getElementById('field-url')      as HTMLInputElement | null;
+    const titleField = document.getElementById('field-title')    as HTMLInputElement | null;
+    const iconField  = document.getElementById('field-icon-url') as HTMLInputElement | null;
+    const iconWrap   = document.getElementById('icon-preview-wrap');
+    if (!urlField) return;
+
+    let ogTimer: ReturnType<typeof setTimeout> | null = null;
+    urlField.addEventListener('input', () => {
+      const val = urlField.value.trim();
+      if (!val.startsWith('http')) return;
+      if (ogTimer) clearTimeout(ogTimer);
+      ogTimer = setTimeout(async () => {
+        showOgLoader(true);
+        const meta = await fetchOgMeta(val);
+        showOgLoader(false);
+        if (!meta) return;
+        if (titleField && !titleField.value) titleField.value = meta.title;
+        if (iconField && !iconField.value && meta.image) {
+          iconField.value = meta.image;
+          if (iconWrap) iconWrap.innerHTML = `<img src="${meta.image}" class="w-full h-full object-cover" />`;
+        }
+      }, 700);
+    });
+  }
+
+  // ── Inline title editing ──────────────────────────────────────────────────
+  let inlineEditId: string | null = null;
+
+  function attachInlineEdit() {
+    document.querySelectorAll('.block-title-editable').forEach(el => {
+      el.addEventListener('dblclick', () => {
+        (el as HTMLElement).contentEditable = 'true';
+        (el as HTMLElement).focus();
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const sel = window.getSelection();
+        sel?.removeAllRanges(); sel?.addRange(range);
+        inlineEditId = (el as HTMLElement).dataset.id!;
+      });
+      el.addEventListener('blur', async () => {
+        if ((el as HTMLElement).contentEditable !== 'true') return;
+        (el as HTMLElement).contentEditable = 'false';
+        const newTitle = (el as HTMLElement).textContent?.trim() || null;
+        const id = (el as HTMLElement).dataset.id!;
+        if (!newTitle || !id) return;
+        try {
+          await apiCall(`/api/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ title: newTitle }) });
+          const b = blocks.find((b: any) => b.id === id);
+          if (b) b.title = newTitle;
+          toast.success('Titre mis à jour');
+          schedulePreviewRefresh();
+        } catch { toast.error('Failed to rename'); renderBlocks(); }
+        inlineEditId = null;
+      });
+      el.addEventListener('keydown', (e: any) => {
+        if (e.key === 'Enter') { e.preventDefault(); (el as HTMLElement).blur(); }
+        if (e.key === 'Escape') {
+          (el as HTMLElement).contentEditable = 'false';
+          const b = blocks.find((b: any) => b.id === (el as HTMLElement).dataset.id);
+          if (b) (el as HTMLElement).textContent = b.title || '';
+        }
+      });
+    });
+  }
+
+  // ── Quick copy URL ────────────────────────────────────────────────────────
+  function attachCopyBtns() {
+    document.querySelectorAll('.block-copy-btn').forEach(btn => {
+      btn.addEventListener('click', async (e: any) => {
+        e.stopPropagation();
+        const url = (btn as HTMLElement).dataset.url!;
+        await navigator.clipboard.writeText(url).catch(() => {});
+        const orig = (btn as HTMLElement).innerHTML;
+        (btn as HTMLElement).innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>`;
+        setTimeout(() => { (btn as HTMLElement).innerHTML = orig; }, 1500);
+        toast.success('URL copiée !');
+      });
+    });
+  }
   const STREAMER_KITS = [
     {
       id: 'gaming', label: '🎮 Gaming', desc: 'Twitch · Discord · Countdown · Ko-fi', color: '#7c3aed',
@@ -663,6 +1051,27 @@ const BLOCK_TYPES = [
       } else if (block.type === 'embed' && block.config?.url) {
         const domain = (() => { try { return new URL(block.config.url).hostname.replace('www.',''); } catch { return ''; } })();
         extraHtml = `<div class="mt-1 pl-7 text-xs text-purple-400/70">🎵 ${domain}</div>`;
+      } else if (block.type === 'text' && block.config?.content) {
+        const snippet = block.config.content.slice(0, 80).replace(/</g,'&lt;');
+        extraHtml = `<div class="mt-1 pl-7 text-xs text-gray-500 italic truncate">"${snippet}${block.config.content.length > 80 ? '…' : ''}"</div>`;
+      } else if (block.type === 'banner') {
+        const badge = block.config?.badge || block.config?.badge_preset || 'LIVE';
+        extraHtml = `<div class="mt-1 pl-7 text-xs text-pink-400/70">📢 Badge: ${badge.toUpperCase()}</div>`;
+      } else if (block.type === 'product' && block.config?.price) {
+        extraHtml = `<div class="mt-1 pl-7 text-xs text-green-400/70">🛍️ ${block.config.price} ${block.config.currency || '€'}</div>`;
+      } else if (block.type === 'poll' && block.config?.options?.length) {
+        const total = block.config.options.reduce((s: number, o: any) => s + (o.votes ?? 0), 0);
+        extraHtml = `<div class="mt-1 pl-7 text-xs text-sky-400/70">📊 ${block.config.options.length} options · ${total} votes</div>`;
+      } else if (block.type === 'twitch_live' && block.config?.channel) {
+        extraHtml = `<div class="mt-1 pl-7 text-xs text-purple-400/70">🟣 twitch.tv/${block.config.channel}</div>`;
+      } else if (block.type === 'newsletter') {
+        const prov = block.config?.provider || 'custom';
+        extraHtml = `<div class="mt-1 pl-7 text-xs text-yellow-400/70">📧 ${prov}</div>`;
+      } else if (block.type === 'vcard') {
+        const name = [block.config?.first_name, block.config?.last_name].filter(Boolean).join(' ');
+        extraHtml = name ? `<div class="mt-1 pl-7 text-xs text-blue-400/70">👤 ${name}</div>` : '';
+      } else if (block.type === 'merch_grid' && block.config?.items?.length) {
+        extraHtml = `<div class="mt-1 pl-7 text-xs text-red-400/70">🛒 ${block.config.items.length} article${block.config.items.length > 1 ? 's' : ''}</div>`;
       }
 
       return `
@@ -685,7 +1094,7 @@ const BLOCK_TYPES = [
               <div class="flex items-center gap-1.5 flex-wrap mb-0.5">
                 <span class="text-xs px-2 py-0.5 rounded-full border font-medium capitalize ${typeBadge || 'bg-white/5 border-white/10 text-gray-400'}">${block.type}</span>
                 ${block.title
-                  ? `<span class="text-sm font-semibold text-white truncate max-w-[160px]">${block.title}</span>`
+                  ? `<span class="block-title-editable text-sm font-semibold text-white truncate max-w-[160px] cursor-default select-none" data-id="${block.id}" title="Double-clic pour renommer">${block.title}</span>`
                   : `<span class="text-sm text-gray-600 italic">No title</span>`}
                 ${isPinned   ? '<span title="Épinglé" class="text-xs leading-none">📌</span>' : ''}
                 ${newBadge   ? '<span class="text-xs px-1.5 py-0.5 rounded-full bg-neon-green/15 text-neon-green font-medium border border-neon-green/25">New</span>' : ''}
@@ -706,6 +1115,13 @@ const BLOCK_TYPES = [
                   </span>` : ''}
               </div>
             </div>
+            ${block.type === 'link' && block.config?.url ? `
+            <button class="block-copy-btn p-1.5 glass rounded-lg border border-white/5 text-gray-600 hover:text-white hover:border-white/20 transition-all shrink-0"
+              data-url="${block.config.url}" title="Copier l'URL">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.1-1.1m-.757-4.9a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+              </svg>
+            </button>` : ''}
             <label class="relative inline-flex items-center cursor-pointer shrink-0">
               <input type="checkbox" ${block.active ? 'checked' : ''}
                 class="sr-only peer block-toggle" data-id="${block.id}" />
@@ -745,8 +1161,11 @@ const BLOCK_TYPES = [
     }).join('');
 
     attachCardListeners();
+    attachInlineEdit();
+    attachCopyBtns();
     initSortable();
     updateBulkBar();
+    schedulePreviewRefresh();
   }
 
   document.addEventListener('click', () => {
@@ -952,8 +1371,10 @@ const BLOCK_TYPES = [
         { kind: 'platform', id: 'instagram' },
         { kind: 'platform', id: 'discord' },
         { kind: 'platform', id: 'kick' },
-        { kind: 'block',    type: 'countdown', emoji: '⏱️', label: 'Countdown',    desc: 'Timer live vers ton prochain stream' },
-        { kind: 'block',    type: 'donation',  emoji: '💸', label: 'Donation',     desc: 'Ko-fi, Patreon, Streamlabs…' },
+        { kind: 'block', type: 'banner',      emoji: '📢', label: 'Banner',      desc: 'Annonce LIVE / NEW / HOT' },
+        { kind: 'block', type: 'countdown',   emoji: '⏱️', label: 'Countdown',   desc: 'Timer live vers ton prochain stream' },
+        { kind: 'block', type: 'donation',    emoji: '💸', label: 'Donation',    desc: 'Ko-fi, Patreon, Streamlabs…' },
+        { kind: 'block', type: 'twitch_live', emoji: '🟣', label: 'Twitch Live', desc: 'Embed de ta chaîne Twitch' },
       ],
     },
     {
@@ -963,8 +1384,11 @@ const BLOCK_TYPES = [
         { kind: 'platform', id: 'twitch' },
         { kind: 'platform', id: 'youtube' },
         { kind: 'platform', id: 'kick' },
-        { kind: 'block',    type: 'countdown', emoji: '⏱️', label: 'Countdown',   desc: 'Timer vers le prochain stream' },
-        { kind: 'block',    type: 'schedule',  emoji: '📅', label: 'Planning',     desc: 'Jours et horaires de stream' },
+        { kind: 'block', type: 'twitch_live', emoji: '🟣', label: 'Twitch Live', desc: 'Embed de ta chaîne' },
+        { kind: 'block', type: 'countdown',   emoji: '⏱️', label: 'Countdown',   desc: 'Timer vers le prochain stream' },
+        { kind: 'block', type: 'schedule',    emoji: '📅', label: 'Planning',    desc: 'Jours et horaires de stream' },
+        { kind: 'block', type: 'poll',        emoji: '📊', label: 'Sondage',     desc: 'Vote communauté' },
+        { kind: 'block', type: 'banner',      emoji: '📢', label: 'Banner LIVE', desc: 'Annonce stream en cours' },
         { kind: 'platform', id: 'streamlabs' },
         { kind: 'platform', id: 'streamelements' },
       ],
@@ -980,7 +1404,9 @@ const BLOCK_TYPES = [
         { kind: 'platform', id: 'facebook' },
         { kind: 'platform', id: 'snapchat' },
         { kind: 'platform', id: 'linkedin' },
-        { kind: 'block',    type: 'social',    emoji: '👥', label: 'Icônes sociales', desc: 'Grille d\'icônes de tous tes réseaux' },
+        { kind: 'block', type: 'social',   emoji: '👥', label: 'Icônes sociales', desc: 'Grille d\'icônes de tous tes réseaux' },
+        { kind: 'block', type: 'vcard',    emoji: '👤', label: 'vCard',           desc: 'Télécharger mes coordonnées' },
+        { kind: 'block', type: 'newsletter', emoji: '📧', label: 'Newsletter',   desc: 'Capture email' },
       ],
     },
     {
@@ -991,7 +1417,10 @@ const BLOCK_TYPES = [
         { kind: 'platform', id: 'patreon' },
         { kind: 'platform', id: 'throne' },
         { kind: 'platform', id: 'streamlabs' },
-        { kind: 'block',    type: 'donation',  emoji: '💸', label: 'Donation CTA', desc: 'Bouton don avec barre de progression' },
+        { kind: 'block', type: 'donation',   emoji: '💸', label: 'Donation CTA', desc: 'Bouton don avec barre de progression' },
+        { kind: 'block', type: 'product',    emoji: '🛍️', label: 'Produit',      desc: 'Carte produit avec prix' },
+        { kind: 'block', type: 'merch_grid', emoji: '🛒', label: 'Merch Grid',   desc: 'Grille de produits / merch' },
+        { kind: 'block', type: 'newsletter', emoji: '📧', label: 'Newsletter',   desc: 'Capture email / abonnés' },
       ],
     },
     {
@@ -999,9 +1428,10 @@ const BLOCK_TYPES = [
       label: '🎵 Médias',
       items: [
         { kind: 'platform', id: 'spotify' },
-        { kind: 'block',    type: 'embed',  emoji: '🎵', label: 'Music Embed',  desc: 'Spotify, SoundCloud, Apple Music' },
-        { kind: 'block',    type: 'video',  emoji: '🎥', label: 'Vidéo',        desc: 'YouTube, Vimeo, TikTok' },
-        { kind: 'block',    type: 'image',  emoji: '🖼️', label: 'Image',        desc: 'Afficher une image' },
+        { kind: 'block', type: 'embed',  emoji: '🎵', label: 'Music Embed', desc: 'Spotify, SoundCloud, Apple Music' },
+        { kind: 'block', type: 'video',  emoji: '🎥', label: 'Vidéo',       desc: 'YouTube, Vimeo, TikTok' },
+        { kind: 'block', type: 'image',  emoji: '🖼️', label: 'Image',       desc: 'Afficher une image' },
+        { kind: 'block', type: 'poll',   emoji: '📊', label: 'Sondage',     desc: 'Vote interactif' },
       ],
     },
     {
@@ -1009,9 +1439,12 @@ const BLOCK_TYPES = [
       label: '🔗 Liens',
       items: [
         { kind: 'platform', id: 'github' },
-        { kind: 'block',    type: 'link',    emoji: '🔗', label: 'Lien',         desc: 'Bouton lien cliquable' },
-        { kind: 'block',    type: 'heading', emoji: '📝', label: 'Titre',         desc: 'Séparateur titre de section' },
-        { kind: 'block',    type: 'spacer',  emoji: '—',  label: 'Spacer',        desc: 'Espace blanc' },
+        { kind: 'block', type: 'link',    emoji: '🔗', label: 'Lien',     desc: 'Bouton lien cliquable' },
+        { kind: 'block', type: 'text',    emoji: '📄', label: 'Texte',    desc: 'Paragraphe de texte libre' },
+        { kind: 'block', type: 'banner',  emoji: '📢', label: 'Banner',   desc: 'Annonce en évidence' },
+        { kind: 'block', type: 'heading', emoji: '📝', label: 'Titre',    desc: 'Séparateur titre de section' },
+        { kind: 'block', type: 'spacer',  emoji: '—',  label: 'Spacer',   desc: 'Espace blanc' },
+        { kind: 'block', type: 'vcard',   emoji: '👤', label: 'vCard',    desc: 'Télécharger mes coordonnées' },
       ],
     },
     {
@@ -1019,16 +1452,24 @@ const BLOCK_TYPES = [
       label: '··· Voir tout',
       items: [
         ...PLATFORMS.map(p => ({ kind: 'platform' as const, id: p.id })),
-        { kind: 'block' as const, type: 'link',      emoji: '🔗', label: 'Lien',          desc: 'Bouton lien cliquable' },
-        { kind: 'block' as const, type: 'social',    emoji: '👥', label: 'Icônes sociales',desc: 'Grille d\'icônes' },
-        { kind: 'block' as const, type: 'countdown', emoji: '⏱️', label: 'Countdown',      desc: 'Timer stream' },
-        { kind: 'block' as const, type: 'schedule',  emoji: '📅', label: 'Planning',        desc: 'Jours et horaires' },
-        { kind: 'block' as const, type: 'donation',  emoji: '💸', label: 'Donation',        desc: 'CTA don' },
-        { kind: 'block' as const, type: 'embed',     emoji: '🎵', label: 'Music Embed',     desc: 'Spotify / SoundCloud' },
-        { kind: 'block' as const, type: 'video',     emoji: '🎥', label: 'Vidéo',           desc: 'YouTube / Vimeo' },
-        { kind: 'block' as const, type: 'image',     emoji: '🖼️', label: 'Image',           desc: 'Image' },
-        { kind: 'block' as const, type: 'heading',   emoji: '📝', label: 'Titre',           desc: 'Section title' },
-        { kind: 'block' as const, type: 'spacer',    emoji: '—',  label: 'Spacer',          desc: 'Espace' },
+        { kind: 'block' as const, type: 'link',        emoji: '🔗', label: 'Lien',           desc: 'Bouton lien cliquable' },
+        { kind: 'block' as const, type: 'text',        emoji: '📄', label: 'Texte',          desc: 'Paragraphe libre' },
+        { kind: 'block' as const, type: 'banner',      emoji: '📢', label: 'Banner',         desc: 'Annonce LIVE/NEW/HOT' },
+        { kind: 'block' as const, type: 'social',      emoji: '👥', label: 'Icônes sociales',desc: 'Grille d\'icônes' },
+        { kind: 'block' as const, type: 'countdown',   emoji: '⏱️', label: 'Countdown',      desc: 'Timer stream' },
+        { kind: 'block' as const, type: 'schedule',    emoji: '📅', label: 'Planning',       desc: 'Jours et horaires' },
+        { kind: 'block' as const, type: 'donation',    emoji: '💸', label: 'Donation',       desc: 'CTA don' },
+        { kind: 'block' as const, type: 'product',     emoji: '🛍️', label: 'Produit',        desc: 'Carte produit' },
+        { kind: 'block' as const, type: 'merch_grid',  emoji: '🛒', label: 'Merch Grid',     desc: 'Grille produits' },
+        { kind: 'block' as const, type: 'poll',        emoji: '📊', label: 'Sondage',        desc: 'Vote interactif' },
+        { kind: 'block' as const, type: 'twitch_live', emoji: '🟣', label: 'Twitch Live',    desc: 'Embed Twitch' },
+        { kind: 'block' as const, type: 'newsletter',  emoji: '📧', label: 'Newsletter',     desc: 'Capture email' },
+        { kind: 'block' as const, type: 'vcard',       emoji: '👤', label: 'vCard',          desc: 'Télécharger contact' },
+        { kind: 'block' as const, type: 'embed',       emoji: '🎵', label: 'Music Embed',    desc: 'Spotify / SoundCloud' },
+        { kind: 'block' as const, type: 'video',       emoji: '🎥', label: 'Vidéo',          desc: 'YouTube / Vimeo' },
+        { kind: 'block' as const, type: 'image',       emoji: '🖼️', label: 'Image',          desc: 'Image' },
+        { kind: 'block' as const, type: 'heading',     emoji: '📝', label: 'Titre',          desc: 'Section title' },
+        { kind: 'block' as const, type: 'spacer',      emoji: '—',  label: 'Spacer',         desc: 'Espace' },
       ],
     },
   ];
@@ -1223,7 +1664,13 @@ const BLOCK_TYPES = [
           <input type="text" id="field-title" value="${titleVal}" required maxlength="100" placeholder="Mon Twitch" class="${IC}" /></div>
         <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">URL <span class="text-red-400">*</span></label>
           <input type="url" id="field-url" value="${urlVal}" required placeholder="https://twitch.tv/username" class="${IC}" /></div>
-        ${iconWidget}`,
+        ${iconWidget}
+        <div id="og-loading" class="flex items-center gap-2 text-xs text-gray-500" style="opacity:0">
+          <svg class="w-3.5 h-3.5 animate-spin shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          Récupération du titre et de l'icône…
+        </div>`,
 
       heading: `
         <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Texte <span class="text-red-400">*</span></label>
@@ -1301,6 +1748,166 @@ const BLOCK_TYPES = [
           <input type="number" id="field-embed-height" value="${val('height') || 152}" min="80" max="500" placeholder="152" class="${IC}" /></div>
         <div class="p-3 rounded-xl bg-purple-500/5 border border-purple-500/15 text-xs text-purple-300/70">
           🎵 Spotify : Partager → Copier le lien de la playlist ou de l'album.</div>`,
+
+      text: `
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Titre <span class="text-gray-500 text-xs">optionnel</span></label>
+          <input type="text" id="field-title" value="${titleVal}" maxlength="80" placeholder="À propos de moi…" class="${IC}" /></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Contenu <span class="text-red-400">*</span></label>
+          <textarea id="field-text-content" rows="5" required maxlength="800" placeholder="Écris ton texte ici…" class="${IC} resize-none">${val('content')}</textarea>
+          <p class="text-xs text-gray-600">Max 800 caractères</p></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Alignement</label>
+            <select id="field-text-align" class="${IC}">
+              <option value="left"   ${val('align')==='left'   ? 'selected' : ''}>Gauche</option>
+              <option value="center" ${val('align')==='center' || !val('align') ? 'selected' : ''}>Centre</option>
+              <option value="right"  ${val('align')==='right'  ? 'selected' : ''}>Droite</option>
+            </select></div>
+          <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Taille</label>
+            <select id="field-text-size" class="${IC}">
+              <option value="sm" ${val('text_size')==='sm' ? 'selected' : ''}>Petit</option>
+              <option value="md" ${val('text_size')==='md' || !val('text_size') ? 'selected' : ''}>Moyen</option>
+              <option value="lg" ${val('text_size')==='lg' ? 'selected' : ''}>Grand</option>
+            </select></div>
+        </div>`,
+
+      banner: `
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Badge <span class="text-red-400">*</span></label>
+          <div class="flex gap-2 flex-wrap mb-2" id="banner-preset-btns">
+            ${['LIVE','NEW','HOT','SOON','SALE'].map(p => `
+              <button type="button" class="banner-preset-btn px-3 py-1.5 text-xs font-bold rounded-lg border transition-all
+                ${(val('badge_preset') || 'LIVE') === p ? 'border-neon-green/50 bg-neon-green/10 text-white' : 'border-white/15 text-gray-500 hover:border-white/30'}"
+                data-preset="${p}">${p}</button>`).join('')}
+          </div>
+          <input type="text" id="field-banner-badge" value="${val('badge') || val('badge_preset') || 'LIVE'}" required maxlength="20" placeholder="LIVE" class="${IC}" />
+          <input type="hidden" id="field-banner-preset" value="${val('badge_preset') || 'LIVE'}" /></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Message <span class="text-red-400">*</span></label>
+          <input type="text" id="field-title" value="${titleVal || 'Je suis en live maintenant !'}" required maxlength="120" placeholder="Je suis en live maintenant !" class="${IC}" /></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">URL <span class="text-gray-500 text-xs">optionnel</span></label>
+          <input type="url" id="field-url" value="${val('url')}" placeholder="https://twitch.tv/username" class="${IC}" /></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Label CTA <span class="text-gray-500 text-xs">optionnel</span></label>
+          <input type="text" id="field-banner-cta" value="${val('url_label') || 'Regarder →'}" maxlength="30" placeholder="Regarder →" class="${IC}" /></div>`,
+
+      product: `
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Nom du produit <span class="text-red-400">*</span></label>
+          <input type="text" id="field-title" value="${titleVal}" required maxlength="100" placeholder="Mon dernier merch 👕" class="${IC}" /></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">URL du produit <span class="text-red-400">*</span></label>
+          <input type="url" id="field-url" value="${val('url')}" required placeholder="https://throne.com/monpseudo/..." class="${IC}" /></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Image <span class="text-gray-500 text-xs">optionnel</span></label>
+          <input type="url" id="field-product-image" value="${val('image_url')}" placeholder="https://example.com/product.jpg" class="${IC}" /></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Prix</label>
+            <input type="text" id="field-product-price" value="${val('price')}" maxlength="20" placeholder="19.99" class="${IC}" /></div>
+          <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Devise</label>
+            <select id="field-product-currency" class="${IC}">
+              ${['EUR','USD','GBP','CAD','CHF'].map(c => `<option value="${c}" ${(val('currency')||'EUR')===c?'selected':''}>${c}</option>`).join('')}
+            </select></div>
+        </div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Label bouton</label>
+          <input type="text" id="field-product-cta" value="${val('cta_label') || 'Acheter →'}" maxlength="40" placeholder="Acheter →" class="${IC}" /></div>`,
+
+      poll: `
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Question <span class="text-red-400">*</span></label>
+          <input type="text" id="field-title" value="${titleVal || ''}" required maxlength="120" placeholder="Quel est ton jeu préféré ?" class="${IC}" /></div>
+        <div class="space-y-2">
+          <div class="flex items-center justify-between"><label class="text-sm font-medium text-gray-300">Options <span class="text-red-400">*</span></label>
+            <button type="button" id="add-poll-option" class="text-xs text-neon-green hover:underline">+ Ajouter</button></div>
+          <div id="poll-options-list" class="space-y-2">
+            ${(block?.config?.options?.length ? block.config.options : [{text:'',votes:0},{text:'',votes:0}]).slice(0,4).map((o: any, i: number) => `
+              <div class="flex items-center gap-2 poll-option-row">
+                <span class="text-xs text-gray-600 w-4 shrink-0">${i+1}.</span>
+                <input type="text" class="poll-opt-input ${IC} flex-1" value="${o.text || ''}" maxlength="80" placeholder="Option ${i+1}" />
+                <input type="hidden" class="poll-opt-votes" value="${o.votes || 0}" />
+                <button type="button" class="rm-poll-option text-gray-600 hover:text-red-400 transition-colors shrink-0 ${i<2?'opacity-0 pointer-events-none':''}">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+              </div>`).join('')}
+          </div>
+          <p class="text-xs text-gray-600">Maximum 4 options. Les votes existants sont conservés.</p>
+        </div>
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" id="field-allow-multiple" ${block?.config?.allow_multiple ? 'checked' : ''} class="w-4 h-4 rounded accent-neon-green" />
+          <span class="text-sm text-gray-300">Autoriser plusieurs votes</span>
+        </label>`,
+
+      twitch_live: `
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Nom de chaîne Twitch <span class="text-red-400">*</span></label>
+          <div class="flex items-center gap-2">
+            <span class="shrink-0 text-sm text-gray-500 font-mono">twitch.tv/</span>
+            <input type="text" id="field-twitch-channel" value="${val('channel')}" required maxlength="50" placeholder="monpseudo" class="${IC} flex-1" />
+          </div></div>
+        <label class="flex items-center gap-3 cursor-pointer">
+          <input type="checkbox" id="field-twitch-chat" ${block?.config?.show_chat ? 'checked' : ''} class="w-4 h-4 rounded accent-neon-green" />
+          <span class="text-sm text-gray-300">Afficher le chat Twitch</span>
+        </label>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Message offline <span class="text-gray-500 text-xs">optionnel</span></label>
+          <input type="text" id="field-title" value="${titleVal || ''}" maxlength="80" placeholder="Je stream bientôt, reste connecté !" class="${IC}" /></div>
+        <div class="p-3 rounded-xl bg-purple-500/5 border border-purple-500/15 text-xs text-purple-300/70">
+          🟣 L'embed Twitch nécessite HTTPS et un domaine autorisé. En production sur bioforge.click ✅</div>`,
+
+      newsletter: `
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Titre <span class="text-red-400">*</span></label>
+          <input type="text" id="field-title" value="${titleVal || 'Abonne-toi à ma newsletter ✉️'}" required maxlength="80" placeholder="Abonne-toi à ma newsletter ✉️" class="${IC}" /></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Fournisseur</label>
+          <div class="grid grid-cols-3 gap-2" id="nl-provider-grid">
+            ${['mailchimp','convertkit','brevo','beehiiv','substack','custom'].map(p => `
+              <button type="button" class="nl-plat-btn flex flex-col items-center gap-1 p-2.5 glass border rounded-xl text-xs font-medium transition-all capitalize
+                ${(val('provider')||'custom')===p ? 'border-neon-green/50 bg-neon-green/5 text-white' : 'border-white/10 text-gray-400 hover:border-white/20'}"
+                data-prov="${p}">${p}</button>`).join('')}
+          </div>
+          <input type="hidden" id="field-nl-provider" value="${val('provider') || 'custom'}" /></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">URL d'action (form action) <span class="text-red-400">*</span></label>
+          <input type="url" id="field-url" value="${val('action_url') || val('url')}" required placeholder="https://app.mailchimp.com/…" class="${IC}" />
+          <p class="text-xs text-gray-600">Mailchimp : Settings → Audience → Signup forms → Embedded forms → action=</p></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Placeholder</label>
+            <input type="text" id="field-nl-placeholder" value="${val('nl_placeholder') || 'ton@email.com'}" maxlength="50" class="${IC}" /></div>
+          <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Bouton</label>
+            <input type="text" id="field-nl-cta" value="${val('nl_cta') || 'S\'abonner'}" maxlength="30" class="${IC}" /></div>
+        </div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Message de succès</label>
+          <input type="text" id="field-nl-success" value="${val('nl_success') || 'Merci ! Vérifie ta boîte mail 📬'}" maxlength="100" class="${IC}" /></div>`,
+
+      vcard: `
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Prénom <span class="text-red-400">*</span></label>
+            <input type="text" id="field-vcard-firstname" value="${val('first_name')}" required maxlength="60" placeholder="Alex" class="${IC}" /></div>
+          <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Nom</label>
+            <input type="text" id="field-vcard-lastname" value="${val('last_name')}" maxlength="60" placeholder="Dupont" class="${IC}" /></div>
+        </div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Titre du bouton <span class="text-red-400">*</span></label>
+          <input type="text" id="field-title" value="${titleVal || 'Télécharger mon contact'}" required maxlength="60" placeholder="Télécharger mon contact" class="${IC}" /></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Email</label>
+          <input type="email" id="field-vcard-email" value="${val('email')}" placeholder="alex@example.com" class="${IC}" /></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Téléphone</label>
+          <input type="tel" id="field-vcard-phone" value="${val('phone')}" placeholder="+33 6 00 00 00 00" class="${IC}" /></div>
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Site web</label>
+          <input type="url" id="field-vcard-website" value="${val('website')}" placeholder="https://bioforge.click/@monpseudo" class="${IC}" /></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Entreprise / Orga</label>
+            <input type="text" id="field-vcard-company" value="${val('company')}" maxlength="80" class="${IC}" /></div>
+          <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Rôle / Poste</label>
+            <input type="text" id="field-vcard-role" value="${val('role')}" maxlength="80" placeholder="Streamer / Creator" class="${IC}" /></div>
+        </div>`,
+
+      merch_grid: `
+        <div class="space-y-1.5"><label class="text-sm font-medium text-gray-300">Titre <span class="text-gray-500 text-xs">optionnel</span></label>
+          <input type="text" id="field-title" value="${titleVal || 'Mon Merch'}" maxlength="80" placeholder="Mon Merch" class="${IC}" /></div>
+        <div class="space-y-3" id="merch-items-list">
+          ${(block?.config?.items?.length ? block.config.items : [{},{},{}]).slice(0,3).map((it: any, i: number) => `
+            <div class="p-3 glass border border-white/10 rounded-xl space-y-2 merch-item" data-i="${i}">
+              <p class="text-xs font-semibold text-gray-400">Article ${i+1}</p>
+              <input type="text" class="merch-title ${IC}" value="${it.title || ''}" placeholder="Nom du produit" maxlength="80" />
+              <input type="url" class="merch-url ${IC}" value="${it.url || ''}" placeholder="https://throne.com/..." />
+              <input type="url" class="merch-img ${IC}" value="${it.image_url || ''}" placeholder="URL image (optionnel)" />
+              <div class="flex gap-2">
+                <input type="text" class="merch-price ${IC} flex-1" value="${it.price || ''}" placeholder="Prix (ex: 24.90)" />
+                <select class="merch-currency ${IC} w-24 shrink-0">
+                  ${['EUR','USD','GBP'].map(c => `<option value="${c}" ${(it.currency||'EUR')===c?'selected':''}>${c}</option>`).join('')}
+                </select>
+              </div>
+            </div>`).join('')}
+        </div>
+        <p class="text-xs text-gray-600">Ajoute jusqu'à 3 produits. Les articles vides sont ignorés.</p>`,
     };
 
     const fields = document.getElementById('form-fields')!;
@@ -1314,6 +1921,7 @@ const BLOCK_TYPES = [
     if (showUntil && block?.config?.show_until) showUntil.value = block.config.show_until.slice(0,16);
 
     openModal('edit-modal');
+    if (type === 'link') setTimeout(attachOgFetch, 50);
     setTimeout(() => (fields.querySelector('input:not([type="checkbox"]):not([type="time"]):not([type="hidden"]), textarea') as HTMLElement|null)?.focus(), 100);
 
     // Donation platform pills
@@ -1366,6 +1974,87 @@ const BLOCK_TYPES = [
         const plat = detectPlatform(urlField.value.trim());
         if (plat?.defaultIcon) { iconInput.value = plat.defaultIcon; iconWrap.innerHTML = `<img src="${plat.defaultIcon}" class="w-full h-full object-cover" />`; }
       });
+    }
+
+    // Banner preset pills
+    if (type === 'banner') {
+      const badgeInput  = document.getElementById('field-banner-badge')  as HTMLInputElement | null;
+      const presetInput = document.getElementById('field-banner-preset') as HTMLInputElement | null;
+      document.querySelectorAll('.banner-preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const p = (btn as HTMLElement).dataset.preset!;
+          if (badgeInput)  badgeInput.value  = p;
+          if (presetInput) presetInput.value = p;
+          document.querySelectorAll('.banner-preset-btn').forEach(b => {
+            b.classList.toggle('border-neon-green/50', b === btn);
+            b.classList.toggle('bg-neon-green/10',    b === btn);
+            b.classList.toggle('text-white',           b === btn);
+            b.classList.toggle('border-white/15',      b !== btn);
+            b.classList.toggle('text-gray-500',        b !== btn);
+          });
+        });
+      });
+    }
+
+    // Newsletter provider pills
+    if (type === 'newsletter') {
+      document.querySelectorAll('.nl-plat-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const p = (btn as HTMLElement).dataset.prov!;
+          (document.getElementById('field-nl-provider') as HTMLInputElement).value = p;
+          document.querySelectorAll('.nl-plat-btn').forEach(b => {
+            b.classList.toggle('border-neon-green/50', b === btn);
+            b.classList.toggle('bg-neon-green/5',      b === btn);
+            b.classList.toggle('text-white',            b === btn);
+            b.classList.toggle('border-white/10',       b !== btn);
+            b.classList.toggle('text-gray-400',         b !== btn);
+          });
+        });
+      });
+    }
+
+    // Poll options: add / remove
+    if (type === 'poll') {
+      function updatePollRemoveBtns() {
+        const rows = document.querySelectorAll('.poll-option-row');
+        rows.forEach((row, i) => {
+          const btn = row.querySelector('.rm-poll-option') as HTMLElement;
+          if (btn) { btn.classList.toggle('opacity-0', i < 2); btn.classList.toggle('pointer-events-none', i < 2); }
+        });
+      }
+      document.getElementById('add-poll-option')?.addEventListener('click', () => {
+        const list = document.getElementById('poll-options-list');
+        if (!list) return;
+        const count = list.querySelectorAll('.poll-option-row').length;
+        if (count >= 4) return;
+        const row = document.createElement('div');
+        row.className = `flex items-center gap-2 poll-option-row`;
+        row.innerHTML = `
+          <span class="text-xs text-gray-600 w-4 shrink-0">${count+1}.</span>
+          <input type="text" class="poll-opt-input ${IC} flex-1" value="" maxlength="80" placeholder="Option ${count+1}" />
+          <input type="hidden" class="poll-opt-votes" value="0" />
+          <button type="button" class="rm-poll-option text-gray-600 hover:text-red-400 transition-colors shrink-0">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>`;
+        list.appendChild(row);
+        updatePollRemoveBtns();
+        attachPollRemove();
+      });
+      function attachPollRemove() {
+        document.querySelectorAll('.rm-poll-option').forEach(btn => {
+          btn.addEventListener('click', () => {
+            btn.closest('.poll-option-row')?.remove();
+            // Renumber
+            document.querySelectorAll('.poll-option-row').forEach((row, i) => {
+              const sp = row.querySelector('span') as HTMLElement;
+              if (sp) sp.textContent = `${i+1}.`;
+            });
+            updatePollRemoveBtns();
+          });
+        });
+      }
+      attachPollRemove();
+      updatePollRemoveBtns();
     }
   }
 
@@ -1466,6 +2155,101 @@ const BLOCK_TYPES = [
         config = { url: u, height: Math.min(500, Math.max(80, h || 152)) };
         break;
       }
+      case 'text': {
+        const content = (document.getElementById('field-text-content') as HTMLTextAreaElement)?.value?.trim() ?? '';
+        if (!content) { toast.error('Le contenu est requis'); return; }
+        title = titleEl?.value?.trim() || null;
+        const align    = (document.getElementById('field-text-align') as HTMLSelectElement)?.value || 'center';
+        const textSize = (document.getElementById('field-text-size')  as HTMLSelectElement)?.value || 'md';
+        config = { content, align, text_size: textSize, ...vis('show_from', showFrom), ...vis('show_until', showUntil) };
+        break;
+      }
+      case 'banner': {
+        title = titleEl?.value?.trim() ?? null;
+        const badge    = (document.getElementById('field-banner-badge')  as HTMLInputElement)?.value?.trim() || 'LIVE';
+        const preset   = (document.getElementById('field-banner-preset') as HTMLInputElement)?.value || 'LIVE';
+        const url      = urlEl?.value?.trim() || null;
+        const urlLabel = (document.getElementById('field-banner-cta') as HTMLInputElement)?.value?.trim() || null;
+        if (!title) { toast.error('Le message est requis'); return; }
+        config = { badge, badge_preset: preset, message: title, ...(url ? { url } : {}), ...(urlLabel ? { url_label: urlLabel } : {}), ...vis('show_from', showFrom), ...vis('show_until', showUntil) };
+        break;
+      }
+      case 'product': {
+        title = titleEl?.value?.trim() ?? null;
+        const url      = urlEl?.value?.trim() ?? '';
+        const imageUrl = (document.getElementById('field-product-image')    as HTMLInputElement)?.value?.trim() || null;
+        const price    = (document.getElementById('field-product-price')    as HTMLInputElement)?.value?.trim() || null;
+        const currency = (document.getElementById('field-product-currency') as HTMLSelectElement)?.value || 'EUR';
+        const cta      = (document.getElementById('field-product-cta')      as HTMLInputElement)?.value?.trim() || 'Acheter →';
+        if (!title) { toast.error('Le nom du produit est requis'); return; }
+        if (!url || !url.startsWith('http')) { toast.error('URL produit valide requise'); return; }
+        config = { url, ...(imageUrl ? { image_url: imageUrl } : {}), ...(price ? { price } : {}), currency, cta_label: cta, ...vis('show_from', showFrom), ...vis('show_until', showUntil) };
+        break;
+      }
+      case 'poll': {
+        title = titleEl?.value?.trim() ?? null;
+        if (!title) { toast.error('La question est requise'); return; }
+        const optInputs = document.querySelectorAll('.poll-opt-input') as NodeListOf<HTMLInputElement>;
+        const optVotes  = document.querySelectorAll('.poll-opt-votes') as NodeListOf<HTMLInputElement>;
+        const options   = Array.from(optInputs).map((inp, i) => ({
+          text:  inp.value.trim(),
+          votes: parseInt(optVotes[i]?.value || '0') || 0,
+        })).filter(o => o.text);
+        if (options.length < 2) { toast.error('Au moins 2 options valides requises'); return; }
+        const allowMultiple = (document.getElementById('field-allow-multiple') as HTMLInputElement)?.checked ?? false;
+        config = { question: title, options, allow_multiple: allowMultiple };
+        break;
+      }
+      case 'twitch_live': {
+        const channel = (document.getElementById('field-twitch-channel') as HTMLInputElement)?.value?.trim().toLowerCase() ?? '';
+        if (!channel) { toast.error('Le nom de chaîne Twitch est requis'); return; }
+        const showChat = (document.getElementById('field-twitch-chat') as HTMLInputElement)?.checked ?? false;
+        title = titleEl?.value?.trim() || null;
+        config = { channel, show_chat: showChat, ...(title ? { offline_message: title } : {}) };
+        title = title || channel;
+        break;
+      }
+      case 'newsletter': {
+        title = titleEl?.value?.trim() ?? null;
+        const actionUrl   = urlEl?.value?.trim() ?? '';
+        const provider    = (document.getElementById('field-nl-provider')    as HTMLInputElement)?.value || 'custom';
+        const placeholder = (document.getElementById('field-nl-placeholder') as HTMLInputElement)?.value?.trim() || 'ton@email.com';
+        const nlCta       = (document.getElementById('field-nl-cta')         as HTMLInputElement)?.value?.trim() || "S'abonner";
+        const nlSuccess   = (document.getElementById('field-nl-success')     as HTMLInputElement)?.value?.trim() || 'Merci !';
+        if (!title) { toast.error('Le titre est requis'); return; }
+        if (!actionUrl || !actionUrl.startsWith('http')) { toast.error("L'URL d'action est requise"); return; }
+        config = { provider, action_url: actionUrl, url: actionUrl, nl_placeholder: placeholder, nl_cta: nlCta, nl_success: nlSuccess, ...vis('show_from', showFrom), ...vis('show_until', showUntil) };
+        break;
+      }
+      case 'vcard': {
+        title = titleEl?.value?.trim() ?? null;
+        const firstName = (document.getElementById('field-vcard-firstname') as HTMLInputElement)?.value?.trim() ?? '';
+        const lastName  = (document.getElementById('field-vcard-lastname')  as HTMLInputElement)?.value?.trim() ?? '';
+        const email     = (document.getElementById('field-vcard-email')     as HTMLInputElement)?.value?.trim() || null;
+        const phone     = (document.getElementById('field-vcard-phone')     as HTMLInputElement)?.value?.trim() || null;
+        const website   = (document.getElementById('field-vcard-website')   as HTMLInputElement)?.value?.trim() || null;
+        const company   = (document.getElementById('field-vcard-company')   as HTMLInputElement)?.value?.trim() || null;
+        const role      = (document.getElementById('field-vcard-role')      as HTMLInputElement)?.value?.trim() || null;
+        if (!firstName) { toast.error('Le prénom est requis'); return; }
+        if (!title)     { toast.error('Le titre du bouton est requis'); return; }
+        config = { first_name: firstName, last_name: lastName, ...(email?{email}:{}), ...(phone?{phone}:{}), ...(website?{website}:{}), ...(company?{company}:{}), ...(role?{role}:{}) };
+        break;
+      }
+      case 'merch_grid': {
+        title = titleEl?.value?.trim() || null;
+        const items: any[] = [];
+        document.querySelectorAll('.merch-item').forEach(row => {
+          const t  = (row.querySelector('.merch-title')    as HTMLInputElement)?.value?.trim();
+          const u  = (row.querySelector('.merch-url')      as HTMLInputElement)?.value?.trim();
+          const im = (row.querySelector('.merch-img')      as HTMLInputElement)?.value?.trim();
+          const pr = (row.querySelector('.merch-price')    as HTMLInputElement)?.value?.trim();
+          const cu = (row.querySelector('.merch-currency') as HTMLSelectElement)?.value || 'EUR';
+          if (t && u && u.startsWith('http')) items.push({ title:t, url:u, ...(im?{image_url:im}:{}), ...(pr?{price:pr}:{}), currency:cu });
+        });
+        if (!items.length) { toast.error('Au moins un article valide requis'); return; }
+        config = { items, ...vis('show_from', showFrom), ...vis('show_until', showUntil) };
+        break;
+      }
       default: toast.error(`Type inconnu: ${type}`); return;
     }
 
@@ -1487,6 +2271,7 @@ const BLOCK_TYPES = [
       }
       closeModal('edit-modal');
       renderBlocks();
+      schedulePreviewRefresh();
       toast.success(blockId ? 'Block modifié !' : 'Block ajouté !');
     } catch (err: any) {
       toast.error(err.message?.includes('limit') ? 'Block limit reached!' : (err.message || 'Failed to save'));
@@ -1515,21 +2300,25 @@ const BLOCK_TYPES = [
   }
 
   async function handleDeleteBlock(id: string) {
-    if (!confirm('Supprimer ce block ? Action irréversible.')) return;
+    const block = blocks.find((b: any) => b.id === id);
+    if (!block) return;
+    // Soft delete → archive (keep in DB as inactive, remove from UI)
     try {
-      await apiCall(`/api/blocks/${id}`, { method: 'DELETE' });
+      await apiCall(`/api/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active: false }) });
       blocks = blocks.filter((b: any) => b.id !== id);
+      archivedBlocks.unshift({ ...block });
       selectedIds.delete(id);
-      renderBlocks();
-      toast.success('Block supprimé');
-    } catch (err: any) { toast.error(err.message || 'Failed to delete'); }
+      renderBlocks(); renderArchive();
+      toast.success('Block archivé — restaurable depuis la corbeille');
+    } catch (err: any) { toast.error(err.message || 'Failed to archive'); }
   }
 
   document.addEventListener('keydown', (e: any) => {
     const tag = (document.activeElement as HTMLElement)?.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement as HTMLElement)?.contentEditable === 'true') return;
     if (e.key === 'n' || e.key === 'N') { e.preventDefault(); openTypeModal(); }
-    if (e.key === 'Escape') { closeModal('type-modal'); closeModal('edit-modal'); }
+    if (e.key === 'p' || e.key === 'P') { e.preventDefault(); previewOpen ? closePreview() : openPreview(); }
+    if (e.key === 'Escape') { closeModal('type-modal'); closeModal('edit-modal'); closePreview(); }
   });
 
   renderBlocks();
