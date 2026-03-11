@@ -257,6 +257,11 @@ function getSocialIconPath(url?: string): string {
   if (u.includes('discord'))       return SOCIAL_ICONS.discord;
   return 'M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71';
 }
+
+// ── Banner badge colors — declared here to avoid JSX generic parsing issues ──
+const BADGE_COLORS: Record<string, string> = {
+  LIVE: '#ef4444', NEW: '#22c55e', HOT: '#f97316', SOON: '#8b5cf6', SALE: '#eab308',
+};
 ---
 
 <BaseLayout title={pageTitle}>
@@ -693,10 +698,6 @@ function getSocialIconPath(url?: string): string {
               const url      = block.config?.url || null;
               const urlLabel = block.config?.url_label || 'Voir →';
               const preset   = (block.config?.badge_preset || badge).toUpperCase();
-              // Color map for badge presets
-              const BADGE_COLORS: Record<string, string> = {
-                LIVE:'#ef4444', NEW:'#22c55e', HOT:'#f97316', SOON:'#8b5cf6', SALE:'#eab308',
-              };
               const badgeColor = BADGE_COLORS[preset] ?? pc;
               const isLive     = preset === 'LIVE';
               return (
