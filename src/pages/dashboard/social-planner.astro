@@ -1,0 +1,486 @@
+---
+import DashboardLayout from '@/layouts/DashboardLayout.astro';
+import { withAuth } from '@/lib/auth/auth';
+import { createClient } from '@supabase/supabase-js';
+
+const authResult = await withAuth({ cookies: Astro.cookies, request: Astro.request });
+if (!authResult.success || !authResult.data) return Astro.redirect('/signin?error=auth_failed');
+const { profile, planLimits } = authResult.data;
+
+const supabase = createClient(
+  import.meta.env.PUBLIC_SUPABASE_URL!,
+  import.meta.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+const plan = (planLimits?.plan ?? 'free') as string;
+const canUseAI = plan === 'creator' || plan === 'pro';
+
+// Fetch last 20 posts
+const { data: posts } = await supabase
+  .from('social_posts')
+  .select('*')
+  .eq('profile_id', profile.id)
+  .order('created_at', { ascending: false })
+  .limit(20);
+
+// Fetch connected social integrations
+const { data: integrations } = await supabase
+  .from('integrations')
+  .select('provider, provider_username, status')
+  .eq('profile_id', profile.id)
+  .in('provider', ['instagram','tiktok','youtube','twitter','discord','twitch'])
+  .eq('status', 'connected');
+
+const connectedPlatforms = (integrations ?? []).map((i: any) => i.provider);
+
+const PLATFORM_ICONS: Record<string, string> = {
+  instagram: '📸', tiktok: '🎵', youtube: '▶️',
+  twitter: '𝕏', discord: '💬', twitch: '🟣',
+};
+
+const POST_TONES = [
+  { id: 'hype',         label: '🔥 Hype',          desc: 'Excité, enthousiaste, caps' },
+  { id: 'chill',        label: '😎 Chill',          desc: 'Détendu, authentique' },
+  { id: 'professional', label: '💼 Pro',             desc: 'Sérieux, crédible' },
+  { id: 'funny',        label: '😂 Drôle',           desc: 'Humour, memes, fun' },
+  { id: 'storytelling', label: '📖 Story',           desc: 'Narratif, émouvant' },
+  { id: 'question',     label: '❓ Engagement',      desc: 'Question, sondage, CTA' },
+];
+
+const POST_TYPES = [
+  { id: 'announce',  label: 'Annonce live/stream' },
+  { id: 'collab',    label: 'Collaboration' },
+  { id: 'product',   label: 'Promotion produit' },
+  { id: 'behind',    label: 'Coulisses / Behind scenes' },
+  { id: 'milestone', label: 'Milestone / Célébration' },
+  { id: 'question',  label: 'Question communauté' },
+  { id: 'custom',    label: 'Sujet libre' },
+];
+
+const formatDate = (d: string) => {
+  const dt = new Date(d);
+  return dt.toLocaleDateString('fr-FR', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+};
+---
+
+<DashboardLayout title="Social Planner — BioForge" activeTab="planner">
+
+  <div class="max-w-5xl mx-auto px-4 py-8">
+
+    <!-- Header -->
+    <div class="flex items-start justify-between gap-4 mb-8 flex-wrap">
+      <div>
+        <h1 class="text-2xl font-bold text-white mb-1">Social Planner</h1>
+        <p class="text-gray-400 text-sm">Génère des posts IA, programme-les et publie sur tous tes réseaux en un clic.</p>
+      </div>
+      {!canUseAI && (
+        <a href="/dashboard/billing"
+          class="px-5 py-2.5 rounded-xl bg-neon-green text-black font-bold text-sm hover:opacity-90 transition flex items-center gap-2 shrink-0">
+          <span>⚡</span> Passer Creator
+        </a>
+      )}
+    </div>
+
+    <div class="grid lg:grid-cols-2 gap-6">
+
+      <!-- ── LEFT: AI Generator ──────────────────────────────── -->
+      <div class="space-y-5">
+
+        <!-- Connected platforms -->
+        <div class="p-4 rounded-2xl border border-white/8 bg-white/2">
+          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Publier sur</p>
+          {connectedPlatforms.length === 0 ? (
+            <div class="text-center py-3">
+              <p class="text-xs text-gray-500">Aucun réseau connecté.</p>
+              <a href="/dashboard/integrations" class="text-xs text-neon-green hover:underline">Connecter mes réseaux →</a>
+            </div>
+          ) : (
+            <div class="flex flex-wrap gap-2">
+              {connectedPlatforms.map(p => (
+                <button class="platform-toggle-btn flex items-center gap-2 px-3 py-2 rounded-xl border transition-all text-sm font-medium border-neon-green/30 bg-neon-green/8 text-white"
+                  data-platform={p} data-selected="true">
+                  <span>{PLATFORM_ICONS[p] ?? '🔌'}</span>
+                  <span class="capitalize">{p}</span>
+                  <svg class="check-icon w-3.5 h-3.5 text-neon-green" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                  </svg>
+                </button>
+              ))}
+              <!-- Also allow typing without connection -->
+              {(['instagram','tiktok','twitter','youtube'].filter(p => !connectedPlatforms.includes(p))).map(p => (
+                <button class="platform-toggle-btn flex items-center gap-2 px-3 py-2 rounded-xl border transition-all text-sm font-medium border-white/10 bg-white/3 text-gray-500"
+                  data-platform={p} data-selected="false">
+                  <span>{PLATFORM_ICONS[p]}</span>
+                  <span class="capitalize">{p}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <!-- Type + Tone -->
+        <div class="grid grid-cols-2 gap-4">
+          <div class="space-y-1.5">
+            <label class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Type de post</label>
+            <select id="post-type"
+              class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:border-neon-green/50 focus:outline-none transition-colors"
+              style="background: rgba(255,255,255,0.05);">
+              {POST_TYPES.map(t => <option value={t.id} style="background:#111;">{t.label}</option>)}
+            </select>
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Ton</label>
+            <select id="post-tone"
+              class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:border-neon-green/50 focus:outline-none transition-colors"
+              style="background: rgba(255,255,255,0.05);">
+              {POST_TONES.map(t => <option value={t.id} style="background:#111;">{t.label}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <!-- Context / Prompt -->
+        <div class="space-y-1.5">
+          <label class="text-xs font-semibold text-gray-400 uppercase tracking-wide">
+            Contexte / Sujet <span class="text-red-400">*</span>
+          </label>
+          <textarea id="post-prompt" rows="3" maxlength="400"
+            placeholder="Ex: Je lance ma nouvelle collection de merch demain, t-shirts noir avec le logo BioForge…"
+            class={`w-full px-4 py-3 rounded-xl border text-white text-sm placeholder-gray-600 focus:outline-none resize-none transition-colors ${!canUseAI ? 'opacity-50 cursor-not-allowed bg-white/3 border-white/8' : 'bg-white/5 border-white/10 focus:border-neon-green/50'}`}
+            disabled={!canUseAI}></textarea>
+          <div class="flex justify-between">
+            <p class="text-xs text-gray-600">Décris l'événement, le produit ou le sujet du post.</p>
+            <span id="prompt-count" class="text-xs text-gray-600">0/400</span>
+          </div>
+        </div>
+
+        <!-- Hashtag style -->
+        <div class="flex items-center gap-3 flex-wrap">
+          <span class="text-xs text-gray-400">Hashtags :</span>
+          {['Aucun','Peu (3-5)','Moyen (8-10)','Max (20+)'].map((h, i) => (
+            <button class="hashtag-style-btn text-xs px-3 py-1.5 rounded-lg border transition-all"
+              data-count={[0,4,9,20][i]}
+              style={i === 1 ? 'border-color:rgba(0,255,157,0.4);background:rgba(0,255,157,0.08);color:#00ff9d;' : 'border-color:rgba(255,255,255,0.1);color:#6b7280;'}>
+              {h}
+            </button>
+          ))}
+        </div>
+
+        <!-- Generate button -->
+        <button id="generate-btn"
+          class={`w-full py-4 rounded-2xl font-bold text-base transition-all flex items-center justify-center gap-3 ${canUseAI ? 'bg-neon-green text-black hover:opacity-90 hover:scale-[1.01] active:scale-[0.99]' : 'bg-white/5 border border-white/10 text-gray-500 cursor-not-allowed'}`}
+          disabled={!canUseAI}>
+          <svg id="gen-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+          <span id="gen-label">{canUseAI ? '✨ Générer avec IA' : '⚡ Creator requis'}</span>
+        </button>
+
+        <!-- Generated result -->
+        <div id="result-area" class="hidden space-y-3">
+          <div class="p-4 rounded-2xl border border-neon-green/20 bg-neon-green/4 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-neon-green uppercase tracking-wide">Post généré</span>
+              <button id="regen-btn" class="text-xs text-gray-400 hover:text-white transition flex items-center gap-1">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Régénérer
+              </button>
+            </div>
+            <textarea id="post-content" rows="6"
+              class="w-full bg-transparent text-white text-sm leading-relaxed focus:outline-none resize-none"></textarea>
+            <div id="hashtags-area" class="flex flex-wrap gap-1.5"></div>
+          </div>
+
+          <!-- Char counter per platform -->
+          <div id="char-counters" class="flex flex-wrap gap-2"></div>
+
+          <!-- Schedule / Publish -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1.5">
+              <label class="text-xs text-gray-400">Programmer pour</label>
+              <input type="datetime-local" id="schedule-at"
+                class="w-full px-3 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:border-neon-green/50 focus:outline-none transition-colors" />
+            </div>
+            <div class="flex flex-col gap-2 justify-end">
+              <button id="save-draft-btn"
+                class="py-2.5 rounded-xl bg-white/8 border border-white/12 text-white text-sm font-semibold hover:bg-white/15 transition-colors text-center">
+                💾 Sauver brouillon
+              </button>
+              <button id="publish-now-btn"
+                class="py-2.5 rounded-xl bg-neon-green text-black text-sm font-bold hover:opacity-90 transition-opacity text-center">
+                🚀 Publier maintenant
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ── RIGHT: Post history ──────────────────────────────── -->
+      <div>
+        <div class="flex items-center justify-between mb-4">
+          <p class="text-sm font-semibold text-white">Historique des posts</p>
+          <div class="flex gap-2">
+            {['Tous','Brouillon','Programmé','Publié'].map((f, i) => (
+              <button class="filter-btn text-xs px-3 py-1.5 rounded-lg border transition-all"
+                data-filter={['all','draft','scheduled','published'][i]}
+                style={i === 0 ? 'border-color:rgba(0,255,157,0.4);color:#00ff9d;background:rgba(0,255,157,0.08);' : 'border-color:rgba(255,255,255,0.1);color:#6b7280;'}>
+                {f}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {(!posts || posts.length === 0) ? (
+          <div class="flex flex-col items-center justify-center py-16 text-center">
+            <div class="text-4xl mb-3">📭</div>
+            <p class="text-gray-400 text-sm">Aucun post pour l'instant.</p>
+            <p class="text-gray-600 text-xs mt-1">Génère ton premier post avec l'IA !</p>
+          </div>
+        ) : (
+          <div class="space-y-3" id="posts-list">
+            {posts.map((post: any) => {
+              const statusStyle: Record<string,string> = {
+                draft:     'background:rgba(107,114,128,0.15);color:#9ca3af;border-color:rgba(107,114,128,0.3);',
+                scheduled: 'background:rgba(251,191,36,0.12);color:#fbbf24;border-color:rgba(251,191,36,0.3);',
+                published: 'background:rgba(0,255,157,0.12);color:#00ff9d;border-color:rgba(0,255,157,0.3);',
+                failed:    'background:rgba(239,68,68,0.12);color:#ef4444;border-color:rgba(239,68,68,0.3);',
+              };
+              const statusLabel: Record<string,string> = { draft:'Brouillon', scheduled:'Programmé', published:'Publié', failed:'Échec' };
+              return (
+                <div class="post-card p-4 rounded-2xl border border-white/8 bg-white/2 hover:border-white/15 transition-all cursor-pointer group"
+                  data-status={post.status} data-id={post.id}>
+                  <div class="flex items-start justify-between gap-3 mb-2">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      {(post.platforms ?? []).map((p: string) => (
+                        <span class="text-sm">{PLATFORM_ICONS[p] ?? '🔌'}</span>
+                      ))}
+                      <span class="text-xs px-2 py-0.5 rounded-full border font-medium" style={statusStyle[post.status] ?? statusStyle.draft}>
+                        {statusLabel[post.status] ?? post.status}
+                      </span>
+                      {post.ai_generated && (
+                        <span class="text-xs px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-400 border border-purple-500/30">✨ IA</span>
+                      )}
+                    </div>
+                    <div class="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <button class="edit-post-btn text-gray-400 hover:text-white transition p-1" data-id={post.id} title="Modifier">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                      </button>
+                      <button class="delete-post-btn text-gray-400 hover:text-red-400 transition p-1" data-id={post.id} title="Supprimer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                  <p class="text-sm text-gray-300 line-clamp-2 leading-relaxed">{post.content}</p>
+                  {post.scheduled_at && (
+                    <p class="text-xs text-yellow-400 mt-2 flex items-center gap-1">
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                      Programmé : {formatDate(post.scheduled_at)}
+                    </p>
+                  )}
+                  {post.published_at && (
+                    <p class="text-xs text-neon-green mt-2 flex items-center gap-1">
+                      <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                      Publié le {formatDate(post.published_at)}
+                    </p>
+                  )}
+                  {post.engagement && Object.keys(post.engagement).length > 0 && (
+                    <div class="flex items-center gap-4 mt-3 pt-3 border-t border-white/5 text-xs text-gray-500">
+                      <span>❤️ {post.engagement.likes ?? 0}</span>
+                      <span>💬 {post.engagement.comments ?? 0}</span>
+                      <span>🔁 {post.engagement.shares ?? 0}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+    </div>
+  </div>
+
+  <style>
+    .bg-neon-green { background-color: #00ff9d; }
+    .text-neon-green { color: #00ff9d; }
+    .bg-neon-green\/4 { background-color: rgba(0,255,157,0.04); }
+    .bg-neon-green\/8 { background-color: rgba(0,255,157,0.08); }
+    .border-neon-green\/20 { border-color: rgba(0,255,157,0.2); }
+    .border-neon-green\/30 { border-color: rgba(0,255,157,0.3); }
+    .border-neon-green\/50 { border-color: rgba(0,255,157,0.5); }
+    .line-clamp-2 { display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden; }
+  </style>
+
+  <script define:vars={{ profileId: profile.id, canUseAI, connectedPlatforms }}>
+
+    const toast = {
+      show(msg, type = 'success') {
+        const t = document.createElement('div');
+        t.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:99999;padding:12px 20px;border-radius:16px;font-size:14px;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,0.4);transition:opacity 0.3s;${type==='success'?'background:#00ff9d;color:#000;':'background:#ef4444;color:#fff;'}`;
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),300);},2500);
+      },
+      success: m => toast.show(m,'success'),
+      error:   m => toast.show(m,'error'),
+    };
+
+    // Platform toggle
+    let selectedPlatforms = [...connectedPlatforms];
+    document.querySelectorAll('.platform-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const p   = btn.dataset.platform;
+        const sel = btn.dataset.selected === 'true';
+        if (sel) {
+          selectedPlatforms = selectedPlatforms.filter(x => x !== p);
+          btn.dataset.selected = 'false';
+          btn.style.cssText = 'border-color:rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:#6b7280;';
+          btn.querySelector('.check-icon')?.classList.add('hidden');
+        } else {
+          selectedPlatforms.push(p);
+          btn.dataset.selected = 'true';
+          btn.style.cssText = 'border-color:rgba(0,255,157,0.3);background:rgba(0,255,157,0.08);color:white;';
+          btn.querySelector('.check-icon')?.classList.remove('hidden');
+        }
+      });
+    });
+
+    // Hashtag style
+    let hashtagCount = 4;
+    document.querySelectorAll('.hashtag-style-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        hashtagCount = parseInt(btn.dataset.count);
+        document.querySelectorAll('.hashtag-style-btn').forEach(b => {
+          b.style.cssText = b === btn
+            ? 'border-color:rgba(0,255,157,0.4);background:rgba(0,255,157,0.08);color:#00ff9d;'
+            : 'border-color:rgba(255,255,255,0.1);color:#6b7280;';
+        });
+      });
+    });
+
+    // Filter buttons
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const filter = btn.dataset.filter;
+        document.querySelectorAll('.filter-btn').forEach(b => {
+          b.style.cssText = b === btn
+            ? 'border-color:rgba(0,255,157,0.4);color:#00ff9d;background:rgba(0,255,157,0.08);'
+            : 'border-color:rgba(255,255,255,0.1);color:#6b7280;';
+        });
+        document.querySelectorAll('.post-card').forEach(card => {
+          card.style.display = (filter === 'all' || card.dataset.status === filter) ? '' : 'none';
+        });
+      });
+    });
+
+    // Prompt counter
+    const promptEl = document.getElementById('post-prompt');
+    const countEl  = document.getElementById('prompt-count');
+    promptEl?.addEventListener('input', () => {
+      if (countEl) countEl.textContent = `${promptEl.value.length}/400`;
+    });
+
+    // ── Generate ────────────────────────────────────────────────
+    async function generate() {
+      if (!canUseAI) return;
+      const prompt = document.getElementById('post-prompt').value.trim();
+      const type   = document.getElementById('post-type').value;
+      const tone   = document.getElementById('post-tone').value;
+      if (!prompt) { toast.error('Décris le sujet du post'); return; }
+
+      const btn   = document.getElementById('generate-btn');
+      const label = document.getElementById('gen-label');
+      btn.disabled = true;
+      label.textContent = '⏳ Génération en cours…';
+
+      try {
+        const res = await fetch('/api/ai/socialPost', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ prompt, type, tone, platforms: selectedPlatforms, hashtag_count: hashtagCount }),
+        });
+        if (!res.ok) throw new Error('API error');
+        const data = await res.json();
+
+        document.getElementById('post-content').value = data.content;
+
+        // Hashtags
+        const hashArea = document.getElementById('hashtags-area');
+        hashArea.innerHTML = (data.hashtags ?? []).map(h => `
+          <span class="text-xs text-neon-green bg-neon-green/10 px-2 py-0.5 rounded-full">${h}</span>
+        `).join('');
+
+        // Char counters
+        const LIMITS = { twitter: 280, instagram: 2200, tiktok: 150, youtube: 5000 };
+        const charArea = document.getElementById('char-counters');
+        const fullText = data.content + ' ' + (data.hashtags ?? []).join(' ');
+        charArea.innerHTML = selectedPlatforms
+          .filter(p => LIMITS[p])
+          .map(p => {
+            const len   = fullText.length;
+            const limit = LIMITS[p];
+            const pct   = Math.min(100, Math.round((len / limit) * 100));
+            const color = pct > 90 ? '#ef4444' : pct > 70 ? '#fbbf24' : '#00ff9d';
+            return `<div class="flex items-center gap-1.5 text-xs" style="color:${color};">
+              <span>${len}/${limit}</span>
+              <span class="capitalize text-gray-500">${p}</span>
+            </div>`;
+          }).join('');
+
+        document.getElementById('result-area').classList.remove('hidden');
+
+      } catch {
+        toast.error('Erreur lors de la génération IA');
+      } finally {
+        btn.disabled = false;
+        label.textContent = '✨ Générer avec IA';
+      }
+    }
+
+    document.getElementById('generate-btn')?.addEventListener('click', generate);
+    document.getElementById('regen-btn')?.addEventListener('click', generate);
+
+    // ── Save / Publish ───────────────────────────────────────────
+    async function savePost(status) {
+      const content     = document.getElementById('post-content').value.trim();
+      const scheduledAt = document.getElementById('schedule-at').value;
+      if (!content) { toast.error('Le contenu est vide'); return; }
+
+      const body = {
+        content,
+        platforms:    selectedPlatforms,
+        status:       status === 'publish' ? 'published' : (scheduledAt ? 'scheduled' : 'draft'),
+        scheduled_at: scheduledAt || null,
+        ai_generated: true,
+        hashtags:     Array.from(document.querySelectorAll('#hashtags-area span')).map(s => s.textContent),
+        published_at: status === 'publish' ? new Date().toISOString() : null,
+      };
+
+      try {
+        await fetch('/api/social-posts', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(body),
+        });
+        toast.success(status === 'publish' ? 'Post publié !' : 'Brouillon sauvegardé !');
+        setTimeout(() => location.reload(), 700);
+      } catch { toast.error('Erreur de sauvegarde'); }
+    }
+
+    document.getElementById('save-draft-btn')?.addEventListener('click',    () => savePost('draft'));
+    document.getElementById('publish-now-btn')?.addEventListener('click',   () => savePost('publish'));
+
+    // ── Delete post ──────────────────────────────────────────────
+    document.querySelectorAll('.delete-post-btn').forEach(btn => {
+      btn.addEventListener('click', async e => {
+        e.stopPropagation();
+        if (!confirm('Supprimer ce post ?')) return;
+        await fetch(`/api/social-posts/${btn.dataset.id}`, { method: 'DELETE' });
+        btn.closest('.post-card')?.remove();
+        toast.success('Post supprimé');
+      });
+    });
+
+  </script>
+
+</DashboardLayout>

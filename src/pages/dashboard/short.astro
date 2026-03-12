@@ -1,0 +1,265 @@
+---
+import DashboardLayout from '@/layouts/DashboardLayout.astro';
+import { withAuth } from '@/lib/auth/auth';
+import { createClient } from '@supabase/supabase-js';
+
+const authResult = await withAuth({ cookies: Astro.cookies, request: Astro.request });
+if (!authResult.success || !authResult.data) return Astro.redirect('/signin?error=auth_failed');
+const { profile, planLimits } = authResult.data;
+
+const supabase = createClient(
+  import.meta.env.PUBLIC_SUPABASE_URL!,
+  import.meta.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+const plan      = (planLimits?.plan ?? 'free') as string;
+const canUse    = plan === 'creator' || plan === 'pro';
+const maxLinks  = plan === 'pro' ? -1 : plan === 'creator' ? 50 : 0;
+
+const { data: links, count } = await supabase
+  .from('short_links')
+  .select('*', { count: 'exact' })
+  .eq('profile_id', profile.id)
+  .order('created_at', { ascending: false })
+  .limit(50);
+
+const totalClicks = (links ?? []).reduce((s: number, l: any) => s + (l.clicks ?? 0), 0);
+const BASE_URL = 'https://bioforge.click/s/';
+
+function formatDate(d: string) {
+  return new Date(d).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'2-digit' });
+}
+---
+
+<DashboardLayout title="Link Shortener — BioForge" activeTab="links">
+
+  <div class="max-w-4xl mx-auto px-4 py-8">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between gap-4 mb-8 flex-wrap">
+      <div>
+        <h1 class="text-2xl font-bold text-white mb-1">Link Shortener</h1>
+        <p class="text-gray-400 text-sm">Crée des liens courts <span class="text-neon-green font-mono">bioforge.click/s/xxx</span> avec analytics intégrés.</p>
+      </div>
+      {!canUse && (
+        <a href="/dashboard/billing" class="px-5 py-2.5 rounded-xl bg-neon-green text-black font-bold text-sm hover:opacity-90 transition">
+          ⚡ Creator requis →
+        </a>
+      )}
+    </div>
+
+    <!-- Stats bar -->
+    <div class="grid grid-cols-3 gap-4 mb-8">
+      {[
+        { label: 'Liens créés', value: String(links?.length ?? 0) + (maxLinks > 0 ? `/${maxLinks}` : ''), icon: '🔗' },
+        { label: 'Clics totaux', value: totalClicks.toLocaleString('fr-FR'), icon: '👆' },
+        { label: 'Actifs', value: String((links ?? []).filter((l: any) => l.is_active).length), icon: '✅' },
+      ].map(s => (
+        <div class="p-4 rounded-2xl border border-white/8 bg-white/2 text-center">
+          <div class="text-2xl mb-1">{s.icon}</div>
+          <div class="text-xl font-bold text-white">{s.value}</div>
+          <div class="text-xs text-gray-500">{s.label}</div>
+        </div>
+      ))}
+    </div>
+
+    <!-- Create link -->
+    <div class={`mb-8 p-5 rounded-2xl border ${canUse ? 'border-neon-green/20 bg-neon-green/3' : 'border-white/8 bg-white/2 opacity-60'}`}>
+      <p class="text-sm font-bold text-white mb-4 flex items-center gap-2">
+        <span>✂️</span> Créer un lien court
+        {!canUse && <span class="text-xs text-gray-500 ml-auto">Nécessite Creator+</span>}
+      </p>
+
+      <div class={!canUse ? 'pointer-events-none' : ''}>
+        <div class="flex gap-3 mb-3 flex-wrap sm:flex-nowrap">
+          <div class="relative flex-1 min-w-0">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 font-mono pointer-events-none">🔗</span>
+            <input type="url" id="new-destination" placeholder="https://youtube.com/watch?v=…"
+              class="w-full pl-8 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none transition-colors" />
+          </div>
+          <div class="relative w-40 shrink-0">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 font-mono pointer-events-none">/s/</span>
+            <input type="text" id="new-code" placeholder="mon-lien" maxlength="20"
+              class="w-full pl-8 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm font-mono placeholder-gray-600 focus:border-neon-green/50 focus:outline-none transition-colors" />
+          </div>
+          <button id="create-link-btn"
+            class="shrink-0 px-6 py-3 rounded-xl bg-neon-green text-black font-bold text-sm hover:opacity-90 active:scale-95 transition-all">
+            Créer →
+          </button>
+        </div>
+
+        <!-- Advanced options (collapsible) -->
+        <button id="advanced-toggle" class="text-xs text-gray-500 hover:text-gray-300 transition flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+          Options avancées (UTM, titre, expiration)
+        </button>
+        <div id="advanced-panel" class="hidden mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <input type="text" id="link-title" placeholder="Titre (ex: YouTube Collab Felix)"
+            class="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none transition-colors" />
+          <input type="datetime-local" id="link-expires" title="Date d'expiration"
+            class="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:border-neon-green/50 focus:outline-none transition-colors" />
+          <input type="text" id="utm-source" placeholder="utm_source (ex: instagram)"
+            class="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none transition-colors" />
+          <input type="text" id="utm-campaign" placeholder="utm_campaign (ex: collab-juin)"
+            class="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none transition-colors" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Links list -->
+    {(!links || links.length === 0) ? (
+      <div class="text-center py-16">
+        <div class="text-4xl mb-3">✂️</div>
+        <p class="text-gray-400 text-sm">Aucun lien court pour l'instant.</p>
+        {!canUse && <p class="text-xs text-gray-600 mt-1">Passe en Creator pour créer tes premiers liens.</p>}
+      </div>
+    ) : (
+      <div class="space-y-3" id="links-list">
+        {(links ?? []).map((link: any) => (
+          <div class="link-row group flex items-center gap-4 p-4 rounded-2xl border border-white/8 bg-white/2 hover:border-white/15 hover:bg-white/4 transition-all"
+            data-id={link.id}>
+
+            <!-- Icon + status -->
+            <div class="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center"
+              style={link.is_active ? 'background:rgba(0,255,157,0.1);' : 'background:rgba(255,255,255,0.05);'}>
+              <span class="text-base">{link.is_active ? '🔗' : '🔒'}</span>
+            </div>
+
+            <!-- Info -->
+            <div class="flex-1 min-w-0">
+              {link.title && <p class="text-sm font-semibold text-white truncate mb-0.5">{link.title}</p>}
+              <div class="flex items-center gap-2 flex-wrap">
+                <button class="copy-short-btn text-sm font-mono text-neon-green hover:underline text-left"
+                  data-url={`${BASE_URL}${link.code}`}>
+                  bioforge.click/s/{link.code}
+                </button>
+                <span class="text-gray-600 text-xs">→</span>
+                <span class="text-xs text-gray-500 truncate max-w-[200px]">{link.destination}</span>
+              </div>
+              <div class="flex items-center gap-3 mt-1 text-xs text-gray-600">
+                <span>Créé {formatDate(link.created_at)}</span>
+                {link.expires_at && <span class="text-yellow-500">Expire {formatDate(link.expires_at)}</span>}
+                {link.utm_campaign && <span>• {link.utm_campaign}</span>}
+              </div>
+            </div>
+
+            <!-- Clicks -->
+            <div class="shrink-0 text-center hidden sm:block">
+              <div class="text-lg font-bold text-white">{(link.clicks ?? 0).toLocaleString('fr-FR')}</div>
+              <div class="text-xs text-gray-600">clics</div>
+            </div>
+
+            <!-- Actions -->
+            <div class="shrink-0 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button class="copy-short-btn p-2 rounded-xl bg-white/8 hover:bg-white/15 text-gray-300 hover:text-white transition-all"
+                data-url={`${BASE_URL}${link.code}`} title="Copier">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+              </button>
+              <button class="toggle-link-btn p-2 rounded-xl bg-white/8 hover:bg-white/15 transition-all"
+                data-id={link.id} data-active={String(link.is_active)}
+                title={link.is_active ? 'Désactiver' : 'Activer'}
+                style={link.is_active ? 'color:#00ff9d;' : 'color:#6b7280;'}>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={link.is_active ? 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z' : 'M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21'}/>
+                </svg>
+              </button>
+              <button class="delete-link-btn p-2 rounded-xl bg-white/8 hover:bg-red-400/20 text-gray-400 hover:text-red-400 transition-all"
+                data-id={link.id} title="Supprimer">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+
+  <style>
+    .text-neon-green { color: #00ff9d; }
+    .bg-neon-green   { background-color: #00ff9d; }
+    .border-neon-green\/20 { border-color: rgba(0,255,157,0.2); }
+    .border-neon-green\/50 { border-color: rgba(0,255,157,0.5); }
+    .bg-neon-green\/3 { background-color: rgba(0,255,157,0.03); }
+  </style>
+
+  <script define:vars={{ canUse }}>
+    const toast = {
+      show(msg, type='success') {
+        const t = document.createElement('div');
+        t.style.cssText=`position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:99999;padding:12px 20px;border-radius:16px;font-size:14px;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,0.4);transition:opacity 0.3s;${type==='success'?'background:#00ff9d;color:#000;':'background:#ef4444;color:#fff;'}`;
+        t.textContent=msg;
+        document.body.appendChild(t);
+        setTimeout(()=>{t.style.opacity='0';setTimeout(()=>t.remove(),300);},2500);
+      },
+      success: m=>toast.show(m,'success'),
+      error:   m=>toast.show(m,'error'),
+    };
+
+    // Advanced toggle
+    document.getElementById('advanced-toggle')?.addEventListener('click', () => {
+      document.getElementById('advanced-panel')?.classList.toggle('hidden');
+    });
+
+    // Create link
+    document.getElementById('create-link-btn')?.addEventListener('click', async () => {
+      if (!canUse) { window.location.href = '/dashboard/billing'; return; }
+      const dest     = document.getElementById('new-destination').value.trim();
+      const code     = document.getElementById('new-code').value.trim().toLowerCase().replace(/[^a-z0-9-_]/g, '');
+      const title    = document.getElementById('link-title').value.trim() || null;
+      const expires  = document.getElementById('link-expires').value || null;
+      const utmSrc   = document.getElementById('utm-source').value.trim() || null;
+      const utmCamp  = document.getElementById('utm-campaign').value.trim() || null;
+
+      if (!dest || !dest.startsWith('http')) { toast.error('URL de destination valide requise'); return; }
+
+      try {
+        const res = await fetch('/api/links', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ destination: dest, code: code || null, title, expires_at: expires, utm_source: utmSrc, utm_campaign: utmCamp }),
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Erreur');
+        }
+        toast.success('Lien créé !');
+        setTimeout(() => location.reload(), 600);
+      } catch(e) {
+        toast.error(e.message || 'Erreur création');
+      }
+    });
+
+    // Copy
+    document.querySelectorAll('.copy-short-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        await navigator.clipboard.writeText(btn.dataset.url).catch(()=>{});
+        toast.success('Copié !');
+      });
+    });
+
+    // Toggle active
+    document.querySelectorAll('.toggle-link-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const active = btn.dataset.active === 'true';
+        await fetch(`/api/links/${btn.dataset.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_active: !active }),
+        });
+        toast.success(active ? 'Lien désactivé' : 'Lien activé');
+        setTimeout(() => location.reload(), 400);
+      });
+    });
+
+    // Delete
+    document.querySelectorAll('.delete-link-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Supprimer ce lien ?')) return;
+        await fetch(`/api/links/${btn.dataset.id}`, { method: 'DELETE' });
+        btn.closest('.link-row')?.remove();
+        toast.success('Lien supprimé');
+      });
+    });
+  </script>
+
+</DashboardLayout>

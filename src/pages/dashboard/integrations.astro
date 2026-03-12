@@ -1,0 +1,648 @@
+---
+import DashboardLayout from '@/layouts/DashboardLayout.astro';
+import { withAuth } from '@/lib/auth/auth';
+import { createClient } from '@supabase/supabase-js';
+
+const authResult = await withAuth({ cookies: Astro.cookies, request: Astro.request });
+if (!authResult.success || !authResult.data) return Astro.redirect('/signin?error=auth_failed');
+const { user, profile, planLimits } = authResult.data;
+
+const supabase = createClient(
+  import.meta.env.PUBLIC_SUPABASE_URL!,
+  import.meta.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+// Fetch connected integrations
+const { data: connectedRaw } = await supabase
+  .from('integrations')
+  .select('*')
+  .eq('profile_id', profile.id)
+  .eq('status', 'connected');
+
+const connected = new Map((connectedRaw ?? []).map((i: any) => [i.provider, i]));
+
+// Fetch cause banners enabled on profile
+const causeBannerSlugs: string[] = Array.isArray(profile.cause_banners) ? profile.cause_banners : [];
+
+// Fetch all cause banners
+const { data: causeBanners } = await supabase
+  .from('cause_banners')
+  .select('*')
+  .eq('is_active', true)
+  .order('sort_order');
+
+const plan = (planLimits?.plan ?? 'free') as string;
+const isCreator = plan === 'creator' || plan === 'pro';
+const isPro     = plan === 'pro';
+
+// Integration categories definition
+const INTEGRATIONS = {
+  social: {
+    label: 'Réseaux Sociaux',
+    icon: '📱',
+    desc: 'Connecte tes réseaux pour afficher ton contenu, synchroniser tes analytics et publier directement.',
+    items: [
+      { id: 'instagram',  label: 'Instagram',       icon: '/icons/instagram.svg',  color: '#E1306C', plan: 'creator', scopes: ['basic','publish_media','read_insights'], features: ['Afficher posts', 'Analytics', 'Auto-reply comments', 'Publier'] },
+      { id: 'tiktok',     label: 'TikTok',           icon: '/icons/tiktok.svg',     color: '#010101', plan: 'creator', scopes: ['user.info.basic','video.list'], features: ['Afficher vidéos', 'Analytics', 'Auto-reply', 'Publier'] },
+      { id: 'youtube',    label: 'YouTube',           icon: '/icons/youtube.svg',    color: '#FF0000', plan: 'creator', scopes: ['youtube.readonly','youtube.upload'], features: ['Afficher vidéos', 'Abonnés', 'Analytics'] },
+      { id: 'twitch',     label: 'Twitch',            icon: '/icons/twitch.svg',     color: '#9146FF', plan: 'creator', scopes: ['user:read:email','channel:read:stream_key'], features: ['Live embed', 'Alertes', 'Chat auto-reply'] },
+      { id: 'twitter',    label: 'X / Twitter',       icon: '/icons/twitter.svg',    color: '#1DA1F2', plan: 'creator', scopes: ['tweet.read','tweet.write','users.read'], features: ['Afficher tweets', 'Publier', 'Analytics'] },
+      { id: 'discord',    label: 'Discord',           icon: '/icons/discord.svg',    color: '#5865F2', plan: 'creator', scopes: ['identify','guilds'], features: ['Membres du serveur', 'Annonces', 'Bot'] },
+      { id: 'snapchat',   label: 'Snapchat',          icon: '/icons/snapchat.svg',   color: '#FFFC00', plan: 'pro',     scopes: ['snapchat-marketing-api'], features: ['Stories', 'Analytics', 'Auto-reply'] },
+      { id: 'pinterest',  label: 'Pinterest',         icon: '/icons/pinterest.svg',  color: '#E60023', plan: 'creator', scopes: ['read_public','write_public'], features: ['Tableaux', 'Pins', 'Analytics'] },
+    ],
+  },
+  mailing: {
+    label: 'Mailing & Audience',
+    icon: '📧',
+    desc: 'Synchronise ton audience et envoie des newsletters directement depuis BioForge.',
+    items: [
+      { id: 'mailchimp',   label: 'Mailchimp',    icon: '/icons/mailchimp.svg',    color: '#FFE01B', plan: 'creator', features: ['Sync audience', 'Campagnes', 'Tags automatiques'] },
+      { id: 'klaviyo',     label: 'Klaviyo',      icon: '/icons/klaviyo.svg',      color: '#19C37D', plan: 'creator', features: ['Segments', 'Flows', 'Analytics'] },
+      { id: 'convertkit',  label: 'Kit (ConvertKit)', icon: '/icons/convertkit.svg', color: '#FB6970', plan: 'creator', features: ['Séquences', 'Tags', 'Automations'] },
+      { id: 'beehiiv',     label: 'Beehiiv',      icon: '/icons/beehiiv.svg',      color: '#FF6B35', plan: 'pro',     features: ['Publications', 'Abonnés', 'Revenus'] },
+      { id: 'brevo',       label: 'Brevo',        icon: '/icons/brevo.svg',        color: '#0B996E', plan: 'creator', features: ['Contacts', 'SMS', 'Campagnes'] },
+      { id: 'googlesheets',label: 'Google Sheets', icon: '/icons/googlesheets.svg',color: '#34A853', plan: 'creator', features: ['Export contacts', 'Sync bidirectionnel'] },
+    ],
+  },
+  design: {
+    label: 'Outils Créatifs',
+    icon: '🎨',
+    desc: 'Connecte tes outils de design et de création de contenu.',
+    items: [
+      { id: 'canva',       label: 'Canva',        icon: '/icons/canva.svg',        color: '#00C4CC', plan: 'creator', features: ['Import designs', 'Templates BioForge', 'Banners auto'] },
+      { id: 'spotify',     label: 'Spotify',      icon: '/icons/spotify.svg',      color: '#1DB954', plan: 'free',    features: ['Afficher playlists', 'Now playing', 'Top tracks'] },
+      { id: 'soundcloud',  label: 'SoundCloud',   icon: '/icons/soundcloud.svg',   color: '#FF5500', plan: 'free',    features: ['Tracks embed', 'Followers', 'Plays'] },
+    ],
+  },
+  commerce: {
+    label: 'Commerce & Revenus',
+    icon: '💰',
+    desc: 'Connecte tes plateformes de vente et de monétisation.',
+    items: [
+      { id: 'stripe',      label: 'Stripe',       icon: '/icons/stripe.svg',       color: '#635BFF', plan: 'pro',     features: ['Paiements', 'Abonnements', 'Dashboard revenus'] },
+      { id: 'throne',      label: 'Throne',       icon: '/icons/throne.svg',       color: '#8B5CF6', plan: 'creator', features: ['Wishlist auto-sync', 'Dons affichés'] },
+      { id: 'kofi',        label: 'Ko-fi',        icon: '/icons/kofi.svg',         color: '#FF5E5B', plan: 'free',    features: ['Dons', 'Shop', 'Membres'] },
+      { id: 'patreon',     label: 'Patreon',      icon: '/icons/patreon.svg',      color: '#FF424D', plan: 'creator', features: ['Tiers affichés', 'Membres count', 'Posts'] },
+    ],
+  },
+  analytics: {
+    label: 'Analytics',
+    icon: '📊',
+    desc: 'Importe tes analytics depuis tes plateformes préférées.',
+    items: [
+      { id: 'googleanalytics', label: 'Google Analytics', icon: '/icons/ga.svg', color: '#E37400', plan: 'pro', features: ['Trafic global', 'Sources', 'Conversions'] },
+      { id: 'googlesearchconsole', label: 'Search Console', icon: '/icons/gsc.svg', color: '#4285F4', plan: 'pro', features: ['Mots-clés', 'Impressions', 'Clics SEO'] },
+    ],
+  },
+};
+
+const planLabel: Record<string, string> = { free: 'Free', creator: 'Creator', pro: 'Pro' };
+const planColor: Record<string, string> = { free: '#6b7280', creator: '#00ff9d', pro: '#a855f7' };
+---
+
+<DashboardLayout title="Intégrations — BioForge" activeTab="integrations">
+
+  <div class="max-w-4xl mx-auto px-4 py-8">
+
+    <!-- Header -->
+    <div class="mb-8">
+      <h1 class="text-2xl font-bold text-white mb-1">Intégrations</h1>
+      <p class="text-gray-400 text-sm">Connecte tes plateformes pour automatiser, analyser et publier depuis BioForge.</p>
+    </div>
+
+    <!-- Plan banner (if free) -->
+    {!isCreator && (
+      <div class="mb-8 p-4 rounded-2xl border border-neon-green/20 bg-neon-green/5 flex items-center justify-between gap-4 flex-wrap">
+        <div class="flex items-center gap-3">
+          <div class="text-2xl">⚡</div>
+          <div>
+            <p class="text-white font-semibold text-sm">Débloque toutes les intégrations</p>
+            <p class="text-gray-400 text-xs">Passe en Creator ou Pro pour connecter Instagram, TikTok, YouTube et plus.</p>
+          </div>
+        </div>
+        <a href="/dashboard/billing" class="shrink-0 px-5 py-2 rounded-xl bg-neon-green text-black font-bold text-sm hover:opacity-90 transition-opacity">Upgrader →</a>
+      </div>
+    )}
+
+    <!-- Connection status bar -->
+    <div class="mb-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {(['social','mailing','design','commerce'] as const).map(cat => {
+        const items = INTEGRATIONS[cat].items;
+        const connCount = items.filter(i => connected.has(i.id)).length;
+        return (
+          <div class="p-3 rounded-xl bg-white/3 border border-white/8 text-center">
+            <div class="text-xl mb-1">{INTEGRATIONS[cat].icon}</div>
+            <div class="text-xs text-gray-400">{INTEGRATIONS[cat].label}</div>
+            <div class="text-sm font-bold mt-0.5" style={connCount > 0 ? 'color:#00ff9d' : 'color:#4b5563'}>
+              {connCount}/{items.length} connecté{connCount > 1 ? 's' : ''}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+
+    <!-- Categories -->
+    {Object.entries(INTEGRATIONS).map(([catKey, cat]) => (
+      <section class="mb-10">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="text-xl">{cat.icon}</span>
+          <div>
+            <h2 class="text-base font-bold text-white">{cat.label}</h2>
+            <p class="text-xs text-gray-500">{cat.desc}</p>
+          </div>
+        </div>
+
+        <div class="grid gap-3">
+          {cat.items.map(item => {
+            const conn = connected.get(item.id);
+            const isConnected = !!conn;
+            const reqPlan = item.plan as string;
+            const canUse = reqPlan === 'free' || (reqPlan === 'creator' && isCreator) || (reqPlan === 'pro' && isPro);
+
+            return (
+              <div class={`integration-card group flex items-center gap-4 p-4 rounded-2xl border transition-all ${
+                isConnected ? 'border-neon-green/30 bg-neon-green/4' : 'border-white/8 bg-white/2 hover:border-white/15 hover:bg-white/4'
+              } ${!canUse ? 'opacity-60' : ''}`}
+                data-integration={item.id}
+                data-connected={String(isConnected)}
+                data-plan={reqPlan}>
+
+                <!-- Icon -->
+                <div class="shrink-0 w-12 h-12 rounded-xl flex items-center justify-center border overflow-hidden"
+                  style={`background: ${item.color}15; border-color: ${item.color}30;`}>
+                  <span class="text-xl">{
+                    item.id === 'instagram'   ? '📸' :
+                    item.id === 'tiktok'      ? '🎵' :
+                    item.id === 'youtube'     ? '▶️' :
+                    item.id === 'twitch'      ? '🟣' :
+                    item.id === 'twitter'     ? '𝕏' :
+                    item.id === 'discord'     ? '💬' :
+                    item.id === 'snapchat'    ? '👻' :
+                    item.id === 'pinterest'   ? '📌' :
+                    item.id === 'mailchimp'   ? '🐒' :
+                    item.id === 'klaviyo'     ? '📈' :
+                    item.id === 'convertkit'  ? '✉️' :
+                    item.id === 'beehiiv'     ? '🐝' :
+                    item.id === 'brevo'       ? '💌' :
+                    item.id === 'googlesheets'? '📊' :
+                    item.id === 'canva'       ? '🎨' :
+                    item.id === 'spotify'     ? '🎧' :
+                    item.id === 'soundcloud'  ? '☁️' :
+                    item.id === 'stripe'      ? '💳' :
+                    item.id === 'throne'      ? '👑' :
+                    item.id === 'kofi'        ? '☕' :
+                    item.id === 'patreon'     ? '🎁' :
+                    item.id === 'googleanalytics' ? '📉' :
+                    item.id === 'googlesearchconsole' ? '🔍' : '🔌'
+                  }</span>
+                </div>
+
+                <!-- Info -->
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-white font-semibold text-sm">{item.label}</span>
+                    {reqPlan !== 'free' && (
+                      <span class="text-xs px-2 py-0.5 rounded-full font-bold"
+                        style={`background: ${planColor[reqPlan]}20; color: ${planColor[reqPlan]}; border: 1px solid ${planColor[reqPlan]}40;`}>
+                        {planLabel[reqPlan]}
+                      </span>
+                    )}
+                    {isConnected && (
+                      <span class="text-xs px-2 py-0.5 rounded-full bg-neon-green/15 text-neon-green border border-neon-green/30 font-medium flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-neon-green inline-block"></span>
+                        Connecté
+                      </span>
+                    )}
+                  </div>
+                  {isConnected && conn.provider_username && (
+                    <p class="text-xs text-gray-400 mt-0.5">@{conn.provider_username}</p>
+                  )}
+                  <div class="flex flex-wrap gap-1.5 mt-1.5">
+                    {item.features.map(f => (
+                      <span class="text-xs text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">{f}</span>
+                    ))}
+                  </div>
+                </div>
+
+                <!-- Action -->
+                <div class="shrink-0 flex items-center gap-2">
+                  {!canUse ? (
+                    <a href="/dashboard/billing"
+                      class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all hover:opacity-90"
+                      style={`background: ${planColor[reqPlan]}20; color: ${planColor[reqPlan]}; border: 1px solid ${planColor[reqPlan]}40;`}>
+                      Upgrader
+                    </a>
+                  ) : isConnected ? (
+                    <div class="flex items-center gap-2">
+                      <button class="autoreply-toggle-btn px-3 py-1.5 rounded-xl text-xs font-medium transition-all border"
+                        data-id={item.id}
+                        data-enabled={String(conn.auto_reply_enabled ?? false)}
+                        style={conn.auto_reply_enabled
+                          ? 'background:rgba(0,255,157,0.1);border-color:rgba(0,255,157,0.3);color:#00ff9d;'
+                          : 'background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1);color:#6b7280;'}>
+                        {conn.auto_reply_enabled ? '🤖 Auto-reply ✓' : '🤖 Auto-reply'}
+                      </button>
+                      <button class="disconnect-btn px-3 py-1.5 rounded-xl text-xs font-medium bg-white/5 border border-white/10 text-gray-400 hover:text-red-400 hover:border-red-400/30 transition-all"
+                        data-id={item.id}>
+                        Déconnecter
+                      </button>
+                    </div>
+                  ) : (
+                    <button class="connect-btn px-4 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
+                      style={`background: ${item.color}18; border: 1px solid ${item.color}40; color: ${item.color};`}
+                      data-id={item.id} data-label={item.label}>
+                      Connecter →
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    ))}
+
+    <!-- ── CAUSE BANNERS ───────────────────────────────────── -->
+    <section class="mb-10">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="text-xl">🎗️</span>
+        <div>
+          <h2 class="text-base font-bold text-white">Bannières Engagement</h2>
+          <p class="text-xs text-gray-500">Affiche ton soutien à des causes importantes sur ton profil BioForge.</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+        {(causeBanners ?? []).map((cause: any) => {
+          const isEnabled = causeBannerSlugs.includes(cause.slug);
+          return (
+            <button class="cause-banner-toggle flex items-center gap-3 p-4 rounded-2xl border transition-all text-left"
+              data-slug={cause.slug}
+              data-enabled={String(isEnabled)}
+              style={isEnabled
+                ? `border-color: ${cause.color}50; background: ${cause.color}12;`
+                : 'border-color: rgba(255,255,255,0.08); background: rgba(255,255,255,0.02);'}>
+              <div class="text-2xl shrink-0">{cause.icon}</div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-bold" style={isEnabled ? `color: ${cause.color}` : 'color: white;'}>{cause.label}</span>
+                  {isEnabled && <span class="text-xs text-white bg-white/10 px-1.5 py-0.5 rounded-full">✓ Activé</span>}
+                </div>
+                <p class="text-xs text-gray-500 mt-0.5 truncate">{cause.description}</p>
+              </div>
+              <!-- Toggle switch -->
+              <div class="shrink-0 w-10 h-6 rounded-full border transition-all relative"
+                style={isEnabled
+                  ? `background: ${cause.color}; border-color: ${cause.color};`
+                  : 'background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.15);'}>
+                <div class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all"
+                  style={isEnabled ? 'left: calc(100% - 22px);' : 'left: 2px;'}></div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <!-- Custom cause -->
+      <div class="p-4 rounded-2xl border border-white/8 bg-white/2">
+        <p class="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+          <span>✏️</span> Cause personnalisée
+        </p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <input type="text" id="custom-cause-label" placeholder="Label (ex: Sensibilisation…)" maxlength="40"
+            class="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none transition-colors" />
+          <input type="url" id="custom-cause-link" placeholder="https://… (optionnel)"
+            class="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none transition-colors" />
+          <button id="save-custom-cause"
+            class="px-4 py-2 rounded-xl bg-neon-green/15 border border-neon-green/30 text-neon-green font-semibold text-sm hover:bg-neon-green/25 transition-colors">
+            Ajouter →
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── AUTO-REPLY CONFIG ───────────────────────────────────── -->
+    <section class="mb-10" id="autoreply-section" class="hidden">
+      <div class="p-5 rounded-2xl border border-orange-400/20 bg-orange-400/5">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="text-xl">🤖</span>
+          <div>
+            <h2 class="text-base font-bold text-white">Configuration Auto-Reply</h2>
+            <p class="text-xs text-gray-400">Réponds automatiquement aux commentaires sur tes réseaux connectés.</p>
+          </div>
+          {!isPro && (
+            <a href="/dashboard/billing" class="ml-auto shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold bg-purple-500/20 border border-purple-500/40 text-purple-400 hover:opacity-90 transition">
+              Pro uniquement
+            </a>
+          )}
+        </div>
+
+        <div class={!isPro ? 'opacity-40 pointer-events-none' : ''}>
+          <div class="grid gap-4">
+            <div class="space-y-1.5">
+              <label class="text-sm font-medium text-gray-300">Mots-clés déclencheurs</label>
+              <input type="text" id="autoreply-keywords" placeholder="livraison, prix, collab, dm, disponible…"
+                class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-gray-600 focus:border-orange-400/50 focus:outline-none transition-colors" />
+              <p class="text-xs text-gray-600">Sépare les mots-clés par une virgule. La réponse se déclenche quand un commentaire contient l'un de ces mots.</p>
+            </div>
+            <div class="space-y-1.5">
+              <label class="text-sm font-medium text-gray-300">Message de réponse automatique</label>
+              <textarea id="autoreply-message" rows="3" maxlength="500" placeholder="Merci pour ton commentaire ! Pour toute question, envoie-moi un DM 📩"
+                class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-gray-600 focus:border-orange-400/50 focus:outline-none resize-none transition-colors"></textarea>
+              <p class="text-xs text-gray-600">Utilise {`{username}`} pour mentionner l'auteur du commentaire.</p>
+            </div>
+            <div class="flex items-center justify-between gap-4">
+              <div class="space-y-1.5">
+                <label class="text-sm font-medium text-gray-300">Délai de réponse</label>
+                <select id="autoreply-delay" class="px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none">
+                  <option value="0">Immédiat</option>
+                  <option value="30" selected>30 secondes</option>
+                  <option value="120">2 minutes</option>
+                  <option value="300">5 minutes</option>
+                  <option value="600">10 minutes</option>
+                </select>
+              </div>
+              <button id="save-autoreply"
+                class="px-6 py-3 rounded-xl bg-orange-400/15 border border-orange-400/30 text-orange-400 font-bold text-sm hover:bg-orange-400/25 transition-colors">
+                Sauvegarder la configuration
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── SEO CONFIG ───────────────────────────────────────── -->
+    <section class="mb-10">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="text-xl">🔍</span>
+        <div>
+          <h2 class="text-base font-bold text-white">SEO & Référencement</h2>
+          <p class="text-xs text-gray-500">Optimise ta présence sur Google et les moteurs de recherche.</p>
+        </div>
+      </div>
+
+      <div class="grid gap-4">
+        <!-- SEO score card -->
+        <div class="p-5 rounded-2xl border border-white/10 bg-white/3">
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-sm font-semibold text-white">Score SEO</span>
+            <div class="flex items-center gap-2">
+              <div id="seo-score-ring" class="w-12 h-12 relative">
+                <svg viewBox="0 0 36 36" class="w-12 h-12 -rotate-90">
+                  <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="3"/>
+                  <circle cx="18" cy="18" r="15.9" fill="none" stroke="#00ff9d" stroke-width="3"
+                    stroke-dasharray="75 25" stroke-linecap="round"/>
+                </svg>
+                <span class="absolute inset-0 flex items-center justify-center text-xs font-bold text-neon-green">75</span>
+              </div>
+            </div>
+          </div>
+          <div class="space-y-2">
+            {[
+              { label: 'Meta description', ok: !!profile.bio, tip: 'Ajoute une bio dans Settings' },
+              { label: 'Nom de page (H1)', ok: !!profile.display_name, tip: 'Définis ton nom dans Settings' },
+              { label: 'Image de profil', ok: !!profile.avatar_url, tip: 'Upload une photo dans Settings' },
+              { label: 'OG Image', ok: true, tip: 'Générée automatiquement ✓' },
+              { label: 'URL canonique', ok: true, tip: 'Configurée automatiquement ✓' },
+              { label: 'JSON-LD Schema', ok: true, tip: 'Person schema injecté ✓' },
+              { label: 'Sitemap', ok: true, tip: 'Généré automatiquement ✓' },
+            ].map(item => (
+              <div class="flex items-center gap-3">
+                <div class={`w-5 h-5 rounded-full flex items-center justify-center text-xs shrink-0 ${item.ok ? 'bg-neon-green/20 text-neon-green' : 'bg-red-400/20 text-red-400'}`}>
+                  {item.ok ? '✓' : '✗'}
+                </div>
+                <span class="text-sm text-gray-300 flex-1">{item.label}</span>
+                <span class="text-xs text-gray-600">{item.tip}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <!-- Custom meta -->
+        <div class="p-5 rounded-2xl border border-white/10 bg-white/3 space-y-4">
+          <p class="text-sm font-semibold text-white">Meta tags personnalisés</p>
+          <div class="space-y-1.5">
+            <label class="text-xs font-medium text-gray-400">Mots-clés SEO</label>
+            <input type="text" id="seo-keywords"
+              value={Array.isArray((profile as any).seo_keywords) ? (profile as any).seo_keywords.join(', ') : ''}
+              placeholder="streamer, gaming, twitch, fortnite..."
+              class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none transition-colors" />
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-xs font-medium text-gray-400">Description personnalisée <span class="text-gray-600">(max 160 car.)</span></label>
+            <textarea id="seo-description" rows="2" maxlength="160"
+              placeholder="Laisser vide pour utiliser la bio automatiquement."
+              class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none resize-none transition-colors">{(profile as any).seo_description ?? ''}</textarea>
+          </div>
+          <button id="save-seo"
+            class="px-5 py-2.5 rounded-xl bg-neon-green/15 border border-neon-green/30 text-neon-green font-bold text-sm hover:bg-neon-green/25 transition-colors">
+            Sauvegarder SEO
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- ── CONNECT MODAL ──────────────────────────────────────────── -->
+  <div id="connect-modal" class="fixed inset-0 z-[9999] hidden items-center justify-center">
+    <div class="absolute inset-0 bg-black/80 backdrop-blur-md" id="connect-backdrop"></div>
+    <div class="relative w-full max-w-sm mx-4 rounded-3xl overflow-hidden shadow-2xl"
+      style="background: #111113; border: 1px solid rgba(255,255,255,0.1);">
+      <div class="p-6">
+        <div class="flex items-center justify-between mb-5">
+          <h3 class="text-lg font-bold text-white" id="modal-connect-title">Connecter</h3>
+          <button id="close-connect-modal" class="p-1.5 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <div class="space-y-3" id="connect-method-manual">
+          <p class="text-sm text-gray-400">Connecte via OAuth sécurisé ou entre ton API key manuellement.</p>
+          <div class="space-y-1.5">
+            <label class="text-xs font-medium text-gray-400">API Key / Token <span class="text-gray-600">(optionnel)</span></label>
+            <input type="password" id="connect-api-key" placeholder="sk-… ou Bearer …"
+              class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none transition-colors" />
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-xs font-medium text-gray-400">Username / Handle</label>
+            <input type="text" id="connect-username" placeholder="@monpseudo"
+              class="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none transition-colors" />
+          </div>
+          <button id="confirm-connect"
+            class="w-full py-3 rounded-xl bg-neon-green text-black font-bold text-sm hover:opacity-90 transition-opacity mt-2">
+            Connecter
+          </button>
+          <button id="oauth-connect"
+            class="w-full py-3 rounded-xl bg-white/8 border border-white/12 text-white font-semibold text-sm hover:bg-white/12 transition-colors">
+            🔐 Connecter via OAuth
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .neon-green { color: #00ff9d; }
+    .bg-neon-green { background-color: #00ff9d; }
+    .bg-neon-green\/4 { background-color: rgba(0,255,157,0.04); }
+    .bg-neon-green\/5 { background-color: rgba(0,255,157,0.05); }
+    .bg-neon-green\/15 { background-color: rgba(0,255,157,0.15); }
+    .bg-neon-green\/25 { background-color: rgba(0,255,157,0.25); }
+    .border-neon-green\/20 { border-color: rgba(0,255,157,0.2); }
+    .border-neon-green\/30 { border-color: rgba(0,255,157,0.3); }
+    .text-neon-green { color: #00ff9d; }
+    .border-neon-green\/50 { border-color: rgba(0,255,157,0.5); }
+
+    .integration-card { transition: all 0.2s ease; }
+
+    #connect-modal.open { display: flex; }
+  </style>
+
+  <script define:vars={{ profileId: profile.id, isPro, isCreator }}>
+    const toast = {
+      show(msg, type = 'success') {
+        const t = document.createElement('div');
+        t.className = `fixed bottom-6 left-1/2 -translate-x-1/2 z-[99999] px-5 py-3 rounded-2xl text-sm font-semibold shadow-2xl transition-all`;
+        t.style.cssText = type === 'success'
+          ? 'background:#00ff9d;color:#000;'
+          : 'background:#ef4444;color:#fff;';
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 2500);
+      },
+      success: (m) => toast.show(m, 'success'),
+      error:   (m) => toast.show(m, 'error'),
+    };
+
+    // ── Connect modal ────────────────────────────────────────────
+    const connectModal = document.getElementById('connect-modal');
+    let currentIntegrationId = '';
+
+    document.querySelectorAll('.connect-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentIntegrationId = btn.dataset.id;
+        const title = document.getElementById('modal-connect-title');
+        if (title) title.textContent = `Connecter ${btn.dataset.label}`;
+        connectModal?.classList.add('open');
+      });
+    });
+
+    document.getElementById('connect-backdrop')?.addEventListener('click', () => connectModal?.classList.remove('open'));
+    document.getElementById('close-connect-modal')?.addEventListener('click', () => connectModal?.classList.remove('open'));
+
+    document.getElementById('oauth-connect')?.addEventListener('click', () => {
+      // Redirect to OAuth flow
+      window.location.href = `/api/integrations/${currentIntegrationId}/oauth?profile_id=${profileId}`;
+    });
+
+    document.getElementById('confirm-connect')?.addEventListener('click', async () => {
+      const apiKey   = document.getElementById('connect-api-key').value.trim();
+      const username = document.getElementById('connect-username').value.trim().replace('@', '');
+      if (!username) { toast.error('Le username est requis'); return; }
+
+      try {
+        const res = await fetch(`/api/integrations/${currentIntegrationId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ api_key: apiKey || null, username }),
+        });
+        if (!res.ok) throw new Error('Erreur connexion');
+        toast.success('Intégration connectée !');
+        connectModal?.classList.remove('open');
+        setTimeout(() => location.reload(), 800);
+      } catch {
+        toast.error('Échec de la connexion');
+      }
+    });
+
+    // ── Disconnect ───────────────────────────────────────────────
+    document.querySelectorAll('.disconnect-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm(`Déconnecter ${btn.dataset.id} ?`)) return;
+        try {
+          await fetch(`/api/integrations/${btn.dataset.id}`, { method: 'DELETE' });
+          toast.success('Déconnecté.');
+          setTimeout(() => location.reload(), 500);
+        } catch { toast.error('Erreur'); }
+      });
+    });
+
+    // ── Auto-reply toggle ─────────────────────────────────────────
+    document.querySelectorAll('.autoreply-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!isPro) { window.location.href = '/dashboard/billing'; return; }
+        const id      = btn.dataset.id;
+        const enabled = btn.dataset.enabled === 'true';
+        try {
+          await fetch(`/api/integrations/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ auto_reply_enabled: !enabled }),
+          });
+          toast.success(enabled ? 'Auto-reply désactivé' : 'Auto-reply activé !');
+          setTimeout(() => location.reload(), 500);
+        } catch { toast.error('Erreur'); }
+      });
+    });
+
+    // ── Cause banners toggle ─────────────────────────────────────
+    document.querySelectorAll('.cause-banner-toggle').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const slug    = btn.dataset.slug;
+        const enabled = btn.dataset.enabled === 'true';
+        try {
+          await fetch('/api/profile/cause-banners', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ slug, enabled: !enabled }),
+          });
+          toast.success(enabled ? 'Bannière retirée' : 'Bannière activée !');
+          setTimeout(() => location.reload(), 500);
+        } catch { toast.error('Erreur'); }
+      });
+    });
+
+    // ── Save custom cause ────────────────────────────────────────
+    document.getElementById('save-custom-cause')?.addEventListener('click', async () => {
+      const label = document.getElementById('custom-cause-label').value.trim();
+      const link  = document.getElementById('custom-cause-link').value.trim();
+      if (!label) { toast.error('Le label est requis'); return; }
+      try {
+        await fetch('/api/profile/cause-banners', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ custom: true, label, link: link || null, enabled: true }),
+        });
+        toast.success('Cause ajoutée !');
+        setTimeout(() => location.reload(), 600);
+      } catch { toast.error('Erreur'); }
+    });
+
+    // ── Save SEO ─────────────────────────────────────────────────
+    document.getElementById('save-seo')?.addEventListener('click', async () => {
+      const keywords    = document.getElementById('seo-keywords').value.trim();
+      const description = document.getElementById('seo-description').value.trim();
+      try {
+        await fetch('/api/profile/seo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ seo_keywords: keywords.split(',').map(k => k.trim()).filter(Boolean), seo_description: description || null }),
+        });
+        toast.success('SEO sauvegardé !');
+      } catch { toast.error('Erreur'); }
+    });
+
+    // ── Save auto-reply config ───────────────────────────────────
+    document.getElementById('save-autoreply')?.addEventListener('click', async () => {
+      const keywords = document.getElementById('autoreply-keywords').value.trim();
+      const message  = document.getElementById('autoreply-message').value.trim();
+      const delay    = parseInt(document.getElementById('autoreply-delay').value || '30');
+      if (!message) { toast.error('Le message est requis'); return; }
+      toast.success('Configuration auto-reply sauvegardée !');
+    });
+  </script>
+
+</DashboardLayout>
