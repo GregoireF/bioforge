@@ -1,5 +1,5 @@
 ---
-import ProfileLayout from '@/layouts/ProfileLayout.astro';
+import BaseLayout from '@/layouts/BaseLayout.astro';
 import { getProfileByUsername, getActiveBlocks } from '@/lib/supabase/queries';
 import QRCode from 'qrcode';
 import CookieBanner from '@/components/ui/CookieBanner.astro';
@@ -264,7 +264,7 @@ const BADGE_COLORS: Record<string, string> = {
 };
 ---
 
-<ProfileLayout title={pageTitle}>
+<BaseLayout title={pageTitle}>
 
   <!-- ===== SEO HEAD ===== -->
   <meta name="description" content={pageDesc} slot="head" />
@@ -376,6 +376,50 @@ const BADGE_COLORS: Record<string, string> = {
           </p>
         )}
       </header>
+
+      <!-- CAUSE BANNERS -->
+      {(() => {
+        const bannerSlugs: string[]  = Array.isArray((profile as any).cause_banners) ? (profile as any).cause_banners : [];
+        const customCauses: any[]    = Array.isArray((profile as any).custom_causes)  ? (profile as any).custom_causes  : [];
+        const CAUSE_DEFS = {
+          antiracism:   { label: 'Anti-Racisme',       color: '#ef4444', icon: '✊',  link: 'https://sos-racisme.org' },
+          lgbtq:        { label: 'Soutien LGBTQ+',     color: '#f97316', icon: '🏳️‍🌈', link: 'https://inter-lgbt.org' },
+          climate:      { label: 'Urgence Climatique', color: '#22c55e', icon: '🌍',  link: 'https://350.org' },
+          mentalhealth: { label: 'Santé Mentale',      color: '#8b5cf6', icon: '💜',  link: 'https://psycom.org' },
+          ukraine:      { label: 'Aide Ukraine',       color: '#3b82f6', icon: '🇺🇦',  link: 'https://ukraineaid.org' },
+          femmes:       { label: 'Droits des Femmes',  color: '#ec4899', icon: '♀️',  link: 'https://planning-familial.org' },
+        };
+        const activeCauses = [
+          ...bannerSlugs.map(s => CAUSE_DEFS[s]).filter(Boolean),
+          ...customCauses,
+        ];
+        if (activeCauses.length === 0) return null;
+        return (
+          <div class="cause-banners-wrap mb-6 flex flex-col gap-2">
+            {activeCauses.map((cause: any) => {
+              const tag = cause.link ? 'a' : 'div';
+              return (
+                <a
+                  href={cause.link ?? undefined}
+                  target={cause.link ? '_blank' : undefined}
+                  rel={cause.link ? 'noopener noreferrer' : undefined}
+                  class="cause-banner flex items-center justify-between gap-3 px-4 py-3 rounded-2xl font-semibold text-sm transition-transform hover:scale-[1.01] active:scale-[0.99]"
+                  style={`background: ${cause.color}18; border: 1.5px solid ${cause.color}40; color: ${cause.color};`}>
+                  <div class="flex items-center gap-2.5">
+                    <span class="text-base">{cause.icon}</span>
+                    <span style={`color: ${tc}; font-weight: 600;`}>{cause.label}</span>
+                  </div>
+                  {cause.link && (
+                    <svg class="w-4 h-4 shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                    </svg>
+                  )}
+                </a>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       <!-- BLOCKS -->
       {blocks.length === 0 ? (
@@ -1576,4 +1620,3 @@ const BADGE_COLORS: Record<string, string> = {
     });
 
   </script>
-</ProfileLayout>
