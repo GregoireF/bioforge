@@ -12,7 +12,7 @@ const supabase = createClient(
   import.meta.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const plan = (planLimits?.plan ?? 'free') as string;
+const plan = (planLimits?.plan ?? 'x') as string;
 const canUseAI = plan === 'creator' || plan === 'pro';
 
 // Fetch last 20 posts

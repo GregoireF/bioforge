@@ -12,7 +12,7 @@ const supabase = createClient(
   import.meta.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const plan      = (planLimits?.plan ?? 'free') as string;
+const plan      = (planLimits?.plan ?? 'x') as string;
 const canUse    = plan === 'free' || plan === 'pro';
 const maxLinks  = plan === 'pro' ? -1 : plan === 'free' ? 50 : 0;
 
