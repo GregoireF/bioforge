@@ -239,13 +239,13 @@ const formatDate = (d: string) => {
         ) : (
           <div class="space-y-3" id="posts-list">
             {posts.map((post: any) => {
-              const statusStyle: Record<string,string> = {
+              const statusStyle = {
                 draft:     'background:rgba(107,114,128,0.15);color:#9ca3af;border-color:rgba(107,114,128,0.3);',
                 scheduled: 'background:rgba(251,191,36,0.12);color:#fbbf24;border-color:rgba(251,191,36,0.3);',
                 published: 'background:rgba(0,255,157,0.12);color:#00ff9d;border-color:rgba(0,255,157,0.3);',
                 failed:    'background:rgba(239,68,68,0.12);color:#ef4444;border-color:rgba(239,68,68,0.3);',
               };
-              const statusLabel: Record<string,string> = { draft:'Brouillon', scheduled:'Programmé', published:'Publié', failed:'Échec' };
+              const statusLabel = { draft:'Brouillon', scheduled:'Programmé', published:'Publié', failed:'Échec' };
               return (
                 <div class="post-card p-4 rounded-2xl border border-white/8 bg-white/2 hover:border-white/15 transition-all cursor-pointer group"
                   data-status={post.status} data-id={post.id}>
@@ -394,7 +394,7 @@ const formatDate = (d: string) => {
       label.textContent = '⏳ Génération en cours…';
 
       try {
-        const res = await fetch('/api/ai/socialPost', {
+        const res = await fetch('/api/ai/social-post', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({ prompt, type, tone, platforms: selectedPlatforms, hashtag_count: hashtagCount }),
