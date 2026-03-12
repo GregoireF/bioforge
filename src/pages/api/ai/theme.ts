@@ -1,6 +1,4 @@
-// pages/api/ai/theme.ts
 import type { APIRoute } from 'astro';
-import { generateFullPalette, seedToHex, detectModeFromHex } from '@/lib/utils/colorSystem';
 
 export const POST: APIRoute = async ({ request }) => {
   // ── Vérification clé Groq ────────────────────────────────────────────────
@@ -26,12 +24,6 @@ export const POST: APIRoute = async ({ request }) => {
     // Sanitize prompt — max 500 chars, no injections
     const safePrompt = prompt.trim().slice(0, 500).replace(/[<>]/g, '');
 
-    // ── Seed + auto dark/light
-    const seedHex = seedToHex(safePrompt);
-    const mode: 'dark' | 'light' = detectModeFromHex(seedHex);
-    const localPalette = generateFullPalette(safePrompt, mode);
-
-    // ── System + user prompts
     const systemPrompt = `Tu es un designer expert en identité visuelle pour pages de liens (style Linktree/BioForge).
 Tu génères des thèmes visuels cohérents, distinctifs et adaptés au profil décrit.
 
@@ -46,21 +38,21 @@ RÈGLES STRICTES :
 
 Format JSON exact (aucun texte autour) :
 {
-  "background_color": "${localPalette.background_color}",
-  "primary_color": "${localPalette.primary_color}",
-  "text_color": "${localPalette.text_color}",
-  "gradient_color_2": "${localPalette.gradient_color}",
-  "background_style": "${localPalette.background_style}",
-  "gradient_type": "${localPalette.gradient_type}",
-  "gradient_angle": ${localPalette.gradient_angle},
-  "pattern": "${localPalette.pattern}",
-  "pattern_opacity": ${localPalette.pattern_opacity},
-  "button_style": "filled",
+  "background_color": "#xxxxxx",
+  "primary_color": "#xxxxxx",
+  "text_color": "#xxxxxx",
+  "gradient_color_2": "#xxxxxx",
+  "background_style": "solid|gradient|blur",
+  "gradient_type": "linear|radial",
+  "gradient_angle": 0,
+  "pattern": "none|dots|grid|waves|noise|mesh",
+  "pattern_opacity": 15,
+  "button_style": "filled|outline|glass|gradient|neon|minimal",
   "border_radius": 14,
-  "font_family": "Exo 2",
-  "animation_preset": "fade",
-  "avatar_shape": "circle",
-  "spacing": "normal",
+  "font_family": "Exo 2|Orbitron|Rajdhani|Bebas Neue|Audiowide|Russo One|Quicksand|Figtree",
+  "animation_preset": "none|fade|slide|bounce|stagger",
+  "avatar_shape": "circle|square|hex|ring",
+  "spacing": "compact|normal|spacious",
   "block_shadow": true,
   "animations": true,
   "reasoning": "Explication courte en français (max 80 mots) de tes choix design"
@@ -68,7 +60,7 @@ Format JSON exact (aucun texte autour) :
 
     // ── Appel Groq ──────────────────────────────────────────────────────────
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25_000);
+    const timeoutId  = setTimeout(() => controller.abort(), 25_000);
 
     const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
@@ -80,11 +72,11 @@ Format JSON exact (aucun texte autour) :
         model: 'llama-3.3-70b-versatile',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
+          { role: 'user',   content: userPrompt   },
         ],
         max_tokens: 500,
         temperature: 0.8,
-        response_format: { type: 'json_object' },
+        response_format: { type: 'json_object' }, // Force JSON output
       }),
       signal: controller.signal,
     });
@@ -125,51 +117,34 @@ Format JSON exact (aucun texte autour) :
       parsed = JSON.parse(clean);
     } catch {
       console.error('[ai/theme] JSON parse error, raw:', rawText.slice(0, 300));
-      // fallback sur palette locale
-      parsed = {
-        background_color: localPalette.background_color,
-        primary_color: localPalette.primary_color,
-        text_color: localPalette.text_color,
-        gradient_color_2: localPalette.gradient_color,
-        background_style: localPalette.background_style,
-        gradient_type: localPalette.gradient_type,
-        gradient_angle: localPalette.gradient_angle,
-        pattern: localPalette.pattern,
-        pattern_opacity: localPalette.pattern_opacity,
-        button_style: 'filled',
-        border_radius: 14,
-        font_family: 'Exo 2',
-        animation_preset: 'fade',
-        avatar_shape: 'circle',
-        spacing: 'normal',
-        block_shadow: true,
-        animations: true,
-        reasoning: '',
-      };
+      return new Response(
+        JSON.stringify({ error: 'Réponse IA invalide, réessaie' }),
+        { status: 422, headers: { 'Content-Type': 'application/json' } }
+      );
     }
 
     const HEX = /^#[0-9A-Fa-f]{6}$/;
     const FONTS = ['Exo 2','Orbitron','Rajdhani','Bebas Neue','Audiowide','Russo One','Quicksand','Figtree'];
 
     const theme = {
-      background_color: HEX.test(parsed.background_color) ? parsed.background_color : '#0a0a0a',
-      primary_color: HEX.test(parsed.primary_color) ? parsed.primary_color : '#00ff9d',
-      text_color: HEX.test(parsed.text_color) ? parsed.text_color : '#ffffff',
-      gradient_color_2: HEX.test(parsed.gradient_color_2) ? parsed.gradient_color_2 : '#1a1a2e',
-      background_style: ['solid','gradient','blur'].includes(parsed.background_style) ? parsed.background_style : 'solid',
-      gradient_type: ['linear','radial'].includes(parsed.gradient_type) ? parsed.gradient_type : 'linear',
-      gradient_angle: Math.min(Math.max(parseInt(parsed.gradient_angle) || 135, 0), 360),
-      pattern: ['none','dots','grid','waves','noise','mesh'].includes(parsed.pattern) ? parsed.pattern : 'none',
-      pattern_opacity: Math.min(Math.max(parseInt(parsed.pattern_opacity) || 15, 5), 60),
-      button_style: ['filled','outline','glass','gradient','neon','minimal'].includes(parsed.button_style) ? parsed.button_style : 'filled',
-      border_radius: Math.min(Math.max(parseInt(parsed.border_radius) || 14, 0), 32),
-      font_family: FONTS.includes(parsed.font_family) ? parsed.font_family : 'Exo 2',
-      animation_preset: ['none','fade','slide','bounce','stagger'].includes(parsed.animation_preset) ? parsed.animation_preset : 'fade',
-      avatar_shape: ['circle','square','hex','ring'].includes(parsed.avatar_shape) ? parsed.avatar_shape : 'circle',
-      spacing: ['compact','normal','spacious'].includes(parsed.spacing) ? parsed.spacing : 'normal',
-      block_shadow: typeof parsed.block_shadow === 'boolean' ? parsed.block_shadow : true,
-      animations: typeof parsed.animations === 'boolean' ? parsed.animations : true,
-      reasoning: typeof parsed.reasoning === 'string' ? parsed.reasoning.slice(0, 200) : '',
+      background_color:  HEX.test(parsed.background_color)  ? parsed.background_color  : '#0a0a0a',
+      primary_color:     HEX.test(parsed.primary_color)     ? parsed.primary_color     : '#00ff9d',
+      text_color:        HEX.test(parsed.text_color)        ? parsed.text_color        : '#ffffff',
+      gradient_color_2:  HEX.test(parsed.gradient_color_2)  ? parsed.gradient_color_2  : '#1a1a2e',
+      background_style:  ['solid','gradient','blur'].includes(parsed.background_style) ? parsed.background_style : 'solid',
+      gradient_type:     ['linear','radial'].includes(parsed.gradient_type) ? parsed.gradient_type : 'linear',
+      gradient_angle:    Math.min(Math.max(parseInt(parsed.gradient_angle) || 135, 0), 360),
+      pattern:           ['none','dots','grid','waves','noise','mesh'].includes(parsed.pattern) ? parsed.pattern : 'none',
+      pattern_opacity:   Math.min(Math.max(parseInt(parsed.pattern_opacity) || 15, 5), 60),
+      button_style:      ['filled','outline','glass','gradient','neon','minimal'].includes(parsed.button_style) ? parsed.button_style : 'filled',
+      border_radius:     Math.min(Math.max(parseInt(parsed.border_radius) || 14, 0), 32),
+      font_family:       FONTS.includes(parsed.font_family) ? parsed.font_family : 'Exo 2',
+      animation_preset:  ['none','fade','slide','bounce','stagger'].includes(parsed.animation_preset) ? parsed.animation_preset : 'fade',
+      avatar_shape:      ['circle','square','hex','ring'].includes(parsed.avatar_shape) ? parsed.avatar_shape : 'circle',
+      spacing:           ['compact','normal','spacious'].includes(parsed.spacing) ? parsed.spacing : 'normal',
+      block_shadow:      typeof parsed.block_shadow === 'boolean' ? parsed.block_shadow : true,
+      animations:        typeof parsed.animations   === 'boolean' ? parsed.animations   : true,
+      reasoning:         typeof parsed.reasoning === 'string' ? parsed.reasoning.slice(0, 200) : '',
     };
 
     return new Response(
