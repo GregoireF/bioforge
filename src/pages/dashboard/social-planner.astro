@@ -394,7 +394,7 @@ const formatDate = (d: string) => {
       label.textContent = '⏳ Génération en cours…';
 
       try {
-        const res = await fetch('/api/ai/social-post', {
+        const res = await fetch('/api/ai/socialPost', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
           body:    JSON.stringify({ prompt, type, tone, platforms: selectedPlatforms, hashtag_count: hashtagCount }),

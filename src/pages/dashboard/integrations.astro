@@ -280,23 +280,25 @@ const planColor: Record<string, string> = { free: '#6b7280', creator: '#00ff9d',
             <button class="cause-banner-toggle flex items-center gap-3 p-4 rounded-2xl border transition-all text-left"
               data-slug={cause.slug}
               data-enabled={String(isEnabled)}
+              data-color={cause.color}
               style={isEnabled
                 ? `border-color: ${cause.color}50; background: ${cause.color}12;`
                 : 'border-color: rgba(255,255,255,0.08); background: rgba(255,255,255,0.02);'}>
               <div class="text-2xl shrink-0">{cause.icon}</div>
               <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2">
-                  <span class="text-sm font-bold" style={isEnabled ? `color: ${cause.color}` : 'color: white;'}>{cause.label}</span>
-                  {isEnabled && <span class="text-xs text-white bg-white/10 px-1.5 py-0.5 rounded-full">✓ Activé</span>}
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="cause-label text-sm font-bold"
+                    style={isEnabled ? `color: ${cause.color}` : 'color: white;'}>{cause.label}</span>
+                  {isEnabled && <span class="cause-active-badge text-xs text-white bg-white/10 px-1.5 py-0.5 rounded-full">✓ Activé</span>}
                 </div>
                 <p class="text-xs text-gray-500 mt-0.5 truncate">{cause.description}</p>
               </div>
               <!-- Toggle switch -->
-              <div class="shrink-0 w-10 h-6 rounded-full border transition-all relative"
+              <div class="toggle-track shrink-0 w-10 h-6 rounded-full border transition-all relative"
                 style={isEnabled
                   ? `background: ${cause.color}; border-color: ${cause.color};`
                   : 'background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.15);'}>
-                <div class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all"
+                <div class="toggle-thumb absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all"
                   style={isEnabled ? 'left: calc(100% - 22px);' : 'left: 2px;'}></div>
               </div>
             </button>
@@ -588,20 +590,64 @@ const planColor: Record<string, string> = { free: '#6b7280', creator: '#00ff9d',
       });
     });
 
-    // ── Cause banners toggle ─────────────────────────────────────
+    // ── Cause banners toggle (optimistic, no reload) ─────────────
+    function applyToggleUI(btn, nowEnabled) {
+      const color = btn.dataset.color || '#ffffff';
+      btn.dataset.enabled = String(nowEnabled);
+
+      // Border + background de la carte
+      btn.style.borderColor = nowEnabled ? `${color}50`   : 'rgba(255,255,255,0.08)';
+      btn.style.background  = nowEnabled ? `${color}12`   : 'rgba(255,255,255,0.02)';
+
+      // Label couleur
+      const labelEl = btn.querySelector('.cause-label');
+      if (labelEl) labelEl.style.color = nowEnabled ? color : 'white';
+
+      // Badge "✓ Activé"
+      let badge = btn.querySelector('.cause-active-badge');
+      if (nowEnabled && !badge) {
+        badge = document.createElement('span');
+        badge.className = 'cause-active-badge text-xs text-white bg-white/10 px-1.5 py-0.5 rounded-full ml-1';
+        badge.textContent = '✓ Activé';
+        labelEl?.parentElement?.appendChild(badge);
+      } else if (!nowEnabled && badge) {
+        badge.remove();
+      }
+
+      // Toggle switch visuel
+      const track  = btn.querySelector('.toggle-track');
+      const thumb  = btn.querySelector('.toggle-thumb');
+      if (track) {
+        track.style.background    = nowEnabled ? color : 'rgba(255,255,255,0.05)';
+        track.style.borderColor   = nowEnabled ? color : 'rgba(255,255,255,0.15)';
+      }
+      if (thumb) {
+        thumb.style.left = nowEnabled ? 'calc(100% - 22px)' : '2px';
+      }
+    }
+
     document.querySelectorAll('.cause-banner-toggle').forEach(btn => {
       btn.addEventListener('click', async () => {
         const slug    = btn.dataset.slug;
         const enabled = btn.dataset.enabled === 'true';
+        const next    = !enabled;
+
+        // Optimistic UI — instant feedback
+        applyToggleUI(btn, next);
+
         try {
-          await fetch('/api/profile/cause-banners', {
+          const res = await fetch('/api/profile/cause-banners', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ slug, enabled: !enabled }),
+            body: JSON.stringify({ slug, enabled: next }),
           });
-          toast.success(enabled ? 'Bannière retirée' : 'Bannière activée !');
-          setTimeout(() => location.reload(), 500);
-        } catch { toast.error('Erreur'); }
+          if (!res.ok) throw new Error('API error');
+          toast.success(next ? '🎗️ Bannière activée !' : 'Bannière retirée');
+        } catch {
+          // Revert on error
+          applyToggleUI(btn, enabled);
+          toast.error('Erreur — réessaie');
+        }
       });
     });
 
@@ -611,14 +657,22 @@ const planColor: Record<string, string> = { free: '#6b7280', creator: '#00ff9d',
       const link  = document.getElementById('custom-cause-link').value.trim();
       if (!label) { toast.error('Le label est requis'); return; }
       try {
-        await fetch('/api/profile/cause-banners', {
+        const res = await fetch('/api/profile/cause-banners', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ custom: true, label, link: link || null, enabled: true }),
         });
-        toast.success('Cause ajoutée !');
-        setTimeout(() => location.reload(), 600);
-      } catch { toast.error('Erreur'); }
+        if (!res.ok) {
+          const e = await res.json();
+          throw new Error(e.error || 'Erreur');
+        }
+        toast.success('🎗️ Cause personnalisée ajoutée !');
+        document.getElementById('custom-cause-label').value = '';
+        document.getElementById('custom-cause-link').value  = '';
+        setTimeout(() => location.reload(), 800); // reload pour afficher dans la liste
+      } catch(e) {
+        toast.error(e.message || 'Erreur');
+      }
     });
 
     // ── Save SEO ─────────────────────────────────────────────────
