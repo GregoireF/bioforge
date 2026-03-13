@@ -1,75 +1,124 @@
 ---
-// src/pages/dashboard/appearance.astro — v2
-// Phone mockup · AI theme generator · Background patterns · 6 button styles · Section nav
+// src/pages/dashboard/appearance.astro — v3
+// Hero · Layout · Social icons · Hover FX · Overlays · Tout free sauf CSS custom + IA
 
 import DashboardLayout from '@/layouts/DashboardLayout.astro';
-import Button from '@/components/ui/Button.astro';
-import Card from '@/components/ui/Card.astro';
 import { withAuth } from '@/lib/auth/auth';
 
 const authResult = await withAuth({ cookies: Astro.cookies, request: Astro.request });
 if (!authResult.success || !authResult.data) {
   return Astro.redirect(authResult.redirect || '/signin?error=auth_failed');
 }
-const { user, profile } = authResult.data;
+const { profile, planLimits } = authResult.data;
 
-// ==================== THEME DEFAULTS ====================
+// ── Plan detection ──────────────────────────────────────────────────────────
+const PAID_TIERS = ['creator','pro','enterprise','business','team'];
+const PRO_TIERS  = ['pro','enterprise','business','team'];
+const plan: string = (planLimits as any)?.plan ?? (profile as any)?.plan ?? 'free';
+const isCreator = PAID_TIERS.includes(plan);
+const isPro     = PRO_TIERS.includes(plan);
+
+// ── Defaults ────────────────────────────────────────────────────────────────
 const DEFAULT_THEME = {
-  preset: 'dark' as const,
-  background_style: 'solid' as const,
+  // Core colors
+  preset:           'dark',
   background_color: '#0a0a0a',
   gradient_color_2: '#1a1a2e',
-  gradient_type: 'linear' as const,
-  gradient_angle: 135,
-  pattern: 'none' as const,
-  pattern_opacity: 15,
-  primary_color: '#00ff9d',
-  text_color: '#ffffff',
-  button_style: 'filled' as const,
-  border_radius: 14,
-  font_family: 'Exo 2' as const,
-  block_shadow: true,
-  animations: true,
-  animation_preset: 'fade' as const,
-  glass_intensity: 12,
-  avatar_shape: 'circle' as const,
-  spacing: 'normal' as const,
-} satisfies Record<string, any>;
+  primary_color:    '#00ff9d',
+  text_color:       '#ffffff',
+  // Background
+  background_style: 'solid',
+  gradient_type:    'linear',
+  gradient_angle:   135,
+  pattern:          'none',
+  pattern_opacity:  15,
+  // Layout (NEW)
+  profile_layout:   'centered',   // centered | left | card | minimal
+  header_style:     'simple',     // simple | glass | banner | hero
+  hero_image:       '',
+  hero_position:    'center',     // top | center | bottom
+  hero_height:      'md',         // sm | md | lg | full
+  hero_overlay:     40,           // 0-80 opacity %
+  content_width:    'normal',     // narrow | normal | wide
+  // Avatar
+  avatar_shape:     'circle',
+  avatar_size:      'md',         // sm | md | lg
+  avatar_border:    'glow',       // none | solid | glow | gradient | double
+  // Bio
+  bio_size:         'sm',         // xs | sm | md | lg
+  bio_style:        'normal',     // normal | italic
+  show_username:    true,
+  // Social icons
+  social_icon_style:'round',      // round | square | pill | ghost | colored
+  // Buttons
+  button_style:     'filled',
+  border_radius:    14,
+  shadow_intensity: 3,            // 0-5
+  hover_effect:     'lift',       // none | lift | glow | slide | ripple
+  button_width:     'full',       // full | auto
+  // Typography
+  font_family:      'Exo 2',
+  // Effects
+  animations:       true,
+  animation_preset: 'fade',
+  scroll_reveal:    true,
+  click_ripple:     false,
+  hover_scale:      3,            // 0-5
+  block_shadow:     true,
+  glass_intensity:  12,
+  spacing:          'normal',
+  // Overlays (NEW)
+  overlay_top:      false,
+  overlay_bottom:   false,
+  overlay_color:    '#000000',
+};
 
-type Theme = typeof DEFAULT_THEME;
+const ALLOWED_FONTS   = ['Exo 2','Orbitron','Rajdhani','Bebas Neue','Audiowide','Russo One','Space Grotesk','DM Sans','Quicksand','Figtree','Inter','Syne','Cabinet Grotesk'];
+const ALLOWED_LAYOUTS = ['centered','left','card','minimal'] as const;
+const ALLOWED_HEADERS = ['simple','glass','banner','hero'] as const;
 
-function sanitizeHex(v: string, fb: string) { return /^#[0-9A-Fa-f]{6}$/.test(v) ? v : fb; }
-function clamp(n: unknown, min: number, max: number, fb: number) {
-  const v = Number(n); return Number.isFinite(v) ? Math.min(Math.max(v, min), max) : fb;
-}
-function sanitizeEnum<T extends string>(v: unknown, allowed: readonly T[], fb: T): T {
-  return allowed.includes(v as T) ? v as T : fb;
-}
-const ALLOWED_FONTS = ['Exo 2','Orbitron','Rajdhani','Bebas Neue','Audiowide','Russo One','Space Grotesk','DM Sans','Quicksand','Figtree'];
-function sanitizeFont(v: string, fb: string) { return ALLOWED_FONTS.includes(v) ? v : fb; }
+function hex(v: string, fb: string) { return /^#[0-9A-Fa-f]{6}$/.test(v) ? v : fb; }
+function clamp(n: unknown, mn: number, mx: number, fb: number) { const v=Number(n); return isFinite(v)?Math.min(Math.max(v,mn),mx):fb; }
+function pick<T extends string>(v: unknown, opts: readonly T[], fb: T): T { return opts.includes(v as T) ? v as T : fb; }
 
-let theme = { ...DEFAULT_THEME };
+let theme: any = { ...DEFAULT_THEME };
 if (profile.theme) {
   try {
-    const raw = typeof profile.theme === 'string' ? JSON.parse(profile.theme) : profile.theme;
+    const r = typeof profile.theme === 'string' ? JSON.parse(profile.theme) : profile.theme;
     theme = {
-      ...DEFAULT_THEME, ...raw,
-      background_color:  sanitizeHex(raw.background_color,  DEFAULT_THEME.background_color),
-      primary_color:     sanitizeHex(raw.primary_color,     DEFAULT_THEME.primary_color),
-      text_color:        sanitizeHex(raw.text_color,        DEFAULT_THEME.text_color),
-      gradient_color_2:  sanitizeHex(raw.gradient_color_2,  DEFAULT_THEME.gradient_color_2),
-      font_family:       sanitizeFont(raw.font_family,      DEFAULT_THEME.font_family),
-      border_radius:     Math.min(Math.max(parseInt(raw.border_radius) || 14, 0), 32),
-      gradient_angle:    Math.min(Math.max(parseInt(raw.gradient_angle) || 135, 0), 360),
-      pattern_opacity:   clamp(raw.pattern_opacity, 5, 60, 15),
-      glass_intensity:   clamp(raw.glass_intensity, 4, 32, 12),
-      background_style:  sanitizeEnum(raw.background_style, ['solid','gradient','blur'] as const, 'solid'),
-      gradient_type:     sanitizeEnum(raw.gradient_type, ['linear','radial'] as const, 'linear'),
-      button_style:      sanitizeEnum(raw.button_style, ['filled','outline','glass','gradient','neon','minimal'] as const, 'filled'),
-      animation_preset:  sanitizeEnum(raw.animation_preset, ['none','fade','slide','bounce','stagger'] as const, 'fade'),
-      avatar_shape:      sanitizeEnum(raw.avatar_shape, ['circle','square','hex','ring'] as const, 'circle'),
-      spacing:           sanitizeEnum(raw.spacing, ['compact','normal','spacious'] as const, 'normal'),
-      pattern:           sanitizeEnum(raw.pattern, ['none','dots','grid','waves','noise','mesh'] as const, 'none'),
+      ...DEFAULT_THEME, ...r,
+      background_color: hex(r.background_color, DEFAULT_THEME.background_color),
+      gradient_color_2: hex(r.gradient_color_2, DEFAULT_THEME.gradient_color_2),
+      primary_color:    hex(r.primary_color,    DEFAULT_THEME.primary_color),
+      text_color:       hex(r.text_color,       DEFAULT_THEME.text_color),
+      overlay_color:    hex(r.overlay_color,    DEFAULT_THEME.overlay_color),
+      font_family:      ALLOWED_FONTS.includes(r.font_family) ? r.font_family : DEFAULT_THEME.font_family,
+      border_radius:    clamp(r.border_radius, 0, 40, 14),
+      gradient_angle:   clamp(r.gradient_angle, 0, 360, 135),
+      pattern_opacity:  clamp(r.pattern_opacity, 5, 60, 15),
+      glass_intensity:  clamp(r.glass_intensity, 4, 32, 12),
+      hero_overlay:     clamp(r.hero_overlay, 0, 80, 40),
+      shadow_intensity: clamp(r.shadow_intensity, 0, 5, 3),
+      hover_scale:      clamp(r.hover_scale, 0, 5, 3),
+      profile_layout:   pick(r.profile_layout,   ALLOWED_LAYOUTS, 'centered'),
+      header_style:     pick(r.header_style,      ALLOWED_HEADERS, 'simple'),
+      background_style: pick(r.background_style, ['solid','gradient','blur'] as const, 'solid'),
+      gradient_type:    pick(r.gradient_type,    ['linear','radial'] as const, 'linear'),
+      button_style:     pick(r.button_style,     ['filled','outline','glass','gradient','neon','minimal'] as const, 'filled'),
+      animation_preset: pick(r.animation_preset, ['none','fade','slide','bounce','stagger'] as const, 'fade'),
+      avatar_shape:     pick(r.avatar_shape,     ['circle','square','hex','ring'] as const, 'circle'),
+      avatar_size:      pick(r.avatar_size,      ['sm','md','lg'] as const, 'md'),
+      avatar_border:    pick(r.avatar_border,    ['none','solid','glow','gradient','double'] as const, 'glow'),
+      social_icon_style:pick(r.social_icon_style,['round','square','pill','ghost','colored'] as const, 'round'),
+      hover_effect:     pick(r.hover_effect,     ['none','lift','glow','slide','ripple'] as const, 'lift'),
+      button_width:     pick(r.button_width,     ['full','auto'] as const, 'full'),
+      spacing:          pick(r.spacing,          ['compact','normal','spacious'] as const, 'normal'),
+      pattern:          pick(r.pattern,          ['none','dots','grid','waves','noise','mesh','crosshatch','triangles'] as const, 'none'),
+      hero_height:      pick(r.hero_height,      ['sm','md','lg','full'] as const, 'md'),
+      hero_position:    pick(r.hero_position,    ['top','center','bottom'] as const, 'center'),
+      content_width:    pick(r.content_width,    ['narrow','normal','wide'] as const, 'normal'),
+      bio_size:         pick(r.bio_size,         ['xs','sm','md','lg'] as const, 'sm'),
+      bio_style:        pick(r.bio_style,        ['normal','italic'] as const, 'normal'),
     };
   } catch { /* keep defaults */ }
 }
@@ -81,189 +130,157 @@ const profileJson = JSON.stringify({
   bio:          profile.bio ?? '',
   avatar_url:   profile.avatar_url ?? '',
 });
+
+// All presets — ALL FREE
+const PRESETS = [
+  { id:'dark',     label:'Dark',     bg:'#0a0a0a', p:'#00ff9d', t:'#ffffff', g2:'#0f1f15' },
+  { id:'neon',     label:'Neon',     bg:'#1a0033', p:'#bf00ff', t:'#ffffff', g2:'#0d001a' },
+  { id:'ocean',    label:'Ocean',    bg:'#001a33', p:'#00d4ff', t:'#ffffff', g2:'#002244' },
+  { id:'sunset',   label:'Sunset',   bg:'#1a0800', p:'#ff6b00', t:'#ffffff', g2:'#2d0a00' },
+  { id:'light',    label:'Light',    bg:'#f8f8f8', p:'#0066ff', t:'#0a0a0a', g2:'#e8f0ff' },
+  { id:'forest',   label:'Forest',   bg:'#0d1f0d', p:'#00cc66', t:'#ffffff', g2:'#0a1a0a' },
+  { id:'rose',     label:'Rose',     bg:'#1a0a0f', p:'#ff2d78', t:'#ffffff', g2:'#0d0508' },
+  { id:'gold',     label:'Gold',     bg:'#120d00', p:'#ffd700', t:'#ffffff', g2:'#1f1500' },
+  { id:'cyber',    label:'Cyber',    bg:'#000d1a', p:'#00ffff', t:'#ffffff', g2:'#001433' },
+  { id:'obsidian', label:'Obsidian', bg:'#0d0d0d', p:'#6366f1', t:'#ffffff', g2:'#13111a' },
+  { id:'aurora',   label:'Aurora',   bg:'#04080f', p:'#00ff9d', t:'#ffffff', g2:'#0a1628' },
+  { id:'sand',     label:'Sand',     bg:'#1a1510', p:'#e8a84c', t:'#f5e6d0', g2:'#120f08' },
+  { id:'midnight', label:'Midnight', bg:'#000010', p:'#4f46e5', t:'#e0e0ff', g2:'#100020' },
+  { id:'blood',    label:'Blood',    bg:'#0d0000', p:'#ef4444', t:'#ffe0e0', g2:'#200000' },
+  { id:'matrix',   label:'Matrix',   bg:'#000a00', p:'#00ff41', t:'#ccffcc', g2:'#001a00' },
+  { id:'hologram', label:'Hologram', bg:'#010115', p:'#a78bfa', t:'#ffffff', g2:'#0a0a30' },
+];
 ---
 
 <DashboardLayout title="Appearance">
-
 <style>
-  /* ── Section nav ── */
-  .sec-tab { transition: all 0.2s; }
-  .sec-tab.active { color: white; background: rgba(0,255,157,0.1); border-color: rgba(0,255,157,0.3); }
-  .sec-panel { display: none; }
-  .sec-panel.active { display: block; }
+  .sec-tab { transition:all 0.2s; }
+  .sec-tab.active { color:white; background:rgba(0,255,157,0.1); border-color:rgba(0,255,157,0.3); }
+  .sec-panel { display:none; }
+  .sec-panel.active { display:block; animation:fadeInUp 0.22s ease both; }
+  @keyframes fadeInUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
 
-  /* ── Active states ── */
-  .preset-btn.active    { outline: 2px solid rgba(0,255,157,0.7); outline-offset: 2px; }
-  .btn-style-btn.active { border-color: rgba(0,255,157,0.7) !important; background: rgba(0,255,157,0.06); }
-  .font-btn.active      { border-color: rgba(0,255,157,0.7) !important; color: #00ff9d; }
-  .pattern-btn.active   { border-color: rgba(0,255,157,0.7) !important; }
-  .anim-btn.active      { border-color: rgba(0,255,157,0.7) !important; color: #00ff9d; }
-  .shape-btn.active     { border-color: rgba(0,255,157,0.7) !important; }
-  .spacing-btn.active   { border-color: rgba(0,255,157,0.7) !important; color: white; }
-  .bg-tab.active        { border-color: rgba(0,255,157,0.7) !important; color: white; }
-  .grad-type-btn.active { border-color: rgba(0,255,157,0.7) !important; color: white; }
+  .active-ring { outline:2px solid rgba(0,255,157,0.8); outline-offset:2px; }
+  .choice-btn { transition:all 0.15s; }
+  .choice-btn.active { border-color:rgba(0,255,157,0.7)!important; background:rgba(0,255,157,0.06)!important; color:white!important; }
 
-  /* ── Color swatch ── */
-  input[type="color"].swatch { -webkit-appearance: none; appearance: none; }
-  input[type="color"].swatch::-webkit-color-swatch-wrapper { padding: 2px; }
-  input[type="color"].swatch::-webkit-color-swatch { border: none; border-radius: 8px; }
+  input[type="color"].swatch { -webkit-appearance:none; appearance:none; }
+  input[type="color"].swatch::-webkit-color-swatch-wrapper { padding:2px; }
+  input[type="color"].swatch::-webkit-color-swatch { border:none; border-radius:8px; }
 
-  /* ── Toggle ── */
-  input[type="checkbox"].toggle { transition: background-color 0.2s; }
-  input[type="checkbox"].toggle::after {
-    content: ''; position: absolute; width: 18px; height: 18px;
-    border-radius: 50%; background: white; top: 3px; left: 3px; transition: left 0.2s;
-  }
-  input[type="checkbox"].toggle:checked { background-color: rgba(0,255,157,0.8); }
-  input[type="checkbox"].toggle:checked::after { left: calc(100% - 21px); }
+  input[type="checkbox"].toggle { transition:background-color 0.2s; }
+  input[type="checkbox"].toggle::after { content:''; position:absolute; width:18px; height:18px; border-radius:50%; background:white; top:3px; left:3px; transition:left 0.2s; }
+  input[type="checkbox"].toggle:checked { background-color:rgba(0,255,157,0.8); }
+  input[type="checkbox"].toggle:checked::after { left:calc(100% - 21px); }
 
-  /* ── Phone mockup ── */
-  .phone-frame {
-    position: relative;
-    width: 260px;
-    background: #111;
-    border-radius: 42px;
-    padding: 14px 10px;
-    box-shadow: 0 0 0 2px #2a2a2a, 0 0 0 4px #1a1a1a, 0 32px 80px rgba(0,0,0,0.8), 0 0 60px rgba(0,255,157,0.04);
-    margin: 0 auto;
-    flex-shrink: 0;
-  }
-  .phone-notch {
-    position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
-    width: 90px; height: 26px;
-    background: #111; border-radius: 0 0 16px 16px;
-    z-index: 10;
-    display: flex; align-items: center; justify-content: center; gap: 6px;
-  }
-  .phone-notch::before { /* camera */ content: ''; width: 8px; height: 8px; border-radius: 50%; background: #1e1e1e; border: 1px solid #2a2a2a; }
-  .phone-notch::after  { /* speaker */ content: ''; width: 36px; height: 4px; border-radius: 2px; background: #1a1a1a; }
-  .phone-screen {
-    border-radius: 32px;
-    overflow: hidden;
-    height: 500px;
-    background: #0a0a0a;
-    position: relative;
-  }
-  .phone-screen iframe { width: 100%; height: 100%; border: 0; }
-  .phone-btn-side {
-    position: absolute;
-    width: 3px; height: 36px; background: #222; border-radius: 2px;
-  }
-  .phone-btn-vol-1 { right: -5px; top: 90px; }
-  .phone-btn-vol-2 { right: -5px; top: 136px; }
-  .phone-btn-power { left: -5px; top: 120px; height: 48px; }
+  /* Phone */
+  .phone-frame { position:relative; width:260px; background:#111; border-radius:42px; padding:14px 10px; box-shadow:0 0 0 2px #2a2a2a,0 0 0 4px #1a1a1a,0 32px 80px rgba(0,0,0,0.8); margin:0 auto; flex-shrink:0; }
+  .phone-notch { position:absolute; top:14px; left:50%; transform:translateX(-50%); width:90px; height:26px; background:#111; border-radius:0 0 16px 16px; z-index:10; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .phone-notch::before { content:''; width:8px; height:8px; border-radius:50%; background:#1e1e1e; border:1px solid #2a2a2a; }
+  .phone-notch::after  { content:''; width:36px; height:4px; border-radius:2px; background:#1a1a1a; }
+  .phone-screen { border-radius:32px; overflow:hidden; height:500px; background:#0a0a0a; }
+  .phone-screen iframe { width:100%; height:100%; border:0; }
+  .phone-btn { position:absolute; width:3px; background:#222; border-radius:2px; }
 
-  /* ── Preview device tabs ── */
-  .device-tab.active svg { color: #00ff9d; }
+  /* Lock badges */
+  .badge-creator { display:inline-flex; align-items:center; gap:2px; padding:1px 5px; border-radius:5px; font-size:9px; font-weight:700; background:rgba(0,255,157,0.12); color:#00ff9d; border:1px solid rgba(0,255,157,0.3); }
+  .badge-pro     { display:inline-flex; align-items:center; gap:2px; padding:1px 5px; border-radius:5px; font-size:9px; font-weight:700; background:rgba(168,85,247,0.15); color:#c084fc; border:1px solid rgba(168,85,247,0.35); }
 
-  /* ── AI typing indicator ── */
-  @keyframes blink { 0%,100%{opacity:0.2} 50%{opacity:1} }
-  .ai-dot { animation: blink 1.2s infinite; }
-  .ai-dot:nth-child(2) { animation-delay: 0.2s; }
-  .ai-dot:nth-child(3) { animation-delay: 0.4s; }
+  /* AI lock overlay */
+  .pro-gate { position:relative; overflow:hidden; border-radius:inherit; }
+  .pro-gate-overlay { position:absolute; inset:0; z-index:10; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; backdrop-filter:blur(6px); background:rgba(0,0,0,0.65); border-radius:inherit; }
 
-  /* ── Palette swatch row ── */
-  .palette-swatch { transition: transform 0.15s; cursor: pointer; }
-  .palette-swatch:hover { transform: scale(1.1); }
+  /* Prog dots */
+  .prog-dot { transition:all 0.2s; }
+  .prog-dot.active { background:#00ff9d; width:20px; border-radius:4px; }
 
-  /* ── Save loading ── */
-  #save-btn.loading { opacity: 0.6; pointer-events: none; }
+  #save-btn.loading { opacity:0.6; pointer-events:none; }
+  @keyframes blink{0%,100%{opacity:0.2}50%{opacity:1}}
+  .ai-dot { animation:blink 1.2s infinite; }
+  .ai-dot:nth-child(2){animation-delay:0.2s;}
+  .ai-dot:nth-child(3){animation-delay:0.4s;}
 
-  /* ── Section progress dots ── */
-  .prog-dot { transition: all 0.2s; }
-  .prog-dot.active { background: #00ff9d; width: 20px; border-radius: 4px; }
-
-  @keyframes fadeInUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
-  .sec-panel.active { animation: fadeInUp 0.25s ease both; }
+  /* Hover FX preview */
+  .hfx-preview { transition:all 0.2s; }
+  .hfx-lift:hover    { transform:translateY(-3px); box-shadow:0 8px 20px rgba(0,0,0,0.4); }
+  .hfx-glow:hover    { box-shadow:0 0 20px var(--p,#00ff9d)80; }
+  .hfx-slide:hover   { background-position:right center !important; }
+  .device-tab.active svg { color:#00ff9d; }
 </style>
 
-  <!-- ===== HEADER ===== -->
-  <div class="flex items-start justify-between mb-6">
+  <!-- Header -->
+  <div class="flex items-start justify-between mb-6 flex-wrap gap-3">
     <div>
-      <h2 class="text-xl font-semibold text-white tracking-tight mb-1">Appearance</h2>
-      <p class="text-sm text-gray-500">Personnalise ton profil BioForge</p>
+      <h2 class="text-xl font-semibold text-white mb-1">Appearance</h2>
+      <p class="text-sm text-gray-500">Personnalise l'apparence de ton profil BioForge</p>
     </div>
-    <div class="flex items-center gap-2">
-      <label class="flex items-center gap-2 px-3 py-2 glass border border-white/10 rounded-xl text-xs text-gray-400 hover:text-white hover:border-white/20 transition-all cursor-pointer">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-        Import
-        <input type="file" id="import-file" accept=".json" class="hidden" />
-      </label>
-      <button id="export-btn" class="flex items-center gap-2 px-3 py-2 glass border border-white/10 rounded-xl text-xs text-gray-400 hover:text-white hover:border-white/20 transition-all">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-        Export
-      </button>
-      <a href={`/${profile.username}`} target="_blank" class="flex items-center gap-2 px-3 py-2 glass border border-neon-green/20 rounded-xl text-xs text-neon-green hover:bg-neon-green/10 transition-all">
+    <div class="flex items-center gap-2 flex-wrap">
+      <a href={`/@${profile.username}`} target="_blank"
+        class="flex items-center gap-2 px-3 py-2 glass border border-neon-green/20 rounded-xl text-xs text-neon-green hover:bg-neon-green/10 transition-all">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
         Voir profil
       </a>
+      <!-- Export Creator / Import Creator -->
+      <button id="export-btn" class="flex items-center gap-1.5 px-3 py-2 glass border border-white/10 rounded-xl text-xs text-gray-400 hover:text-white hover:border-white/20 transition-all">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        Export
+        {!isCreator && <span class="badge-creator">Creator</span>}
+      </button>
+      <label class="flex items-center gap-1.5 px-3 py-2 glass border border-white/10 rounded-xl text-xs text-gray-400 hover:text-white hover:border-white/20 transition-all cursor-pointer">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        Import
+        {!isCreator && <span class="badge-creator">Creator</span>}
+        <input type="file" id="import-file" accept=".json" class="hidden" />
+      </label>
     </div>
   </div>
 
-  <!-- Data bridge -->
-  <div id="server-data" class="hidden" data-theme={themeJson} data-profile={profileJson}></div>
+  <div id="server-data" class="hidden" data-theme={themeJson} data-profile={profileJson} data-plan={plan} data-is-pro={String(isPro)} data-is-creator={String(isCreator)}></div>
 
-  <!-- ===== MAIN LAYOUT ===== -->
   <div class="grid lg:grid-cols-5 gap-6 items-start">
-
-    <!-- ===== LEFT: SECTION TABS + SETTINGS (3/5) ===== -->
+    <!-- ═══ LEFT PANELS ═══ -->
     <div class="lg:col-span-3 space-y-4">
 
-      <!-- Section navigation -->
+      <!-- Section tabs -->
       <div class="flex items-center gap-1.5 flex-wrap">
         {[
-          { id: 'presets',    label: 'Presets',    icon: 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z' },
-          { id: 'background', label: 'Fond',       icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
-          { id: 'buttons',    label: 'Boutons',    icon: 'M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5' },
-          { id: 'typography', label: 'Typo',       icon: 'M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129' },
-          { id: 'profile',    label: 'Profil',     icon: 'M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z' },
-          { id: 'effects',    label: 'Effets',     icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' },
-          { id: 'ai',         label: '✦ IA',       icon: '' },
-        ].map((sec, i) => (
-          <button
-            class={`sec-tab flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-white/8 text-gray-500 hover:text-gray-300 hover:border-white/15 ${i === 0 ? 'active' : ''} ${sec.id === 'ai' ? 'text-neon-green/70 border-neon-green/20 hover:border-neon-green/40 hover:text-neon-green' : ''}`}
-            data-section={sec.id}>
-            {sec.icon && (
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={sec.icon}/>
-              </svg>
-            )}
-            {sec.label}
+          { id:'presets',    label:'🎨 Presets' },
+          { id:'layout',     label:'📐 Layout'  },
+          { id:'background', label:'🖼 Fond'    },
+          { id:'buttons',    label:'🔘 Boutons' },
+          { id:'profile',    label:'👤 Profil'  },
+          { id:'typography', label:'✍ Typo'    },
+          { id:'effects',    label:'✨ Effets'  },
+          { id:'advanced',   label:'⚙ Avancé'  },
+          { id:'ai',         label:'✦ IA'       },
+        ].map((s, i) => (
+          <button class={`sec-tab px-3 py-2 rounded-xl text-xs font-semibold border border-white/8 text-gray-500 hover:text-gray-300 hover:border-white/15 ${i===0?'active':''} ${s.id==='ai'?'text-neon-green/70 border-neon-green/20 hover:border-neon-green/40':''}`}
+            data-section={s.id}>
+            {s.label}
+            {s.id==='advanced' && !isPro && <span class="badge-pro ml-1">Pro</span>}
+            {s.id==='ai' && !isPro && <span class="badge-pro ml-1">Pro</span>}
           </button>
         ))}
       </div>
 
-      <!-- ── PANEL: PRESETS ── -->
+      <!-- ══ PRESETS ══ -->
       <div class="sec-panel active" id="panel-presets">
-        <div class="p-5 glass rounded-2xl border border-white/8 space-y-5">
-          <div>
-            <p class="text-sm font-semibold text-white mb-1">Thèmes prédéfinis</p>
-            <p class="text-xs text-gray-500">Point de départ — modifiable après</p>
+        <div class="p-5 glass rounded-2xl border border-white/8 space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm font-semibold text-white">Thèmes prédéfinis</p>
+              <p class="text-xs text-gray-500 mt-0.5">Tous gratuits — point de départ modifiable</p>
+            </div>
           </div>
-          <div class="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
-            {[
-              { id:'dark',    label:'Dark',     bg:'#0a0a0a', p:'#00ff9d', t:'#fff', g1:'#0a0a0a', g2:'#0f1f15', thumb:'from-[#0a0a0a] to-[#0f1f15]' },
-              { id:'neon',    label:'Neon',     bg:'#1a0033', p:'#bf00ff', t:'#fff', g1:'#1a0033', g2:'#0d001a', thumb:'from-[#1a0033] to-[#0d001a]' },
-              { id:'ocean',   label:'Ocean',    bg:'#001a33', p:'#00d4ff', t:'#fff', g1:'#001a33', g2:'#002244', thumb:'from-[#001a33] to-[#002244]' },
-              { id:'sunset',  label:'Sunset',   bg:'#1a0800', p:'#ff6b00', t:'#fff', g1:'#1a0800', g2:'#2d0a00', thumb:'from-[#1a0800] to-[#2d0a00]' },
-              { id:'light',   label:'Light',    bg:'#f8f8f8', p:'#0066ff', t:'#0a0a0a', g1:'#f8f8f8', g2:'#e8f0ff', thumb:'from-white to-[#e8f0ff]' },
-              { id:'forest',  label:'Forest',   bg:'#0d1f0d', p:'#00cc66', t:'#fff', g1:'#0d1f0d', g2:'#0a1a0a', thumb:'from-[#0d1f0d] to-[#0a1a0a]' },
-              { id:'rose',    label:'Rose',     bg:'#1a0a0f', p:'#ff2d78', t:'#fff', g1:'#1a0a0f', g2:'#0d0508', thumb:'from-[#1a0a0f] to-[#0d0508]' },
-              { id:'gold',    label:'Gold',     bg:'#120d00', p:'#ffd700', t:'#fff', g1:'#120d00', g2:'#1f1500', thumb:'from-[#120d00] to-[#1f1500]' },
-              { id:'cyber',   label:'Cyber',    bg:'#000d1a', p:'#00ffff', t:'#fff', g1:'#000d1a', g2:'#001433', thumb:'from-[#000d1a] to-[#001433]' },
-              { id:'obsidian',label:'Obsidian', bg:'#0d0d0d', p:'#6366f1', t:'#fff', g1:'#0d0d0d', g2:'#13111a', thumb:'from-[#0d0d0d] to-[#13111a]' },
-              { id:'aurora',  label:'Aurora',   bg:'#04080f', p:'#00ff9d', t:'#fff', g1:'#04080f', g2:'#0a1628', thumb:'from-[#04080f] to-[#0a1628]' },
-              { id:'sand',    label:'Sand',     bg:'#1a1510', p:'#e8a84c', t:'#f5e6d0', g1:'#1a1510', g2:'#120f08', thumb:'from-[#1a1510] to-[#120f08]' },
-            ].map(p => (
-              <button
-                class="preset-btn group flex flex-col rounded-xl overflow-hidden border-2 border-white/8 hover:border-white/20 transition-all hover:scale-[1.03] active:scale-[0.97]"
-                data-preset={p.id} data-bg={p.bg} data-primary={p.p} data-text={p.t}
-                data-g1={p.g1} data-g2={p.g2} title={p.label}>
-                <div class={`h-12 bg-gradient-to-br ${p.thumb} flex items-end justify-end p-1.5`}>
-                  <div class="w-5 h-2 rounded-full" style={`background:${p.p};opacity:0.9`}></div>
+          <div class="grid grid-cols-4 sm:grid-cols-8 gap-2">
+            {PRESETS.map(p => (
+              <button class="preset-btn group flex flex-col rounded-xl overflow-hidden border-2 border-white/8 hover:border-white/25 transition-all hover:scale-[1.04] active:scale-[0.97]"
+                data-preset={p.id} data-bg={p.bg} data-primary={p.p} data-text={p.t} data-g2={p.g2} title={p.label}>
+                <div class="h-10 w-full" style={`background:linear-gradient(135deg,${p.bg},${p.g2});position:relative`}>
+                  <div style={`position:absolute;bottom:4px;right:4px;width:14px;height:14px;border-radius:50%;background:${p.p}`}></div>
                 </div>
-                <div class="py-1.5 text-center bg-white/3">
-                  <span class="text-xs text-gray-400 font-medium">{p.label}</span>
+                <div class="py-1 text-center" style="background:rgba(255,255,255,0.04)">
+                  <span class="text-xs text-gray-500" style="font-size:9px">{p.label}</span>
                 </div>
               </button>
             ))}
@@ -271,18 +288,128 @@ const profileJson = JSON.stringify({
         </div>
       </div>
 
-      <!-- ── PANEL: BACKGROUND ── -->
+      <!-- ══ LAYOUT ══ -->
+      <div class="sec-panel" id="panel-layout">
+        <div class="p-5 glass rounded-2xl border border-white/8 space-y-6">
+          <p class="text-sm font-semibold text-white">Layout & Structure</p>
+
+          <!-- Profile layout -->
+          <div class="space-y-3">
+            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Disposition du profil</p>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                { id:'centered', label:'Centré',   icon:'⊙', desc:'Avatar centré, liens full-width' },
+                { id:'left',     label:'Gauche',   icon:'⊏', desc:'Avatar + texte à gauche' },
+                { id:'card',     label:'Card',     icon:'▭', desc:'Profil dans une carte' },
+                { id:'minimal',  label:'Minimal',  icon:'—', desc:'Ultra épuré, juste les liens' },
+              ].map(l => (
+                <button class="choice-btn layout-btn flex flex-col items-center gap-2 p-3 glass border-2 border-white/10 rounded-xl hover:border-white/20 transition-all text-center"
+                  data-layout={l.id} title={l.desc}>
+                  <span class="text-2xl leading-none">{l.icon}</span>
+                  <span class="text-xs font-semibold text-white">{l.label}</span>
+                  <span class="text-xs text-gray-600 leading-tight">{l.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <!-- Header style -->
+          <div class="space-y-3">
+            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Style du header</p>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                { id:'simple', label:'Simple',    icon:'○',  desc:'Avatar + nom + bio' },
+                { id:'glass',  label:'Glass Card', icon:'◫',  desc:'Carte verre dépoli' },
+                { id:'banner', label:'Banner',    icon:'▬',  desc:'Bannière colorée derrière' },
+                { id:'hero',   label:'Hero Image', icon:'🖼', desc:'Grande image en fond' },
+              ].map(h => (
+                <button class="choice-btn header-btn flex flex-col items-center gap-2 p-3 glass border-2 border-white/10 rounded-xl hover:border-white/20 transition-all text-center"
+                  data-header={h.id} title={h.desc}>
+                  <span class="text-2xl leading-none">{h.icon}</span>
+                  <span class="text-xs font-semibold text-white">{h.label}</span>
+                  <span class="text-xs text-gray-600 leading-tight">{h.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <!-- Hero image settings (shown when hero selected) -->
+          <div id="hero-settings" class="hidden space-y-4 p-4 rounded-xl bg-white/3 border border-white/8">
+            <p class="text-xs text-gray-400 font-medium">Image Hero</p>
+            <div class="space-y-1.5">
+              <label class="text-xs text-gray-500">URL de l'image</label>
+              <input type="url" id="hero-image-url" value={theme.hero_image} placeholder="https://…/ma-banniere.jpg"
+                class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none transition-colors" />
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              {[
+                { id:'sm',   label:'Compact', h:'120px' },
+                { id:'md',   label:'Moyen',   h:'200px' },
+                { id:'lg',   label:'Grand',   h:'280px' },
+                { id:'full', label:'Pleine page', h:'100vh' },
+              ].map((s,i) => (
+                <button class="choice-btn hero-height-btn py-2 px-1 glass border-2 border-white/10 rounded-lg text-xs text-gray-400 hover:text-white transition-all" data-height={s.id}>
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <p class="text-xs text-gray-500 mb-1.5">Position image</p>
+                <div class="flex gap-1">
+                  {['top','center','bottom'].map(pos => (
+                    <button class="choice-btn hero-pos-btn flex-1 py-1.5 text-xs glass border-2 border-white/10 rounded-lg text-gray-400 hover:text-white transition-all" data-pos={pos}>
+                      {pos}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div class="col-span-2">
+                <div class="flex justify-between items-center mb-1.5">
+                  <p class="text-xs text-gray-500">Overlay sombre</p>
+                  <span id="hero-overlay-val" class="text-xs font-mono text-white">{theme.hero_overlay}%</span>
+                </div>
+                <input type="range" id="hero-overlay-slider" min="0" max="80" value={theme.hero_overlay}
+                  class="w-full accent-neon-green h-1.5 rounded-full" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Content width -->
+          <div class="space-y-3">
+            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Largeur du contenu</p>
+            <div class="flex gap-2">
+              {[
+                { id:'narrow', label:'Étroit',  w:'360px' },
+                { id:'normal', label:'Normal',  w:'480px' },
+                { id:'wide',   label:'Large',   w:'600px' },
+              ].map(w => (
+                <button class="choice-btn width-btn flex-1 py-3 glass border-2 border-white/10 rounded-xl text-xs font-medium text-gray-400 hover:text-white transition-all"
+                  data-width={w.id}>
+                  <div class="flex items-center justify-center gap-1.5 mb-1">
+                    <div style={`width:${['narrow','normal','wide'].indexOf(w.id)*8+12}px;height:3px;background:currentColor;border-radius:2px`}></div>
+                  </div>
+                  {w.label}
+                  <span class="block text-gray-600 text-xs">{w.w}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ BACKGROUND ══ -->
       <div class="sec-panel" id="panel-background">
         <div class="p-5 glass rounded-2xl border border-white/8 space-y-6">
           <p class="text-sm font-semibold text-white">Arrière-plan</p>
 
           <!-- Colors -->
-          <div>
-            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium mb-3">Couleurs</p>
+          <div class="space-y-3">
+            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Couleurs</p>
             <div class="grid grid-cols-3 gap-4">
               {[
                 { id:'background_color', label:'Fond',    key:'background_color' },
-                { id:'primary_color',    label:'Primaire', key:'primary_color' },
+                { id:'primary_color',    label:'Accent',  key:'primary_color' },
                 { id:'text_color',       label:'Texte',   key:'text_color' },
               ].map(c => (
                 <div class="space-y-2">
@@ -291,137 +418,193 @@ const profileJson = JSON.stringify({
                     <input type="color" id={c.id} value={(theme as any)[c.key]}
                       class="swatch w-10 h-10 rounded-xl cursor-pointer border border-white/10 p-0.5 shrink-0" />
                     <input type="text" id={`${c.id}_text`} value={(theme as any)[c.key]}
-                      maxlength="7" placeholder="#000000"
-                      class="w-full px-2 py-2 glass border border-white/10 rounded-lg text-white text-xs font-mono focus:border-neon-green/40 focus:outline-none" />
+                      maxlength="7" class="w-full px-2 py-2 glass border border-white/10 rounded-lg text-white text-xs font-mono focus:border-neon-green/40 focus:outline-none" />
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          <!-- BG Style -->
-          <div>
-            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium mb-3">Style</p>
-            <div class="flex gap-2 mb-4">
+          <!-- BG style -->
+          <div class="space-y-3">
+            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Style</p>
+            <div class="flex gap-2">
               {['solid','gradient','blur'].map(s => (
-                <button class="bg-tab flex-1 py-2 rounded-xl text-xs font-semibold border-2 border-white/10 text-gray-400 hover:text-white transition-all"
-                  data-style={s}>
-                  {{ solid:'Solide', gradient:'Dégradé', blur:'Blur' }[s]}
+                <button class="choice-btn bg-tab flex-1 py-2.5 glass border-2 border-white/10 rounded-xl text-xs font-semibold text-gray-400 hover:text-white transition-all" data-style={s}>
+                  {{ solid:'Solide', gradient:'Dégradé', blur:'Blur verre' }[s]}
                 </button>
               ))}
             </div>
-
             <!-- Gradient builder -->
-            <div id="gradient-builder" class="hidden space-y-4 p-4 bg-white/3 rounded-xl border border-white/8">
+            <div id="gradient-builder" class="hidden space-y-4 p-4 rounded-xl bg-white/3 border border-white/8">
               <div class="grid grid-cols-2 gap-3">
                 {['gradient_color_1','gradient_color_2'].map((cid, i) => (
                   <div class="space-y-1.5">
                     <label class="text-xs text-gray-500">Couleur {i + 1}</label>
                     <div class="flex gap-2">
-                      <input type="color" id={cid}
-                        value={i === 0 ? theme.background_color : theme.gradient_color_2}
+                      <input type="color" id={cid} value={i===0?theme.background_color:theme.gradient_color_2}
                         class="swatch w-10 h-10 rounded-lg cursor-pointer border border-white/10 p-0.5 shrink-0" />
-                      <input type="text" id={`${cid}_text`}
-                        value={i === 0 ? theme.background_color : theme.gradient_color_2}
-                        maxlength="7"
-                        class="w-full px-2 py-2 glass border border-white/10 rounded-lg text-white text-xs font-mono focus:border-neon-green/40 focus:outline-none" />
+                      <input type="text" id={`${cid}_text`} value={i===0?theme.background_color:theme.gradient_color_2}
+                        maxlength="7" class="w-full px-2 py-2 glass border border-white/10 rounded-lg text-white text-xs font-mono focus:border-neon-green/40 focus:outline-none" />
                     </div>
                   </div>
                 ))}
               </div>
               <div class="flex gap-2">
                 {['linear','radial'].map(t => (
-                  <button class="grad-type-btn flex-1 py-2 rounded-xl text-xs font-semibold border-2 border-white/10 text-gray-400 hover:text-white transition-all"
-                    data-type={t}>
+                  <button class="choice-btn grad-type-btn flex-1 py-2 rounded-xl text-xs font-semibold border-2 border-white/10 text-gray-400 hover:text-white transition-all" data-type={t}>
                     {{ linear:'⟶ Linéaire', radial:'◎ Radial' }[t]}
                   </button>
                 ))}
               </div>
               <div id="angle-wrap">
-                <div class="flex justify-between items-center mb-2">
-                  <label class="text-xs text-gray-500">Angle</label>
+                <div class="flex justify-between mb-1.5">
+                  <span class="text-xs text-gray-500">Angle</span>
                   <span id="angle-val" class="text-xs font-mono text-white">{theme.gradient_angle}°</span>
                 </div>
-                <input type="range" id="gradient_angle" min="0" max="360" value={theme.gradient_angle}
-                  class="w-full accent-neon-green h-1.5 rounded-full" />
+                <input type="range" id="gradient_angle" min="0" max="360" value={theme.gradient_angle} class="w-full accent-neon-green h-1.5 rounded-full" />
               </div>
             </div>
           </div>
 
-          <!-- Background patterns -->
-          <div>
-            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium mb-3">Motif</p>
-            <div class="grid grid-cols-6 gap-2 mb-3">
+          <!-- Patterns -->
+          <div class="space-y-3">
+            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Motif de fond</p>
+            <div class="grid grid-cols-4 sm:grid-cols-8 gap-2">
               {[
-                { id:'none',  label:'Aucun',  preview:'bg-gray-900' },
-                { id:'dots',  label:'Points', preview:'bg-gray-900' },
-                { id:'grid',  label:'Grille', preview:'bg-gray-900' },
-                { id:'waves', label:'Vagues', preview:'bg-gray-900' },
-                { id:'noise', label:'Bruit',  preview:'bg-gray-900' },
-                { id:'mesh',  label:'Mesh',   preview:'bg-gray-900' },
+                { id:'none',        label:'Aucun'     },
+                { id:'dots',        label:'Points'    },
+                { id:'grid',        label:'Grille'    },
+                { id:'waves',       label:'Vagues'    },
+                { id:'noise',       label:'Bruit'     },
+                { id:'mesh',        label:'Mesh'      },
+                { id:'crosshatch',  label:'Hachures'  },
+                { id:'triangles',   label:'Triangles' },
               ].map(pt => (
-                <button
-                  class="pattern-btn flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 border-white/8 hover:border-white/20 transition-all"
-                  data-pattern={pt.id}>
-                  <div class="w-full h-8 rounded-lg overflow-hidden relative bg-gray-900" id={`pattern-preview-${pt.id}`}></div>
-                  <span class="text-xs text-gray-500">{pt.label}</span>
+                <button class="choice-btn pattern-btn flex flex-col items-center gap-1.5 p-2 rounded-xl border-2 border-white/8 hover:border-white/20 transition-all" data-pattern={pt.id}>
+                  <div class="w-full h-7 rounded-lg overflow-hidden bg-gray-900" id={`pattern-preview-${pt.id}`}></div>
+                  <span style="font-size:9px" class="text-gray-500">{pt.label}</span>
                 </button>
               ))}
             </div>
-            <div id="pattern-opacity-wrap" class="hidden">
-              <div class="flex justify-between items-center mb-2">
-                <label class="text-xs text-gray-500">Opacité du motif</label>
+            <div id="pattern-opacity-wrap" class="hidden space-y-1.5">
+              <div class="flex justify-between">
+                <span class="text-xs text-gray-500">Opacité</span>
                 <span id="pattern-opacity-val" class="text-xs font-mono text-white">{theme.pattern_opacity}%</span>
               </div>
-              <input type="range" id="pattern_opacity" min="5" max="60" value={theme.pattern_opacity}
-                class="w-full accent-neon-green h-1.5 rounded-full" />
+              <input type="range" id="pattern_opacity" min="5" max="60" value={theme.pattern_opacity} class="w-full accent-neon-green h-1.5 rounded-full" />
+            </div>
+          </div>
+
+          <!-- Overlays -->
+          <div class="space-y-3">
+            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Overlays de fond</p>
+            <div class="space-y-2">
+              <label class="flex items-center justify-between p-3.5 glass rounded-xl cursor-pointer hover:bg-white/3 border border-white/5 transition-all">
+                <div>
+                  <span class="text-sm text-gray-300 font-medium block">Fondu en haut</span>
+                  <span class="text-xs text-gray-600">Dégradé sombre depuis le haut</span>
+                </div>
+                <input type="checkbox" id="overlay-top" checked={theme.overlay_top}
+                  class="toggle w-11 h-6 rounded-full appearance-none bg-white/10 relative cursor-pointer focus:outline-none" />
+              </label>
+              <label class="flex items-center justify-between p-3.5 glass rounded-xl cursor-pointer hover:bg-white/3 border border-white/5 transition-all">
+                <div>
+                  <span class="text-sm text-gray-300 font-medium block">Fondu en bas</span>
+                  <span class="text-xs text-gray-600">Dégradé sombre vers le bas</span>
+                </div>
+                <input type="checkbox" id="overlay-bottom" checked={theme.overlay_bottom}
+                  class="toggle w-11 h-6 rounded-full appearance-none bg-white/10 relative cursor-pointer focus:outline-none" />
+              </label>
+              <div class="flex items-center gap-3 px-1">
+                <span class="text-xs text-gray-500">Couleur overlay</span>
+                <input type="color" id="overlay-color" value={theme.overlay_color}
+                  class="swatch w-8 h-8 rounded-lg cursor-pointer border border-white/10 p-0.5" />
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- ── PANEL: BUTTONS ── -->
+      <!-- ══ BUTTONS ══ -->
       <div class="sec-panel" id="panel-buttons">
         <div class="p-5 glass rounded-2xl border border-white/8 space-y-6">
-          <p class="text-sm font-semibold text-white">Styles de boutons</p>
+          <p class="text-sm font-semibold text-white">Boutons & Liens</p>
 
-          <!-- 6 button style previews -->
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {[
-              { id:'filled',   label:'Rempli',     desc:'Style classique' },
-              { id:'outline',  label:'Contour',    desc:'Élégant et léger' },
-              { id:'glass',    label:'Glass',      desc:'Effet verre dépoli' },
-              { id:'gradient', label:'Dégradé',    desc:'Dynamique' },
-              { id:'neon',     label:'Néon',       desc:'Glow lumineux' },
-              { id:'minimal',  label:'Minimal',    desc:'Épuré, discret' },
-            ].map(s => (
-              <button
-                class="btn-style-btn p-3.5 glass border-2 border-white/10 rounded-xl hover:border-white/20 transition-all text-left space-y-2.5"
-                data-style={s.id}>
-                <!-- Preview element -->
-                <div id={`btn-preview-${s.id}`} class="w-full h-9 rounded-lg flex items-center justify-center text-xs font-semibold transition-all">
-                  Aperçu
-                </div>
-                <div>
-                  <p class="text-xs text-white font-semibold">{s.label}</p>
-                  <p class="text-xs text-gray-600">{s.desc}</p>
-                </div>
+          <!-- 6 styles -->
+          <div class="space-y-3">
+            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Style</p>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {[
+                { id:'filled',   label:'Rempli',   desc:'Classique' },
+                { id:'outline',  label:'Contour',  desc:'Léger et élégant' },
+                { id:'glass',    label:'Glass',    desc:'Verre dépoli' },
+                { id:'gradient', label:'Dégradé',  desc:'Dynamique' },
+                { id:'neon',     label:'Néon',     desc:'Glow lumineux' },
+                { id:'minimal',  label:'Minimal',  desc:'Juste une ligne' },
+              ].map(s => (
+                <button class="choice-btn btn-style-btn p-3.5 glass border-2 border-white/10 rounded-xl hover:border-white/20 transition-all text-left space-y-2" data-style={s.id}>
+                  <div id={`btn-preview-${s.id}`} class="w-full h-9 rounded-lg flex items-center justify-center text-xs font-semibold">Aperçu</div>
+                  <div>
+                    <p class="text-xs text-white font-semibold">{s.label}</p>
+                    <p class="text-xs text-gray-600">{s.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <!-- Hover effect -->
+          <div class="space-y-3">
+            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Effet au survol</p>
+            <div class="grid grid-cols-3 sm:grid-cols-5 gap-2">
+              {[
+                { id:'none',   label:'Aucun',  preview:'static' },
+                { id:'lift',   label:'Lift',   preview:'↑' },
+                { id:'glow',   label:'Glow',   preview:'✦' },
+                { id:'slide',  label:'Slide',  preview:'→' },
+                { id:'ripple', label:'Ripple', preview:'◎' },
+              ].map(fx => (
+                <button class="choice-btn hover-fx-btn py-2.5 px-1 glass border-2 border-white/10 rounded-xl text-xs font-medium text-gray-400 hover:text-white transition-all text-center" data-fx={fx.id}>
+                  <div class="text-lg mb-1">{fx.preview}</div>
+                  {fx.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <!-- Width -->
+          <div class="space-y-3">
+            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Largeur des boutons</p>
+            <div class="flex gap-2">
+              <button class="choice-btn btn-width-btn flex-1 py-2.5 glass border-2 border-white/10 rounded-xl text-xs font-medium text-gray-400 hover:text-white transition-all" data-bw="full">
+                Pleine largeur <span class="block text-gray-600">━━━━━━</span>
               </button>
-            ))}
+              <button class="choice-btn btn-width-btn flex-1 py-2.5 glass border-2 border-white/10 rounded-xl text-xs font-medium text-gray-400 hover:text-white transition-all" data-bw="auto">
+                Auto <span class="block text-gray-600">━━</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Shadow intensity -->
+          <div class="space-y-2">
+            <div class="flex justify-between">
+              <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Intensité ombre</p>
+              <span id="shadow-val" class="text-xs font-mono text-white">{theme.shadow_intensity}</span>
+            </div>
+            <input type="range" id="shadow-intensity" min="0" max="5" value={theme.shadow_intensity} class="w-full accent-neon-green h-1.5 rounded-full" />
           </div>
 
           <!-- Border radius -->
-          <div>
-            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium mb-3">Arrondi des coins</p>
-            <div class="flex gap-2 mb-3 flex-wrap">
-              {[0,4,8,14,20,28,32].map(r => (
-                <button class="radius-btn px-3 py-1.5 glass rounded-xl border-2 border-white/10 text-xs text-gray-400 hover:text-white hover:border-white/20 transition-all font-mono"
-                  data-radius={r}>{r}px</button>
+          <div class="space-y-3">
+            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Arrondi</p>
+            <div class="flex gap-2 flex-wrap">
+              {[0,4,8,14,20,28,32,40].map(r => (
+                <button class="choice-btn radius-btn px-3 py-1.5 glass rounded-xl border-2 border-white/10 text-xs text-gray-400 hover:text-white transition-all font-mono" data-radius={r}>{r}</button>
               ))}
             </div>
-            <input type="range" id="border_radius" min="0" max="32" value={theme.border_radius}
-              class="w-full accent-neon-green h-1.5 rounded-full" />
-            <div class="flex justify-between text-xs text-gray-600 mt-1.5">
+            <input type="range" id="border_radius" min="0" max="40" value={theme.border_radius} class="w-full accent-neon-green h-1.5 rounded-full" />
+            <div class="flex justify-between text-xs text-gray-600 -mt-1">
               <span>Carré</span>
               <span id="radius-val" class="text-white font-mono">{theme.border_radius}px</span>
               <span>Pill</span>
@@ -430,70 +613,106 @@ const profileJson = JSON.stringify({
         </div>
       </div>
 
-      <!-- ── PANEL: TYPOGRAPHY ── -->
-      <div class="sec-panel" id="panel-typography">
-        <div class="p-5 glass rounded-2xl border border-white/8 space-y-5">
-          <p class="text-sm font-semibold text-white">Police de caractères</p>
-          <div class="grid grid-cols-2 gap-2">
-            {[
-              { name:'Exo 2',       cat:'Tech / Futuriste' },
-              { name:'Orbitron',    cat:'Sci-Fi / Gaming' },
-              { name:'Rajdhani',    cat:'Moderne / Sharp' },
-              { name:'Bebas Neue',  cat:'Display / Impact' },
-              { name:'Audiowide',   cat:'Électronique' },
-              { name:'Russo One',   cat:'Solide / Bold' },
-              { name:'Quicksand',   cat:'Friendly / Rond' },
-              { name:'Figtree',     cat:'Clean / Lisible' },
-              { name:'DM Sans',     cat:'Neutre / Pro' },
-              { name:'Space Grotesk',cat:'Géométrique' },
-            ].map(f => (
-              <button
-                class="font-btn flex items-center justify-between px-3 py-3 glass border-2 border-white/10 rounded-xl hover:border-white/20 transition-all"
-                data-font={f.name}>
-                <span class="text-sm text-white font-medium" style={`font-family:'${f.name}',sans-serif`}>{f.name}</span>
-                <span class="text-xs text-gray-600">{f.cat}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <!-- ── PANEL: PROFILE ── -->
+      <!-- ══ PROFILE ══ -->
       <div class="sec-panel" id="panel-profile">
         <div class="p-5 glass rounded-2xl border border-white/8 space-y-6">
           <p class="text-sm font-semibold text-white">Style du profil</p>
 
-          <!-- Avatar shape -->
-          <div>
-            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium mb-3">Forme de l'avatar</p>
-            <div class="flex gap-3">
+          <!-- Avatar -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            <div class="space-y-2">
+              <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Forme</p>
+              <div class="grid grid-cols-2 gap-1.5">
+                {[
+                  { id:'circle', label:'Rond' },
+                  { id:'square', label:'Carré' },
+                  { id:'hex',    label:'Hex' },
+                  { id:'ring',   label:'Ring' },
+                ].map(s => (
+                  <button class="choice-btn shape-btn py-2 glass border-2 border-white/10 rounded-lg text-xs text-gray-400 hover:text-white transition-all" data-shape={s.id}>{s.label}</button>
+                ))}
+              </div>
+            </div>
+            <div class="space-y-2">
+              <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Bordure</p>
+              <div class="grid grid-cols-1 gap-1.5">
+                {[
+                  { id:'none',     label:'Aucune' },
+                  { id:'solid',    label:'Solide' },
+                  { id:'glow',     label:'Glow' },
+                  { id:'gradient', label:'Dégradé' },
+                  { id:'double',   label:'Double' },
+                ].map(b => (
+                  <button class="choice-btn avatar-border-btn py-1.5 glass border-2 border-white/10 rounded-lg text-xs text-gray-400 hover:text-white transition-all" data-border={b.id}>{b.label}</button>
+                ))}
+              </div>
+            </div>
+            <div class="space-y-2">
+              <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Taille</p>
+              <div class="grid grid-cols-1 gap-1.5">
+                {[
+                  { id:'sm', label:'Petit (64px)' },
+                  { id:'md', label:'Normal (96px)' },
+                  { id:'lg', label:'Grand (128px)' },
+                ].map(sz => (
+                  <button class="choice-btn avatar-size-btn py-1.5 glass border-2 border-white/10 rounded-lg text-xs text-gray-400 hover:text-white transition-all" data-size={sz.id}>{sz.label}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <!-- Social icons style -->
+          <div class="space-y-3">
+            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Style icônes sociales</p>
+            <div class="grid grid-cols-3 sm:grid-cols-5 gap-2">
               {[
-                { id:'circle', label:'Rond',   preview:'rounded-full' },
-                { id:'square', label:'Carré',  preview:'rounded-xl' },
-                { id:'hex',    label:'Hex',    preview:'rounded-full' },
-                { id:'ring',   label:'Ring',   preview:'rounded-full ring-2 ring-offset-2 ring-neon-green ring-offset-black' },
+                { id:'round',   label:'Rond',    icon:'●' },
+                { id:'square',  label:'Carré',   icon:'■' },
+                { id:'pill',    label:'Pill',    icon:'⬬' },
+                { id:'ghost',   label:'Ghost',   icon:'○' },
+                { id:'colored', label:'Coloré',  icon:'◐' },
               ].map(s => (
-                <button class="shape-btn flex flex-col items-center gap-2 flex-1 p-3 glass border-2 border-white/10 rounded-xl hover:border-white/20 transition-all"
-                  data-shape={s.id}>
-                  <div class={`w-10 h-10 bg-gradient-to-br from-neon-green/30 to-neon-blue/30 ${s.preview}`}
-                    style={s.id === 'hex' ? 'clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)' : ''}></div>
-                  <span class="text-xs text-gray-400">{s.label}</span>
+                <button class="choice-btn social-style-btn py-2.5 glass border-2 border-white/10 rounded-xl text-xs text-gray-400 hover:text-white transition-all text-center" data-social={s.id}>
+                  <div class="text-xl mb-1">{s.icon}</div>
+                  {s.label}
                 </button>
               ))}
             </div>
           </div>
 
-          <!-- Spacing density -->
-          <div>
-            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium mb-3">Densité d'espacement</p>
+          <!-- Bio -->
+          <div class="grid grid-cols-2 gap-4">
+            <div class="space-y-2">
+              <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Taille bio</p>
+              <div class="flex gap-1.5">
+                {['xs','sm','md','lg'].map(sz => (
+                  <button class="choice-btn bio-size-btn flex-1 py-2 glass border-2 border-white/10 rounded-lg text-xs text-gray-400 hover:text-white transition-all font-medium" data-bio-size={sz}>{sz.toUpperCase()}</button>
+                ))}
+              </div>
+            </div>
+            <div class="space-y-2">
+              <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Style bio</p>
+              <div class="flex gap-1.5">
+                {[
+                  { id:'normal', label:'Normal' },
+                  { id:'italic', label:'Italique' },
+                ].map(s => (
+                  <button class="choice-btn bio-style-btn flex-1 py-2 glass border-2 border-white/10 rounded-lg text-xs text-gray-400 hover:text-white transition-all" data-bio-style={s.id}>{s.label}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <!-- Spacing -->
+          <div class="space-y-2">
+            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Espacement</p>
             <div class="flex gap-2">
               {[
-                { id:'compact',   label:'Compact',   icon:'▪▪▪' },
-                { id:'normal',    label:'Normal',    icon:'▪ ▪ ▪' },
-                { id:'spacious',  label:'Aéré',      icon:'▪  ▪  ▪' },
+                { id:'compact',  label:'Compact',  icon:'▪▪▪' },
+                { id:'normal',   label:'Normal',   icon:'▪ ▪ ▪' },
+                { id:'spacious', label:'Aéré',     icon:'▪  ▪  ▪' },
               ].map(s => (
-                <button class="spacing-btn flex-1 py-3 px-2 glass border-2 border-white/10 rounded-xl hover:border-white/20 transition-all text-center"
-                  data-spacing={s.id}>
+                <button class="choice-btn spacing-btn flex-1 py-3 glass border-2 border-white/10 rounded-xl hover:border-white/20 transition-all text-center" data-spacing={s.id}>
                   <p class="text-xs text-gray-300 mb-1 tracking-widest">{s.icon}</p>
                   <p class="text-xs text-gray-500">{s.label}</p>
                 </button>
@@ -501,15 +720,17 @@ const profileJson = JSON.stringify({
             </div>
           </div>
 
-          <!-- Advanced toggles -->
+          <!-- Toggles -->
           <div class="space-y-2">
-            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium mb-3">Options avancées</p>
             {[
-              { id:'block_shadow', label:'Ombres sur les blocs',     checked: theme.block_shadow },
-              { id:'animations',   label:'Animations hover',         checked: theme.animations },
+              { id:'block_shadow', label:'Ombres sur les blocs', sub:'Relief sur chaque block', checked: theme.block_shadow },
+              { id:'show_username', label:'Afficher @username', sub:'Sous le nom du profil', checked: theme.show_username ?? true },
             ].map(opt => (
               <label class="flex items-center justify-between p-3.5 glass rounded-xl cursor-pointer hover:bg-white/3 border border-white/5 transition-all">
-                <span class="text-sm text-gray-300 font-medium">{opt.label}</span>
+                <div>
+                  <span class="text-sm text-gray-300 font-medium block">{opt.label}</span>
+                  <span class="text-xs text-gray-600">{opt.sub}</span>
+                </div>
                 <input type="checkbox" id={opt.id} checked={opt.checked}
                   class="toggle w-11 h-6 rounded-full appearance-none bg-white/10 relative cursor-pointer focus:outline-none" />
               </label>
@@ -518,160 +739,253 @@ const profileJson = JSON.stringify({
         </div>
       </div>
 
-      <!-- ── PANEL: EFFECTS ── -->
-      <div class="sec-panel" id="panel-effects">
+      <!-- ══ TYPOGRAPHY ══ -->
+      <div class="sec-panel" id="panel-typography">
         <div class="p-5 glass rounded-2xl border border-white/8 space-y-5">
-          <p class="text-sm font-semibold text-white">Effets d'animation</p>
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+          <p class="text-sm font-semibold text-white">Police — toutes gratuites</p>
+          <div class="grid grid-cols-2 gap-2">
             {[
-              { id:'none',    label:'Aucun',      icon:'⊘',  desc:'Statique' },
-              { id:'fade',    label:'Fade In',    icon:'◐',  desc:'Apparition douce' },
-              { id:'slide',   label:'Slide Up',   icon:'↑',  desc:'Glissement bas→haut' },
-              { id:'bounce',  label:'Bounce',     icon:'◉',  desc:'Rebond élastique' },
-              { id:'stagger', label:'Stagger',    icon:'≡',  desc:'Décalé ligne par ligne' },
-            ].map(a => (
-              <button class="anim-btn flex flex-col gap-2 p-3.5 glass border-2 border-white/10 rounded-xl hover:border-white/20 transition-all text-left"
-                data-anim={a.id}>
-                <span class="text-2xl leading-none">{a.icon}</span>
-                <div>
-                  <p class="text-xs text-white font-semibold">{a.label}</p>
-                  <p class="text-xs text-gray-600">{a.desc}</p>
-                </div>
+              { name:'Exo 2',         cat:'Tech / Futuriste' },
+              { name:'Orbitron',      cat:'Sci-Fi / Gaming' },
+              { name:'Rajdhani',      cat:'Moderne / Sharp' },
+              { name:'Bebas Neue',    cat:'Display / Impact' },
+              { name:'Audiowide',     cat:'Électronique' },
+              { name:'Russo One',     cat:'Solide / Bold' },
+              { name:'Quicksand',     cat:'Friendly / Rond' },
+              { name:'Figtree',       cat:'Clean / Lisible' },
+              { name:'DM Sans',       cat:'Neutre / Pro' },
+              { name:'Space Grotesk', cat:'Géométrique' },
+              { name:'Syne',          cat:'Editorial / Unique' },
+              { name:'Inter',         cat:'Universel / App' },
+            ].map(f => (
+              <button class="choice-btn font-btn flex items-center justify-between px-3 py-3 glass border-2 border-white/10 rounded-xl hover:border-white/20 transition-all" data-font={f.name}>
+                <span class="text-sm text-white font-medium" style={`font-family:'${f.name}',sans-serif`}>{f.name}</span>
+                <span class="text-xs text-gray-600">{f.cat}</span>
               </button>
             ))}
           </div>
+        </div>
+      </div>
 
-          <!-- Glass intensity (only when blur selected) -->
-          <div id="glass-wrap" class="hidden">
-            <div class="flex justify-between items-center mb-2">
-              <label class="text-xs text-gray-500 uppercase tracking-widest font-medium">Intensité glass</label>
+      <!-- ══ EFFECTS ══ -->
+      <div class="sec-panel" id="panel-effects">
+        <div class="p-5 glass rounded-2xl border border-white/8 space-y-6">
+          <p class="text-sm font-semibold text-white">Animations & Effets</p>
+
+          <!-- Animation preset -->
+          <div class="space-y-3">
+            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Animation d'entrée</p>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {[
+                { id:'none',    label:'Aucune',   icon:'⊘', desc:'Statique' },
+                { id:'fade',    label:'Fade In',  icon:'◐', desc:'Apparition douce' },
+                { id:'slide',   label:'Slide Up', icon:'↑', desc:'Bas → haut' },
+                { id:'bounce',  label:'Bounce',   icon:'◉', desc:'Rebond élastique' },
+                { id:'stagger', label:'Stagger',  icon:'≡', desc:'Décalé bloc par bloc' },
+              ].map(a => (
+                <button class="choice-btn anim-btn flex flex-col gap-2 p-3.5 glass border-2 border-white/10 rounded-xl hover:border-white/20 transition-all text-left" data-anim={a.id}>
+                  <span class="text-2xl leading-none">{a.icon}</span>
+                  <div>
+                    <p class="text-xs text-white font-semibold">{a.label}</p>
+                    <p class="text-xs text-gray-600">{a.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <!-- Hover scale intensity -->
+          <div class="space-y-2">
+            <div class="flex justify-between">
+              <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Intensité hover</p>
+              <span id="hover-scale-val" class="text-xs font-mono text-white">{theme.hover_scale}/5</span>
+            </div>
+            <input type="range" id="hover-scale" min="0" max="5" value={theme.hover_scale} class="w-full accent-neon-green h-1.5 rounded-full" />
+          </div>
+
+          <!-- Glass intensity -->
+          <div class="space-y-2">
+            <div class="flex justify-between">
+              <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Intensité glass (fond blur)</p>
               <span id="glass-val" class="text-xs font-mono text-white">{theme.glass_intensity}</span>
             </div>
-            <input type="range" id="glass_intensity" min="4" max="32" value={theme.glass_intensity}
-              class="w-full accent-neon-green h-1.5 rounded-full" />
-          </div>
-        </div>
-      </div>
-
-      <!-- ── PANEL: AI ── -->
-      <div class="sec-panel" id="panel-ai">
-        <div class="p-5 glass rounded-2xl border border-neon-green/15 space-y-5"
-          style="background:linear-gradient(135deg,rgba(0,255,157,0.03),transparent)">
-          <div class="flex items-start gap-3">
-            <div class="w-9 h-9 rounded-xl bg-neon-green/10 border border-neon-green/20 flex items-center justify-center shrink-0">
-              <svg class="w-4.5 h-4.5 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
-              </svg>
-            </div>
-            <div>
-              <p class="text-sm font-semibold text-white">Assistant IA Design</p>
-              <p class="text-xs text-gray-500 mt-0.5">Décris ton univers, l'IA génère un thème complet</p>
-            </div>
+            <input type="range" id="glass_intensity" min="4" max="32" value={theme.glass_intensity} class="w-full accent-neon-green h-1.5 rounded-full" />
           </div>
 
-          <!-- Input -->
-          <div>
-            <textarea
-              id="ai-prompt"
-              rows="3"
-              placeholder="Ex: Je suis un développeur indie qui crée des jeux rétro. Mon style est sombre, pixel art, années 80..."
-              class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-sm text-white placeholder-gray-600 focus:border-neon-green/40 focus:outline-none resize-none transition-colors"
-            ></textarea>
-          </div>
-
-          <!-- Quick prompts -->
-          <div class="flex flex-wrap gap-2">
+          <!-- Toggles -->
+          <div class="space-y-2">
             {[
-              'Musicien électro 🎵',
-              'Photographe minimaliste 📷',
-              'Streamer gaming 🎮',
-              'Designer mode 👗',
-              'Coach fitness 💪',
-              'Développeur tech ⌨️',
-            ].map(q => (
-              <button class="ai-quick-prompt px-3 py-1.5 glass border border-white/10 rounded-full text-xs text-gray-400 hover:text-white hover:border-neon-green/30 transition-all"
-                data-prompt={q}>{q}</button>
+              { id:'animations',    label:'Animations activées',  sub:'Désactive tout d\'un coup', checked: theme.animations },
+              { id:'scroll_reveal', label:'Révélation au scroll', sub:'Blocs apparaissent en scrollant', checked: theme.scroll_reveal ?? true },
+              { id:'click_ripple',  label:'Effet ripple au clic', sub:'Onde circulaire sur les boutons', checked: theme.click_ripple ?? false },
+            ].map(opt => (
+              <label class="flex items-center justify-between p-3.5 glass rounded-xl cursor-pointer hover:bg-white/3 border border-white/5 transition-all">
+                <div>
+                  <span class="text-sm text-gray-300 font-medium block">{opt.label}</span>
+                  <span class="text-xs text-gray-600">{opt.sub}</span>
+                </div>
+                <input type="checkbox" id={opt.id} checked={opt.checked}
+                  class="toggle w-11 h-6 rounded-full appearance-none bg-white/10 relative cursor-pointer focus:outline-none" />
+              </label>
             ))}
           </div>
-
-          <!-- Generate button -->
-          <button id="ai-generate-btn"
-            class="w-full py-3 bg-neon-green/10 border border-neon-green/30 rounded-xl text-sm font-semibold text-neon-green hover:bg-neon-green/20 transition-all flex items-center justify-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/>
-            </svg>
-            Générer avec l'IA
-          </button>
-
-          <!-- AI response area -->
-          <div id="ai-response" class="hidden">
-            <!-- Thinking state -->
-            <div id="ai-thinking" class="hidden flex items-center gap-2 py-3 text-sm text-gray-400">
-              <span>L'IA réfléchit</span>
-              <span class="flex gap-1">
-                <span class="ai-dot w-1.5 h-1.5 rounded-full bg-neon-green inline-block"></span>
-                <span class="ai-dot w-1.5 h-1.5 rounded-full bg-neon-green inline-block"></span>
-                <span class="ai-dot w-1.5 h-1.5 rounded-full bg-neon-green inline-block"></span>
-              </span>
-            </div>
-            <!-- Result -->
-            <div id="ai-result" class="hidden space-y-3">
-              <div class="p-4 bg-white/3 rounded-xl border border-white/8">
-                <p class="text-xs text-gray-500 uppercase tracking-widest font-medium mb-2">Palette suggérée</p>
-                <div id="ai-palette" class="flex gap-2 mb-3"></div>
-                <p id="ai-reasoning" class="text-xs text-gray-500 leading-relaxed"></p>
-              </div>
-              <button id="ai-apply-btn"
-                class="w-full py-2.5 bg-neon-green text-black rounded-xl text-sm font-bold hover:bg-neon-green/90 transition-all">
-                Appliquer ce thème
-              </button>
-            </div>
-            <!-- Error -->
-            <div id="ai-error" class="hidden p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
-              <p class="text-xs text-red-400" id="ai-error-msg"></p>
-            </div>
-          </div>
-
-          <!-- History -->
-          <div id="history-list" class="pt-4 border-t border-white/5">
-            <p class="text-xs text-gray-600 uppercase tracking-widest font-medium mb-2">Historique récent</p>
-            <div id="history-items">
-              <p class="text-xs text-gray-700 py-2">Aucun historique</p>
-            </div>
-          </div>
         </div>
       </div>
 
-      <!-- ── SAVE ACTIONS ── -->
+      <!-- ══ ADVANCED (Pro — CSS custom) ══ -->
+      <div class="sec-panel" id="panel-advanced">
+        <div class="p-5 glass rounded-2xl border border-white/8 space-y-5">
+          <p class="text-sm font-semibold text-white flex items-center gap-2">
+            CSS Personnalisé
+            <span class="badge-pro">⚡ Pro</span>
+          </p>
+
+          {isPro ? (
+            <div class="space-y-3">
+              <p class="text-xs text-gray-500">Contrôle total. Cibler <code class="text-neon-green">.profile-page</code> pour ton profil public.</p>
+              <textarea
+                id="custom-css-editor"
+                rows="12"
+                maxlength="4000"
+                placeholder={`/* Ex: changer la couleur des titres */\n.profile-page h1 {\n  color: #ff6b00;\n  letter-spacing: 0.1em;\n}\n\n/* Ajouter un effet brillant */\n.link-btn:hover {\n  background: radial-gradient(circle at center, #fff2, transparent);\n}`}
+                class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white text-xs font-mono placeholder-gray-700 focus:border-purple-500/40 focus:outline-none resize-y transition-colors"
+                style="min-height:200px;font-family:'Fira Code','Courier New',monospace;line-height:1.6">
+                {(theme as any).custom_css ?? ''}
+              </textarea>
+              <div class="flex items-center justify-between text-xs text-gray-600">
+                <span>Max 4000 caractères</span>
+                <span id="css-char-count">0 / 4000</span>
+              </div>
+            </div>
+          ) : (
+            <div class="rounded-2xl overflow-hidden">
+              <!-- Blurred preview -->
+              <div class="p-4 rounded-xl bg-white/3 border border-white/8 blur-sm pointer-events-none select-none" aria-hidden="true">
+                <pre class="text-xs text-gray-400 font-mono">{`.profile-page h1 {
+  color: #ff6b00;
+  letter-spacing: 0.1em;
+}
+.link-btn {
+  background: linear-gradient(135deg, #1a0033, #0d001a);
+  border: 1px solid #bf00ff40;
+}`}</pre>
+              </div>
+              <div class="mt-4 p-4 rounded-xl border border-purple-500/20 bg-purple-500/5 flex items-center gap-4">
+                <span class="text-3xl">⚡</span>
+                <div class="flex-1">
+                  <p class="text-sm font-bold text-white mb-0.5">CSS Personnalisé — Plan Pro</p>
+                  <p class="text-xs text-gray-400">Contrôle total sur chaque élément de ton profil. Aucune limite.</p>
+                </div>
+                <a href="/dashboard/billing" class="shrink-0 px-4 py-2 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-300 text-xs font-bold hover:bg-purple-500/30 transition whitespace-nowrap">
+                  Passer Pro →
+                </a>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <!-- ══ AI (Pro) ══ -->
+      <div class="sec-panel" id="panel-ai">
+        {isPro ? (
+          <div class="p-5 glass rounded-2xl border border-neon-green/15 space-y-5" style="background:linear-gradient(135deg,rgba(0,255,157,0.03),transparent)">
+            <div class="flex items-start gap-3">
+              <div class="w-9 h-9 rounded-xl bg-neon-green/10 border border-neon-green/20 flex items-center justify-center shrink-0">
+                <svg class="w-4 h-4 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-white">Assistant IA Design</p>
+                <p class="text-xs text-gray-500 mt-0.5">Décris ton univers, l'IA génère un thème complet</p>
+              </div>
+            </div>
+            <textarea id="ai-prompt" rows="3"
+              placeholder="Ex: Je suis un DJ techno berlinois. Ambiance sombre, rouge sang, industrielle, no bullshit..."
+              class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-sm text-white placeholder-gray-600 focus:border-neon-green/40 focus:outline-none resize-none transition-colors"></textarea>
+            <div class="flex flex-wrap gap-2">
+              {['Streamer FPS 🎮','Artiste urbain 🎨','DJ techno 🎛️','Coach fitness 💪','Photographe 📷','Dev indie ⌨️','Cosplayer ✨','Musicien jazz 🎺'].map(q => (
+                <button class="ai-quick-prompt px-3 py-1.5 glass border border-white/10 rounded-full text-xs text-gray-400 hover:text-white hover:border-neon-green/30 transition-all" data-prompt={q}>{q}</button>
+              ))}
+            </div>
+            <button id="ai-generate-btn" class="w-full py-3 bg-neon-green/10 border border-neon-green/30 rounded-xl text-sm font-semibold text-neon-green hover:bg-neon-green/20 transition-all flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+              Générer avec l'IA
+            </button>
+            <div id="ai-response" class="hidden">
+              <div id="ai-thinking" class="hidden flex items-center gap-2 py-3 text-sm text-gray-400">
+                <span>L'IA réfléchit</span>
+                <span class="flex gap-1">
+                  <span class="ai-dot w-1.5 h-1.5 rounded-full bg-neon-green inline-block"></span>
+                  <span class="ai-dot w-1.5 h-1.5 rounded-full bg-neon-green inline-block"></span>
+                  <span class="ai-dot w-1.5 h-1.5 rounded-full bg-neon-green inline-block"></span>
+                </span>
+              </div>
+              <div id="ai-result" class="hidden space-y-3">
+                <div class="p-4 bg-white/3 rounded-xl border border-white/8">
+                  <p class="text-xs text-gray-500 uppercase tracking-widest font-medium mb-2">Palette suggérée</p>
+                  <div id="ai-palette" class="flex gap-2 mb-3"></div>
+                  <p id="ai-reasoning" class="text-xs text-gray-500 leading-relaxed"></p>
+                </div>
+                <button id="ai-apply-btn" class="w-full py-2.5 bg-neon-green text-black rounded-xl text-sm font-bold hover:bg-neon-green/90 transition-all">Appliquer ce thème</button>
+              </div>
+              <div id="ai-error" class="hidden p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
+                <p class="text-xs text-red-400" id="ai-error-msg"></p>
+              </div>
+            </div>
+            <!-- History -->
+            <div class="pt-4 border-t border-white/5">
+              <p class="text-xs text-gray-600 uppercase tracking-widest font-medium mb-2">Historique récent</p>
+              <div id="history-items"><p class="text-xs text-gray-700 py-2">Aucun historique</p></div>
+            </div>
+          </div>
+        ) : (
+          <div class="p-5 glass rounded-2xl border border-neon-green/10 space-y-5">
+            <div class="rounded-2xl overflow-hidden blur-sm pointer-events-none select-none" aria-hidden="true">
+              <div class="p-5 space-y-3 bg-white/3">
+                <div class="h-16 rounded-xl bg-white/5"></div>
+                <div class="flex gap-2">
+                  {['Streamer FPS 🎮','Artiste 🎨','DJ 🎛️'].map(q => (
+                    <div class="px-3 py-1.5 rounded-full bg-white/5 text-xs text-gray-600">{q}</div>
+                  ))}
+                </div>
+                <div class="h-10 rounded-xl bg-neon-green/20"></div>
+              </div>
+            </div>
+            <div class="p-4 rounded-xl border border-purple-500/20 bg-purple-500/5 flex items-center gap-4">
+              <span class="text-3xl">✦</span>
+              <div class="flex-1">
+                <p class="text-sm font-bold text-white mb-0.5">IA Design — Plan Pro</p>
+                <p class="text-xs text-gray-400">Décris ton univers, l'IA génère un thème complet en secondes.</p>
+              </div>
+              <a href="/dashboard/billing" class="shrink-0 px-4 py-2 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-300 text-xs font-bold hover:bg-purple-500/30 transition whitespace-nowrap">
+                Passer Pro →
+              </a>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <!-- Save -->
       <div class="flex items-center gap-3 pt-2">
-        <button id="save-btn"
-          class="flex-1 py-3 bg-neon-green text-black font-bold rounded-xl hover:bg-neon-green/90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-sm">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-          </svg>
+        <button id="save-btn" class="flex-1 py-3 bg-neon-green text-black font-bold rounded-xl hover:bg-neon-green/90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-sm">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
           <span id="save-btn-text">Sauvegarder</span>
         </button>
-        <button id="reset-btn"
-          class="py-3 px-4 glass border border-white/10 rounded-xl text-sm text-gray-400 hover:text-white hover:border-white/20 transition-all">
-          Reset
-        </button>
+        <button id="reset-btn" class="py-3 px-4 glass border border-white/10 rounded-xl text-sm text-gray-400 hover:text-white hover:border-white/20 transition-all">Reset</button>
       </div>
-    </div>
 
-    <!-- ===== RIGHT: PHONE PREVIEW (2/5) ===== -->
+    </div><!-- end left -->
+
+    <!-- ═══ RIGHT: PHONE PREVIEW ═══ -->
     <div class="lg:col-span-2">
       <div class="sticky top-6 space-y-4">
-
-        <!-- Device toggle -->
         <div class="flex items-center justify-between px-1">
-          <p class="text-xs text-gray-500 font-medium uppercase tracking-widest">Aperçu en direct</p>
+          <p class="text-xs text-gray-500 font-medium uppercase tracking-widest">Aperçu</p>
           <div class="flex items-center gap-1">
             {[
               { id:'phone',   icon:'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z' },
               { id:'desktop', icon:'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
             ].map((d, i) => (
-              <button class={`device-tab p-1.5 rounded-lg border border-white/8 hover:border-white/20 transition-all ${i === 0 ? 'active' : ''}`}
-                data-device={d.id}>
+              <button class={`device-tab p-1.5 rounded-lg border border-white/8 hover:border-white/20 transition-all ${i===0?'active':''}`} data-device={d.id}>
                 <svg class="w-4 h-4 text-gray-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={d.icon}/>
                 </svg>
@@ -680,23 +994,18 @@ const profileJson = JSON.stringify({
           </div>
         </div>
 
-        <!-- Phone mockup -->
         <div id="preview-phone" class="flex justify-center py-4">
           <div class="phone-frame">
-            <!-- Side buttons -->
-            <div class="phone-btn-side phone-btn-vol-1"></div>
-            <div class="phone-btn-side phone-btn-vol-2"></div>
-            <div class="phone-btn-side phone-btn-power"></div>
-            <!-- Notch -->
+            <div class="phone-btn phone-btn-side" style="right:-5px;top:90px;height:36px"></div>
+            <div class="phone-btn phone-btn-side" style="right:-5px;top:136px;height:36px"></div>
+            <div class="phone-btn phone-btn-side" style="left:-5px;top:120px;height:48px"></div>
             <div class="phone-notch"></div>
-            <!-- Screen -->
             <div class="phone-screen">
               <iframe id="preview-iframe" sandbox="allow-same-origin allow-scripts" title="Preview" class="w-full h-full border-0"></iframe>
             </div>
           </div>
         </div>
 
-        <!-- Desktop preview (hidden by default) -->
         <div id="preview-desktop" class="hidden">
           <div class="rounded-xl border border-white/10 overflow-hidden" style="height:420px">
             <div class="h-8 bg-white/5 border-b border-white/8 flex items-center gap-1.5 px-3">
@@ -708,15 +1017,14 @@ const profileJson = JSON.stringify({
           </div>
         </div>
 
-        <!-- Section indicator -->
-        <div class="flex items-center justify-center gap-1.5 pb-2">
-          {['presets','background','buttons','typography','profile','effects','ai'].map(s => (
-            <div class="prog-dot h-1.5 w-1.5 rounded-full bg-white/15 transition-all" data-for={s}></div>
+        <!-- Progress dots -->
+        <div class="flex items-center justify-center gap-1.5">
+          {['presets','layout','background','buttons','profile','typography','effects','advanced','ai'].map(s => (
+            <div class="prog-dot h-1.5 w-1.5 rounded-full bg-white/15" data-for={s}></div>
           ))}
         </div>
       </div>
     </div>
-
   </div>
 
 </DashboardLayout>
@@ -724,26 +1032,27 @@ const profileJson = JSON.stringify({
 <script>
   import { toast } from '@/lib/utils/toast';
 
-  // ── Server data ──────────────────────────────────────────────────────────────
-  const sd = document.getElementById('server-data');
-  let theme   = JSON.parse(sd?.dataset.theme   ?? '{}');
-  const prof  = JSON.parse(sd?.dataset.profile ?? '{}');
+  const sd       = document.getElementById('server-data');
+  let theme      = JSON.parse(sd?.dataset.theme   ?? '{}');
+  const prof     = JSON.parse(sd?.dataset.profile ?? '{}');
+  const isPro    = sd?.dataset.isPro    === 'true';
+  const isCreator = sd?.dataset.isCreator === 'true';
 
-  const ALLOWED_FONTS = ['Exo 2','Orbitron','Rajdhani','Bebas Neue','Audiowide','Russo One','Space Grotesk','DM Sans','Quicksand','Figtree'];
-  const HISTORY_KEY   = 'bf_theme_history_v2';
-  let aiSuggestedTheme = null;
+  const ALLOWED_FONTS = ['Exo 2','Orbitron','Rajdhani','Bebas Neue','Audiowide','Russo One','Space Grotesk','DM Sans','Quicksand','Figtree','Inter','Syne','Cabinet Grotesk'];
+  const HISTORY_KEY   = 'bf_theme_history_v3';
+  let aiSuggestedTheme: any = null;
 
-  // ── RAF-debounced preview ────────────────────────────────────────────────────
-  let rafId = null;
+  // ── RAF preview debounce ─────────────────────────────────────────────────────
+  let rafId: number | null = null;
   const schedulePreview = () => {
     if (rafId) cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(renderPreview);
   };
 
   // ── Build preview HTML ───────────────────────────────────────────────────────
-  function buildPreviewHTML(t, p) {
-    const fontFamily = t.font_family ?? 'Exo 2';
-    const fontUrl    = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontFamily)}:wght@400;500;600;700&display=swap`;
+  function buildPreviewHTML(t: any, p: any): string {
+    const font    = t.font_family ?? 'Exo 2';
+    const fontUrl = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(font)}:wght@400;500;600;700&display=swap`;
 
     const bg = (() => {
       if (t.background_style === 'gradient') {
@@ -758,51 +1067,108 @@ const profileJson = JSON.stringify({
       const op = (t.pattern_opacity ?? 15) / 100;
       const c  = `rgba(255,255,255,${op})`;
       switch (t.pattern) {
-        case 'dots':  return `background-image: radial-gradient(${c} 1px, transparent 1px); background-size: 16px 16px;`;
-        case 'grid':  return `background-image: linear-gradient(${c} 1px,transparent 1px),linear-gradient(90deg,${c} 1px,transparent 1px); background-size: 20px 20px;`;
-        case 'waves': return `background-image: repeating-linear-gradient(-45deg,${c},${c} 1px,transparent 0,transparent 50%); background-size: 10px 10px;`;
-        case 'noise': return `background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='${op}'/%3E%3C/svg%3E"); background-size: 200px;`;
-        case 'mesh':  return `background-image: radial-gradient(ellipse at 20% 50%,${t.primary_color}22 0%,transparent 50%),radial-gradient(ellipse at 80% 20%,${t.primary_color}15 0%,transparent 50%); background-size: cover;`;
+        case 'dots':       return `background-image:radial-gradient(${c} 1px,transparent 1px);background-size:16px 16px;`;
+        case 'grid':       return `background-image:linear-gradient(${c} 1px,transparent 1px),linear-gradient(90deg,${c} 1px,transparent 1px);background-size:20px 20px;`;
+        case 'waves':      return `background-image:repeating-linear-gradient(-45deg,${c},${c} 1px,transparent 0,transparent 50%);background-size:10px 10px;`;
+        case 'crosshatch': return `background-image:repeating-linear-gradient(45deg,${c} 0,${c} 1px,transparent 0,transparent 50%),repeating-linear-gradient(-45deg,${c} 0,${c} 1px,transparent 0,transparent 50%);background-size:12px 12px;`;
+        case 'triangles':  return `background-image:linear-gradient(120deg,transparent 25%,${c} 25%,${c} 50%,transparent 50%,transparent 75%,${c} 75%);background-size:16px 28px;`;
+        case 'mesh':       return `background-image:radial-gradient(ellipse at 20% 50%,${t.primary_color}22 0%,transparent 50%),radial-gradient(ellipse at 80% 20%,${t.primary_color}15 0%,transparent 50%);`;
+        case 'noise':      return `background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='${op}'/%3E%3C/svg%3E");background-size:200px;`;
         default: return '';
       }
     })();
 
-    const avatarStyle = (() => {
-      switch (t.avatar_shape) {
-        case 'square': return 'border-radius:16px';
-        case 'hex':    return 'clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%); border-radius:0';
-        case 'ring':   return `border-radius:50%; box-shadow:0 0 0 3px ${t.primary_color},0 0 0 5px ${t.background_color},0 0 20px ${t.primary_color}60`;
-        default:       return 'border-radius:50%';
+    // Avatar style
+    const avSize   = { sm:'64px', md:'96px', lg:'128px' }[t.avatar_size ?? 'md'] ?? '96px';
+    const avRadius = t.avatar_shape === 'square' ? '16px' : t.avatar_shape === 'hex' ? '0' : '50%';
+    const avClip   = t.avatar_shape === 'hex' ? 'clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)' : '';
+    const avBorder = (() => {
+      const p = t.primary_color;
+      switch (t.avatar_border) {
+        case 'solid':    return `border:3px solid ${p}`;
+        case 'glow':     return `border:3px solid ${p};box-shadow:0 0 20px ${p}60,0 0 40px ${p}30`;
+        case 'gradient': return `border:3px solid transparent;background-clip:padding-box;box-shadow:0 0 0 3px ${p}60`;
+        case 'double':   return `border:2px solid ${p};box-shadow:0 0 0 4px ${t.background_color},0 0 0 6px ${p}60`;
+        default:         return '';
       }
     })();
 
+    // Hero
+    const heroHTML = (() => {
+      if (t.header_style !== 'hero' || !t.hero_image) return '';
+      const h  = { sm:'120px', md:'200px', lg:'280px', full:'60vh' }[t.hero_height ?? 'md'] ?? '200px';
+      const ov = Math.round(t.hero_overlay ?? 40);
+      return `<div style="width:100%;height:${h};position:relative;overflow:hidden;margin-bottom:0">
+        <img src="${t.hero_image}" style="width:100%;height:100%;object-fit:cover;object-position:${t.hero_position ?? 'center'}" />
+        <div style="position:absolute;inset:0;background:rgba(0,0,0,${ov/100})"></div>
+      </div>`;
+    })();
+
+    // Header card
+    const headerWrap = t.header_style === 'glass'
+      ? `backdrop-filter:blur(${t.glass_intensity ?? 12}px);background:rgba(255,255,255,0.05);border-radius:24px;padding:24px;border:1px solid rgba(255,255,255,0.1);margin-bottom:24px`
+      : t.header_style === 'banner'
+        ? `background:${t.primary_color}18;border-radius:24px;padding:24px;border:1px solid ${t.primary_color}30;margin-bottom:24px`
+        : `margin-bottom:24px`;
+
+    // Bio style
+    const bioFontSize = { xs:'11px', sm:'13px', md:'15px', lg:'17px' }[t.bio_size ?? 'sm'] ?? '13px';
+    const bioFontStyle = t.bio_style === 'italic' ? 'italic' : 'normal';
+
+    // Layout alignment
+    const isLeft   = t.profile_layout === 'left';
+    const isCard   = t.profile_layout === 'card';
+    const isMinimal = t.profile_layout === 'minimal';
+    const headerAlign = isLeft ? 'left' : 'center';
+    const headerFlex  = isLeft ? 'flex;flex-direction:row;align-items:center;gap:16px' : 'block;text-align:center';
+
+    // Content width
+    const maxW = { narrow:'360px', normal:'480px', wide:'600px' }[t.content_width ?? 'normal'] ?? '480px';
+
+    // Gap
     const gap = t.spacing === 'compact' ? '8px' : t.spacing === 'spacious' ? '20px' : '12px';
 
+    // Button CSS
+    const btnBase = `width:${t.button_width==='auto'?'auto':'100%'};padding:14px 20px;font-size:14px;font-weight:600;cursor:pointer;border-radius:${t.border_radius ?? 14}px;font-family:'${font}',sans-serif;transition:all 0.2s;`;
+    const shadowLvl = (t.shadow_intensity ?? 3);
+    const shadowStr = shadowLvl > 0 ? `box-shadow:0 ${shadowLvl*2}px ${shadowLvl*8}px rgba(0,0,0,${shadowLvl*0.07+0.15});` : '';
     const btnCSS = (() => {
-      const base = `width:100%;padding:14px 20px;font-size:14px;font-weight:600;cursor:pointer;border-radius:${t.border_radius}px;font-family:'${fontFamily}',sans-serif;transition:all 0.2s;`;
-      const shadow = t.block_shadow ? `box-shadow:0 4px 16px rgba(0,0,0,0.35);` : '';
       switch (t.button_style) {
-        case 'outline':  return `${base}${shadow}background:transparent;border:2px solid ${t.primary_color};color:${t.primary_color};`;
-        case 'glass':    return `${base}${shadow}background:${t.primary_color}15;backdrop-filter:blur(12px);border:1px solid ${t.primary_color}40;color:${t.primary_color};`;
-        case 'gradient': return `${base}${shadow}background:linear-gradient(135deg,${t.primary_color},${t.primary_color}99);border:none;color:${t.background_color};`;
-        case 'neon':     return `${base}background:transparent;border:1.5px solid ${t.primary_color};color:${t.primary_color};box-shadow:0 0 12px ${t.primary_color}50,inset 0 0 8px ${t.primary_color}10;`;
-        case 'minimal':  return `${base}background:transparent;border:none;color:${t.text_color};text-decoration:none;border-bottom:1px solid ${t.primary_color}60;border-radius:0;padding-bottom:6px;`;
-        default:         return `${base}${shadow}background:${t.primary_color};border:none;color:${t.background_color};`;
+        case 'outline':  return `${btnBase}${shadowStr}background:transparent;border:2px solid ${t.primary_color};color:${t.primary_color};`;
+        case 'glass':    return `${btnBase}${shadowStr}background:${t.primary_color}18;backdrop-filter:blur(12px);border:1px solid ${t.primary_color}40;color:${t.primary_color};`;
+        case 'gradient': return `${btnBase}${shadowStr}background:linear-gradient(135deg,${t.primary_color},${t.primary_color}88);border:none;color:${t.background_color};`;
+        case 'neon':     return `${btnBase}background:transparent;border:1.5px solid ${t.primary_color};color:${t.primary_color};box-shadow:0 0 14px ${t.primary_color}50,inset 0 0 10px ${t.primary_color}10;`;
+        case 'minimal':  return `${btnBase}background:transparent;border:none;border-bottom:1px solid ${t.primary_color}60;border-radius:0;color:${t.text_color};padding-bottom:6px;`;
+        default:         return `${btnBase}${shadowStr}background:${t.primary_color};border:none;color:${t.background_color};`;
+      }
+    })();
+
+    // Hover CSS
+    const hoverCSS = (() => {
+      const scale = 1 + (t.hover_scale ?? 3) * 0.005;
+      if (!t.animations) return '';
+      switch (t.hover_effect ?? 'lift') {
+        case 'lift':   return `button:hover{transform:translateY(-${(t.hover_scale??3)}px);box-shadow:0 12px 30px rgba(0,0,0,0.3)}`;
+        case 'glow':   return `button:hover{box-shadow:0 0 ${(t.hover_scale??3)*6}px ${t.primary_color}80}`;
+        case 'slide':  return `button{background-size:200% auto!important}button:hover{background-position:right center!important}`;
+        case 'ripple': return `button{position:relative;overflow:hidden}button::after{content:'';position:absolute;border-radius:50%;transform:scale(0);background:rgba(255,255,255,0.3);width:100px;height:100px;top:50%;left:50%;transform-origin:center;pointer-events:none}button:active::after{animation:ripple 0.4s ease}@keyframes ripple{to{transform:scale(4);opacity:0}}`;
+        default:       return `button:hover{transform:scale(${scale})}`;
       }
     })();
 
     const animCSS = (() => {
       if (!t.animations) return '';
       switch (t.animation_preset) {
-        case 'slide':   return `@keyframes si{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}.link-item{animation:si 0.4s ease both;} .link-item:nth-child(1){animation-delay:0.05s} .link-item:nth-child(2){animation-delay:0.12s} .link-item:nth-child(3){animation-delay:0.19s}`;
-        case 'bounce':  return `@keyframes bo{0%,100%{transform:none}60%{transform:scale(1.03)}} button:hover{animation:bo 0.4s ease}`;
-        case 'stagger': return `.link-item{opacity:0;animation:si 0.35s ease both;} @keyframes si{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}} .link-item:nth-child(1){animation-delay:0.1s} .link-item:nth-child(2){animation-delay:0.2s} .link-item:nth-child(3){animation-delay:0.3s}`;
-        default:        return `button:hover{transform:scale(1.025)!important}button:active{transform:scale(0.975)!important}`;
+        case 'slide':   return `@keyframes si{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}.link-item{animation:si 0.4s ease both;}.link-item:nth-child(1){animation-delay:0.05s}.link-item:nth-child(2){animation-delay:0.12s}.link-item:nth-child(3){animation-delay:0.19s}`;
+        case 'bounce':  return `@keyframes bo{0%,100%{transform:none}60%{transform:scale(1.03)}}button:hover{animation:bo 0.4s ease}`;
+        case 'stagger': return `@keyframes si{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}.link-item{opacity:0;animation:si 0.35s ease both;}.link-item:nth-child(1){animation-delay:0.1s}.link-item:nth-child(2){animation-delay:0.2s}.link-item:nth-child(3){animation-delay:0.3s}`;
+        default:        return `@keyframes fd{from{opacity:0}to{opacity:1}}.link-item{animation:fd 0.5s ease both}`;
       }
     })();
 
-    const blurOverlay = t.background_style === 'blur'
-      ? `<div style="position:fixed;inset:0;backdrop-filter:blur(60px);background:${t.background_color}88;z-index:0"></div>` : '';
+    const overlayTop    = t.overlay_top    ? `<div style="position:fixed;top:0;left:0;right:0;height:120px;background:linear-gradient(to bottom,${t.overlay_color ?? '#000'}cc,transparent);z-index:0;pointer-events:none"></div>` : '';
+    const overlayBottom = t.overlay_bottom ? `<div style="position:fixed;bottom:0;left:0;right:0;height:120px;background:linear-gradient(to top,${t.overlay_color ?? '#000'}cc,transparent);z-index:0;pointer-events:none"></div>` : '';
+    const blurOverlay   = t.background_style === 'blur' ? `<div style="position:fixed;inset:0;backdrop-filter:blur(60px);background:${t.background_color}88;z-index:0"></div>` : '';
 
     const links = ['✦ Mon Portfolio','✦ Twitter / X','✦ Dernier projet'];
 
@@ -811,30 +1177,44 @@ const profileJson = JSON.stringify({
 <link rel="stylesheet" href="${fontUrl}">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{min-height:100%;font-family:'${fontFamily}',sans-serif;background:${bg};${patternCSS}color:${t.text_color}}
-.page{position:relative;z-index:1;max-width:380px;margin:0 auto;padding:36px 20px}
-.avatar{width:76px;height:76px;background:linear-gradient(135deg,${t.primary_color}60,${t.primary_color}20);${avatarStyle};margin:0 auto 14px;display:flex;align-items:center;justify-content:center;font-size:28px}
-.name{font-size:18px;font-weight:700;text-align:center;margin-bottom:4px}
-.handle{font-size:12px;text-align:center;opacity:0.4;margin-bottom:8px}
-.bio{font-size:12px;text-align:center;opacity:0.6;margin-bottom:24px;line-height:1.6}
-.links{display:flex;flex-direction:column;gap:${gap}}
-button{${btnCSS}display:block}
+html,body{min-height:100%;font-family:'${font}',sans-serif;background:${bg};${patternCSS}color:${t.text_color}}
+.page{position:relative;z-index:1;max-width:${maxW};margin:0 auto;padding:${heroHTML?'0':'36px'} 20px 36px}
+.header{${headerWrap};text-align:${headerAlign}}
+.avatar-wrap{${isLeft?'display:flex;align-items:center;gap:16px;':''}}
+.avatar{width:${avSize};height:${avSize};background:linear-gradient(135deg,${t.primary_color}60,${t.primary_color}20);border-radius:${avRadius};${avClip};${avBorder};${isLeft?'':'margin:0 auto 14px'};display:flex;align-items:center;justify-content:center;font-size:28px;overflow:hidden;flex-shrink:0}
+.name{font-size:${isLeft?'20px':'18px'};font-weight:700;${isLeft?'':'text-align:center'};margin-bottom:4px}
+.handle{font-size:12px;${isLeft?'':'text-align:center'};opacity:0.4;margin-bottom:6px;display:${t.show_username===false?'none':'block'}}
+.bio{font-size:${bioFontSize};font-style:${bioFontStyle};${isLeft?'':'text-align:center'};opacity:0.65;${isLeft?'':'margin-bottom:20px'};line-height:1.6}
+.links{display:flex;flex-direction:column;gap:${gap};margin-top:${isLeft?'24px':'0'}}
+button{${btnCSS}display:block;text-align:center}
+${hoverCSS}
 ${animCSS}
+${isCard?'.page{padding:0;}.page-inner{margin:20px;background:rgba(255,255,255,0.04);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);border-radius:24px;padding:28px}':''}
 </style></head><body>
-${blurOverlay}
+${blurOverlay}${overlayTop}${overlayBottom}
+${heroHTML}
 <div class="page">
-<div class="avatar">${p.avatar_url ? `<img src="${p.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">` : '👤'}</div>
-<div class="name">${p.display_name || p.username || 'Ton Nom'}</div>
-<div class="handle">@${p.username || 'username'}</div>
-<div class="bio">${p.bio || 'Ta bio ici ✨'}</div>
-<div class="links">${links.map(l => `<div class="link-item"><button>${l}</button></div>`).join('')}
-</div></div></body></html>`;
+${isCard?'<div class="page-inner">':''}
+<div class="header">
+  <div class="avatar-wrap">
+    <div class="avatar">${p.avatar_url?`<img src="${p.avatar_url}" style="width:100%;height:100%;object-fit:cover" />`:'👤'}</div>
+    <div>
+      <div class="name">${p.display_name || p.username || 'Ton Nom'}</div>
+      <div class="handle">@${p.username || 'username'}</div>
+      ${!isLeft?`<div class="bio">${p.bio || 'Ta bio ici ✨'}</div>`:''}
+    </div>
+  </div>
+  ${isLeft?`<div class="bio" style="margin-top:8px">${p.bio || 'Ta bio ici ✨'}</div>`:''}
+</div>
+<div class="links">${links.map(l=>`<div class="link-item"><button>${l}</button></div>`).join('')}</div>
+${isCard?'</div>':''}
+</div></body></html>`;
   }
 
   function renderPreview() {
     const iframes = [
-      document.getElementById('preview-iframe'),
-      document.getElementById('preview-desktop-iframe'),
+      document.getElementById('preview-iframe') as HTMLIFrameElement | null,
+      document.getElementById('preview-desktop-iframe') as HTMLIFrameElement | null,
     ];
     const html = buildPreviewHTML(theme, prof);
     iframes.forEach(f => { if (f) f.srcdoc = html; });
@@ -842,9 +1222,8 @@ ${blurOverlay}
     updatePatternPreviews();
   }
 
-  // ── Button style preview in panel ───────────────────────────────────────────
   function updateButtonPreviews() {
-    const p = theme.primary_color ?? '#00ff9d';
+    const p  = theme.primary_color ?? '#00ff9d';
     const bg = theme.background_color ?? '#0a0a0a';
     const r  = theme.border_radius ?? 14;
     const styles = {
@@ -857,115 +1236,165 @@ ${blurOverlay}
     };
     Object.entries(styles).forEach(([id, style]) => {
       const el = document.getElementById(`btn-preview-${id}`);
-      if (el) {
-        el.style.cssText = `border-radius:${r}px;font-size:11px;${style}`;
-      }
+      if (el) el.style.cssText = `border-radius:${r}px;font-size:11px;${style}`;
     });
   }
 
-  // ── Pattern previews in panel ────────────────────────────────────────────────
   function updatePatternPreviews() {
-    const t  = theme;
-    const op = 0.25;
+    const op = 0.3;
     const c  = `rgba(255,255,255,${op})`;
     const patterns = {
-      none:  '',
-      dots:  `radial-gradient(${c} 1px,transparent 1px) 0 0/8px 8px`,
-      grid:  `linear-gradient(${c} 1px,transparent 1px) 0 0/10px 10px,linear-gradient(90deg,${c} 1px,transparent 1px) 0 0/10px 10px`,
-      waves: `repeating-linear-gradient(-45deg,${c},${c} 1px,transparent 0,transparent 50%) 0 0/5px 5px`,
-      noise: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'n\'%3E%3CfeTurbulence baseFrequency=\'0.9\' numOctaves=\'4\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23n)\' opacity=\'.3\'/%3E%3C/svg%3E")',
-      mesh:  `radial-gradient(ellipse at 30% 50%,${t.primary_color}33 0%,transparent 60%)`,
+      none:       '',
+      dots:       `radial-gradient(${c} 1px,transparent 1px) 0 0/8px 8px`,
+      grid:       `linear-gradient(${c} 1px,transparent 1px) 0 0/10px 10px,linear-gradient(90deg,${c} 1px,transparent 1px) 0 0/10px 10px`,
+      waves:      `repeating-linear-gradient(-45deg,${c},${c} 1px,transparent 0,transparent 50%) 0 0/5px 5px`,
+      crosshatch: `repeating-linear-gradient(45deg,${c} 0,${c} 1px,transparent 0,transparent 50%),repeating-linear-gradient(-45deg,${c} 0,${c} 1px,transparent 0,transparent 50%) 0 0/8px 8px`,
+      triangles:  `linear-gradient(120deg,transparent 25%,${c} 25%,${c} 50%,transparent 50%,transparent 75%,${c} 75%) 0 0/10px 18px`,
+      noise:      `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E")`,
+      mesh:       `radial-gradient(ellipse at 30% 50%,${theme.primary_color}44 0%,transparent 60%)`,
     };
     Object.entries(patterns).forEach(([id, bg]) => {
       const el = document.getElementById(`pattern-preview-${id}`);
-      if (!el) return;
-      el.style.background = bg || '#1a1a1a';
+      if (el) el.style.background = bg || '#1a1a1a';
     });
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+  function activateBtn(selector: string, attr: string, val: string) {
+    document.querySelectorAll(selector).forEach(b => {
+      b.classList.toggle('active', (b as HTMLElement).dataset[attr] === val);
+    });
+  }
+
+  function syncColor(id: string, val: string) {
+    const p = document.getElementById(id) as HTMLInputElement | null;
+    const t = document.getElementById(`${id}_text`) as HTMLInputElement | null;
+    if (p) p.value = val;
+    if (t) t.value = val;
   }
 
   // ── Section nav ──────────────────────────────────────────────────────────────
   document.querySelectorAll('.sec-tab').forEach(btn => {
     btn.addEventListener('click', () => {
-      const sec = btn.getAttribute('data-section');
+      const sec = (btn as HTMLElement).dataset.section!;
       document.querySelectorAll('.sec-tab').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.sec-panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById(`panel-${sec}`)?.classList.add('active');
-      // Progress dots
       document.querySelectorAll('.prog-dot').forEach(d => {
-        d.classList.toggle('active', d.getAttribute('data-for') === sec);
+        d.classList.toggle('active', (d as HTMLElement).dataset.for === sec);
       });
     });
   });
 
-  // ── Device toggle ────────────────────────────────────────────────────────────
+  // ── Device toggle ─────────────────────────────────────────────────────────────
   document.querySelectorAll('.device-tab').forEach(btn => {
     btn.addEventListener('click', () => {
-      const device = btn.getAttribute('data-device');
+      const device = (btn as HTMLElement).dataset.device;
       document.querySelectorAll('.device-tab').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      const isPhone = device === 'phone';
-      document.getElementById('preview-phone')?.classList.toggle('hidden', !isPhone);
-      document.getElementById('preview-desktop')?.classList.toggle('hidden', isPhone);
+      document.getElementById('preview-phone')?.classList.toggle('hidden', device !== 'phone');
+      document.getElementById('preview-desktop')?.classList.toggle('hidden', device === 'phone');
     });
   });
 
-  // ── Color inputs ─────────────────────────────────────────────────────────────
-  const COLOR_BINDINGS = [
+  // ── Color bindings ────────────────────────────────────────────────────────────
+  [
     { id:'background_color', key:'background_color' },
     { id:'primary_color',    key:'primary_color' },
     { id:'text_color',       key:'text_color' },
     { id:'gradient_color_1', key:'background_color' },
     { id:'gradient_color_2', key:'gradient_color_2' },
-  ];
-
-  COLOR_BINDINGS.forEach(({ id, key }) => {
-    const picker = document.getElementById(id);
-    const text   = document.getElementById(`${id}_text`);
-
+    { id:'overlay-color',    key:'overlay_color' },
+  ].forEach(({ id, key }) => {
+    const picker = document.getElementById(id) as HTMLInputElement | null;
+    const text   = document.getElementById(`${id}_text`) as HTMLInputElement | null;
     picker?.addEventListener('input', e => {
-      theme[key] = e.target.value;
-      if (id === 'background_color') syncColor('gradient_color_1', e.target.value);
-      if (id === 'gradient_color_1') syncColor('background_color', e.target.value);
-      if (text) text.value = e.target.value;
+      const v = (e.target as HTMLInputElement).value;
+      theme[key] = v;
+      if (id==='background_color') syncColor('gradient_color_1', v);
+      if (id==='gradient_color_1') syncColor('background_color', v);
+      if (text) text.value = v;
       schedulePreview();
     });
-
     text?.addEventListener('input', e => {
-      if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value)) {
-        theme[key] = e.target.value;
-        if (picker) picker.value = e.target.value;
-        schedulePreview();
-      }
+      const v = (e.target as HTMLInputElement).value;
+      if (/^#[0-9A-Fa-f]{6}$/.test(v)) { theme[key]=v; if(picker) picker.value=v; schedulePreview(); }
     });
   });
 
-  function syncColor(id, val) {
-    const p = document.getElementById(id);
-    const t = document.getElementById(`${id}_text`);
-    if (p) p.value = val;
-    if (t) t.value = val;
-  }
-
-  // ── Presets ──────────────────────────────────────────────────────────────────
+  // ── Presets ───────────────────────────────────────────────────────────────────
   document.querySelectorAll('.preset-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      const { preset, bg, primary, text, g2 } = btn.dataset;
-      theme = { ...theme, preset, background_color: bg, primary_color: primary, text_color: text, gradient_color_2: g2 || bg };
-      syncColor('background_color', bg); syncColor('gradient_color_1', bg);
-      syncColor('primary_color', primary); syncColor('text_color', text);
-      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      const { preset, bg, primary, text, g2 } = (btn as HTMLElement).dataset;
+      theme = { ...theme, preset, background_color:bg, primary_color:primary, text_color:text, gradient_color_2:g2||bg };
+      syncColor('background_color',bg!); syncColor('gradient_color_1',bg!);
+      syncColor('primary_color',primary!); syncColor('text_color',text!);
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active-ring'));
+      btn.classList.add('active-ring');
       schedulePreview();
     });
   });
 
-  // ── Background tabs ──────────────────────────────────────────────────────────
+  // ── Layout ────────────────────────────────────────────────────────────────────
+  document.querySelectorAll('.layout-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      theme.profile_layout = (btn as HTMLElement).dataset.layout;
+      activateBtn('.layout-btn','layout', theme.profile_layout);
+      schedulePreview();
+    });
+  });
+
+  document.querySelectorAll('.header-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      theme.header_style = (btn as HTMLElement).dataset.header;
+      activateBtn('.header-btn','header', theme.header_style);
+      document.getElementById('hero-settings')?.classList.toggle('hidden', theme.header_style !== 'hero');
+      schedulePreview();
+    });
+  });
+
+  document.getElementById('hero-image-url')?.addEventListener('input', e => {
+    theme.hero_image = (e.target as HTMLInputElement).value.trim();
+    schedulePreview();
+  });
+
+  document.getElementById('hero-overlay-slider')?.addEventListener('input', e => {
+    theme.hero_overlay = +(e.target as HTMLInputElement).value;
+    const v = document.getElementById('hero-overlay-val');
+    if (v) v.textContent = `${theme.hero_overlay}%`;
+    schedulePreview();
+  });
+
+  document.querySelectorAll('.hero-height-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      theme.hero_height = (btn as HTMLElement).dataset.height;
+      activateBtn('.hero-height-btn','height',theme.hero_height);
+      schedulePreview();
+    });
+  });
+
+  document.querySelectorAll('.hero-pos-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      theme.hero_position = (btn as HTMLElement).dataset.pos;
+      activateBtn('.hero-pos-btn','pos',theme.hero_position);
+      schedulePreview();
+    });
+  });
+
+  document.querySelectorAll('.width-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      theme.content_width = (btn as HTMLElement).dataset.width;
+      activateBtn('.width-btn','width',theme.content_width);
+      schedulePreview();
+    });
+  });
+
+  // ── Background ────────────────────────────────────────────────────────────────
   document.querySelectorAll('.bg-tab').forEach(btn => {
     btn.addEventListener('click', () => {
-      theme.background_style = btn.dataset.style;
-      document.querySelectorAll('.bg-tab').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      theme.background_style = (btn as HTMLElement).dataset.style;
+      activateBtn('.bg-tab','style',theme.background_style);
       document.getElementById('gradient-builder')?.classList.toggle('hidden', theme.background_style !== 'gradient');
       schedulePreview();
     });
@@ -973,137 +1402,172 @@ ${blurOverlay}
 
   document.querySelectorAll('.grad-type-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      theme.gradient_type = btn.dataset.type;
-      document.querySelectorAll('.grad-type-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      theme.gradient_type = (btn as HTMLElement).dataset.type;
+      activateBtn('.grad-type-btn','type',theme.gradient_type);
       document.getElementById('angle-wrap')?.classList.toggle('hidden', theme.gradient_type !== 'linear');
       schedulePreview();
     });
   });
 
-  const angleSlider = document.getElementById('gradient_angle');
-  const angleVal    = document.getElementById('angle-val');
-  angleSlider?.addEventListener('input', e => {
-    theme.gradient_angle = +e.target.value;
-    if (angleVal) angleVal.textContent = `${theme.gradient_angle}°`;
+  document.getElementById('gradient_angle')?.addEventListener('input', e => {
+    theme.gradient_angle = +(e.target as HTMLInputElement).value;
+    const v = document.getElementById('angle-val');
+    if (v) v.textContent = `${theme.gradient_angle}°`;
     schedulePreview();
   });
 
-  // ── Patterns ─────────────────────────────────────────────────────────────────
   document.querySelectorAll('.pattern-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      theme.pattern = btn.dataset.pattern;
-      document.querySelectorAll('.pattern-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      theme.pattern = (btn as HTMLElement).dataset.pattern;
+      activateBtn('.pattern-btn','pattern',theme.pattern);
       document.getElementById('pattern-opacity-wrap')?.classList.toggle('hidden', theme.pattern === 'none');
       schedulePreview();
     });
   });
 
-  const patOpSlider = document.getElementById('pattern_opacity');
-  const patOpVal    = document.getElementById('pattern-opacity-val');
-  patOpSlider?.addEventListener('input', e => {
-    theme.pattern_opacity = +e.target.value;
-    if (patOpVal) patOpVal.textContent = `${theme.pattern_opacity}%`;
+  document.getElementById('pattern_opacity')?.addEventListener('input', e => {
+    theme.pattern_opacity = +(e.target as HTMLInputElement).value;
+    const v = document.getElementById('pattern-opacity-val');
+    if (v) v.textContent = `${theme.pattern_opacity}%`;
     schedulePreview();
   });
 
-  // ── Button styles ────────────────────────────────────────────────────────────
+  document.getElementById('overlay-top')?.addEventListener('change', e => { theme.overlay_top = (e.target as HTMLInputElement).checked; schedulePreview(); });
+  document.getElementById('overlay-bottom')?.addEventListener('change', e => { theme.overlay_bottom = (e.target as HTMLInputElement).checked; schedulePreview(); });
+
+  // ── Buttons ───────────────────────────────────────────────────────────────────
   document.querySelectorAll('.btn-style-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      theme.button_style = btn.dataset.style;
-      document.querySelectorAll('.btn-style-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      theme.button_style = (btn as HTMLElement).dataset.style;
+      activateBtn('.btn-style-btn','style',theme.button_style);
       schedulePreview();
     });
   });
 
+  document.querySelectorAll('.hover-fx-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      theme.hover_effect = (btn as HTMLElement).dataset.fx;
+      activateBtn('.hover-fx-btn','fx',theme.hover_effect);
+      schedulePreview();
+    });
+  });
+
+  document.querySelectorAll('.btn-width-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      theme.button_width = (btn as HTMLElement).dataset.bw;
+      activateBtn('.btn-width-btn','bw',theme.button_width);
+      schedulePreview();
+    });
+  });
+
+  document.getElementById('shadow-intensity')?.addEventListener('input', e => {
+    theme.shadow_intensity = +(e.target as HTMLInputElement).value;
+    const v = document.getElementById('shadow-val');
+    if (v) v.textContent = String(theme.shadow_intensity);
+    schedulePreview();
+  });
+
   document.querySelectorAll('.radius-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      theme.border_radius = +btn.dataset.radius;
-      const s = document.getElementById('border_radius');
+      theme.border_radius = +(btn as HTMLElement).dataset.radius!;
+      const s = document.getElementById('border_radius') as HTMLInputElement | null;
       const v = document.getElementById('radius-val');
-      if (s) s.value = theme.border_radius;
+      if (s) s.value = String(theme.border_radius);
       if (v) v.textContent = `${theme.border_radius}px`;
       schedulePreview();
     });
   });
 
   document.getElementById('border_radius')?.addEventListener('input', e => {
-    theme.border_radius = +e.target.value;
+    theme.border_radius = +(e.target as HTMLInputElement).value;
     const v = document.getElementById('radius-val');
     if (v) v.textContent = `${theme.border_radius}px`;
     schedulePreview();
   });
 
-  // ── Fonts ────────────────────────────────────────────────────────────────────
+  // ── Profile ───────────────────────────────────────────────────────────────────
+  document.querySelectorAll('.shape-btn').forEach(btn => {
+    btn.addEventListener('click', () => { theme.avatar_shape=(btn as HTMLElement).dataset.shape; activateBtn('.shape-btn','shape',theme.avatar_shape); schedulePreview(); });
+  });
+  document.querySelectorAll('.avatar-border-btn').forEach(btn => {
+    btn.addEventListener('click', () => { theme.avatar_border=(btn as HTMLElement).dataset.border; activateBtn('.avatar-border-btn','border',theme.avatar_border); schedulePreview(); });
+  });
+  document.querySelectorAll('.avatar-size-btn').forEach(btn => {
+    btn.addEventListener('click', () => { theme.avatar_size=(btn as HTMLElement).dataset.size; activateBtn('.avatar-size-btn','size',theme.avatar_size); schedulePreview(); });
+  });
+  document.querySelectorAll('.social-style-btn').forEach(btn => {
+    btn.addEventListener('click', () => { theme.social_icon_style=(btn as HTMLElement).dataset.social; activateBtn('.social-style-btn','social',theme.social_icon_style); schedulePreview(); });
+  });
+  document.querySelectorAll('.bio-size-btn').forEach(btn => {
+    btn.addEventListener('click', () => { theme.bio_size=(btn as HTMLElement).dataset.bioSize; activateBtn('.bio-size-btn','bioSize',theme.bio_size); schedulePreview(); });
+  });
+  document.querySelectorAll('.bio-style-btn').forEach(btn => {
+    btn.addEventListener('click', () => { theme.bio_style=(btn as HTMLElement).dataset.bioStyle; activateBtn('.bio-style-btn','bioStyle',theme.bio_style); schedulePreview(); });
+  });
+  document.querySelectorAll('.spacing-btn').forEach(btn => {
+    btn.addEventListener('click', () => { theme.spacing=(btn as HTMLElement).dataset.spacing; activateBtn('.spacing-btn','spacing',theme.spacing); schedulePreview(); });
+  });
+  document.getElementById('block_shadow')?.addEventListener('change', e => { theme.block_shadow=(e.target as HTMLInputElement).checked; schedulePreview(); });
+  document.getElementById('show_username')?.addEventListener('change', e => { theme.show_username=(e.target as HTMLInputElement).checked; schedulePreview(); });
+
+  // ── Typography ────────────────────────────────────────────────────────────────
   document.querySelectorAll('.font-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      if (!ALLOWED_FONTS.includes(btn.dataset.font)) return;
-      theme.font_family = btn.dataset.font;
-      document.querySelectorAll('.font-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      const f = (btn as HTMLElement).dataset.font!;
+      if (!ALLOWED_FONTS.includes(f)) return;
+      theme.font_family = f;
+      activateBtn('.font-btn','font',f);
       schedulePreview();
     });
   });
 
-  // ── Profile settings ─────────────────────────────────────────────────────────
-  document.querySelectorAll('.shape-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      theme.avatar_shape = btn.dataset.shape;
-      document.querySelectorAll('.shape-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      schedulePreview();
-    });
-  });
-
-  document.querySelectorAll('.spacing-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      theme.spacing = btn.dataset.spacing;
-      document.querySelectorAll('.spacing-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      schedulePreview();
-    });
-  });
-
-  document.getElementById('block_shadow')?.addEventListener('change', e => { theme.block_shadow = e.target.checked; schedulePreview(); });
-  document.getElementById('animations')?.addEventListener('change',   e => { theme.animations   = e.target.checked; schedulePreview(); });
-
-  // ── Animations ───────────────────────────────────────────────────────────────
+  // ── Effects ───────────────────────────────────────────────────────────────────
   document.querySelectorAll('.anim-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      theme.animation_preset = btn.dataset.anim;
-      document.querySelectorAll('.anim-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      schedulePreview();
-    });
+    btn.addEventListener('click', () => { theme.animation_preset=(btn as HTMLElement).dataset.anim; activateBtn('.anim-btn','anim',theme.animation_preset); schedulePreview(); });
   });
-
+  document.getElementById('hover-scale')?.addEventListener('input', e => {
+    theme.hover_scale = +(e.target as HTMLInputElement).value;
+    const v = document.getElementById('hover-scale-val');
+    if (v) v.textContent = `${theme.hover_scale}/5`;
+    schedulePreview();
+  });
   document.getElementById('glass_intensity')?.addEventListener('input', e => {
-    theme.glass_intensity = +e.target.value;
+    theme.glass_intensity = +(e.target as HTMLInputElement).value;
     const v = document.getElementById('glass-val');
     if (v) v.textContent = String(theme.glass_intensity);
     schedulePreview();
   });
+  document.getElementById('animations')?.addEventListener('change', e => { theme.animations=(e.target as HTMLInputElement).checked; schedulePreview(); });
+  document.getElementById('scroll_reveal')?.addEventListener('change', e => { theme.scroll_reveal=(e.target as HTMLInputElement).checked; schedulePreview(); });
+  document.getElementById('click_ripple')?.addEventListener('change', e => { theme.click_ripple=(e.target as HTMLInputElement).checked; schedulePreview(); });
 
-  // ── Quick prompts (AI) ───────────────────────────────────────────────────────
+  // ── Custom CSS ────────────────────────────────────────────────────────────────
+  const cssEditor = document.getElementById('custom-css-editor') as HTMLTextAreaElement | null;
+  const cssCount  = document.getElementById('css-char-count');
+  cssEditor?.addEventListener('input', () => {
+    theme.custom_css = cssEditor.value;
+    if (cssCount) cssCount.textContent = `${cssEditor.value.length} / 4000`;
+    schedulePreview();
+  });
+
+  // ── AI quick prompts ──────────────────────────────────────────────────────────
   document.querySelectorAll('.ai-quick-prompt').forEach(btn => {
     btn.addEventListener('click', () => {
-      const ta = document.getElementById('ai-prompt');
-      if (ta) ta.value = btn.dataset.prompt;
+      const ta = document.getElementById('ai-prompt') as HTMLTextAreaElement | null;
+      if (ta) ta.value = (btn as HTMLElement).dataset.prompt ?? '';
     });
   });
 
-  // ── AI Theme Generator ───────────────────────────────────────────────────────
+  // ── AI generate ───────────────────────────────────────────────────────────────
   document.getElementById('ai-generate-btn')?.addEventListener('click', async () => {
-    const prompt = (document.getElementById('ai-prompt')).value.trim();
+    const prompt = ((document.getElementById('ai-prompt') as HTMLTextAreaElement)?.value ?? '').trim();
     if (!prompt) { toast.error('Décris ton univers d\'abord'); return; }
 
     const responseEl = document.getElementById('ai-response');
     const thinkingEl = document.getElementById('ai-thinking');
     const resultEl   = document.getElementById('ai-result');
     const errorEl    = document.getElementById('ai-error');
-    const genBtn     = document.getElementById('ai-generate-btn');
+    const genBtn     = document.getElementById('ai-generate-btn') as HTMLButtonElement | null;
 
     responseEl?.classList.remove('hidden');
     thinkingEl?.classList.remove('hidden');
@@ -1112,45 +1576,31 @@ ${blurOverlay}
     if (genBtn) genBtn.disabled = true;
 
     try {
-      // ── Appel serveur → Groq via /api/ai/theme ──────────────────────────
-      const response = await fetch('/api/ai/theme', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-      if (!data.theme) throw new Error('Réponse invalide du serveur');
-
+      const r = await fetch('/api/ai/theme', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({prompt}) });
+      if (!r.ok) throw new Error((await r.json().catch(()=>({}))).error || `HTTP ${r.status}`);
+      const data = await r.json();
+      if (!data.theme) throw new Error('Réponse invalide');
       aiSuggestedTheme = data.theme;
 
-      // Show palette
       const paletteEl = document.getElementById('ai-palette');
       if (paletteEl) {
         const colors = [aiSuggestedTheme.background_color, aiSuggestedTheme.primary_color, aiSuggestedTheme.text_color, aiSuggestedTheme.gradient_color_2];
-        const labels = ['Fond','Primaire','Texte','Dégradé'];
+        const labels = ['Fond','Accent','Texte','Dégradé'];
         paletteEl.innerHTML = colors.map((col, i) => `
           <div class="flex flex-col gap-1 items-center">
-            <div style="width:36px;height:36px;border-radius:8px;background:${col};border:1px solid rgba(255,255,255,0.1)"></div>
+            <div style="width:32px;height:32px;border-radius:8px;background:${col};border:1px solid rgba(255,255,255,0.1)"></div>
             <span style="font-size:9px;color:#6b7280">${labels[i]}</span>
           </div>`).join('');
       }
-
       const reasonEl = document.getElementById('ai-reasoning');
       if (reasonEl) reasonEl.textContent = data.theme.reasoning ?? '';
-
       thinkingEl?.classList.add('hidden');
       resultEl?.classList.remove('hidden');
-    } catch (err) {
+    } catch {
       thinkingEl?.classList.add('hidden');
       errorEl?.classList.remove('hidden');
       const errMsg = document.getElementById('ai-error-msg');
-      if (errMsg) errMsg.textContent = 'Erreur de génération — réessaie ou reformule ta description.';
+      if (errMsg) errMsg.textContent = 'Erreur de génération — réessaie ou reformule.';
     } finally {
       if (genBtn) genBtn.disabled = false;
     }
@@ -1162,8 +1612,8 @@ ${blurOverlay}
     toast.success('Thème IA appliqué !');
   });
 
-  // ── Apply full theme ─────────────────────────────────────────────────────────
-  function applyFullTheme(t) {
+  // ── Apply full theme ──────────────────────────────────────────────────────────
+  function applyFullTheme(t: any) {
     theme = { ...theme, ...t };
     syncColor('background_color', theme.background_color);
     syncColor('gradient_color_1', theme.background_color);
@@ -1171,102 +1621,122 @@ ${blurOverlay}
     syncColor('text_color',       theme.text_color);
     syncColor('gradient_color_2', theme.gradient_color_2 ?? theme.background_color);
 
-    const setSlider = (id, val, displayId, fmt) => {
-      const s = document.getElementById(id);
+    const setSlider = (id: string, val: number, displayId: string, fmt: (v:number)=>string) => {
+      const s = document.getElementById(id) as HTMLInputElement | null;
       const d = document.getElementById(displayId);
-      if (s) s.value = val;
+      if (s) s.value = String(val);
       if (d) d.textContent = fmt(val);
     };
-    setSlider('border_radius',  theme.border_radius,  'radius-val',      v => `${v}px`);
-    setSlider('gradient_angle', theme.gradient_angle, 'angle-val',       v => `${v}°`);
-    setSlider('pattern_opacity',theme.pattern_opacity,'pattern-opacity-val', v => `${v}%`);
-    setSlider('glass_intensity',theme.glass_intensity,'glass-val',       v => String(v));
+    setSlider('border_radius',      theme.border_radius,     'radius-val',          v=>`${v}px`);
+    setSlider('gradient_angle',     theme.gradient_angle,    'angle-val',           v=>`${v}°`);
+    setSlider('pattern_opacity',    theme.pattern_opacity,   'pattern-opacity-val', v=>`${v}%`);
+    setSlider('glass_intensity',    theme.glass_intensity,   'glass-val',           v=>String(v));
+    setSlider('shadow-intensity',   theme.shadow_intensity,  'shadow-val',          v=>String(v));
+    setSlider('hover-scale',        theme.hover_scale,       'hover-scale-val',     v=>`${v}/5`);
+    setSlider('hero-overlay-slider',theme.hero_overlay,      'hero-overlay-val',    v=>`${v}%`);
 
-    const setCheck = (id, val) => { const el = document.getElementById(id); if (el) el.checked = val; };
-    setCheck('block_shadow', theme.block_shadow);
-    setCheck('animations',   theme.animations);
+    const checks: [string, boolean][] = [
+      ['block_shadow', theme.block_shadow],
+      ['animations',   theme.animations],
+      ['scroll_reveal',theme.scroll_reveal ?? true],
+      ['click_ripple', theme.click_ripple ?? false],
+      ['show_username',theme.show_username ?? true],
+      ['overlay-top',  theme.overlay_top ?? false],
+      ['overlay-bottom',theme.overlay_bottom ?? false],
+    ];
+    checks.forEach(([id, val]) => {
+      const el = document.getElementById(id) as HTMLInputElement | null;
+      if (el) el.checked = val;
+    });
 
-    const activateBtn = (selector, attr, val) => {
-      document.querySelectorAll(selector).forEach(b => b.classList.toggle('active', b.dataset[attr] === val));
-    };
-    activateBtn('.preset-btn',    'preset',  theme.preset);
-    activateBtn('.btn-style-btn', 'style',   theme.button_style);
-    activateBtn('.font-btn',      'font',    theme.font_family);
-    activateBtn('.bg-tab',        'style',   theme.background_style);
-    activateBtn('.grad-type-btn', 'type',    theme.gradient_type);
-    activateBtn('.pattern-btn',   'pattern', theme.pattern);
-    activateBtn('.anim-btn',      'anim',    theme.animation_preset);
-    activateBtn('.shape-btn',     'shape',   theme.avatar_shape);
-    activateBtn('.spacing-btn',   'spacing', theme.spacing);
+    // Activate all choice buttons
+    activateBtn('.preset-btn',        'preset',   theme.preset);
+    activateBtn('.btn-style-btn',     'style',    theme.button_style);
+    activateBtn('.font-btn',          'font',     theme.font_family);
+    activateBtn('.bg-tab',            'style',    theme.background_style);
+    activateBtn('.grad-type-btn',     'type',     theme.gradient_type);
+    activateBtn('.pattern-btn',       'pattern',  theme.pattern);
+    activateBtn('.anim-btn',          'anim',     theme.animation_preset);
+    activateBtn('.shape-btn',         'shape',    theme.avatar_shape);
+    activateBtn('.avatar-border-btn', 'border',   theme.avatar_border);
+    activateBtn('.avatar-size-btn',   'size',     theme.avatar_size);
+    activateBtn('.social-style-btn',  'social',   theme.social_icon_style);
+    activateBtn('.spacing-btn',       'spacing',  theme.spacing);
+    activateBtn('.layout-btn',        'layout',   theme.profile_layout);
+    activateBtn('.header-btn',        'header',   theme.header_style);
+    activateBtn('.hover-fx-btn',      'fx',       theme.hover_effect);
+    activateBtn('.btn-width-btn',     'bw',       theme.button_width);
+    activateBtn('.bio-size-btn',      'bioSize',  theme.bio_size);
+    activateBtn('.bio-style-btn',     'bioStyle', theme.bio_style);
+    activateBtn('.width-btn',         'width',    theme.content_width);
 
     document.getElementById('gradient-builder')?.classList.toggle('hidden', theme.background_style !== 'gradient');
     document.getElementById('pattern-opacity-wrap')?.classList.toggle('hidden', theme.pattern === 'none');
     document.getElementById('angle-wrap')?.classList.toggle('hidden', theme.gradient_type !== 'linear');
+    document.getElementById('hero-settings')?.classList.toggle('hidden', theme.header_style !== 'hero');
+
+    if (cssEditor) { cssEditor.value = theme.custom_css ?? ''; if(cssCount) cssCount.textContent=`${cssEditor.value.length} / 4000`; }
 
     schedulePreview();
   }
 
-  // ── History ──────────────────────────────────────────────────────────────────
-  function getHistory() {
-    try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; }
-  }
-  function pushHistory(t) {
-    const h = getHistory();
-    h.unshift({ theme: { ...t }, savedAt: new Date().toISOString() });
-    if (h.length > 5) h.pop();
+  // ── History ───────────────────────────────────────────────────────────────────
+  function getHistory() { try { return JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]'); } catch { return []; } }
+  function pushHistory(t: any) {
+    const h = getHistory(); h.unshift({ theme:{...t}, savedAt:new Date().toISOString() });
+    if (h.length>5) h.pop();
     localStorage.setItem(HISTORY_KEY, JSON.stringify(h));
     renderHistory();
   }
   function renderHistory() {
-    const container = document.getElementById('history-items');
-    if (!container) return;
+    const c = document.getElementById('history-items');
+    if (!c) return;
     const h = getHistory();
-    if (!h.length) { container.innerHTML = '<p class="text-xs text-gray-700 py-2">Aucun historique</p>'; return; }
-    container.innerHTML = h.map((entry, i) => {
-      const d = new Date(entry.savedAt).toLocaleString('fr-FR', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+    if (!h.length) { c.innerHTML='<p class="text-xs text-gray-700 py-2">Aucun historique</p>'; return; }
+    c.innerHTML = h.map((entry: any, i: number) => {
+      const d = new Date(entry.savedAt).toLocaleString('fr-FR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
       return `<button class="hist-btn w-full flex items-center gap-2.5 p-2.5 glass rounded-xl border border-white/5 hover:border-white/15 transition-all text-left mb-1.5" data-idx="${i}">
         <div class="flex gap-1 shrink-0">
-          <div style="width:14px;height:28px;border-radius:4px;background:${entry.theme.background_color};border:1px solid rgba(255,255,255,0.1)"></div>
-          <div style="width:14px;height:28px;border-radius:4px;background:${entry.theme.primary_color}"></div>
+          <div style="width:12px;height:28px;border-radius:3px;background:${entry.theme.background_color};border:1px solid rgba(255,255,255,0.1)"></div>
+          <div style="width:12px;height:28px;border-radius:3px;background:${entry.theme.primary_color}"></div>
         </div>
         <div class="flex-1 min-w-0">
-          <p class="text-xs text-gray-300 font-medium truncate">${entry.theme.preset || 'custom'}</p>
+          <p class="text-xs text-gray-300 font-medium truncate">${entry.theme.preset||'custom'}</p>
           <p class="text-xs text-gray-600">${d}</p>
         </div>
-        <svg class="w-3 h-3 text-gray-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9"/></svg>
       </button>`;
     }).join('');
-    container.querySelectorAll('.hist-btn').forEach(btn => {
+    c.querySelectorAll('.hist-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        const entry = getHistory()[+btn.dataset.idx];
+        const entry = getHistory()[+(btn as HTMLElement).dataset.idx!];
         if (entry) { applyFullTheme(entry.theme); toast.success('Thème restauré !'); }
       });
     });
   }
 
-  // ── Save ─────────────────────────────────────────────────────────────────────
+  // ── Save ──────────────────────────────────────────────────────────────────────
   let lastSave = 0;
   document.getElementById('save-btn')?.addEventListener('click', async () => {
-    if (Date.now() - lastSave < 2000) { toast.error('Attends avant de sauvegarder'); return; }
-    const btn  = document.getElementById('save-btn');
-    const txt  = document.getElementById('save-btn-text');
+    if (Date.now()-lastSave < 2000) { toast.error('Attends avant de sauvegarder'); return; }
+    const btn = document.getElementById('save-btn');
+    const txt = document.getElementById('save-btn-text');
     btn?.classList.add('loading');
     if (txt) txt.textContent = 'Sauvegarde…';
     try {
-      const r = await fetch('/api/profile', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ theme }) });
-      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
+      const r = await fetch('/api/profile', { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ theme }) });
+      if (!r.ok) throw new Error((await r.json().catch(()=>({}))).error||`HTTP ${r.status}`);
       lastSave = Date.now();
       pushHistory(theme);
-      toast.success('Thème sauvegardé !');
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Erreur de sauvegarde');
+      toast.success('Thème sauvegardé ! ✓');
+    } catch(err: any) {
+      toast.error(err.message||'Erreur de sauvegarde');
     } finally {
       btn?.classList.remove('loading');
       if (txt) txt.textContent = 'Sauvegarder';
     }
   });
 
-  // ── Reset ────────────────────────────────────────────────────────────────────
+  // ── Reset ─────────────────────────────────────────────────────────────────────
   document.getElementById('reset-btn')?.addEventListener('click', () => {
     if (!confirm('Réinitialiser au thème par défaut ?')) return;
     applyFullTheme({
@@ -1274,58 +1744,56 @@ ${blurOverlay}
       gradient_color_2:'#1a1a2e', background_style:'solid', gradient_type:'linear', gradient_angle:135,
       pattern:'none', pattern_opacity:15, button_style:'filled', border_radius:14,
       font_family:'Exo 2', block_shadow:true, animations:true, animation_preset:'fade',
-      avatar_shape:'circle', spacing:'normal', glass_intensity:12,
+      avatar_shape:'circle', avatar_size:'md', avatar_border:'glow', spacing:'normal',
+      glass_intensity:12, profile_layout:'centered', header_style:'simple', hero_image:'',
+      hero_height:'md', hero_position:'center', hero_overlay:40, content_width:'normal',
+      button_width:'full', hover_effect:'lift', shadow_intensity:3, hover_scale:3,
+      social_icon_style:'round', bio_size:'sm', bio_style:'normal', show_username:true,
+      scroll_reveal:true, click_ripple:false, overlay_top:false, overlay_bottom:false,
+      overlay_color:'#000000', custom_css:'',
     });
     toast.success('Réinitialisé !');
   });
 
-  // ── Export / Import ──────────────────────────────────────────────────────────
+  // ── Export / Import ───────────────────────────────────────────────────────────
   document.getElementById('export-btn')?.addEventListener('click', () => {
-    const blob = new Blob([JSON.stringify(theme, null, 2)], { type:'application/json' });
+    if (!isCreator) { toast.error('Export disponible dès Creator'); return; }
+    const blob = new Blob([JSON.stringify(theme,null,2)],{type:'application/json'});
     const url  = URL.createObjectURL(blob);
-    const a    = Object.assign(document.createElement('a'), { href:url, download:`theme-${theme.preset||'custom'}-${Date.now()}.json` });
+    const a    = Object.assign(document.createElement('a'),{href:url,download:`theme-${theme.preset||'custom'}-${Date.now()}.json`});
     a.click(); URL.revokeObjectURL(url);
-    toast.success('Exporté !');
+    toast.success('Thème exporté !');
   });
 
-  document.getElementById('import-file')?.addEventListener('change', e => {
+  document.getElementById('import-file')?.addEventListener('change', (e: any) => {
+    if (!isCreator) { toast.error('Import disponible dès Creator'); return; }
     const file = e.target.files?.[0];
-    if (!file || file.size > 50000) { toast.error('Fichier invalide ou trop volumineux'); return; }
+    if (!file||file.size>50000) { toast.error('Fichier invalide'); return; }
     const reader = new FileReader();
-    reader.onload = ev => {
+    reader.onload = (ev: any) => {
       try {
         const raw  = JSON.parse(ev.target.result);
-        const safe = {
-          preset:           String(raw.preset ?? 'custom').slice(0,20),
-          background_color: /^#[0-9A-Fa-f]{6}$/.test(raw.background_color) ? raw.background_color : '#0a0a0a',
-          primary_color:    /^#[0-9A-Fa-f]{6}$/.test(raw.primary_color)    ? raw.primary_color    : '#00ff9d',
-          text_color:       /^#[0-9A-Fa-f]{6}$/.test(raw.text_color)       ? raw.text_color       : '#ffffff',
-          gradient_color_2: /^#[0-9A-Fa-f]{6}$/.test(raw.gradient_color_2) ? raw.gradient_color_2 : '#1a1a2e',
-          gradient_angle:   Math.min(Math.max(+raw.gradient_angle||135,0),360),
-          border_radius:    Math.min(Math.max(+raw.border_radius||14,0),32),
-          pattern_opacity:  Math.min(Math.max(+raw.pattern_opacity||15,5),60),
-          font_family:      ALLOWED_FONTS.includes(raw.font_family) ? raw.font_family : 'Exo 2',
-          block_shadow:     typeof raw.block_shadow === 'boolean' ? raw.block_shadow : true,
-          animations:       typeof raw.animations   === 'boolean' ? raw.animations   : true,
-          background_style: ['solid','gradient','blur'].includes(raw.background_style) ? raw.background_style : 'solid',
-          gradient_type:    ['linear','radial'].includes(raw.gradient_type)            ? raw.gradient_type    : 'linear',
-          button_style:     ['filled','outline','glass','gradient','neon','minimal'].includes(raw.button_style) ? raw.button_style : 'filled',
-          animation_preset: ['none','fade','slide','bounce','stagger'].includes(raw.animation_preset) ? raw.animation_preset : 'fade',
-          avatar_shape:     ['circle','square','hex','ring'].includes(raw.avatar_shape) ? raw.avatar_shape : 'circle',
-          spacing:          ['compact','normal','spacious'].includes(raw.spacing) ? raw.spacing : 'normal',
-          pattern:          ['none','dots','grid','waves','noise','mesh'].includes(raw.pattern) ? raw.pattern : 'none',
-        };
+        const safe: any = {};
+        if (/^#[0-9A-Fa-f]{6}$/.test(raw.background_color)) safe.background_color = raw.background_color;
+        if (/^#[0-9A-Fa-f]{6}$/.test(raw.primary_color))    safe.primary_color    = raw.primary_color;
+        if (/^#[0-9A-Fa-f]{6}$/.test(raw.text_color))       safe.text_color       = raw.text_color;
+        if (ALLOWED_FONTS.includes(raw.font_family))         safe.font_family      = raw.font_family;
+        const numFields = ['border_radius','gradient_angle','pattern_opacity','glass_intensity','shadow_intensity','hover_scale'];
+        numFields.forEach(k => { if (typeof raw[k]==='number') safe[k]=raw[k]; });
+        const boolFields = ['block_shadow','animations','scroll_reveal','click_ripple','show_username','overlay_top','overlay_bottom'];
+        boolFields.forEach(k => { if (typeof raw[k]==='boolean') safe[k]=raw[k]; });
+        const strFields = ['preset','background_style','gradient_type','button_style','animation_preset','avatar_shape','avatar_size','avatar_border','spacing','profile_layout','header_style','hero_height','hero_position','content_width','button_width','hover_effect','social_icon_style','bio_size','bio_style','pattern'];
+        strFields.forEach(k => { if (typeof raw[k]==='string') safe[k]=raw[k]; });
         applyFullTheme(safe);
         toast.success('Thème importé !');
       } catch { toast.error('Fichier JSON invalide'); }
     };
     reader.readAsText(file);
-    e.target.value = '';
+    e.target.value='';
   });
 
-  // ── INIT ─────────────────────────────────────────────────────────────────────
+  // ── INIT ──────────────────────────────────────────────────────────────────────
   applyFullTheme(theme);
   renderHistory();
-  // Set initial prog dot
   document.querySelector('.prog-dot[data-for="presets"]')?.classList.add('active');
 </script>
