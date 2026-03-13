@@ -17,8 +17,11 @@ export const GET: APIRoute = async (ctx) => {
 export const POST: APIRoute = async (ctx) => {
   const auth = await withAuth(ctx);
   if (!auth.success || !auth.data) return err('Unauthorized', 401);
-  const plan = auth.data.planLimits?.plan ?? 'free';
-  if (plan === 'free') return err('Creator requis', 403);
+  const _pl    = auth.data.planLimits as any;
+  const plan   = _pl?.plan ?? (auth.data.profile as any)?.plan ?? 'free';
+  const PAID   = ['creator', 'pro', 'enterprise', 'business', 'team'];
+  const PROS   = ['pro', 'enterprise', 'business', 'team'];
+  if (!PAID.includes(plan)) return err('Creator requis', 403);
 
   let body: any;
   try { body = await ctx.request.json(); } catch { return err('Invalid JSON', 400); }

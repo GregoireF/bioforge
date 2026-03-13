@@ -21,14 +21,17 @@ export const POST: APIRoute = async (ctx) => {
 
   if (!VALID_PROVIDERS.includes(provider ?? '')) return err('Provider invalide', 400);
 
-  const plan = planLimits?.plan ?? 'free';
+  const _pl = planLimits as any;
+  const plan = _pl?.plan ?? (profile as any)?.plan ?? 'free';
+  const PAID = ['creator', 'pro', 'enterprise', 'business', 'team'];
+  const PROS = ['pro', 'enterprise', 'business', 'team'];
   // Check plan limits for premium integrations
   const CREATOR_PROVIDERS = ['instagram','tiktok','youtube','twitch','twitter','discord','pinterest','mailchimp','klaviyo','convertkit','brevo','googlesheets','canva','throne','patreon'];
   const PRO_PROVIDERS     = ['snapchat','stripe','beehiiv','googleanalytics','googlesearchconsole'];
 
-  if (PRO_PROVIDERS.includes(provider!) && plan !== 'pro')
+  if (PRO_PROVIDERS.includes(provider!) && !PROS.includes(plan))
     return err('Plan Pro requis pour cette intégration', 403);
-  if (CREATOR_PROVIDERS.includes(provider!) && plan === 'free')
+  if (CREATOR_PROVIDERS.includes(provider!) && !PAID.includes(plan))
     return err('Plan Creator requis pour cette intégration', 403);
 
   let body: any;
@@ -63,7 +66,7 @@ export const PATCH: APIRoute = async (ctx) => {
   const allowed: any = {};
   if (typeof body.auto_reply_enabled === 'boolean') {
     // Auto-reply requires Pro
-    if (body.auto_reply_enabled && planLimits?.plan !== 'pro')
+    if (body.auto_reply_enabled && !PROS.includes(plan))
       return err('Plan Pro requis pour l\'auto-reply', 403);
     allowed.auto_reply_enabled = body.auto_reply_enabled;
   }

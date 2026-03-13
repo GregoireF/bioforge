@@ -19,8 +19,11 @@ export const POST: APIRoute = async (ctx) => {
   const { profile, planLimits } = auth.data;
 
   // SEO avancé = Creator+
-  const plan = planLimits?.plan ?? 'free';
-  if (plan === 'free') return err('Plan Creator requis pour le SEO avancé', 403);
+  const _pl    = planLimits as any;
+  const plan   = _pl?.plan ?? (profile as any)?.plan ?? 'free';
+  const PAID   = ['creator', 'pro', 'enterprise', 'business', 'team'];
+  const PROS   = ['pro', 'enterprise', 'business', 'team'];
+  if (!PAID.includes(plan)) return err('Plan Creator requis pour le SEO avancé', 403);
 
   let body: any;
   try { body = await ctx.request.json(); } catch { return err('Invalid JSON', 400); }

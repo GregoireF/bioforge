@@ -31,9 +31,15 @@ const { data: causeBanners } = await supabase
   .eq('is_active', true)
   .order('sort_order');
 
-const plan = (planLimits?.plan ?? 'free') as string;
-const isCreator = plan === 'creator' || plan === 'pro';
-const isPro     = plan === 'pro';
+// ── Plan detection ────────────────────────────────────────────────────────
+// planLimits = { ...profile, plan_limits: PlanLimitsRow }
+// donc planLimits.plan = profile.plan, limites dans planLimits.plan_limits
+const PAID_TIERS = ['creator', 'pro', 'enterprise', 'business', 'team'];
+const PRO_TIERS  = ['pro', 'enterprise', 'business', 'team'];
+const plan: string = (planLimits as any)?.plan ?? (profile as any)?.plan ?? 'free';
+const planLimRow  = (planLimits as any)?.plan_limits ?? planLimits ?? {};
+const isCreator   = PAID_TIERS.includes(plan);
+const isPro       = PRO_TIERS.includes(plan);
 
 // Integration categories definition
 const INTEGRATIONS = {

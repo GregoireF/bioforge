@@ -29,8 +29,11 @@ export const POST: APIRoute = async (ctx) => {
   if (!auth.success || !auth.data) return err('Unauthorized', 401);
   const { profile, planLimits } = auth.data;
 
-  const plan = planLimits?.plan ?? 'free';
-  if (plan === 'free') return err('Plan Creator requis pour le link shortener', 403);
+  const _pl    = planLimits as any;
+  const plan   = _pl?.plan ?? (profile as any)?.plan ?? 'free';
+  const PAID   = ['creator', 'pro', 'enterprise', 'business', 'team'];
+  const PROS   = ['pro', 'enterprise', 'business', 'team'];
+  if (!PAID.includes(plan)) return err('Plan Creator requis pour le link shortener', 403);
 
   let body: any;
   try { body = await ctx.request.json(); } catch { return err('Invalid JSON', 400); }
@@ -49,7 +52,7 @@ export const POST: APIRoute = async (ctx) => {
   if (existing) return err(`Le code "${finalCode}" est déjà pris`, 409);
 
   // Check plan limit
-  if (plan === 'creator') {
+  if (!PROS.includes(plan)) {  // cap at creator tier (not pro/enterprise)
     const { count } = await sb.from('short_links').select('*', { count: 'exact', head: true }).eq('profile_id', profile.id);
     if ((count ?? 0) >= 50) return err('Limite de 50 liens atteinte sur Creator', 403);
   }
