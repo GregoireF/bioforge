@@ -15,8 +15,8 @@ const supabase = createClient(
 // ── Plan detection ────────────────────────────────────────────────────────
 // planLimits = { ...profile, plan_limits: PlanLimitsRow }
 // donc planLimits.plan = profile.plan, limites dans planLimits.plan_limits
-const PAID_TIERS = ['creator', 'pro', 'enterprise', 'business', 'team'];
-const PRO_TIERS  = ['pro', 'enterprise', 'business', 'team'];
+const PAID_TIERS = ['creator', 'pro', 'Enterprise', 'business', 'team'];
+const PRO_TIERS  = ['pro', 'Enterprise', 'business', 'team'];
 const plan: string = (planLimits as any)?.plan ?? (profile as any)?.plan ?? 'free';
 const planLimRow  = (planLimits as any)?.plan_limits ?? planLimits ?? {};
 const isCreator   = PAID_TIERS.includes(plan);
