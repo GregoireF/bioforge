@@ -15,37 +15,102 @@ const { user, profile } = authResult.data;
 
 // ==================== THEME DEFAULTS ====================
 const DEFAULT_THEME = {
+  // Core colors
   preset: 'dark' as const,
-  background_style: 'solid' as const,
   background_color: '#0a0a0a',
   gradient_color_2: '#1a1a2e',
+  primary_color: '#00ff9d',
+  text_color: '#ffffff',
+  // Background
+  background_style: 'solid' as const,
   gradient_type: 'linear' as const,
   gradient_angle: 135,
   pattern: 'none' as const,
   pattern_opacity: 15,
-  primary_color: '#00ff9d',
-  text_color: '#ffffff',
-  button_style: 'filled' as const,
-  border_radius: 14,
-  font_family: 'Exo 2' as const,
-  block_shadow: true,
-  animations: true,
-  animation_preset: 'fade' as const,
-  glass_intensity: 12,
-  avatar_shape: 'circle' as const,
-  spacing: 'normal' as const,
+  // Layout
+  profile_layout: 'centered',
+  header_style: 'simple',
+  hero_image: '',
+  hero_position: 'center',
+  hero_height: 40,
+  content_width: 'normal',
+  // Avatar
+  avatar_shape:     'circle',
+  avatar_size:      'md',         // sm | md | lg
+  avatar_border:    'glow',       // none | solid | glow | gradient | double
+  // Bio
+  bio_size:         'sm',         // xs | sm | md | lg
+  bio_style:        'normal',     // normal | italic
+  show_username:    true,
+  // Buttons
+  button_style:     'filled',
+  border_radius:    14,
+  shadow_intensity: 3,            // 0-5
+  hover_effect:     'lift',       // none | lift | glow | slide | ripple
+  button_width:     'full',       // full | auto
+  // Typography
+  font_family:      'Exo 2',
+  // Effects
+  animations:       true,
+  animation_preset: 'fade',
+  scroll_reveal:    true,
+  click_ripple:     false,
+  hover_scale:      3,            // 0-5
+  block_shadow:     true,
+  glass_intensity:  12,
+  spacing:          'normal',
+  // Overlays
+  overlay_top:      false,
+  overlay_bottom:   false,
+  overlay_color:    '#000000',
+  // Links appearance
+  link_separator:   'none',      // none | line | dots | gradient | glow
+  link_icon_pos:    'left',      // left | right | none
+  link_subtitle:    false,       // show subtitle under link text
+  link_hover_fill:  false,       // fill bg on hover
+  // Logo
+  show_logo:        false,
+  logo_url:         '',
+  logo_size:        'md',         // sm | md | lg (lg = Pro)
+  // Wallpaper
+  wallpaper_type:   'none',       // none | image | video
+  wallpaper_url:    '',
+  wallpaper_video_url: '',
+  wallpaper_blur:   0,            // 0-20
+  wallpaper_dim:    50,           // 0-90 opacity of dim overlay
+  // Custom font
+  custom_font_url:  '',
+  custom_font_name: '',
 } satisfies Record<string, any>;
 
 type Theme = typeof DEFAULT_THEME;
 
 function sanitizeHex(v: string, fb: string) { return /^#[0-9A-Fa-f]{6}$/.test(v) ? v : fb; }
+
 function clamp(n: unknown, min: number, max: number, fb: number) {
   const v = Number(n); return Number.isFinite(v) ? Math.min(Math.max(v, min), max) : fb;
 }
+
 function sanitizeEnum<T extends string>(v: unknown, allowed: readonly T[], fb: T): T {
   return allowed.includes(v as T) ? v as T : fb;
 }
-const ALLOWED_FONTS = ['Exo 2','Orbitron','Rajdhani','Bebas Neue','Audiowide','Russo One','Space Grotesk','DM Sans','Quicksand','Figtree'];
+
+const ALLOWED_FONTS = [
+  // Gratuites — toutes
+  'Exo 2','Orbitron','Rajdhani','Bebas Neue','Audiowide','Russo One',
+  'Space Grotesk','DM Sans','Quicksand','Figtree','Inter','Syne',
+  'Cabinet Grotesk','Outfit','Plus Jakarta Sans','Nunito','Poppins',
+  'Josefin Sans','Archivo','Barlow','Rubik','Work Sans','Manrope',
+  'Space Mono','JetBrains Mono','Fira Code',
+  // Serif
+  'Playfair Display','Lora','Merriweather','DM Serif Display',
+  // Display
+  'Bungee','Righteous','Teko','Oswald','Anton',
+];
+
+const ALLOWED_LAYOUTS = ['centered','left','card','minimal'] as const;
+const ALLOWED_HEADERS = ['simple','glass','banner','hero'] as const;
+
 function sanitizeFont(v: string, fb: string) { return ALLOWED_FONTS.includes(v) ? v : fb; }
 
 let theme = { ...DEFAULT_THEME };
@@ -55,21 +120,37 @@ if (profile.theme) {
     theme = {
       ...DEFAULT_THEME, ...raw,
       background_color:  sanitizeHex(raw.background_color,  DEFAULT_THEME.background_color),
+      gradient_color_2:  sanitizeHex(raw.gradient_color_2,  DEFAULT_THEME.gradient_color_2),
       primary_color:     sanitizeHex(raw.primary_color,     DEFAULT_THEME.primary_color),
       text_color:        sanitizeHex(raw.text_color,        DEFAULT_THEME.text_color),
-      gradient_color_2:  sanitizeHex(raw.gradient_color_2,  DEFAULT_THEME.gradient_color_2),
+      overlay_color:     sanitizeHex(raw.overlay_color,     DEFAULT_THEME.overlay_color),
       font_family:       sanitizeFont(raw.font_family,      DEFAULT_THEME.font_family),
       border_radius:     Math.min(Math.max(parseInt(raw.border_radius) || 14, 0), 32),
       gradient_angle:    Math.min(Math.max(parseInt(raw.gradient_angle) || 135, 0), 360),
       pattern_opacity:   clamp(raw.pattern_opacity, 5, 60, 15),
       glass_intensity:   clamp(raw.glass_intensity, 4, 32, 12),
+      hero_overlay:      clamp(raw.hero_overlay, 0, 80, 40),
+      shadow_intensity:  clamp(raw.shadow_intensity, 0, 5 , 3),
+      hover_scale:       clamp(raw.hover_scale, 0, 5, 3),
+      profile_layout:    sanitizeEnum(raw.profile_layout, ALLOWED_LAYOUTS, 'centered'),
+      header_style:      sanitizeEnum(raw.header_style, ALLOWED_HEADERS, 'simple'),
       background_style:  sanitizeEnum(raw.background_style, ['solid','gradient','blur'] as const, 'solid'),
-      gradient_type:     sanitizeEnum(raw.gradient_type, ['linear','radial'] as const, 'linear'),
-      button_style:      sanitizeEnum(raw.button_style, ['filled','outline','glass','gradient','neon','minimal'] as const, 'filled'),
+      gradient_type:     sanitizeEnum(raw.gradient_type,    ['linear','radial'] as const, 'linear'),
+      button_style:      sanitizeEnum(raw.button_style,     ['filled','outline','glass','gradient','neon','minimal'] as const, 'filled'),
       animation_preset:  sanitizeEnum(raw.animation_preset, ['none','fade','slide','bounce','stagger'] as const, 'fade'),
-      avatar_shape:      sanitizeEnum(raw.avatar_shape, ['circle','square','hex','ring'] as const, 'circle'),
-      spacing:           sanitizeEnum(raw.spacing, ['compact','normal','spacious'] as const, 'normal'),
-      pattern:           sanitizeEnum(raw.pattern, ['none','dots','grid','waves','noise','mesh'] as const, 'none'),
+      avatar_shape:      sanitizeEnum(raw.avatar_shape,     ['circle','square','hex','ring'] as const, 'circle'),
+      avatar_size:       sanitizeEnum(raw.avatar_size,      ['sm','md','lg'] as const, 'md'),
+      avatar_border:     sanitizeEnum(raw.avatar_border,    ['none','solid','glow','gradient','double'] as const, 'glow'),
+      social_icon_style: sanitizeEnum(raw.social_icon_style,['round','square','pill','ghost','colored'] as const, 'round'),
+      hover_effect:      sanitizeEnum(raw.hover_effect,     ['none','lift','glow','slide','ripple'] as const, 'lift'),
+      button_width:      sanitizeEnum(raw.button_width,     ['full','auto'] as const, 'full'),
+      spacing:           sanitizeEnum(raw.spacing,          ['compact','normal','spacious'] as const, 'normal'),
+      pattern:           sanitizeEnum(raw.pattern,          ['none','dots','grid','waves','noise','mesh','crosshatch','triangles'] as const, 'none'),
+      hero_height:       sanitizeEnum(raw.hero_height,      ['sm','md','lg','full'] as const, 'md'),
+      hero_position:     sanitizeEnum(raw.hero_position,    ['top','center','bottom'] as const, 'center'),
+      content_width:     sanitizeEnum(raw.content_width,    ['narrow','normal','wide'] as const, 'normal'),
+      bio_size:          sanitizeEnum(raw.bio_size,         ['xs','sm','md','lg'] as const, 'sm'),
+      bio_style:         sanitizeEnum(raw.bio_style,        ['normal','italic'] as const, 'normal'),
     };
   } catch { /* keep defaults */ }
 }
@@ -212,22 +293,17 @@ const profileJson = JSON.stringify({
       <!-- Section navigation -->
       <div class="flex items-center gap-1.5 flex-wrap">
         {[
-          { id: 'presets',    label: 'Presets',    icon: 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z' },
-          { id: 'background', label: 'Fond',       icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
-          { id: 'buttons',    label: 'Boutons',    icon: 'M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5' },
-          { id: 'typography', label: 'Typo',       icon: 'M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129' },
-          { id: 'profile',    label: 'Profil',     icon: 'M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0z' },
-          { id: 'effects',    label: 'Effets',     icon: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' },
-          { id: 'ai',         label: '✦ IA',       icon: '' },
+          { id: 'presets',    label: '🎨 Presets' },
+          { id: 'background', label: '🖼 Fond' },
+          { id: 'buttons',    label: '🔘 Boutons' },
+          { id: 'typography', label: '✍ Typo' },
+          { id: 'profile',    label: '👤 Profil' },
+          { id: 'effects',    label: '✨ Effets' },
+          { id: 'ai',         label: '✦ IA' },
         ].map((sec, i) => (
           <button
             class={`sec-tab flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-white/8 text-gray-500 hover:text-gray-300 hover:border-white/15 ${i === 0 ? 'active' : ''} ${sec.id === 'ai' ? 'text-neon-green/70 border-neon-green/20 hover:border-neon-green/40 hover:text-neon-green' : ''}`}
             data-section={sec.id}>
-            {sec.icon && (
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={sec.icon}/>
-              </svg>
-            )}
             {sec.label}
           </button>
         ))}
@@ -296,6 +372,25 @@ const profileJson = JSON.stringify({
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <!-- Auto palette generator -->
+          <div class="p-3.5 rounded-xl bg-white/3 border border-white/8 space-y-3">
+            <div class="flex items-center justify-between">
+              <p class="text-xs text-gray-400 font-semibold flex items-center gap-1.5">
+                <span>🎨</span> Palettes harmonieuses
+              </p>
+              <button id="gen-palette-btn"
+                class="text-xs text-neon-green hover:text-neon-green/70 transition flex items-center gap-1">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                Générer depuis l'accent
+              </button>
+            </div>
+            <div id="palette-suggestions" class="flex gap-2 flex-wrap">
+              <span class="text-xs text-gray-700">Clique sur "Générer" pour voir des combinaisons</span>
             </div>
           </div>
 
@@ -380,48 +475,85 @@ const profileJson = JSON.stringify({
         </div>
       </div>
 
-      <!-- ── PANEL: BUTTONS ── -->
+      <!-- ══ BUTTONS ══ -->
       <div class="sec-panel" id="panel-buttons">
         <div class="p-5 glass rounded-2xl border border-white/8 space-y-6">
-          <p class="text-sm font-semibold text-white">Styles de boutons</p>
-
-          <!-- 6 button style previews -->
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {[
-              { id:'filled',   label:'Rempli',     desc:'Style classique' },
-              { id:'outline',  label:'Contour',    desc:'Élégant et léger' },
-              { id:'glass',    label:'Glass',      desc:'Effet verre dépoli' },
-              { id:'gradient', label:'Dégradé',    desc:'Dynamique' },
-              { id:'neon',     label:'Néon',       desc:'Glow lumineux' },
-              { id:'minimal',  label:'Minimal',    desc:'Épuré, discret' },
-            ].map(s => (
-              <button
-                class="btn-style-btn p-3.5 glass border-2 border-white/10 rounded-xl hover:border-white/20 transition-all text-left space-y-2.5"
-                data-style={s.id}>
-                <!-- Preview element -->
-                <div id={`btn-preview-${s.id}`} class="w-full h-9 rounded-lg flex items-center justify-center text-xs font-semibold transition-all">
-                  Aperçu
-                </div>
-                <div>
-                  <p class="text-xs text-white font-semibold">{s.label}</p>
-                  <p class="text-xs text-gray-600">{s.desc}</p>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          <!-- Border radius -->
-          <div>
-            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium mb-3">Arrondi des coins</p>
-            <div class="flex gap-2 mb-3 flex-wrap">
-              {[0,4,8,14,20,28,32].map(r => (
-                <button class="radius-btn px-3 py-1.5 glass rounded-xl border-2 border-white/10 text-xs text-gray-400 hover:text-white hover:border-white/20 transition-all font-mono"
-                  data-radius={r}>{r}px</button>
+          <p class="text-sm font-semibold text-white">Boutons & Liens</p>
+ 
+          <!-- 6 styles -->
+          <div class="space-y-3">
+            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Style</p>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {[
+                { id:'filled',   label:'Rempli',   desc:'Classique' },
+                { id:'outline',  label:'Contour',  desc:'Léger et élégant' },
+                { id:'glass',    label:'Glass',    desc:'Verre dépoli' },
+                { id:'gradient', label:'Dégradé',  desc:'Dynamique' },
+                { id:'neon',     label:'Néon',     desc:'Glow lumineux' },
+                { id:'minimal',  label:'Minimal',  desc:'Juste une ligne' },
+              ].map(s => (
+                <button class="choice-btn btn-style-btn p-3.5 glass border-2 border-white/10 rounded-xl hover:border-white/20 transition-all text-left space-y-2" data-style={s.id}>
+                  <div id={`btn-preview-${s.id}`} class="w-full h-9 rounded-lg flex items-center justify-center text-xs font-semibold">Aperçu</div>
+                  <div>
+                    <p class="text-xs text-white font-semibold">{s.label}</p>
+                    <p class="text-xs text-gray-600">{s.desc}</p>
+                  </div>
+                </button>
               ))}
             </div>
-            <input type="range" id="border_radius" min="0" max="32" value={theme.border_radius}
-              class="w-full accent-neon-green h-1.5 rounded-full" />
-            <div class="flex justify-between text-xs text-gray-600 mt-1.5">
+          </div>
+ 
+          <!-- Hover effect -->
+          <div class="space-y-3">
+            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Effet au survol</p>
+            <div class="grid grid-cols-3 sm:grid-cols-5 gap-2">
+              {[
+                { id:'none',   label:'Aucun',  preview:'static' },
+                { id:'lift',   label:'Lift',   preview:'↑' },
+                { id:'glow',   label:'Glow',   preview:'✦' },
+                { id:'slide',  label:'Slide',  preview:'→' },
+                { id:'ripple', label:'Ripple', preview:'◎' },
+              ].map(fx => (
+                <button class="choice-btn hover-fx-btn py-2.5 px-1 glass border-2 border-white/10 rounded-xl text-xs font-medium text-gray-400 hover:text-white transition-all text-center" data-fx={fx.id}>
+                  <div class="text-lg mb-1">{fx.preview}</div>
+                  {fx.label}
+                </button>
+              ))}
+            </div>
+          </div>
+ 
+          <!-- Width -->
+          <div class="space-y-3">
+            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Largeur des boutons</p>
+            <div class="flex gap-2">
+              <button class="choice-btn btn-width-btn flex-1 py-2.5 glass border-2 border-white/10 rounded-xl text-xs font-medium text-gray-400 hover:text-white transition-all" data-bw="full">
+                Pleine largeur <span class="block text-gray-600">━━━━━━</span>
+              </button>
+              <button class="choice-btn btn-width-btn flex-1 py-2.5 glass border-2 border-white/10 rounded-xl text-xs font-medium text-gray-400 hover:text-white transition-all" data-bw="auto">
+                Auto <span class="block text-gray-600">━━</span>
+              </button>
+            </div>
+          </div>
+ 
+          <!-- Shadow intensity -->
+          <div class="space-y-2">
+            <div class="flex justify-between">
+              <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Intensité ombre</p>
+              <span id="shadow-val" class="text-xs font-mono text-white">{theme.shadow_intensity}</span>
+            </div>
+            <input type="range" id="shadow-intensity" min="0" max="5" value={theme.shadow_intensity} class="w-full accent-neon-green h-1.5 rounded-full" />
+          </div>
+ 
+          <!-- Border radius -->
+          <div class="space-y-3">
+            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Arrondi</p>
+            <div class="flex gap-2 flex-wrap">
+              {[0,4,8,14,20,28,32,40].map(r => (
+                <button class="choice-btn radius-btn px-3 py-1.5 glass rounded-xl border-2 border-white/10 text-xs text-gray-400 hover:text-white transition-all font-mono" data-radius={r}>{r}</button>
+              ))}
+            </div>
+            <input type="range" id="border_radius" min="0" max="40" value={theme.border_radius} class="w-full accent-neon-green h-1.5 rounded-full" />
+            <div class="flex justify-between text-xs text-gray-600 -mt-1">
               <span>Carré</span>
               <span id="radius-val" class="text-white font-mono">{theme.border_radius}px</span>
               <span>Pill</span>
@@ -430,30 +562,114 @@ const profileJson = JSON.stringify({
         </div>
       </div>
 
-      <!-- ── PANEL: TYPOGRAPHY ── -->
+      <!-- ══ TYPOGRAPHY ══ -->
       <div class="sec-panel" id="panel-typography">
         <div class="p-5 glass rounded-2xl border border-white/8 space-y-5">
-          <p class="text-sm font-semibold text-white">Police de caractères</p>
-          <div class="grid grid-cols-2 gap-2">
+          <div class="flex items-center justify-between">
+            <p class="text-sm font-semibold text-white">Police de caractères</p>
+            <span class="text-xs text-gray-600">{ALLOWED_FONTS.length} polices disponibles</span>
+          </div>
+ 
+          <!-- Search filter -->
+          <div class="relative">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+            <input type="text" id="font-search" placeholder="Rechercher une police…"
+              class="w-full pl-8 pr-4 py-2.5 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/40 focus:outline-none transition-colors" />
+          </div>
+ 
+          <!-- Category tabs -->
+          <div class="flex gap-1.5 flex-wrap">
             {[
-              { name:'Exo 2',       cat:'Tech / Futuriste' },
-              { name:'Orbitron',    cat:'Sci-Fi / Gaming' },
-              { name:'Rajdhani',    cat:'Moderne / Sharp' },
-              { name:'Bebas Neue',  cat:'Display / Impact' },
-              { name:'Audiowide',   cat:'Électronique' },
-              { name:'Russo One',   cat:'Solide / Bold' },
-              { name:'Quicksand',   cat:'Friendly / Rond' },
-              { name:'Figtree',     cat:'Clean / Lisible' },
-              { name:'DM Sans',     cat:'Neutre / Pro' },
-              { name:'Space Grotesk',cat:'Géométrique' },
+              { id:'all',     label:'Toutes' },
+              { id:'tech',    label:'Tech / Gaming' },
+              { id:'clean',   label:'Clean / Pro' },
+              { id:'serif',   label:'Serif' },
+              { id:'display', label:'Display' },
+              { id:'mono',    label:'Mono' },
+            ].map((c, i) => (
+              <button class={`font-cat-btn px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${i===0?'border-neon-green/40 bg-neon-green/8 text-white':'border-white/10 text-gray-500 hover:text-white hover:border-white/20'}`}
+                data-cat={c.id}>{c.label}</button>
+            ))}
+          </div>
+ 
+          <!-- Font grid -->
+          <div class="grid grid-cols-1 gap-1.5 max-h-64 overflow-y-auto scrollbar-none pr-1" id="font-grid">
+            {[
+              // Tech / Gaming
+              { name:'Exo 2',          cat:'tech',    preview:'Tech / Futuriste' },
+              { name:'Orbitron',       cat:'tech',    preview:'Sci-Fi / Gaming' },
+              { name:'Rajdhani',       cat:'tech',    preview:'Moderne / Sharp' },
+              { name:'Audiowide',      cat:'tech',    preview:'Électronique' },
+              { name:'Russo One',      cat:'tech',    preview:'Solide / Bold' },
+              { name:'Space Grotesk',  cat:'tech',    preview:'Géométrique' },
+              { name:'Bebas Neue',     cat:'display', preview:'Display / Impact' },
+              { name:'Syne',           cat:'tech',    preview:'Éditorial' },
+              // Clean / Pro
+              { name:'DM Sans',        cat:'clean',   preview:'Neutre / Pro' },
+              { name:'Inter',          cat:'clean',   preview:'Universel / App' },
+              { name:'Figtree',        cat:'clean',   preview:'Clean / Lisible' },
+              { name:'Quicksand',      cat:'clean',   preview:'Friendly / Rond' },
+              { name:'Outfit',         cat:'clean',   preview:'Moderne / Clair' },
+              { name:'Plus Jakarta Sans', cat:'clean', preview:'Élégant / Premium' },
+              { name:'Nunito',         cat:'clean',   preview:'Doux / Accessible' },
+              { name:'Poppins',        cat:'clean',   preview:'Startup / App' },
+              { name:'Josefin Sans',   cat:'clean',   preview:'Chic / Fashion' },
+              { name:'Archivo',        cat:'clean',   preview:'Editorial / News' },
+              { name:'Barlow',         cat:'clean',   preview:'Condensed / Sport' },
+              { name:'Rubik',          cat:'clean',   preview:'Playful / Round' },
+              { name:'Work Sans',      cat:'clean',   preview:'Corporate / Clean' },
+              { name:'Manrope',        cat:'clean',   preview:'Moderne / Variable' },
+              // Serif
+              { name:'Playfair Display', cat:'serif', preview:'Luxe / Magazine' },
+              { name:'Lora',           cat:'serif',   preview:'Littéraire / Élégant' },
+              { name:'Merriweather',   cat:'serif',   preview:'Classique / News' },
+              { name:'DM Serif Display', cat:'serif', preview:'Display Serif' },
+              // Display / Bold
+              { name:'Righteous',      cat:'display', preview:'Retro / Fun' },
+              { name:'Teko',           cat:'display', preview:'Compact / Sport' },
+              { name:'Oswald',         cat:'display', preview:'Bold / Impact' },
+              { name:'Anton',          cat:'display', preview:'Headlines / Choc' },
+              { name:'Bungee',         cat:'display', preview:'Street / Urban' },
+              // Mono
+              { name:'Space Mono',     cat:'mono',    preview:'Code / Dev' },
+              { name:'JetBrains Mono', cat:'mono',    preview:'IDE / Tech' },
+              { name:'Fira Code',      cat:'mono',    preview:'Code / Élégant' },
+              // Cabinet Grotesk toutes catégories
+              { name:'Cabinet Grotesk', cat:'clean',  preview:'Premium / Unique' },
             ].map(f => (
               <button
-                class="font-btn flex items-center justify-between px-3 py-3 glass border-2 border-white/10 rounded-xl hover:border-white/20 transition-all"
-                data-font={f.name}>
-                <span class="text-sm text-white font-medium" style={`font-family:'${f.name}',sans-serif`}>{f.name}</span>
-                <span class="text-xs text-gray-600">{f.cat}</span>
+                class="choice-btn font-btn font-item flex items-center justify-between px-3 py-2.5 glass border-2 border-white/8 rounded-xl hover:border-white/20 transition-all"
+                data-font={f.name} data-font-cat={f.cat}>
+                <span class="text-sm text-white" style={`font-family:'${f.name}',sans-serif`}>{f.name}</span>
+                <span class="text-xs text-gray-600 truncate max-w-[120px]">{f.preview}</span>
               </button>
             ))}
+          </div>
+ 
+          <!-- Custom font (Pro) -->
+          <div class="pt-4 border-t border-white/8 space-y-3">
+            <div class="flex items-center gap-2">
+              <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Police personnalisée</p>
+              <span class="badge-pro">⚡ Pro</span>
+            </div>
+            <p class="text-xs text-gray-600">Importe n'importe quelle police Google Fonts ou via URL CSS.</p>
+            <div class="space-y-2">
+              <input type="url" id="custom-font-url"
+                value={theme.custom_font_url}
+                placeholder="https://fonts.googleapis.com/css2?family=MaPolice…"
+                class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-purple-500/40 focus:outline-none transition-colors"
+                data-premium="pro" />
+              <input type="text" id="custom-font-name"
+                value={theme.custom_font_name}
+                placeholder="Nom de la police (ex: MaPolice)"
+                class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-purple-500/40 focus:outline-none transition-colors"
+                data-premium="pro" />
+              <button id="apply-custom-font"
+                class="w-full py-2.5 rounded-xl text-sm font-semibold transition-all bg-purple-500/15 border border-purple-500/30 text-purple-300 hover:bg-purple-500/25"
+                data-premium="pro">
+                Appliquer cette police →
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -518,37 +734,67 @@ const profileJson = JSON.stringify({
         </div>
       </div>
 
-      <!-- ── PANEL: EFFECTS ── -->
+      <!-- ══ EFFECTS ══ -->
       <div class="sec-panel" id="panel-effects">
-        <div class="p-5 glass rounded-2xl border border-white/8 space-y-5">
-          <p class="text-sm font-semibold text-white">Effets d'animation</p>
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-            {[
-              { id:'none',    label:'Aucun',      icon:'⊘',  desc:'Statique' },
-              { id:'fade',    label:'Fade In',    icon:'◐',  desc:'Apparition douce' },
-              { id:'slide',   label:'Slide Up',   icon:'↑',  desc:'Glissement bas→haut' },
-              { id:'bounce',  label:'Bounce',     icon:'◉',  desc:'Rebond élastique' },
-              { id:'stagger', label:'Stagger',    icon:'≡',  desc:'Décalé ligne par ligne' },
-            ].map(a => (
-              <button class="anim-btn flex flex-col gap-2 p-3.5 glass border-2 border-white/10 rounded-xl hover:border-white/20 transition-all text-left"
-                data-anim={a.id}>
-                <span class="text-2xl leading-none">{a.icon}</span>
-                <div>
-                  <p class="text-xs text-white font-semibold">{a.label}</p>
-                  <p class="text-xs text-gray-600">{a.desc}</p>
-                </div>
-              </button>
-            ))}
+        <div class="p-5 glass rounded-2xl border border-white/8 space-y-6">
+          <p class="text-sm font-semibold text-white">Animations & Effets</p>
+ 
+          <!-- Animation preset -->
+          <div class="space-y-3">
+            <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Animation d'entrée</p>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {[
+                { id:'none',    label:'Aucune',   icon:'⊘', desc:'Statique' },
+                { id:'fade',    label:'Fade In',  icon:'◐', desc:'Apparition douce' },
+                { id:'slide',   label:'Slide Up', icon:'↑', desc:'Bas → haut' },
+                { id:'bounce',  label:'Bounce',   icon:'◉', desc:'Rebond élastique' },
+                { id:'stagger', label:'Stagger',  icon:'≡', desc:'Décalé bloc par bloc' },
+              ].map(a => (
+                <button class="choice-btn anim-btn flex flex-col gap-2 p-3.5 glass border-2 border-white/10 rounded-xl hover:border-white/20 transition-all text-left" data-anim={a.id}>
+                  <span class="text-2xl leading-none">{a.icon}</span>
+                  <div>
+                    <p class="text-xs text-white font-semibold">{a.label}</p>
+                    <p class="text-xs text-gray-600">{a.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
-
-          <!-- Glass intensity (only when blur selected) -->
-          <div id="glass-wrap" class="hidden">
-            <div class="flex justify-between items-center mb-2">
-              <label class="text-xs text-gray-500 uppercase tracking-widest font-medium">Intensité glass</label>
+ 
+          <!-- Hover scale intensity -->
+          <div class="space-y-2">
+            <div class="flex justify-between">
+              <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Intensité hover</p>
+              <span id="hover-scale-val" class="text-xs font-mono text-white">{theme.hover_scale}/5</span>
+            </div>
+            <input type="range" id="hover-scale" min="0" max="5" value={theme.hover_scale} class="w-full accent-neon-green h-1.5 rounded-full" />
+          </div>
+ 
+          <!-- Glass intensity -->
+          <div class="space-y-2">
+            <div class="flex justify-between">
+              <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Intensité glass (fond blur)</p>
               <span id="glass-val" class="text-xs font-mono text-white">{theme.glass_intensity}</span>
             </div>
-            <input type="range" id="glass_intensity" min="4" max="32" value={theme.glass_intensity}
-              class="w-full accent-neon-green h-1.5 rounded-full" />
+            <input type="range" id="glass_intensity" min="4" max="32" value={theme.glass_intensity} class="w-full accent-neon-green h-1.5 rounded-full" />
+          </div>
+ 
+          <!-- Toggles -->
+          <div class="space-y-2">
+            {[
+              { id:'animations',    label:'Animations activées',  sub:'Désactive tout d\'un coup', checked: theme.animations },
+              { id:'scroll_reveal', label:'Révélation au scroll', sub:'Blocs apparaissent en scrollant', checked: theme.scroll_reveal ?? true },
+              { id:'click_ripple',  label:'Effet ripple au clic', sub:'Onde circulaire sur les boutons', checked: theme.click_ripple ?? false },
+            ].map(opt => (
+              <label class="flex items-center justify-between p-3.5 glass rounded-xl cursor-pointer hover:bg-white/3 border border-white/5 transition-all">
+                <div>
+                  <span class="text-sm text-gray-300 font-medium block">{opt.label}</span>
+                  <span class="text-xs text-gray-600">{opt.sub}</span>
+                </div>
+                <input type="checkbox" id={opt.id} checked={opt.checked}
+                  class="toggle w-11 h-6 rounded-full appearance-none bg-white/10 relative cursor-pointer focus:outline-none" />
+              </label>
+            ))}
           </div>
         </div>
       </div>
