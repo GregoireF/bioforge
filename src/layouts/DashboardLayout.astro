@@ -31,7 +31,7 @@ try {
 } catch {}
 
 // ── Plan helpers ───────────────────────────────────────────────────────────────
-const PAID_PLANS   = ['Creator', 'Pro', 'Enterprise'];
+const PAID_PLANS   = ['Pro', 'Business', 'Enterprise'];
 const plan         = profile?.plan ?? 'Free';
 const isPaid       = PAID_PLANS.includes(plan);
 const isBasicOrFree = !isPaid;
@@ -58,6 +58,30 @@ const chatContext = JSON.stringify({
   plan,
   isPaid,
 });
+
+// ── Completion score ──────────────────────────────────────────────────────────
+type CompletionStep = { id: string; label: string; href: string; done: boolean };
+const completionSteps: CompletionStep[] = [
+  { id:'avatar',   label:'Photo de profil',        href:'/dashboard/settings', done: !!profile?.avatar_url },
+  { id:'bio',      label:'Bio renseignée',          href:'/dashboard/settings', done: !!(profile?.bio && profile.bio.length > 5) },
+  { id:'username', label:'Pseudo personnalisé',     href:'/dashboard/settings', done: !!(profile?.username && !profile.username.startsWith('user_')) },
+  { id:'theme',    label:'Apparence configurée',    href:'/dashboard/appearance', done: !!(profile?.theme && typeof profile.theme === 'object') },
+  { id:'links',    label:'3 liens ajoutés',         href:'/dashboard/blocks', done: false }, // resolved client-side via API
+];
+const completionDone  = completionSteps.filter(s => s.done).length;
+const completionTotal = completionSteps.length;
+const completionPct   = Math.round((completionDone / completionTotal) * 100);
+const completionFull  = completionDone === completionTotal;
+
+// ── Changelog entries ─────────────────────────────────────────────────────────
+const CHANGELOG = [
+  { date: 'Jan 2025', badge: '🆕', title: 'Mode Hero Photo',      desc: 'Affiche ta photo en pleine largeur avec fondu cinématique.', isNew: true },
+  { date: 'Jan 2025', badge: '🎨', title: '35+ nouvelles polices', desc: 'Tech, Serif, Display, Mono — Cabinet Grotesk et plus.', isNew: true },
+  { date: 'Jan 2025', badge: '🔗', title: 'Raccourcisseur de liens', desc: 'bioforge.click/s/xxx avec UTM et stats.', isNew: false },
+  { date: 'Jan 2025', badge: '📊', title: 'Analytics avancées',   desc: 'Heatmaps, rétention, taux de clic par bloc.', isNew: false },
+  { date: 'Déc 2024', badge: '✦',  title: 'Palettes auto-gen',    desc: 'Génère des palettes harmonieuses depuis ta couleur accent.', isNew: false },
+];
+const newCount = CHANGELOG.filter(c => c.isNew).length;
 
 // ── Navigation items ───────────────────────────────────────────────────────────
 const NAV_MAIN = [
@@ -341,6 +365,48 @@ function navClass(href: string, exact: boolean): string {
     </div>
   )}
 
+    <!-- Profile completion bar -->
+    {!completionFull && (
+      <div id="completion-bar"
+        class="hidden lg:flex items-center gap-4 px-6 py-2 shrink-0"
+        style="background:rgba(255,255,255,0.02);border-bottom:1px solid rgba(255,255,255,0.06)">
+        <!-- Label -->
+        <div class="flex items-center gap-2 shrink-0">
+          <div class="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
+            style="background:rgba(0,255,157,0.12);border:1px solid rgba(0,255,157,0.2)">
+            <svg class="w-2.5 h-2.5 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+            </svg>
+          </div>
+          <span class="text-xs font-semibold text-white/60 whitespace-nowrap">Profil <span class="text-white font-bold">{completionPct}%</span> complet</span>
+        </div>
+        <!-- Progress track -->
+        <div class="flex-1 h-1.5 rounded-full overflow-hidden" style="background:rgba(255,255,255,0.08);max-width:160px">
+          <div class="h-full rounded-full transition-all duration-700"
+            style={`width:${completionPct}%;background:linear-gradient(90deg,#00ff9d,#00cc7a)`}></div>
+        </div>
+        <!-- Steps chips -->
+        <div class="flex items-center gap-1.5 flex-1 overflow-hidden">
+          {completionSteps.filter(s => !s.done).slice(0, 3).map(step => (
+            <a href={step.href}
+              class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium shrink-0 transition-all"
+              style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.5)"
+              onmouseover="this.style.background='rgba(255,255,255,0.09)';this.style.color='#fff'"
+              onmouseout="this.style.background='rgba(255,255,255,0.05)';this.style.color='rgba(255,255,255,0.5)'">
+              <svg class="w-2.5 h-2.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+              </svg>
+              {step.label}
+            </a>
+          ))}
+        </div>
+        <!-- Dismiss -->
+        <button id="completion-dismiss"
+          class="shrink-0 text-white/20 hover:text-white/50 transition-colors text-xs"
+          aria-label="Masquer">✕</button>
+      </div>
+    )}
+
     <!-- Top Bar -->
     <header class="h-14 lg:h-16 glass-strong border-b border-white/10 flex items-center justify-between px-4 lg:px-6 shrink-0 gap-3">
 
@@ -378,16 +444,47 @@ function navClass(href: string, exact: boolean): string {
 
         {profile?.username && (
           <a href={`/@${profile.username}`} target="_blank"
-            class="hidden lg:flex items-center gap-1.5 px-3 py-1.5 glass border border-white/10 rounded-lg hover:border-white/20 transition-all text-xs text-gray-400 hover:text-white">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+            class="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+            style="background:rgba(0,255,157,0.08);border:1px solid rgba(0,255,157,0.2);color:#00ff9d"
+            onmouseover="this.style.background='rgba(0,255,157,0.14)'" onmouseout="this.style.background='rgba(0,255,157,0.08)'">
+            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
             </svg>
-            View profile
+            Mon profil
           </a>
         )}
 
+        <!-- Changelog bell -->
+        <button id="changelog-btn"
+          class="relative hidden lg:flex items-center justify-center w-8 h-8 rounded-lg glass border border-white/10 hover:border-white/20 transition-all text-gray-400 hover:text-white"
+          aria-label="Quoi de neuf">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+          </svg>
+          {newCount > 0 && (
+            <span class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-neon-green text-black text-[9px] font-bold flex items-center justify-center">{newCount}</span>
+          )}
+        </button>
+
+        <!-- Usage indicator (Free only) -->
         {!isPaid && (
-          <a href="/dashboard/#"
+          <div id="usage-indicator"
+            class="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-default"
+            style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08)"
+            title="Blocs utilisés sur ton plan Free">
+            <div id="usage-track" class="flex items-center gap-1">
+              <!-- populated by JS -->
+            </div>
+            <span id="usage-label" class="text-[11px] font-medium text-white/40">— / — blocs</span>
+            <a href="/dashboard/billing"
+              class="text-[11px] font-bold text-neon-green hover:underline transition-all ml-0.5"
+              style="white-space:nowrap">↑ Plus</a>
+          </div>
+        )}
+
+        {!isPaid && (
+          <a href="/dashboard/billing"
             class="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-neon-green/10 border border-neon-green/25 rounded-lg text-xs font-semibold text-neon-green hover:bg-neon-green/20 transition-all">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
@@ -532,6 +629,66 @@ function navClass(href: string, exact: boolean): string {
     <span class="text-xs font-medium">More</span>
   </button>
 </nav>
+
+<!-- ══ CHANGELOG PANEL ═══════════════════════════════════════════════════════ -->
+<div id="changelog-panel"
+  style="display:none;position:fixed;top:60px;right:16px;z-index:9970;width:340px;
+    background:linear-gradient(160deg,#0e1317,#090c0f);
+    border:1px solid rgba(255,255,255,0.09);border-top:1px solid rgba(255,255,255,0.14);
+    border-radius:20px;overflow:hidden;
+    box-shadow:0 32px 64px rgba(0,0,0,0.6),0 0 0 1px rgba(0,0,0,0.4);
+    opacity:0;transform:translateY(-8px) scale(0.97);
+    transition:opacity 0.25s ease,transform 0.25s cubic-bezier(0.22,1,0.36,1)">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px 12px;border-bottom:1px solid rgba(255,255,255,0.06)">
+    <div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+        <span style="font-family:'Cabinet Grotesk',system-ui;font-size:14px;font-weight:900;color:#fff;letter-spacing:-0.02em">Quoi de neuf ✦</span>
+        {newCount > 0 && (
+          <span style="font-size:10px;font-weight:800;background:#00ff9d;color:#000;padding:2px 8px;border-radius:99px">{newCount} new</span>
+        )}
+      </div>
+      <p style="font-size:11px;color:rgba(255,255,255,0.3)">Dernières mises à jour BioForge</p>
+    </div>
+    <button id="changelog-close"
+      style="width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgba(255,255,255,0.4);font-size:11px;transition:all 0.15s"
+      onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">✕</button>
+  </div>
+
+  <!-- Entries -->
+  <div style="max-height:320px;overflow-y:auto;padding:8px 8px 4px">
+    {CHANGELOG.map(entry => (
+      <div style="padding:10px 12px;border-radius:12px;margin-bottom:2px;transition:background 0.15s;cursor:default"
+        onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background='transparent'">
+        <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">
+          <span style="font-size:15px;line-height:1;flex-shrink:0">{entry.badge}</span>
+          <span style="font-family:'Cabinet Grotesk',system-ui;font-size:13px;font-weight:800;color:#fff;letter-spacing:-0.01em;flex:1">{entry.title}</span>
+          {entry.isNew && (
+            <span style="font-size:9px;font-weight:800;background:rgba(0,255,157,0.12);color:#00ff9d;border:1px solid rgba(0,255,157,0.22);padding:2px 6px;border-radius:99px;letter-spacing:0.05em;text-transform:uppercase;flex-shrink:0">NEW</span>
+          )}
+        </div>
+        <p style="font-size:12px;color:rgba(255,255,255,0.4);line-height:1.55;padding-left:22px">{entry.desc}</p>
+        <span style="font-size:10px;color:rgba(255,255,255,0.2);padding-left:22px;display:block;margin-top:3px">{entry.date}</span>
+      </div>
+    ))}
+  </div>
+
+  <!-- Footer -->
+  <div style="padding:11px 18px;border-top:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:space-between">
+    <a href="/dashboard/roadmap"
+      style="font-size:12px;color:#00ff9d;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:5px;transition:opacity 0.2s"
+      onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">
+      <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
+      Voir la roadmap
+    </a>
+    <a href="/dashboard/roadmap"
+      style="font-size:11px;color:rgba(255,255,255,0.3);text-decoration:none;font-weight:500;transition:color 0.2s"
+      onmouseover="this.style.color='rgba(255,255,255,0.6)'" onmouseout="this.style.color='rgba(255,255,255,0.3)'">
+      💡 Suggérer une feature
+    </a>
+  </div>
+</div>
 
 <!-- V4 Features -->
 <CommandPalette />
@@ -1032,6 +1189,141 @@ function navClass(href: string, exact: boolean): string {
         sessionStorage.setItem('bf_promo_dismissed', '1');
       });
     }
+  })();
+</script>
+
+<script>
+  /* ══ CHANGELOG ══════════════════════════════════════════════════════════════ */
+  (function () {
+    var btn    = document.getElementById('changelog-btn');
+    var panel  = document.getElementById('changelog-panel');
+    var close  = document.getElementById('changelog-close');
+    if (!btn || !panel) return;
+
+    var open = false;
+
+    function openPanel() {
+      open = true;
+      panel.style.display = 'block';
+      requestAnimationFrame(function () {
+        panel.style.opacity   = '1';
+        panel.style.transform = 'translateY(0) scale(1)';
+      });
+      // Mark as seen
+      localStorage.setItem('bf_changelog_seen', 'true');
+      var badge = btn.querySelector('span');
+      if (badge) badge.remove();
+    }
+
+    function closePanel() {
+      open = false;
+      panel.style.opacity   = '0';
+      panel.style.transform = 'translateY(-8px) scale(0.97)';
+      setTimeout(function () { panel.style.display = 'none'; }, 260);
+    }
+
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      open ? closePanel() : openPanel();
+    });
+    if (close) close.addEventListener('click', closePanel);
+
+    document.addEventListener('click', function (e) {
+      if (open && !panel.contains(e.target) && e.target !== btn) closePanel();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && open) closePanel();
+    });
+
+    // Hide badge if already seen
+    if (localStorage.getItem('bf_changelog_seen')) {
+      var badge = btn.querySelector('span');
+      if (badge) badge.style.display = 'none';
+    }
+  })();
+
+  /* ══ COMPLETION BAR ═════════════════════════════════════════════════════════ */
+  (function () {
+    var bar     = document.getElementById('completion-bar');
+    var dismiss = document.getElementById('completion-dismiss');
+    if (!bar) return;
+
+    if (sessionStorage.getItem('bf_completion_dismissed')) {
+      bar.style.display = 'none';
+      return;
+    }
+
+    if (dismiss) {
+      dismiss.addEventListener('click', function () {
+        bar.style.height  = '0';
+        bar.style.opacity = '0';
+        bar.style.overflow = 'hidden';
+        bar.style.transition = 'height 0.3s ease, opacity 0.2s ease';
+        setTimeout(function () { bar.style.display = 'none'; }, 320);
+        sessionStorage.setItem('bf_completion_dismissed', '1');
+      });
+    }
+
+    // Check block count via API and update the "3 liens" step
+    fetch('/api/blocks?count=1')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var count = d.data?.total ?? d.data?.count ?? 0;
+        if (count >= 3) {
+          // All chips might need refreshing — soft approach: just update if visible
+          var chips = bar.querySelectorAll('a');
+          chips.forEach(function (chip) {
+            if (chip.textContent.includes('3 liens')) {
+              chip.style.display = 'none';
+            }
+          });
+        }
+      })
+      .catch(function () {/* silent */});
+  })();
+
+  /* ══ USAGE INDICATOR ════════════════════════════════════════════════════════ */
+  (function () {
+    var wrap  = document.getElementById('usage-indicator');
+    var track = document.getElementById('usage-track');
+    var label = document.getElementById('usage-label');
+    if (!wrap || !track || !label) return;
+
+    var FREE_LIMIT = 5;
+
+    fetch('/api/blocks?count=1')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var used = d.data?.total ?? d.data?.count ?? 0;
+        var pct  = Math.min(used / FREE_LIMIT, 1);
+        var isWarning = pct >= 0.8;
+        var isFull    = pct >= 1;
+
+        // Mini segmented bar (5 dots)
+        track.innerHTML = '';
+        for (var i = 0; i < FREE_LIMIT; i++) {
+          var dot = document.createElement('div');
+          dot.style.cssText = 'width:6px;height:6px;border-radius:2px;transition:background 0.3s;background:' +
+            (i < used
+              ? (isFull ? '#ff5050' : isWarning ? '#ffaa00' : '#00ff9d')
+              : 'rgba(255,255,255,0.1)');
+          track.appendChild(dot);
+        }
+
+        label.textContent = used + '/' + FREE_LIMIT + ' blocs';
+        label.style.color = isFull ? '#ff5050' : isWarning ? '#ffaa00' : 'rgba(255,255,255,0.4)';
+
+        if (isFull) {
+          wrap.style.borderColor = 'rgba(255,80,80,0.25)';
+          wrap.style.background  = 'rgba(255,80,80,0.04)';
+        } else if (isWarning) {
+          wrap.style.borderColor = 'rgba(255,170,0,0.25)';
+          wrap.style.background  = 'rgba(255,170,0,0.04)';
+        }
+      })
+      .catch(function () {
+        wrap.style.display = 'none';
+      });
   })();
 </script>
 
