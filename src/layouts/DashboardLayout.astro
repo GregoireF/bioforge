@@ -31,7 +31,7 @@ try {
 } catch {}
 
 // ── Plan helpers ───────────────────────────────────────────────────────────────
-const PAID_PLANS   = ['Pro', 'Business', 'Enterprise'];
+const PAID_PLANS   = ['Creator', 'Pro', 'Enterprise'];
 const plan         = profile?.plan ?? 'Free';
 const isPaid       = PAID_PLANS.includes(plan);
 const isBasicOrFree = !isPaid;
@@ -252,6 +252,94 @@ function navClass(href: string, exact: boolean): string {
 
   <!-- ===== MAIN CONTENT ===== -->
   <div class="flex-1 flex flex-col min-w-0">
+
+  <!-- ===== TOP PROMO BANNER ===== -->
+  {!isPaid && (
+    <div id="promo-banner"
+      style="position:relative;z-index:40;height:36px;overflow:hidden;flex-shrink:0;background:linear-gradient(90deg,rgba(0,255,157,0.06) 0%,rgba(0,0,0,0) 50%,rgba(0,255,157,0.06) 100%);border-bottom:1px solid rgba(0,255,157,0.12)"
+    >
+      <!-- Rotating messages track -->
+      <div id="promo-track" style="display:flex;height:100%;align-items:center;justify-content:center;gap:0">
+        <!-- Each message — JS will show one at a time -->
+        <div class="promo-msg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;opacity:0;transform:translateY(8px);transition:opacity 0.5s ease,transform 0.5s ease">
+          <span style="font-size:11px;font-weight:500;color:rgba(255,255,255,0.55)">
+            ✦ Passe à Pro et débloque les <strong style="color:#fff;font-weight:700">wallpapers, polices custom</strong> et le <strong style="color:#fff;font-weight:700">mode Hero</strong>
+          </span>
+          <a href="/dashboard/billing"
+            style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;background:#00ff9d;color:#000;border-radius:99px;font-size:11px;font-weight:800;font-family:'Cabinet Grotesk',system-ui,sans-serif;text-decoration:none;transition:all 0.2s;white-space:nowrap;flex-shrink:0"
+            onmouseover="this.style.background='#20ffaa'" onmouseout="this.style.background='#00ff9d'"
+          >
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            Upgrader
+          </a>
+        </div>
+
+        <div class="promo-msg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;opacity:0;transform:translateY(8px);transition:opacity 0.5s ease,transform 0.5s ease">
+          <span style="font-size:11px;font-weight:500;color:rgba(255,255,255,0.55)">
+            📊 Pro : analytics <strong style="color:#fff;font-weight:700">avancées</strong>, rétention, provenance et <strong style="color:#fff;font-weight:700">heatmaps</strong> — dès <strong style="color:#fff;font-weight:700">7€/mois</strong>
+          </span>
+          <a href="/dashboard/billing"
+            style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;background:#00ff9d;color:#000;border-radius:99px;font-size:11px;font-weight:800;font-family:'Cabinet Grotesk',system-ui,sans-serif;text-decoration:none;transition:all 0.2s;white-space:nowrap;flex-shrink:0"
+            onmouseover="this.style.background='#20ffaa'" onmouseout="this.style.background='#00ff9d'"
+          >
+            Voir les plans →
+          </a>
+        </div>
+
+        <div class="promo-msg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;opacity:0;transform:translateY(8px);transition:opacity 0.5s ease,transform 0.5s ease">
+          <span style="font-size:11px;font-weight:500;color:rgba(255,255,255,0.55)">
+            🎨 <strong style="color:#fff;font-weight:700">35+ polices</strong>, dégradés, presets exclusifs et CSS personnalisé en Pro
+          </span>
+          <a href="/dashboard/appearance"
+            style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border:1px solid rgba(0,255,157,0.35);color:#00ff9d;border-radius:99px;font-size:11px;font-weight:700;font-family:'Cabinet Grotesk',system-ui,sans-serif;text-decoration:none;transition:all 0.2s;white-space:nowrap;flex-shrink:0;background:rgba(0,255,157,0.07)"
+            onmouseover="this.style.background='rgba(0,255,157,0.14)'" onmouseout="this.style.background='rgba(0,255,157,0.07)'"
+          >
+            Tester l'Aperçu
+          </a>
+        </div>
+
+        <div class="promo-msg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;opacity:0;transform:translateY(8px);transition:opacity 0.5s ease,transform 0.5s ease">
+          <span style="font-size:11px;font-weight:500;color:rgba(255,255,255,0.55)">
+            🔗 Raccourcisseur de liens, planificateur social et <strong style="color:#fff;font-weight:700">intégrations</strong> débloqués en Creator
+          </span>
+          <a href="/dashboard/billing"
+            style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;background:#00ff9d;color:#000;border-radius:99px;font-size:11px;font-weight:800;font-family:'Cabinet Grotesk',system-ui,sans-serif;text-decoration:none;transition:all 0.2s;white-space:nowrap;flex-shrink:0"
+            onmouseover="this.style.background='#20ffaa'" onmouseout="this.style.background='#00ff9d'"
+          >
+            Passer Creator
+          </a>
+        </div>
+
+        <div class="promo-msg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;opacity:0;transform:translateY(8px);transition:opacity 0.5s ease,transform 0.5s ease">
+          <span style="font-size:11px;font-weight:500;color:rgba(255,255,255,0.55)">
+            ⚡ <strong style="color:#fff;font-weight:700">Essai gratuit 7 jours</strong> — accès complet à toutes les fonctionnalités Pro, sans CB
+          </span>
+          <a href="/dashboard/billing"
+            style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;background:linear-gradient(135deg,#00ff9d,#00cc7a);color:#000;border-radius:99px;font-size:11px;font-weight:800;font-family:'Cabinet Grotesk',system-ui,sans-serif;text-decoration:none;transition:all 0.2s;white-space:nowrap;flex-shrink:0;box-shadow:0 2px 10px rgba(0,255,157,0.25)"
+            onmouseover="this.style.boxShadow='0 4px 16px rgba(0,255,157,0.4)'" onmouseout="this.style.boxShadow='0 2px 10px rgba(0,255,157,0.25)'"
+          >
+            Démarrer l'essai ✦
+          </a>
+        </div>
+      </div>
+
+      <!-- Progress dots -->
+      <div id="promo-dots" style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);display:flex;gap:4px">
+        <div class="pdot" style="width:14px;height:2px;border-radius:1px;background:#00ff9d;transition:all 0.3s ease"></div>
+        <div class="pdot" style="width:4px;height:2px;border-radius:1px;background:rgba(255,255,255,0.2);transition:all 0.3s ease"></div>
+        <div class="pdot" style="width:4px;height:2px;border-radius:1px;background:rgba(255,255,255,0.2);transition:all 0.3s ease"></div>
+        <div class="pdot" style="width:4px;height:2px;border-radius:1px;background:rgba(255,255,255,0.2);transition:all 0.3s ease"></div>
+        <div class="pdot" style="width:4px;height:2px;border-radius:1px;background:rgba(255,255,255,0.2);transition:all 0.3s ease"></div>
+      </div>
+
+      <!-- Dismiss -->
+      <button id="promo-dismiss"
+        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:20px;height:20px;border-radius:6px;background:none;border:none;color:rgba(255,255,255,0.25);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;transition:color 0.15s"
+        onmouseover="this.style.color='rgba(255,255,255,0.6)'" onmouseout="this.style.color='rgba(255,255,255,0.25)'"
+        aria-label="Fermer"
+      >✕</button>
+    </div>
+  )}
 
     <!-- Top Bar -->
     <header class="h-14 lg:h-16 glass-strong border-b border-white/10 flex items-center justify-between px-4 lg:px-6 shrink-0 gap-3">
@@ -888,5 +976,64 @@ function navClass(href: string, exact: boolean): string {
     window.addEventListener('load', function() { setTimeout(initAdsense, 400); });
   }
 </script>
+
+<script>
+  (function() {
+    var banner  = document.getElementById('promo-banner');
+    var dismiss = document.getElementById('promo-dismiss');
+    var msgs    = document.querySelectorAll('.promo-msg');
+    var dots    = document.querySelectorAll('.pdot');
+    if (!banner || !msgs.length) return;
+
+    // Check dismissed
+    if (sessionStorage.getItem('bf_promo_dismissed')) {
+      banner.style.display = 'none';
+      return;
+    }
+
+    var current = 0;
+    var interval = null;
+
+    function show(idx) {
+      msgs.forEach(function(m, i) {
+        m.style.opacity = i === idx ? '1' : '0';
+        m.style.transform = i === idx ? 'translateY(0)' : 'translateY(8px)';
+      });
+      dots.forEach(function(d, i) {
+        d.style.width    = i === idx ? '14px' : '4px';
+        d.style.background = i === idx ? '#00ff9d' : 'rgba(255,255,255,0.2)';
+      });
+      current = idx;
+    }
+
+    function next() {
+      show((current + 1) % msgs.length);
+    }
+
+    // Show first message after 300ms
+    setTimeout(function() { show(0); }, 300);
+
+    // Rotate every 5 seconds
+    interval = setInterval(next, 5000);
+
+    // Pause on hover
+    banner.addEventListener('mouseenter', function() { clearInterval(interval); });
+    banner.addEventListener('mouseleave', function() { interval = setInterval(next, 5000); });
+
+    // Dismiss
+    if (dismiss) {
+      dismiss.addEventListener('click', function() {
+        banner.style.height = '0';
+        banner.style.opacity = '0';
+        banner.style.overflow = 'hidden';
+        banner.style.transition = 'height 0.3s ease, opacity 0.3s ease';
+        clearInterval(interval);
+        setTimeout(function() { banner.style.display = 'none'; }, 320);
+        sessionStorage.setItem('bf_promo_dismissed', '1');
+      });
+    }
+  })();
+</script>
+
 </body>
 </html>
