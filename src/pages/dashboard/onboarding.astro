@@ -4,668 +4,787 @@ import { withAuth } from '@/lib/auth/auth';
 
 const authResult = await withAuth({ cookies: Astro.cookies, request: Astro.request });
 if (!authResult.success || !authResult.data) return Astro.redirect('/signin');
-const { user, profile } = authResult.data;
+const { profile } = authResult.data;
 
 if ((profile as any)?.onboarding_completed_at) return Astro.redirect('/dashboard');
 
-const avatarUrl       = profile?.avatar_url    ?? '';
-const existingName    = profile?.display_name  ?? '';
+const avatarUrl        = profile?.avatar_url    ?? '';
+const existingName     = profile?.display_name  ?? '';
 const existingUsername = (profile as any)?.username ?? '';
 ---
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" class="h-full">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>BioForge — Bienvenue</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <link href="https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@400;500;700;800;900&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet"/>
-  <style>
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    :root{
-      --g:#00ff9d;--g2:#00cc7a;--glow:rgba(0,255,157,.15);
-      --bg:#070809;--s1:#0c0e10;--s2:#111416;
-      --bd:rgba(255,255,255,.07);--bd2:rgba(255,255,255,.13);
-      --text:#fff;--muted:rgba(255,255,255,.45);--dim:rgba(255,255,255,.2);
-      --err:#ff5050;--r:14px;
-    }
-    html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;overflow:hidden}
-    body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.04;
-      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-      background-size:200px}
-
-    /* ══ LAYOUT ═════════════════════════════════════════════════════════ */
-    .wrap{position:relative;z-index:1;display:flex;flex-direction:column;height:100vh}
-    @media(min-width:1024px){.wrap{flex-direction:row}}
-
-    /* ── Topbar ── */
-    .topbar{
-      position:fixed;top:0;left:0;right:0;z-index:100;
-      display:flex;align-items:center;justify-content:space-between;
-      padding:18px 28px;
-      background:rgba(7,8,9,.9);backdrop-filter:blur(16px);
-      border-bottom:1px solid var(--bd);
-    }
-    .logo{display:flex;align-items:center;gap:9px;text-decoration:none}
-    .logo-mark{width:30px;height:30px;border-radius:8px;background:var(--g);display:grid;place-items:center}
-    .logo-mark svg{width:15px;height:15px}
-    .logo-name{font-family:'Cabinet Grotesk',sans-serif;font-weight:800;font-size:16px;color:var(--text)}
-    .step-dots{display:flex;align-items:center;gap:5px}
-    .sd{width:6px;height:6px;border-radius:50%;background:var(--bd2);transition:all .3s ease}
-    .sd.done{background:var(--g2);width:18px;border-radius:3px}
-    .sd.active{background:var(--g);box-shadow:0 0 7px var(--g)}
-
-    /* ── Main left ── */
-    .main{
-      flex:1;overflow-y:auto;padding:88px 24px 60px;
-      display:flex;flex-direction:column;justify-content:center;
-    }
-    @media(min-width:600px){.main{padding:88px 64px 60px}}
-    @media(min-width:1024px){.main{padding:88px 80px 60px;max-width:620px}}
-    .inner{max-width:460px;width:100%;margin:0 auto}
-    @media(min-width:1024px){.inner{margin:0}}
-
-    /* ── Panels ── */
-    .panel{display:none;animation:sIn .38s cubic-bezier(.22,1,.36,1) both}
-    .panel.active{display:block}
-    .panel.leaving{animation:sOut .2s ease forwards;pointer-events:none}
-    @keyframes sIn{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
-    @keyframes sOut{to{opacity:0;transform:translateX(-28px)}}
-
-    .eyebrow{
-      font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
-      color:var(--g);margin-bottom:14px;display:flex;align-items:center;gap:8px;
-    }
-    .eyebrow::before{content:'';width:14px;height:1.5px;background:var(--g);border-radius:1px;display:block}
-
-    h1{
-      font-family:'Cabinet Grotesk',sans-serif;
-      font-size:clamp(30px,5.5vw,50px);font-weight:900;
-      line-height:.98;letter-spacing:-.03em;margin-bottom:10px;
-    }
-    h1 em{font-style:normal;color:var(--g);display:block}
-    .sub{font-size:15px;color:var(--muted);line-height:1.65;margin-bottom:32px}
-    .sub strong{color:rgba(255,255,255,.7);font-weight:500}
-
-    /* back btn */
-    .back{
-      display:inline-flex;align-items:center;gap:7px;background:none;border:none;
-      padding:0;color:var(--muted);font-size:13px;cursor:pointer;
-      margin-bottom:28px;transition:color .2s;font-family:'DM Sans',sans-serif;
-    }
-    .back:hover{color:var(--text)}
-
-    /* ── Fields ── */
-    .field{margin-bottom:18px}
-    .flabel{
-      font-size:11.5px;font-weight:700;letter-spacing:.05em;color:var(--dim);
-      display:flex;align-items:center;justify-content:space-between;
-      margin-bottom:7px;text-transform:uppercase;
-    }
-    .fw{position:relative}
-    .fpfx{position:absolute;left:15px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none}
-    input.fi,textarea.fi{
-      width:100%;padding:13px 44px 13px 14px;
-      background:var(--s1);border:1.5px solid var(--bd);border-radius:var(--r);
-      color:var(--text);font-size:15px;font-family:'DM Sans',sans-serif;
-      outline:none;transition:border-color .2s,background .2s,box-shadow .2s;
-    }
-    input.fi.pfx{padding-left:36px}
-    input.fi:focus,textarea.fi:focus{
-      border-color:rgba(0,255,157,.4);background:rgba(0,255,157,.025);
-      box-shadow:0 0 0 3px rgba(0,255,157,.07);
-    }
-    input.fi.ok{border-color:var(--g)}
-    input.fi.bad{border-color:var(--err)}
-    input.fi::placeholder,textarea.fi::placeholder{color:rgba(255,255,255,.17)}
-    textarea.fi{resize:none;padding-top:13px}
-    .ficon{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:14px}
-    .fmsg{font-size:12px;color:var(--muted);margin-top:5px;min-height:17px;transition:color .2s}
-    .fmsg.ok{color:var(--g)}.fmsg.bad{color:var(--err)}
-    .fmsg.spin::after{content:'';animation:pulse .8s ease-in-out infinite alternate;display:inline-block;width:24px;height:2px;background:var(--muted);border-radius:1px;vertical-align:middle;margin-left:6px}
-    @keyframes pulse{from{opacity:.3}to{opacity:1}}
-    .cc{text-align:right;font-size:11px;color:var(--dim);margin-top:3px}
-
-    /* CTA */
-    .cta{
-      width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
-      padding:14px 24px;background:var(--g);color:#000;
-      font-family:'Cabinet Grotesk',sans-serif;font-size:14px;font-weight:800;
-      border:none;border-radius:var(--r);cursor:pointer;margin-top:8px;
-      transition:transform .18s,box-shadow .18s,background .18s,opacity .18s;
-      letter-spacing:.02em;
-    }
-    .cta:hover:not(:disabled){background:#1affa8;transform:translateY(-2px);box-shadow:0 10px 28px rgba(0,255,157,.22)}
-    .cta:active:not(:disabled){transform:scale(.98)}
-    .cta:disabled{opacity:.35;cursor:not-allowed}
-    .cta .arr{transition:transform .2s}
-    .cta:hover:not(:disabled) .arr{transform:translateX(4px)}
-
-    /* Presets */
-    .presets{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:24px}
-    .pc{position:relative;border:1.5px solid var(--bd);border-radius:16px;padding:15px 13px 13px;cursor:pointer;transition:all .2s;background:none;text-align:left;overflow:hidden}
-    .pc:hover{border-color:var(--bd2);transform:translateY(-1px)}
-    .pc.sel{border-color:var(--g)!important;box-shadow:0 0 0 1px var(--g),0 6px 20px rgba(0,255,157,.08)}
-    .pc .ck{position:absolute;top:9px;right:9px;width:17px;height:17px;border-radius:50%;background:var(--g);display:none;place-items:center}
-    .pc.sel .ck{display:grid}
-    .psw{height:42px;border-radius:9px;margin-bottom:9px;position:relative}
-    .pd2{position:absolute;bottom:7px;right:7px;width:9px;height:9px;border-radius:50%}
-    .pn{font-family:'Cabinet Grotesk',sans-serif;font-size:13px;font-weight:800;color:var(--text)}
-    .pd{font-size:11px;color:var(--muted);margin-top:1px}
-
-    /* Usage grid */
-    .ugrid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:22px}
-    .ub{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;background:var(--s1);border:1.5px solid var(--bd);color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;text-align:left;font-family:'DM Sans',sans-serif}
-    .ub:hover{border-color:var(--bd2);color:var(--text)}
-    .ub.sel{border-color:var(--g);background:rgba(0,255,157,.05);color:var(--g)}
-    .uico{font-size:15px;flex-shrink:0}
-
-    /* Source chips */
-    .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:22px}
-    .chip{padding:6px 13px;border-radius:99px;background:var(--s1);border:1.5px solid var(--bd);color:var(--muted);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif}
-    .chip:hover{border-color:var(--bd2);color:var(--text)}
-    .chip.sel{border-color:var(--g);color:var(--g);background:rgba(0,255,157,.05)}
-
-    /* NPS */
-    .npsrow{display:flex;gap:4px}
-    .nb{flex:1;height:38px;border-radius:9px;background:var(--s1);border:1.5px solid var(--bd);color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif}
-    .nb:hover{border-color:var(--bd2);color:var(--text)}
-    .nb.sel{background:var(--g);border-color:var(--g);color:#000;transform:scale(1.06);box-shadow:0 4px 12px rgba(0,255,157,.25)}
-
-    /* Done */
-    .done-icon{width:68px;height:68px;border-radius:50%;background:rgba(0,255,157,.08);border:2px solid var(--g);display:grid;place-items:center;font-size:28px;margin-bottom:24px;animation:pop .5s cubic-bezier(.34,1.56,.64,1) both}
-    @keyframes pop{from{transform:scale(0) rotate(-12deg);opacity:0}to{transform:scale(1);opacity:1}}
-    .dactions{display:flex;flex-direction:column;gap:9px;margin-top:28px}
-    .dlink{display:flex;align-items:center;justify-content:space-between;padding:12px 17px;border-radius:var(--r);font-size:14px;font-weight:600;border:1.5px solid var(--bd);color:var(--text);text-decoration:none;cursor:pointer;background:none;width:100%;text-align:left;transition:all .2s}
-    .dlink:hover{border-color:var(--bd2);transform:translateX(2px)}
-    .dlink.prim{background:var(--g);color:#000;border-color:transparent}
-    .dlink.prim:hover{background:#1affa8;transform:translateY(-1px)}
-
-    /* ══ PREVIEW PANEL ════════════════════════════════════════════════════ */
-    .aside{display:none}
-    @media(min-width:1024px){
-      .aside{
-        display:flex;flex-direction:column;align-items:center;justify-content:center;
-        width:380px;flex-shrink:0;border-left:1px solid var(--bd);
-        background:var(--s1);padding:88px 28px 40px;position:relative;overflow:hidden;
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            green: { DEFAULT: '#00ff9d', dark: '#00cc7a', glow: 'rgba(0,255,157,0.15)' },
+            surface: { 1: '#0c0e11', 2: '#141719', 3: '#1c1f23' },
+            ink: { 1: 'rgba(255,255,255,0.9)', 2: 'rgba(255,255,255,0.55)', 3: 'rgba(255,255,255,0.25)', 4: 'rgba(255,255,255,0.08)' }
+          },
+          fontFamily: { display: ['Cabinet Grotesk','system-ui','sans-serif'], body: ['DM Sans','system-ui','sans-serif'] },
+          keyframes: {
+            'slide-up': { '0%': { opacity:'0', transform:'translateY(20px)' }, '100%': { opacity:'1', transform:'translateY(0)' } },
+            'fade-in':  { '0%': { opacity:'0' }, '100%': { opacity:'1' } },
+            'step-in':  { '0%': { opacity:'0', transform:'translateX(24px)' }, '100%': { opacity:'1', transform:'translateX(0)' } },
+            'step-out': { '0%': { opacity:'1', transform:'translateX(0)' }, '100%': { opacity:'0', transform:'translateX(-24px)' } },
+            'pulse-dot':{ '0%,100%':{ boxShadow:'0 0 0 0 rgba(0,255,157,0.5)' }, '50%':{ boxShadow:'0 0 0 6px rgba(0,255,157,0)' } },
+            'shimmer':  { '0%':{ backgroundPosition:'200% 0' }, '100%':{ backgroundPosition:'-200% 0' } },
+            'pop':      { '0%':{ transform:'scale(0) rotate(-12deg)', opacity:'0' }, '60%':{ transform:'scale(1.12) rotate(2deg)' }, '100%':{ transform:'scale(1) rotate(0)', opacity:'1' } },
+            'confetti-fall': { 'to':{ transform:'translateY(110vh) rotate(720deg)', opacity:'0' } },
+          },
+          animation: {
+            'slide-up':    'slide-up 0.5s cubic-bezier(0.22,1,0.36,1) both',
+            'fade-in':     'fade-in 0.4s ease both',
+            'step-in':     'step-in 0.35s cubic-bezier(0.22,1,0.36,1) both',
+            'step-out':    'step-out 0.2s ease forwards',
+            'pulse-dot':   'pulse-dot 2s ease-in-out infinite',
+            'shimmer':     'shimmer 2s linear infinite',
+            'pop':         'pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both',
+            'confetti-fall':'confetti-fall linear forwards',
+          },
+          backgroundImage: {
+            'noise': "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E\")",
+          }
+        }
       }
     }
-    /* Ambient glow */
-    .aside::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 60%,rgba(0,255,157,.06) 0%,transparent 70%);pointer-events:none}
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@500;700;800;900&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet"/>
+  <style>
+    *{ -webkit-font-smoothing: antialiased }
+    body{ font-family: 'DM Sans', sans-serif; background: #080a0d }
+    .font-display{ font-family: 'Cabinet Grotesk', sans-serif }
 
-    .aside-lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:22px;font-weight:600;position:relative;z-index:1}
+    /* Panels */
+    .panel { display: none }
+    .panel.active { display: block }
+    .panel.leaving { animation: step-out 0.2s ease forwards; pointer-events: none }
 
-    /* Phone */
-    .phone{width:230px;border-radius:34px;border:1.5px solid var(--bd2);overflow:hidden;position:relative;z-index:1;
-      box-shadow:0 40px 80px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.07)}
-    .notch{height:26px;display:flex;align-items:center;justify-content:center;background:var(--bg)}
-    .notch-pill{width:56px;height:5px;background:rgba(255,255,255,.12);border-radius:3px}
-    .pbody{padding:18px 13px 22px;display:flex;flex-direction:column;align-items:center;min-height:380px;transition:background .5s}
-    .pav{width:56px;height:56px;border-radius:50%;overflow:hidden;margin-bottom:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:800;border:2px solid;transition:border-color .4s,background .4s,color .4s}
-    .pav img{width:100%;height:100%;object-fit:cover}
-    .pname{font-family:'Cabinet Grotesk',sans-serif;font-size:14px;font-weight:900;color:#fff;margin-bottom:2px;text-align:center;letter-spacing:-.02em;transition:all .3s}
-    .phdl{font-size:10px;color:rgba(255,255,255,.36);margin-bottom:5px}
-    .pbio{font-size:10px;color:rgba(255,255,255,.48);text-align:center;line-height:1.5;margin-bottom:14px;max-width:180px;min-height:12px;transition:all .3s}
-    .plinks{width:100%;display:flex;flex-direction:column;gap:6px}
-    .plink{width:100%;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;transition:background .4s,color .4s,border-color .4s;font-family:'Cabinet Grotesk',sans-serif}
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 4px }
+    ::-webkit-scrollbar-track { background: transparent }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px }
 
-    /* URL pill */
-    .url-pill{
-      position:relative;z-index:1;margin-top:18px;
-      display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:99px;
-      background:rgba(0,255,157,.07);border:1px solid rgba(0,255,157,.18);
-      font-size:11.5px;font-weight:600;color:var(--g);font-family:'DM Sans',sans-serif;
-      transition:all .3s;
+    /* Input focus ring */
+    .inp:focus { outline: none; border-color: rgba(0,255,157,0.45); background: rgba(0,255,157,0.025); box-shadow: 0 0 0 3px rgba(0,255,157,0.07) }
+    .inp.ok    { border-color: #00ff9d }
+    .inp.bad   { border-color: #ff5050 }
+
+    /* Preset card selected ring */
+    .preset.selected { border-color: #00ff9d; box-shadow: 0 0 0 1px #00ff9d, 0 8px 24px rgba(0,255,157,0.12) }
+
+    /* Usage btn */
+    .ubtn.selected { border-color: #00ff9d; background: rgba(0,255,157,0.07); color: #00ff9d }
+
+    /* Chip */
+    .chip.selected { border-color: #00ff9d; background: rgba(0,255,157,0.07); color: #00ff9d }
+
+    /* NPS */
+    .nps.selected { background: #00ff9d; border-color: #00ff9d; color: #000; transform: scale(1.08); box-shadow: 0 4px 14px rgba(0,255,157,0.3) }
+
+    /* Step dot active */
+    .sdot.active { background: #00ff9d; animation: pulse-dot 2s ease-in-out infinite }
+    .sdot.done   { background: #00cc7a; width: 20px; border-radius: 4px }
+
+    /* Shimmer loader */
+    .checking {
+      background: linear-gradient(90deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.05) 100%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s linear infinite;
     }
-    .url-pill .grey{color:var(--muted);font-weight:400}
 
-    /* Confetti */
-    .cf{position:fixed;width:6px;height:6px;border-radius:2px;top:-10px;animation:cff linear forwards;pointer-events:none;z-index:999}
-    @keyframes cff{to{transform:translateY(110vh) rotate(720deg);opacity:0}}
+    /* Phone glow */
+    .phone-glow { transition: box-shadow 0.4s ease }
+    .phone-glow:hover { box-shadow: 0 0 60px rgba(0,255,157,0.12), 0 40px 80px rgba(0,0,0,0.6) }
 
-    /* Toast */
-    #toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);background:#160000;border:1px solid rgba(255,80,80,.25);color:#ff8080;padding:10px 20px;border-radius:12px;font-size:13px;z-index:999;display:none;white-space:nowrap}
-    #toast.show{display:block;animation:tin .3s ease}
-    @keyframes tin{from{opacity:0;transform:translateX(-50%) translateY(6px)}}
+    /* CTA hover arrow */
+    .cta-arrow { transition: transform 0.2s ease }
+    button:not(:disabled):hover .cta-arrow { transform: translateX(4px) }
   </style>
 </head>
-<body>
-<div class="wrap">
 
-  <!-- ── Topbar ── -->
-  <header class="topbar">
-    <a href="/" class="logo">
-      <div class="logo-mark">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+<body class="h-full overflow-hidden bg-noise">
+
+<!-- ══ ROOT ══════════════════════════════════════════════════════════════ -->
+<div class="flex flex-col h-full lg:flex-row">
+
+  <!-- ── Topbar (mobile) / Sidebar top (desktop) ── -->
+  <header class="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4
+    bg-[#080a0d]/90 backdrop-blur-xl border-b border-white/[0.06] lg:hidden">
+    <a href="/" class="flex items-center gap-2.5 text-white no-underline">
+      <div class="w-8 h-8 bg-[#00ff9d] rounded-[9px] grid place-items-center flex-shrink-0">
+        <svg width="15" height="15" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
       </div>
-      <span class="logo-name">BioForge</span>
+      <span class="font-display font-extrabold text-[15px]">BioForge</span>
     </a>
-    <div class="step-dots" id="sdots">
-      <div class="sd active" id="d0"></div>
-      <div class="sd" id="d1"></div>
-      <div class="sd" id="d2"></div>
-      <div class="sd" id="d3"></div>
+    <!-- Mobile step dots -->
+    <div class="flex items-center gap-1.5" id="sdots-mobile">
+      <div class="sdot h-1.5 rounded-full bg-white/10 transition-all duration-300" style="width:6px" id="dm0"></div>
+      <div class="sdot h-1.5 rounded-full bg-white/10 transition-all duration-300" style="width:6px" id="dm1"></div>
+      <div class="sdot h-1.5 rounded-full bg-white/10 transition-all duration-300" style="width:6px" id="dm2"></div>
+      <div class="sdot h-1.5 rounded-full bg-white/10 transition-all duration-300" style="width:6px" id="dm3"></div>
     </div>
   </header>
 
-  <!-- ── Main left ── -->
-  <main class="main">
-    <div class="inner">
+  <!-- ══ LEFT — Form area ══════════════════════════════════════════════ -->
+  <main class="flex-1 overflow-y-auto pt-20 pb-16 px-6 flex flex-col justify-center
+    lg:pt-0 lg:px-0 lg:max-w-[640px]">
 
-      <!-- ══ P0 — Username ══ -->
-      <div class="panel active" id="p0">
-        <div class="eyebrow">Étape 1 sur 4</div>
-        <h1>Ton adresse<em>sur le web</em></h1>
-        <p class="sub">Visible dans ton URL : <strong>bioforge.click/@toi</strong></p>
-        <div class="field">
-          <label class="flabel" for="ui">Pseudo</label>
-          <div class="fw">
-            <span class="fpfx">@</span>
-            <input type="text" id="ui" class="fi pfx" placeholder="pseudo" maxlength="24" autocomplete="off" autocapitalize="off" spellcheck="false"/>
-            <span class="ficon" id="uic"></span>
-          </div>
-          <p class="fmsg" id="um">3 à 24 caractères — lettres, chiffres, _</p>
+    <!-- Desktop logo — inside the form column -->
+    <div class="hidden lg:flex items-center gap-3 px-14 pt-10 pb-0 mb-auto">
+      <a href="/" class="flex items-center gap-2.5 text-white no-underline">
+        <div class="w-8 h-8 bg-[#00ff9d] rounded-[9px] grid place-items-center flex-shrink-0">
+          <svg width="15" height="15" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
         </div>
-        <button class="cta" id="cta0" disabled>
-          Continuer <svg class="arr" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 12h14M12 5l7 7-7 7"/></svg>
-        </button>
-      </div>
-
-      <!-- ══ P1 — Profile ══ -->
-      <div class="panel" id="p1">
-        <button class="back" id="back1">
-          <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 12H5M12 5l-7 7 7 7"/></svg>Retour
-        </button>
-        <div class="eyebrow">Étape 2 sur 4</div>
-        <h1>Qui es-<em>tu ?</em></h1>
-        <p class="sub">Un nom et une bio mémorables font toute la différence.</p>
-        <div class="field">
-          <label class="flabel" for="ni">Nom affiché</label>
-          <div class="fw"><input type="text" id="ni" class="fi" placeholder="Ton nom ou pseudonyme" maxlength="80"/></div>
-        </div>
-        <div class="field">
-          <label class="flabel">Bio <span style="font-weight:400;text-transform:none;color:var(--dim)">optionnel</span></label>
-          <div class="fw"><textarea id="bi" class="fi" rows="3" maxlength="160" placeholder="Créateur · Dev · Humain 🌱"></textarea></div>
-          <div class="cc"><span id="bc">0</span>/160</div>
-        </div>
-        <button class="cta" id="cta1">
-          Continuer <svg class="arr" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 12h14M12 5l7 7-7 7"/></svg>
-        </button>
-      </div>
-
-      <!-- ══ P2 — Style ══ -->
-      <div class="panel" id="p2">
-        <button class="back" id="back2">
-          <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 12H5M12 5l-7 7 7 7"/></svg>Retour
-        </button>
-        <div class="eyebrow">Étape 3 sur 4</div>
-        <h1>Ton<em>identité visuelle</em></h1>
-        <p class="sub">Un point de départ — tout est modifiable ensuite depuis Apparence.</p>
-        <div class="presets">
-          <button class="pc sel" data-p="dark">
-            <div class="ck"><svg width="8" height="8" fill="none" stroke="#000" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3.5" d="M5 13l4 4L19 7"/></svg></div>
-            <div class="psw" style="background:linear-gradient(135deg,#0a0a0a,#0f1f15)"><div class="pd2" style="background:#00ff9d"></div></div>
-            <div class="pn">Dark</div><div class="pd">Sombre · Néon</div>
-          </button>
-          <button class="pc" data-p="neon">
-            <div class="ck"><svg width="8" height="8" fill="none" stroke="#000" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3.5" d="M5 13l4 4L19 7"/></svg></div>
-            <div class="psw" style="background:linear-gradient(135deg,#1a0033,#0d001a)"><div class="pd2" style="background:#bf00ff"></div></div>
-            <div class="pn">Neon</div><div class="pd">Violet · Électrique</div>
-          </button>
-          <button class="pc" data-p="ocean">
-            <div class="ck"><svg width="8" height="8" fill="none" stroke="#000" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3.5" d="M5 13l4 4L19 7"/></svg></div>
-            <div class="psw" style="background:linear-gradient(135deg,#001a33,#002244)"><div class="pd2" style="background:#00d4ff"></div></div>
-            <div class="pn">Ocean</div><div class="pd">Bleu · Profond</div>
-          </button>
-          <button class="pc" data-p="light">
-            <div class="ck"><svg width="8" height="8" fill="none" stroke="#000" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3.5" d="M5 13l4 4L19 7"/></svg></div>
-            <div class="psw" style="background:linear-gradient(135deg,#f0f0f0,#e8f0ff)"><div class="pd2" style="background:#0066ff"></div></div>
-            <div class="pn">Light</div><div class="pd">Clair · Épuré</div>
-          </button>
-        </div>
-        <button class="cta" id="cta2">
-          Continuer <svg class="arr" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 12h14M12 5l7 7-7 7"/></svg>
-        </button>
-      </div>
-
-      <!-- ══ P3 — Feedback ══ -->
-      <div class="panel" id="p3">
-        <button class="back" id="back3">
-          <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 12H5M12 5l-7 7 7 7"/></svg>Retour
-        </button>
-        <div class="eyebrow">Étape 4 sur 4</div>
-        <h1>Aide-nous à<em>progresser</em></h1>
-        <p class="sub">30 secondes — vraiment utile pour construire ce qu'il te faut.</p>
-
-        <p class="flabel" style="margin-bottom:10px">Tu utilises BioForge pour…</p>
-        <div class="ugrid">
-          <button class="ub" data-u="creator"><span class="uico">🎥</span>Créateur</button>
-          <button class="ub" data-u="dev"><span class="uico">💻</span>Dev / Tech</button>
-          <button class="ub" data-u="brand"><span class="uico">🏢</span>Marque</button>
-          <button class="ub" data-u="artist"><span class="uico">🎨</span>Artiste</button>
-          <button class="ub" data-u="free"><span class="uico">🚀</span>Freelance</button>
-          <button class="ub" data-u="other"><span class="uico">✨</span>Autre</button>
-        </div>
-
-        <p class="flabel" style="margin-bottom:9px">Tu as découvert BioForge via…</p>
-        <div class="chips">
-          <button class="chip" data-s="social">Réseaux sociaux</button>
-          <button class="chip" data-s="friend">Bouche à oreille</button>
-          <button class="chip" data-s="search">Google</button>
-          <button class="chip" data-s="ph">Product Hunt</button>
-          <button class="chip" data-s="ad">Pub</button>
-          <button class="chip" data-s="other">Autre</button>
-        </div>
-
-        <div style="margin-bottom:16px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
-            <p class="flabel" style="margin-bottom:0">Première impression</p>
-            <span id="nps-lbl" style="font-size:12px;color:var(--muted)">noter de 0 à 10</span>
-          </div>
-          <div class="npsrow">
-            <button class="nb" data-n="0">0</button><button class="nb" data-n="1">1</button>
-            <button class="nb" data-n="2">2</button><button class="nb" data-n="3">3</button>
-            <button class="nb" data-n="4">4</button><button class="nb" data-n="5">5</button>
-            <button class="nb" data-n="6">6</button><button class="nb" data-n="7">7</button>
-            <button class="nb" data-n="8">8</button><button class="nb" data-n="9">9</button>
-            <button class="nb" data-n="10">10</button>
-          </div>
-          <div style="display:flex;justify-content:space-between;margin-top:5px">
-            <span style="font-size:10px;color:var(--dim)">Pas convaincu</span>
-            <span style="font-size:10px;color:var(--dim)">Excellent 🔥</span>
-          </div>
-        </div>
-
-        <div class="field">
-          <label class="flabel">Un mot <span style="font-weight:400;text-transform:none;color:var(--dim)">optionnel</span></label>
-          <div class="fw"><textarea id="fbi" class="fi" rows="2" maxlength="500" placeholder="Ce que tu attends, une idée…"></textarea></div>
-          <div class="cc"><span id="fbc">0</span>/500</div>
-        </div>
-
-        <button class="cta" id="cta-sub">
-          <span id="sub-txt">Créer mon profil ✦</span>
-          <svg class="arr" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 12h14M12 5l7 7-7 7"/></svg>
-        </button>
-        <p style="text-align:center;font-size:12px;color:var(--dim);margin-top:11px">Tu peux passer — ça prend vraiment 20 secondes 🙏</p>
-      </div>
-
-      <!-- ══ DONE ══ -->
-      <div class="panel" id="pdone">
-        <div class="done-icon">✦</div>
-        <div class="eyebrow">Bienvenue sur BioForge !</div>
-        <h1>Ton profil<em>est prêt</em></h1>
-        <p class="sub">Tout est en place. Ajoute tes premiers liens et partage ton URL.</p>
-        <div class="dactions">
-          <a id="done-href" href="#" class="dlink prim" target="_blank">Voir mon profil <span>→</span></a>
-          <a href="/dashboard" class="dlink">Aller au dashboard <span style="opacity:.35">→</span></a>
-          <a href="/dashboard/appearance" class="dlink">Personnaliser l'apparence <span style="opacity:.35">→</span></a>
-        </div>
-      </div>
-
+        <span class="font-display font-extrabold text-[15px]">BioForge</span>
+      </a>
     </div>
+
+    <div class="flex-1 flex flex-col justify-center lg:px-14">
+
+      <!-- Step dots desktop -->
+      <div class="hidden lg:flex items-center gap-2 mb-12" id="sdots-desktop">
+        <div class="sdot h-1.5 rounded-full bg-white/10 transition-all duration-300" style="width:6px" id="dd0"></div>
+        <div class="sdot h-1.5 rounded-full bg-white/10 transition-all duration-300" style="width:6px" id="dd1"></div>
+        <div class="sdot h-1.5 rounded-full bg-white/10 transition-all duration-300" style="width:6px" id="dd2"></div>
+        <div class="sdot h-1.5 rounded-full bg-white/10 transition-all duration-300" style="width:6px" id="dd3"></div>
+      </div>
+
+      <!-- ══ PANEL 0 — Username ══ -->
+      <div class="panel active animate-step-in" id="p0">
+        <p class="text-[11px] font-bold tracking-[0.12em] uppercase text-[#00ff9d] mb-4 flex items-center gap-2">
+          <span class="block w-4 h-px bg-[#00ff9d]"></span>Étape 1 sur 4
+        </p>
+        <h1 class="font-display font-black text-[clamp(32px,6vw,52px)] leading-[0.96] tracking-[-0.03em] mb-3">
+          Ton adresse<br/><em class="not-italic text-[#00ff9d]">sur le web</em>
+        </h1>
+        <p class="text-[15px] text-white/50 leading-relaxed mb-8">
+          Visible dans ton URL&nbsp;: <span class="text-white/80 font-medium">bioforge.click/@toi</span>
+        </p>
+
+        <!-- Username field -->
+        <div class="mb-6">
+          <label class="block text-[11px] font-bold tracking-[0.08em] uppercase text-white/35 mb-2" for="ui">
+            Pseudo
+          </label>
+          <div class="relative">
+            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-white/35 font-medium text-[15px] pointer-events-none select-none">@</span>
+            <input
+              type="text" id="ui" maxlength="24"
+              autocomplete="off" autocapitalize="off" spellcheck="false"
+              placeholder="tonsuperpseudo"
+              class="inp w-full bg-[#0c0e11] border border-white/[0.09] rounded-xl
+                pl-8 pr-11 py-3.5 text-[15px] text-white placeholder-white/20
+                transition-all duration-200 focus:outline-none"
+            />
+            <span id="u-icon" class="absolute right-4 top-1/2 -translate-y-1/2 text-sm transition-all duration-200"></span>
+          </div>
+          <p id="u-msg" class="text-[12px] text-white/35 mt-2 min-h-[18px] transition-colors duration-200">
+            3 à 24 caractères — lettres, chiffres, _
+          </p>
+        </div>
+
+        <button id="cta0" disabled
+          class="group w-full flex items-center justify-center gap-2.5
+            bg-[#00ff9d] text-black font-display font-extrabold text-[14px] tracking-[0.01em]
+            py-3.5 rounded-xl transition-all duration-200
+            hover:bg-[#1affa8] hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(0,255,157,0.22)]
+            active:scale-[0.98] disabled:opacity-35 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none">
+          Continuer
+          <svg class="cta-arrow w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <!-- ══ PANEL 1 — Profile ══ -->
+      <div class="panel" id="p1">
+        <button id="back1" class="flex items-center gap-1.5 text-white/40 hover:text-white text-[13px] mb-7 transition-colors group">
+          <svg class="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          Retour
+        </button>
+        <p class="text-[11px] font-bold tracking-[0.12em] uppercase text-[#00ff9d] mb-4 flex items-center gap-2">
+          <span class="block w-4 h-px bg-[#00ff9d]"></span>Étape 2 sur 4
+        </p>
+        <h1 class="font-display font-black text-[clamp(32px,6vw,52px)] leading-[0.96] tracking-[-0.03em] mb-3">
+          Qui es-<em class="not-italic text-[#00ff9d]">tu ?</em>
+        </h1>
+        <p class="text-[15px] text-white/50 leading-relaxed mb-8">
+          Un nom mémorable et une bio percutante font toute la différence.
+        </p>
+
+        <div class="space-y-4 mb-6">
+          <div>
+            <label class="block text-[11px] font-bold tracking-[0.08em] uppercase text-white/35 mb-2" for="ni">Nom affiché</label>
+            <input type="text" id="ni" maxlength="80" placeholder="Ton nom ou pseudonyme"
+              class="inp w-full bg-[#0c0e11] border border-white/[0.09] rounded-xl px-4 py-3.5 text-[15px] text-white placeholder-white/20 transition-all duration-200"/>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label class="text-[11px] font-bold tracking-[0.08em] uppercase text-white/35" for="bi">Bio</label>
+              <span class="text-[11px] text-white/25"><span id="bc">0</span>/160</span>
+            </div>
+            <textarea id="bi" maxlength="160" rows="3" placeholder="Créateur · Dev · Humain 🌱"
+              class="inp w-full bg-[#0c0e11] border border-white/[0.09] rounded-xl px-4 py-3.5 text-[15px] text-white placeholder-white/20 resize-none transition-all duration-200 focus:outline-none"></textarea>
+          </div>
+        </div>
+
+        <button id="cta1"
+          class="group w-full flex items-center justify-center gap-2.5
+            bg-[#00ff9d] text-black font-display font-extrabold text-[14px] tracking-[0.01em]
+            py-3.5 rounded-xl transition-all duration-200
+            hover:bg-[#1affa8] hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(0,255,157,0.22)]
+            active:scale-[0.98]">
+          Continuer
+          <svg class="cta-arrow w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <!-- ══ PANEL 2 — Style ══ -->
+      <div class="panel" id="p2">
+        <button id="back2" class="flex items-center gap-1.5 text-white/40 hover:text-white text-[13px] mb-7 transition-colors group">
+          <svg class="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          Retour
+        </button>
+        <p class="text-[11px] font-bold tracking-[0.12em] uppercase text-[#00ff9d] mb-4 flex items-center gap-2">
+          <span class="block w-4 h-px bg-[#00ff9d]"></span>Étape 3 sur 4
+        </p>
+        <h1 class="font-display font-black text-[clamp(32px,6vw,52px)] leading-[0.96] tracking-[-0.03em] mb-3">
+          Ton<em class="not-italic text-[#00ff9d]">identité visuelle</em>
+        </h1>
+        <p class="text-[15px] text-white/50 leading-relaxed mb-8">
+          Un point de départ — tout est modifiable depuis Apparence.
+        </p>
+
+        <div class="grid grid-cols-2 gap-3 mb-6">
+          <button class="preset selected text-left border border-white/[0.09] rounded-2xl p-4 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 relative group" data-p="dark">
+            <div class="absolute top-2.5 right-2.5 w-4 h-4 bg-[#00ff9d] rounded-full hidden group-[.selected]:grid place-items-center">
+              <svg width="8" height="8" fill="none" stroke="#000" stroke-width="3.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div class="h-10 rounded-lg mb-3 relative overflow-hidden" style="background:linear-gradient(135deg,#0a0a0a,#0f1f15)">
+              <div class="absolute bottom-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-[#00ff9d]"></div>
+            </div>
+            <div class="font-display font-bold text-[13px] text-white">Dark</div>
+            <div class="text-[11px] text-white/40 mt-0.5">Sombre · Néon</div>
+          </button>
+          <button class="preset text-left border border-white/[0.09] rounded-2xl p-4 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 relative group" data-p="neon">
+            <div class="absolute top-2.5 right-2.5 w-4 h-4 bg-[#00ff9d] rounded-full hidden group-[.selected]:grid place-items-center">
+              <svg width="8" height="8" fill="none" stroke="#000" stroke-width="3.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div class="h-10 rounded-lg mb-3 relative overflow-hidden" style="background:linear-gradient(135deg,#1a0033,#0d001a)">
+              <div class="absolute bottom-1.5 right-1.5 w-2.5 h-2.5 rounded-full" style="background:#bf00ff"></div>
+            </div>
+            <div class="font-display font-bold text-[13px] text-white">Neon</div>
+            <div class="text-[11px] text-white/40 mt-0.5">Violet · Électrique</div>
+          </button>
+          <button class="preset text-left border border-white/[0.09] rounded-2xl p-4 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 relative group" data-p="ocean">
+            <div class="absolute top-2.5 right-2.5 w-4 h-4 bg-[#00ff9d] rounded-full hidden group-[.selected]:grid place-items-center">
+              <svg width="8" height="8" fill="none" stroke="#000" stroke-width="3.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div class="h-10 rounded-lg mb-3 relative overflow-hidden" style="background:linear-gradient(135deg,#001a33,#002244)">
+              <div class="absolute bottom-1.5 right-1.5 w-2.5 h-2.5 rounded-full" style="background:#00d4ff"></div>
+            </div>
+            <div class="font-display font-bold text-[13px] text-white">Ocean</div>
+            <div class="text-[11px] text-white/40 mt-0.5">Bleu · Profond</div>
+          </button>
+          <button class="preset text-left border border-white/[0.09] rounded-2xl p-4 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 relative group" data-p="light">
+            <div class="absolute top-2.5 right-2.5 w-4 h-4 bg-[#00ff9d] rounded-full hidden group-[.selected]:grid place-items-center">
+              <svg width="8" height="8" fill="none" stroke="#000" stroke-width="3.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <div class="h-10 rounded-lg mb-3 relative overflow-hidden" style="background:linear-gradient(135deg,#f0f0f0,#e8f0ff)">
+              <div class="absolute bottom-1.5 right-1.5 w-2.5 h-2.5 rounded-full" style="background:#0066ff"></div>
+            </div>
+            <div class="font-display font-bold text-[13px] text-white">Light</div>
+            <div class="text-[11px] text-white/40 mt-0.5">Clair · Épuré</div>
+          </button>
+        </div>
+
+        <button id="cta2"
+          class="group w-full flex items-center justify-center gap-2.5
+            bg-[#00ff9d] text-black font-display font-extrabold text-[14px] tracking-[0.01em]
+            py-3.5 rounded-xl transition-all duration-200
+            hover:bg-[#1affa8] hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(0,255,157,0.22)]
+            active:scale-[0.98]">
+          Continuer
+          <svg class="cta-arrow w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+
+      <!-- ══ PANEL 3 — Feedback ══ -->
+      <div class="panel" id="p3">
+        <button id="back3" class="flex items-center gap-1.5 text-white/40 hover:text-white text-[13px] mb-7 transition-colors group">
+          <svg class="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          Retour
+        </button>
+        <p class="text-[11px] font-bold tracking-[0.12em] uppercase text-[#00ff9d] mb-4 flex items-center gap-2">
+          <span class="block w-4 h-px bg-[#00ff9d]"></span>Étape 4 sur 4
+        </p>
+        <h1 class="font-display font-black text-[clamp(28px,5vw,44px)] leading-[0.96] tracking-[-0.03em] mb-3">
+          Aide-nous à<em class="not-italic text-[#00ff9d]">progresser</em>
+        </h1>
+        <p class="text-[15px] text-white/50 leading-relaxed mb-7">30 sec · ça fait vraiment la différence pour nous 🙏</p>
+
+        <!-- Usage -->
+        <p class="text-[11px] font-bold tracking-[0.08em] uppercase text-white/35 mb-2.5">Tu utilises BioForge pour…</p>
+        <div class="grid grid-cols-2 gap-2 mb-6">
+          <button class="ubtn flex items-center gap-2.5 border border-white/[0.09] rounded-xl px-3.5 py-2.5 text-[13px] text-white/50 font-medium transition-all duration-150 hover:text-white hover:border-white/20 text-left" data-u="creator"><span class="text-base">🎥</span>Créateur</button>
+          <button class="ubtn flex items-center gap-2.5 border border-white/[0.09] rounded-xl px-3.5 py-2.5 text-[13px] text-white/50 font-medium transition-all duration-150 hover:text-white hover:border-white/20 text-left" data-u="dev"><span class="text-base">💻</span>Dev / Tech</button>
+          <button class="ubtn flex items-center gap-2.5 border border-white/[0.09] rounded-xl px-3.5 py-2.5 text-[13px] text-white/50 font-medium transition-all duration-150 hover:text-white hover:border-white/20 text-left" data-u="brand"><span class="text-base">🏢</span>Marque</button>
+          <button class="ubtn flex items-center gap-2.5 border border-white/[0.09] rounded-xl px-3.5 py-2.5 text-[13px] text-white/50 font-medium transition-all duration-150 hover:text-white hover:border-white/20 text-left" data-u="artist"><span class="text-base">🎨</span>Artiste</button>
+          <button class="ubtn flex items-center gap-2.5 border border-white/[0.09] rounded-xl px-3.5 py-2.5 text-[13px] text-white/50 font-medium transition-all duration-150 hover:text-white hover:border-white/20 text-left" data-u="free"><span class="text-base">🚀</span>Freelance</button>
+          <button class="ubtn flex items-center gap-2.5 border border-white/[0.09] rounded-xl px-3.5 py-2.5 text-[13px] text-white/50 font-medium transition-all duration-150 hover:text-white hover:border-white/20 text-left" data-u="other"><span class="text-base">✨</span>Autre</button>
+        </div>
+
+        <!-- Source -->
+        <p class="text-[11px] font-bold tracking-[0.08em] uppercase text-white/35 mb-2.5">Découvert via…</p>
+        <div class="flex flex-wrap gap-2 mb-6">
+          <button class="chip border border-white/[0.09] rounded-full px-3.5 py-1.5 text-[12px] text-white/45 font-medium transition-all duration-150 hover:text-white hover:border-white/20" data-s="social">Réseaux sociaux</button>
+          <button class="chip border border-white/[0.09] rounded-full px-3.5 py-1.5 text-[12px] text-white/45 font-medium transition-all duration-150 hover:text-white hover:border-white/20" data-s="friend">Bouche à oreille</button>
+          <button class="chip border border-white/[0.09] rounded-full px-3.5 py-1.5 text-[12px] text-white/45 font-medium transition-all duration-150 hover:text-white hover:border-white/20" data-s="search">Google</button>
+          <button class="chip border border-white/[0.09] rounded-full px-3.5 py-1.5 text-[12px] text-white/45 font-medium transition-all duration-150 hover:text-white hover:border-white/20" data-s="ph">Product Hunt</button>
+          <button class="chip border border-white/[0.09] rounded-full px-3.5 py-1.5 text-[12px] text-white/45 font-medium transition-all duration-150 hover:text-white hover:border-white/20" data-s="ad">Pub</button>
+          <button class="chip border border-white/[0.09] rounded-full px-3.5 py-1.5 text-[12px] text-white/45 font-medium transition-all duration-150 hover:text-white hover:border-white/20" data-s="other">Autre</button>
+        </div>
+
+        <!-- NPS -->
+        <div class="mb-6">
+          <div class="flex items-center justify-between mb-2.5">
+            <p class="text-[11px] font-bold tracking-[0.08em] uppercase text-white/35">Première impression</p>
+            <span id="nps-lbl" class="text-[12px] text-white/30 transition-all duration-200">noter de 0 à 10</span>
+          </div>
+          <div class="flex gap-1.5">
+            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="0">0</button>
+            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="1">1</button>
+            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="2">2</button>
+            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="3">3</button>
+            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="4">4</button>
+            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="5">5</button>
+            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="6">6</button>
+            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="7">7</button>
+            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="8">8</button>
+            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="9">9</button>
+            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="10">10</button>
+          </div>
+          <div class="flex justify-between mt-1.5">
+            <span class="text-[10px] text-white/25">Pas convaincu</span>
+            <span class="text-[10px] text-white/25">Excellent 🔥</span>
+          </div>
+        </div>
+
+        <!-- Comment -->
+        <div class="mb-6">
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-[11px] font-bold tracking-[0.08em] uppercase text-white/35">Un mot <span class="normal-case tracking-normal font-normal text-white/25">— optionnel</span></label>
+            <span class="text-[11px] text-white/25"><span id="fbc">0</span>/500</span>
+          </div>
+          <textarea id="fbi" rows="2" maxlength="500" placeholder="Ce que tu attends, une idée, un retour…"
+            class="inp w-full bg-[#0c0e11] border border-white/[0.09] rounded-xl px-4 py-3 text-[14px] text-white placeholder-white/20 resize-none transition-all duration-200 focus:outline-none"></textarea>
+        </div>
+
+        <button id="cta-sub"
+          class="group w-full flex items-center justify-center gap-2.5
+            bg-[#00ff9d] text-black font-display font-extrabold text-[14px] tracking-[0.01em]
+            py-3.5 rounded-xl transition-all duration-200
+            hover:bg-[#1affa8] hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(0,255,157,0.22)]
+            active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none">
+          <span id="sub-txt">Créer mon profil ✦</span>
+          <svg class="cta-arrow w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+        <p class="text-center text-[12px] text-white/25 mt-3">Tu peux passer — vraiment 20 secondes 🙏</p>
+      </div>
+
+      <!-- ══ PANEL DONE ══ -->
+      <div class="panel" id="pdone">
+        <div class="w-16 h-16 rounded-full border-2 border-[#00ff9d] bg-[#00ff9d]/10 grid place-items-center text-2xl mb-7 animate-pop">✦</div>
+        <p class="text-[11px] font-bold tracking-[0.12em] uppercase text-[#00ff9d] mb-4 flex items-center gap-2">
+          <span class="block w-4 h-px bg-[#00ff9d]"></span>C'est parti !
+        </p>
+        <h1 class="font-display font-black text-[clamp(32px,6vw,52px)] leading-[0.96] tracking-[-0.03em] mb-3">
+          Ton profil<em class="not-italic text-[#00ff9d]">est prêt</em>
+        </h1>
+        <p class="text-[15px] text-white/50 leading-relaxed mb-8">Tout est en place. Ajoute tes premiers liens et partage ton URL.</p>
+        <div class="flex flex-col gap-3">
+          <a id="done-href" href="#" target="_blank"
+            class="flex items-center justify-between px-5 py-3.5 rounded-xl
+              bg-[#00ff9d] text-black font-display font-extrabold text-[14px]
+              transition-all hover:bg-[#1affa8] hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(0,255,157,0.22)]">
+            Voir mon profil <span>→</span>
+          </a>
+          <a href="/dashboard"
+            class="flex items-center justify-between px-5 py-3.5 rounded-xl
+              border border-white/[0.09] text-white font-semibold text-[14px]
+              transition-all hover:border-white/20 hover:translate-x-0.5">
+            Aller au dashboard <span class="text-white/30">→</span>
+          </a>
+          <a href="/dashboard/appearance"
+            class="flex items-center justify-between px-5 py-3.5 rounded-xl
+              border border-white/[0.09] text-white font-semibold text-[14px]
+              transition-all hover:border-white/20 hover:translate-x-0.5">
+            Personnaliser l'apparence <span class="text-white/30">→</span>
+          </a>
+        </div>
+      </div>
+
+    </div><!-- /inner -->
+
+    <!-- Desktop footer -->
+    <div class="hidden lg:block px-14 pb-10 mt-auto pt-8 text-[12px] text-white/20">
+      BioForge · <a href="/privacy" class="hover:text-white/40 transition-colors">Confidentialité</a>
+    </div>
+
   </main>
 
-  <!-- ── Aside preview ── -->
-  <aside class="aside">
-    <p class="aside-lbl">Aperçu de ton profil</p>
-    <div class="phone">
-      <div class="notch"><div class="notch-pill"></div></div>
-      <div class="pbody" id="pb" style="background:#0a0a0a">
-        <div class="pav" id="pav" style="border-color:#00ff9d;background:rgba(0,255,157,.1);color:#00ff9d">
+  <!-- ══ RIGHT — Preview panel ══════════════════════════════════════════ -->
+  <aside class="hidden lg:flex flex-col items-center justify-center flex-shrink-0
+    w-[400px] border-l border-white/[0.06] relative overflow-hidden"
+    style="background: #0a0c0f">
+
+    <!-- Ambient radial glow -->
+    <div class="absolute inset-0 pointer-events-none" style="background:radial-gradient(ellipse 60% 50% at 50% 60%, rgba(0,255,157,0.07) 0%, transparent 70%)"></div>
+
+    <!-- Grid pattern -->
+    <div class="absolute inset-0 pointer-events-none opacity-[0.03]"
+      style="background-image: linear-gradient(rgba(255,255,255,0.8) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.8) 1px, transparent 1px); background-size: 40px 40px"></div>
+
+    <p class="text-[11px] font-bold tracking-[0.1em] uppercase text-white/25 mb-6 relative z-10">Aperçu de ton profil</p>
+
+    <!-- Phone mockup -->
+    <div class="phone-glow relative z-10 w-[220px] rounded-[34px] overflow-hidden"
+      style="border: 1.5px solid rgba(255,255,255,0.12); box-shadow: 0 40px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08)">
+      <!-- Notch -->
+      <div class="h-6 flex items-center justify-center" style="background:#070809">
+        <div class="w-14 h-[5px] bg-white/[0.12] rounded-full"></div>
+      </div>
+      <!-- Screen -->
+      <div id="phone-body" class="flex flex-col items-center px-3.5 pb-6 pt-4 min-h-[360px] transition-all duration-500" style="background:#0a0a0a">
+        <!-- Avatar -->
+        <div id="pav" class="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center font-display font-black text-xl mb-2.5 flex-shrink-0 border-2 transition-all duration-400" style="border-color:#00ff9d;background:rgba(0,255,157,0.1);color:#00ff9d">
           {avatarUrl
-            ? <img src={avatarUrl} alt=""/>
+            ? <img src={avatarUrl} alt="" class="w-full h-full object-cover"/>
             : <span id="pavl">?</span>
           }
         </div>
-        <div class="pname" id="pname">@bioforge</div>
-        <div class="phdl" id="phdl">@username</div>
-        <div class="pbio" id="pbio"></div>
-        <div class="plinks">
-          <div class="plink" id="pl1" style="background:#00ff9d;color:#000">Mon premier lien ✦</div>
-          <div class="plink" id="pl2" style="background:rgba(0,255,157,.1);border:1px solid rgba(0,255,157,.3);color:#00ff9d">Lien 2</div>
-          <div class="plink" id="pl3" style="background:rgba(0,255,157,.1);border:1px solid rgba(0,255,157,.3);color:#00ff9d">Lien 3</div>
+        <!-- Name -->
+        <div id="pname" class="font-display font-black text-[14px] text-white text-center tracking-tight mb-0.5 transition-all duration-300">@bioforge</div>
+        <div id="phdl" class="text-[10px] text-white/35 mb-1.5">@username</div>
+        <div id="pbio" class="text-[10px] text-white/50 text-center leading-relaxed mb-3.5 max-w-[180px] min-h-[12px] transition-all duration-300"></div>
+        <!-- Links -->
+        <div class="w-full space-y-1.5">
+          <div id="pl1" class="w-full h-8 rounded-[9px] flex items-center justify-center text-[10px] font-bold transition-all duration-400 font-display" style="background:#00ff9d;color:#000">Mon premier lien ✦</div>
+          <div id="pl2" class="w-full h-8 rounded-[9px] flex items-center justify-center text-[10px] font-bold transition-all duration-400" style="background:rgba(0,255,157,0.09);border:1px solid rgba(0,255,157,0.3);color:#00ff9d">Lien 2</div>
+          <div id="pl3" class="w-full h-8 rounded-[9px] flex items-center justify-center text-[10px] font-bold transition-all duration-400" style="background:rgba(0,255,157,0.09);border:1px solid rgba(0,255,157,0.3);color:#00ff9d">Lien 3</div>
         </div>
       </div>
     </div>
-    <div class="url-pill" id="urlp">
-      <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.1-1.1"/></svg>
-      <span class="grey">bioforge.click/</span><strong id="urlslug">@username</strong>
+
+    <!-- URL pill -->
+    <div id="url-pill" class="relative z-10 mt-5 flex items-center gap-2 px-4 py-2 rounded-full text-[12px] font-medium transition-all duration-300"
+      style="background:rgba(0,255,157,0.08);border:1px solid rgba(0,255,157,0.2);color:#00ff9d">
+      <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.1-1.1"/></svg>
+      <span class="text-white/40 font-normal">bioforge.click/</span><strong id="url-slug">@username</strong>
     </div>
+
+    <!-- Testimonial quote -->
+    <div class="relative z-10 mt-8 mx-6 p-4 rounded-2xl bg-white/[0.03] border border-white/[0.05]">
+      <p class="text-[12px] text-white/40 leading-relaxed italic">"J'ai mis mon profil en ligne en 3 minutes. Mes abonnés ont adoré le design."</p>
+      <div class="flex items-center gap-2 mt-2.5">
+        <div class="w-6 h-6 rounded-full bg-[#00ff9d]/20 flex items-center justify-center text-[10px]">🎙</div>
+        <span class="text-[11px] text-white/30">Créateur · 42k abonnés</span>
+      </div>
+    </div>
+
   </aside>
 
-</div>
-<div id="toast"></div>
+</div><!-- /root -->
+
+<!-- Confetti canvas -->
+<div id="cf-wrap" class="fixed inset-0 pointer-events-none z-50 overflow-hidden"></div>
+
+<!-- Toast -->
+<div id="toast" class="fixed bottom-7 left-1/2 -translate-x-1/2 bg-[#1a0000] border border-red-500/25 text-red-400 px-5 py-3 rounded-xl text-[13px] z-50 hidden whitespace-nowrap shadow-xl"></div>
 
 <script define:vars={{ avatarUrl, existingName, existingUsername }}>
-  /* ── State ──────────────────────────────────────────────────── */
-  var step=0, uValid=false, uVal='', preset='dark', usages=[], src=null, nps=null, timer=null;
+  /* ── STATE ──────────────────────────────────────────────────── */
+  var step=0, uValid=false, uVal='', preset='dark', usages=[], src=null, npsVal=null, timer=null;
   var currentUsername = existingUsername || '';
 
-  var P={
-    dark: {bg:'#0a0a0a',pc:'#00ff9d',tc:'#fff',   b1:'#00ff9d',b1c:'#000',b2:'rgba(0,255,157,.09)',b2c:'#00ff9d'},
-    neon: {bg:'#1a0033',pc:'#bf00ff',tc:'#fff',   b1:'#bf00ff',b1c:'#fff',b2:'rgba(191,0,255,.09)',b2c:'#bf00ff'},
-    ocean:{bg:'#001a33',pc:'#00d4ff',tc:'#fff',   b1:'#00d4ff',b1c:'#000',b2:'rgba(0,212,255,.09)',b2c:'#00d4ff'},
-    light:{bg:'#f0f0f0',pc:'#0066ff',tc:'#0a0a0a',b1:'#0066ff',b1c:'#fff',b2:'rgba(0,102,255,.09)',b2c:'#0066ff'},
+  var PRESETS = {
+    dark:  {bg:'#0a0a0a', pc:'#00ff9d', tc:'#fff',    b1:'#00ff9d',             b1c:'#000', b2:'rgba(0,255,157,0.09)',   b2c:'#00ff9d'},
+    neon:  {bg:'#1a0033', pc:'#bf00ff', tc:'#fff',    b1:'#bf00ff',             b1c:'#fff', b2:'rgba(191,0,255,0.09)',   b2c:'#bf00ff'},
+    ocean: {bg:'#001a33', pc:'#00d4ff', tc:'#fff',    b1:'#00d4ff',             b1c:'#000', b2:'rgba(0,212,255,0.09)',   b2c:'#00d4ff'},
+    light: {bg:'#f0f0f0', pc:'#0066ff', tc:'#0a0a0a', b1:'#0066ff',             b1c:'#fff', b2:'rgba(0,102,255,0.09)',   b2c:'#0066ff'},
   };
 
-  /* ── Navigation ─────────────────────────────────────────────── */
-  function go(n){
-    var cur=document.getElementById(step===99?'pdone':'p'+step);
-    if(!cur)return;
-    cur.classList.add('leaving');
-    setTimeout(function(){
-      cur.classList.remove('active','leaving');
-      step=n;
-      var nxt=n===99?document.getElementById('pdone'):document.getElementById('p'+n);
-      if(nxt)nxt.classList.add('active');
-      updDots();
-      if(n!==99){var inp=nxt&&nxt.querySelector('input,textarea');if(inp)setTimeout(function(){inp.focus()},120);}
-    },180);
-  }
-  function updDots(){
-    for(var i=0;i<4;i++){
-      var d=document.getElementById('d'+i);if(!d)continue;
-      d.className='sd'+(i<step?' done':i===step?' active':'');
+  /* ── NAVIGATION ─────────────────────────────────────────────── */
+  function go(n) {
+    var curId = step === 99 ? 'pdone' : 'p' + step;
+    var cur = document.getElementById(curId);
+    if (cur) {
+      cur.classList.add('leaving');
+      setTimeout(function() {
+        cur.classList.remove('active', 'leaving');
+        step = n;
+        var nextId = n === 99 ? 'pdone' : 'p' + n;
+        var nxt = document.getElementById(nextId);
+        if (nxt) {
+          nxt.classList.add('active', 'animate-step-in');
+          setTimeout(function() { nxt.classList.remove('animate-step-in') }, 400);
+        }
+        syncDots();
+        if (n !== 99) {
+          var inp = nxt && nxt.querySelector('input, textarea');
+          if (inp) setTimeout(function() { inp.focus() }, 130);
+        }
+      }, 190);
     }
   }
 
-  /* ── Bind back/cta ──────────────────────────────────────────── */
-  document.getElementById('back1').onclick=function(){go(0)};
-  document.getElementById('back2').onclick=function(){go(1)};
-  document.getElementById('back3').onclick=function(){go(2)};
-  document.getElementById('cta1').onclick=function(){go(2)};
-  document.getElementById('cta2').onclick=function(){go(3)};
+  function syncDots() {
+    ['mobile','desktop'].forEach(function(variant) {
+      for (var i = 0; i < 4; i++) {
+        var prefix = variant === 'mobile' ? 'dm' : 'dd';
+        var d = document.getElementById(prefix + i);
+        if (!d) continue;
+        d.className = 'sdot h-1.5 rounded-full transition-all duration-300 ';
+        if (i < step)      { d.className += 'done bg-[#00cc7a]'; d.style.width = '20px' }
+        else if (i===step) { d.className += 'active bg-[#00ff9d]'; d.style.width = '6px' }
+        else               { d.className += 'bg-white/10'; d.style.width = '6px' }
+      }
+    });
+  }
 
-  /* ── Username ─────────────────────────────────────────────────  */
-  var ui=document.getElementById('ui');
-  var uic=document.getElementById('uic');
-  var um=document.getElementById('um');
-  var cta0=document.getElementById('cta0');
+  /* ── BACK BUTTONS ───────────────────────────────────────────── */
+  document.getElementById('back1').addEventListener('click', function() { go(0) });
+  document.getElementById('back2').addEventListener('click', function() { go(1) });
+  document.getElementById('back3').addEventListener('click', function() { go(2) });
 
-  ui.addEventListener('input',function(){
-    var v=ui.value.toLowerCase().replace(/[^a-z0-9_]/g,'');
-    ui.value=v;
-    document.getElementById('phdl').textContent='@'+(v||'username');
-    document.getElementById('urlslug').textContent='@'+(v||'username');
-    uValid=false;cta0.disabled=true;
-    if(v.length<3){setU('idle',v?'Minimum 3 caractères':'3 à 24 caractères — lettres, chiffres, _');return;}
-    if(v.length>24){setU('bad','Maximum 24 caractères');return;}
-    setU('spin','Vérification');
+  /* ── CTA BUTTONS ────────────────────────────────────────────── */
+  document.getElementById('cta1').addEventListener('click', function() { go(2) });
+  document.getElementById('cta2').addEventListener('click', function() { go(3) });
+
+  /* ── USERNAME ───────────────────────────────────────────────── */
+  var ui   = document.getElementById('ui');
+  var uic  = document.getElementById('u-icon');
+  var umsg = document.getElementById('u-msg');
+  var cta0 = document.getElementById('cta0');
+
+  ui.addEventListener('input', function() {
+    var v = ui.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+    ui.value = v;
+    document.getElementById('phdl').textContent = '@' + (v || 'username');
+    document.getElementById('url-slug').textContent = '@' + (v || 'username');
+
+    uValid = false; cta0.disabled = true;
+    if (v.length < 3) { setState(v ? 'idle' : 'idle', v ? 'Minimum 3 caractères' : '3 à 24 caractères — lettres, chiffres, _'); return }
+    if (v.length > 24){ setState('bad', 'Maximum 24 caractères'); return }
+
+    // Pattern de settings.astro : vérification locale d'abord
+    if (v === currentUsername && currentUsername.length >= 3) {
+      uVal = v; uValid = true; cta0.disabled = false;
+      setState('ok', '@' + v + ' ✓'); return;
+    }
+
+    setState('checking', 'Vérification');
     clearTimeout(timer);
-    timer=setTimeout(function(){checkU(v)},500);
+    timer = setTimeout(function() { checkUsername(v) }, 600);
   });
-  ui.addEventListener('keydown',function(e){if(e.key==='Enter'&&uValid)go(1);});
-  cta0.addEventListener('click',function(){if(uValid)go(1);});
+  ui.addEventListener('keydown', function(e) { if (e.key === 'Enter' && uValid) go(1) });
+  cta0.addEventListener('click', function() { if (uValid) go(1) });
 
-  function checkU(v){
-    // Même pattern que settings.astro:
-    // si l'user retape son username actuel (auto-généré), on accepte directement
-    if(v===currentUsername&&currentUsername.length>=3){
-      uVal=v;uValid=true;cta0.disabled=false;
-      setU('ok','@'+v+' ✓');
-      return;
-    }
-    fetch('/api/profile/check-username?username='+encodeURIComponent(v))
-    .then(function(r){return r.json()})
-    .then(function(d){
-      if(d.success&&d.data&&d.data.available){uVal=v;uValid=true;cta0.disabled=false;setU('ok','@'+v+' est disponible ✓');}
-      else if(d.success&&d.data&&!d.data.available){setU('bad','Ce pseudo est déjà pris');}
-      else{setU('bad','Erreur de vérification');}
-    })
-    .catch(function(){setU('bad','Erreur réseau');});
-  }
-  function setU(s,msg){
-    ui.className='fi pfx';uic.textContent='';um.className='fmsg';
-    if(s==='ok') {ui.classList.add('ok'); uic.textContent='✓';um.classList.add('ok');}
-    if(s==='bad'){ui.classList.add('bad');uic.textContent='✗';um.classList.add('bad');}
-    if(s==='spin'){um.classList.add('spin');}
-    um.textContent=msg;
+  async function checkUsername(v) {
+    try {
+      var r = await fetch('/api/profile/check-username?username=' + encodeURIComponent(v));
+      var d = await r.json();
+      var available = d.data && d.data.available;
+      if (available) {
+        uVal = v; uValid = true; cta0.disabled = false;
+        setState('ok', '@' + v + ' est disponible ✓');
+      } else {
+        setState('bad', d.data && !d.data.available ? 'Ce pseudo est déjà pris' : 'Erreur de vérification');
+      }
+    } catch { setState('bad', 'Erreur réseau') }
   }
 
-  /* ── Profile ─────────────────────────────────────────────────── */
-  var ni=document.getElementById('ni');
-  var bi=document.getElementById('bi');
-  if(existingName){ni.value=existingName;}
+  function setState(s, msg) {
+    ui.classList.remove('ok', 'bad');
+    uic.textContent = '';
+    umsg.className = 'text-[12px] mt-2 min-h-[18px] transition-colors duration-200 ';
 
-  ni.addEventListener('input',function(){
-    var v=ni.value.trim();
-    document.getElementById('pname').textContent=v||('@'+(uVal||'bioforge'));
-    if(!avatarUrl){var l=document.getElementById('pavl');if(l)l.textContent=v.charAt(0).toUpperCase()||'?';}
-    syncP();
-  });
-  bi.addEventListener('input',function(){
-    document.getElementById('bc').textContent=String(bi.value.length);
-    document.getElementById('pbio').textContent=bi.value.trim();
-  });
-  document.getElementById('fbi').addEventListener('input',function(e){
-    document.getElementById('fbc').textContent=String(e.target.value.length);
-  });
+    if (s === 'ok')       { ui.classList.add('ok');  uic.textContent = '✓'; uic.style.color = '#00ff9d'; umsg.className += 'text-[#00ff9d]' }
+    else if (s === 'bad') { ui.classList.add('bad'); uic.textContent = '✗'; uic.style.color = '#ff5050'; umsg.className += 'text-red-400' }
+    else if (s === 'checking') { uic.style.color = 'rgba(255,255,255,0.3)'; uic.textContent = '…'; umsg.className += 'checking rounded text-transparent' }
+    else                  { uic.style.color = ''; umsg.className += 'text-white/35' }
 
-  /* ── Presets ─────────────────────────────────────────────────── */
-  document.querySelectorAll('.pc').forEach(function(b){
-    b.addEventListener('click',function(){
-      document.querySelectorAll('.pc').forEach(function(x){x.classList.remove('sel')});
-      b.classList.add('sel');
-      preset=b.dataset.p;
-      syncP();
-    });
-  });
-
-  function syncP(){
-    var p=P[preset]||P.dark;
-    document.getElementById('pb').style.background=p.bg;
-    document.getElementById('pname').style.color=p.tc;
-    document.getElementById('pbio').style.color=p.tc;
-    var av=document.getElementById('pav');
-    av.style.borderColor=p.pc;av.style.color=p.pc;
-    if(!avatarUrl)av.style.background=p.pc+'18';
-    var l1=document.getElementById('pl1');
-    l1.style.background=p.b1;l1.style.color=p.b1c;l1.style.border='none';
-    [document.getElementById('pl2'),document.getElementById('pl3')].forEach(function(el){
-      el.style.background=p.b2;el.style.color=p.b2c;el.style.border='1px solid '+p.pc+'40';
-    });
-    var up=document.getElementById('urlp');
-    up.style.background=p.pc+'0f';up.style.borderColor=p.pc+'28';up.style.color=p.pc;
+    if (s !== 'checking') umsg.textContent = msg;
   }
 
-  /* ── Feedback ────────────────────────────────────────────────── */
-  document.querySelectorAll('.ub').forEach(function(b){
-    b.addEventListener('click',function(){
-      b.classList.toggle('sel');
-      var u=b.dataset.u;
-      usages=usages.includes(u)?usages.filter(function(x){return x!==u}):[...usages,u];
+  /* ── PROFILE ────────────────────────────────────────────────── */
+  var ni = document.getElementById('ni');
+  var bi = document.getElementById('bi');
+  if (existingName) ni.value = existingName;
+
+  ni.addEventListener('input', function() {
+    var v = ni.value.trim();
+    document.getElementById('pname').textContent = v || ('@' + (uVal || 'bioforge'));
+    if (!avatarUrl) { var l = document.getElementById('pavl'); if (l) l.textContent = v.charAt(0).toUpperCase() || '?' }
+    syncPreview();
+  });
+  bi.addEventListener('input', function() {
+    document.getElementById('bc').textContent = String(bi.value.length);
+    document.getElementById('pbio').textContent = bi.value.trim();
+  });
+  document.getElementById('fbi').addEventListener('input', function(e) {
+    document.getElementById('fbc').textContent = String(e.target.value.length);
+  });
+
+  /* ── PRESETS ────────────────────────────────────────────────── */
+  document.querySelectorAll('.preset').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.preset').forEach(function(b) { b.classList.remove('selected') });
+      btn.classList.add('selected');
+      preset = btn.dataset.p;
+      syncPreview();
     });
   });
-  document.querySelectorAll('.chip').forEach(function(b){
-    b.addEventListener('click',function(){
-      document.querySelectorAll('.chip').forEach(function(c){c.classList.remove('sel')});
-      b.classList.add('sel');src=b.dataset.s;
+
+  function syncPreview() {
+    var p = PRESETS[preset] || PRESETS.dark;
+    var body = document.getElementById('phone-body');
+    body.style.background = p.bg;
+
+    var pname = document.getElementById('pname');
+    pname.style.color = p.tc;
+    document.getElementById('pbio').style.color = p.tc;
+
+    var av = document.getElementById('pav');
+    av.style.borderColor = p.pc; av.style.color = p.pc;
+    if (!avatarUrl) av.style.background = p.pc + '18';
+
+    var pl1 = document.getElementById('pl1');
+    pl1.style.background = p.b1; pl1.style.color = p.b1c; pl1.style.border = 'none';
+
+    [document.getElementById('pl2'), document.getElementById('pl3')].forEach(function(el) {
+      el.style.background = p.b2; el.style.color = p.b2c;
+      el.style.border = '1px solid ' + p.pc + '40';
+    });
+
+    var pill = document.getElementById('url-pill');
+    pill.style.background = p.pc + '10';
+    pill.style.borderColor = p.pc + '28';
+    pill.style.color = p.pc;
+  }
+
+  /* ── FEEDBACK ───────────────────────────────────────────────── */
+  document.querySelectorAll('.ubtn').forEach(function(b) {
+    b.addEventListener('click', function() {
+      b.classList.toggle('selected');
+      var u = b.dataset.u;
+      usages = usages.includes(u) ? usages.filter(function(x){return x!==u}) : usages.concat([u]);
     });
   });
-  document.querySelectorAll('.nb').forEach(function(b){
-    b.addEventListener('click',function(){
-      document.querySelectorAll('.nb').forEach(function(x){x.classList.remove('sel')});
-      b.classList.add('sel');nps=parseInt(b.dataset.n);
+  document.querySelectorAll('.chip').forEach(function(b) {
+    b.addEventListener('click', function() {
+      document.querySelectorAll('.chip').forEach(function(c){c.classList.remove('selected')});
+      b.classList.add('selected'); src = b.dataset.s;
+    });
+  });
+  document.querySelectorAll('.nps').forEach(function(b) {
+    b.addEventListener('click', function() {
+      document.querySelectorAll('.nps').forEach(function(x){x.classList.remove('selected')});
+      b.classList.add('selected'); npsVal = parseInt(b.dataset.n);
       var e=['😐','😐','😕','😕','😑','😐','🙂','😊','😄','🤩','🔥'];
       var t=['Très déçu','Déçu','Pas convaincu','Plutôt non','Moyen','Neutre','Bien','Bien !','Super !','Excellent !','Exceptionnel 🔥'];
-      document.getElementById('nps-lbl').textContent=e[nps]+' '+t[nps];
+      document.getElementById('nps-lbl').textContent = e[npsVal] + ' ' + t[npsVal];
     });
   });
 
-  /* ── Submit ─────────────────────────────────────────────────── */
-  document.getElementById('cta-sub').addEventListener('click',function(){
-    var btn=document.getElementById('cta-sub');
-    var txt=document.getElementById('sub-txt');
-    btn.disabled=true;txt.textContent='Création en cours…';
+  /* ── SUBMIT ─────────────────────────────────────────────────── */
+  document.getElementById('cta-sub').addEventListener('click', async function() {
+    var btn = document.getElementById('cta-sub');
+    var txt = document.getElementById('sub-txt');
+    btn.disabled = true; txt.textContent = 'Création en cours…';
 
-    fetch('/api/profile/onboarding',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        username:uVal,
-        display_name:ni.value.trim()||uVal,
-        bio:bi.value.trim()||'',
-        preset:preset,
-        feedback:{usages:usages,source:src,nps:nps,comment:document.getElementById('fbi').value.trim()||null}
-      })
-    })
-    .then(function(r){return r.json()})
-    .then(function(d){
-      if(!d.success)throw new Error(d.error||'Erreur');
-      document.getElementById('done-href').href='/@'+d.data.username;
-      confetti();
-      step=99;
-      document.getElementById('p3').classList.add('leaving');
-      setTimeout(function(){
-        document.getElementById('p3').classList.remove('active','leaving');
-        document.getElementById('pdone').classList.add('active');
-        document.getElementById('sdots').style.opacity='0';
-      },180);
-    })
-    .catch(function(e){
-      toast(e.message||'Une erreur est survenue');
-      btn.disabled=false;txt.textContent='Créer mon profil ✦';
-    });
+    try {
+      var r = await fetch('/api/profile/onboarding', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          username:     uVal,
+          display_name: ni.value.trim() || uVal,
+          bio:          bi.value.trim() || '',
+          preset:       preset,
+          feedback:     {usages, source: src, nps: npsVal, comment: document.getElementById('fbi').value.trim() || null}
+        })
+      });
+      var d = await r.json();
+      if (!d.success) throw new Error(d.error || 'Erreur');
+      document.getElementById('done-href').href = '/@' + d.data.username;
+      launchConfetti();
+      step = 99;
+      var p3 = document.getElementById('p3');
+      p3.classList.add('leaving');
+      setTimeout(function() {
+        p3.classList.remove('active', 'leaving');
+        var done = document.getElementById('pdone');
+        done.classList.add('active', 'animate-step-in');
+        ['sdots-mobile','sdots-desktop'].forEach(function(id){
+          var el = document.getElementById(id); if (el) el.style.opacity = '0';
+        });
+      }, 190);
+    } catch(e) {
+      showToast(e.message || 'Une erreur est survenue');
+      btn.disabled = false; txt.textContent = 'Créer mon profil ✦';
+    }
   });
 
-  /* ── Confetti ─────────────────────────────────────────────────── */
-  function confetti(){
-    var cols=['#00ff9d','#00cc7a','#fff','#a0ffd6'];
-    for(var i=0;i<55;i++){
-      (function(i){setTimeout(function(){
-        var el=document.createElement('div');el.className='cf';
-        el.style.cssText='left:'+Math.random()*100+'vw;background:'+cols[Math.floor(Math.random()*cols.length)]+';width:'+(4+Math.random()*7)+'px;height:'+(4+Math.random()*7)+'px;border-radius:'+(Math.random()>.5?'50%':'2px')+';animation-duration:'+(2+Math.random()*2)+'s;animation-delay:'+(Math.random()*.4)+'s';
-        document.body.appendChild(el);setTimeout(function(){el.remove()},4500);
-      },i*28)})(i);
+  /* ── CONFETTI ───────────────────────────────────────────────── */
+  function launchConfetti() {
+    var wrap = document.getElementById('cf-wrap');
+    var cols = ['#00ff9d','#00cc7a','#ffffff','#a0ffd6','#00ff9d'];
+    for (var i = 0; i < 60; i++) {
+      (function(i) {
+        setTimeout(function() {
+          var el = document.createElement('div');
+          el.className = 'animate-confetti-fall';
+          el.style.cssText = 'position:absolute;left:' + Math.random()*100 + '%;top:-10px;background:' + cols[Math.floor(Math.random()*cols.length)] + ';width:' + (4 + Math.random()*8) + 'px;height:' + (4 + Math.random()*8) + 'px;border-radius:' + (Math.random() > 0.5 ? '50%' : '2px') + ';animation-duration:' + (2 + Math.random()*2) + 's;animation-delay:' + (Math.random()*0.4) + 's;pointer-events:none';
+          wrap.appendChild(el);
+          setTimeout(function() { el.remove() }, 4500);
+        }, i * 28);
+      })(i);
     }
   }
 
-  /* ── Toast ───────────────────────────────────────────────────── */
-  function toast(msg){
-    var t=document.getElementById('toast');
-    t.textContent=msg;t.classList.add('show');
-    setTimeout(function(){t.classList.remove('show')},4000);
+  /* ── TOAST ──────────────────────────────────────────────────── */
+  function showToast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg; t.classList.remove('hidden');
+    t.style.animation = 'none'; t.offsetHeight; t.style.animation = '';
+    setTimeout(function() { t.classList.add('hidden') }, 4000);
   }
 
-  /* ── Init ────────────────────────────────────────────────────── */
-  syncP();
-  // Pré-remplir avec l'username existant si Supabase en a auto-généré un
-  if(currentUsername){
-    var uiEl=document.getElementById('ui');
-    if(uiEl){
-      uiEl.value=currentUsername;
-      document.getElementById('phdl').textContent='@'+currentUsername;
-      document.getElementById('urlslug').textContent='@'+currentUsername;
-      uVal=currentUsername;uValid=true;
-      document.getElementById('cta0').disabled=false;
-      setU('ok','@'+currentUsername+' ✓');
-    }
+  /* ── INIT ───────────────────────────────────────────────────── */
+  syncDots();
+  syncPreview();
+  if (existingName) {
+    document.getElementById('pname').textContent = existingName;
+    if (!avatarUrl) { var l = document.getElementById('pavl'); if (l) l.textContent = existingName.charAt(0).toUpperCase() }
   }
-  if(existingName){
-    document.getElementById('pname').textContent=existingName;
-    if(!avatarUrl){var l=document.getElementById('pavl');if(l)l.textContent=existingName.charAt(0).toUpperCase();}
+  if (currentUsername) {
+    ui.value = currentUsername;
+    document.getElementById('phdl').textContent = '@' + currentUsername;
+    document.getElementById('url-slug').textContent = '@' + currentUsername;
+    uVal = currentUsername; uValid = true; cta0.disabled = false;
+    setState('ok', '@' + currentUsername + ' ✓');
   }
+  // Focus username on load
+  setTimeout(function() { if (!currentUsername) ui.focus() }, 300);
 </script>
 </body>
 </html>
