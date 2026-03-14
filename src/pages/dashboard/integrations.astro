@@ -103,7 +103,7 @@ const INTEGRATIONS = {
   },
 };
 
-const planLabel: Record<string, string> = { free: 'Free', creator: 'Creator', pro: 'Pro' };
+const planLabel: Record<string, string> = { free: 'Free', creator: 'Creator', pro: 'Pro', enterprise: 'Enterprise' };
 const planColor: Record<string, string> = { free: '#6b7280', creator: '#00ff9d', pro: '#a855f7' };
 ---
 
@@ -164,7 +164,7 @@ const planColor: Record<string, string> = { free: '#6b7280', creator: '#00ff9d',
             const conn = connected.get(item.id);
             const isConnected = !!conn;
             const reqPlan = item.plan as string;
-            const canUse = reqPlan === 'Free' || (reqPlan === 'Creator' && isCreator) || (reqPlan === 'pro' && isPro);
+            const canUse = reqPlan === 'Free' || (reqPlan === 'Creator' && isCreator) || (reqPlan === 'Pro' && isPro) || (reqPlan === 'Enterprise' && isPro);
 
             return (
               <div class={`integration-card group flex items-center gap-4 p-4 rounded-2xl border transition-all ${
