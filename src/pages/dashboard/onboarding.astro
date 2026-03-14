@@ -13,787 +13,499 @@ const existingName     = profile?.display_name  ?? '';
 const existingUsername = (profile as any)?.username ?? '';
 ---
 <!DOCTYPE html>
-<html lang="fr" class="h-full">
+<html lang="fr">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>BioForge — Bienvenue</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            green: { DEFAULT: '#00ff9d', dark: '#00cc7a', glow: 'rgba(0,255,157,0.15)' },
-            surface: { 1: '#0c0e11', 2: '#141719', 3: '#1c1f23' },
-            ink: { 1: 'rgba(255,255,255,0.9)', 2: 'rgba(255,255,255,0.55)', 3: 'rgba(255,255,255,0.25)', 4: 'rgba(255,255,255,0.08)' }
-          },
-          fontFamily: { display: ['Cabinet Grotesk','system-ui','sans-serif'], body: ['DM Sans','system-ui','sans-serif'] },
-          keyframes: {
-            'slide-up': { '0%': { opacity:'0', transform:'translateY(20px)' }, '100%': { opacity:'1', transform:'translateY(0)' } },
-            'fade-in':  { '0%': { opacity:'0' }, '100%': { opacity:'1' } },
-            'step-in':  { '0%': { opacity:'0', transform:'translateX(24px)' }, '100%': { opacity:'1', transform:'translateX(0)' } },
-            'step-out': { '0%': { opacity:'1', transform:'translateX(0)' }, '100%': { opacity:'0', transform:'translateX(-24px)' } },
-            'pulse-dot':{ '0%,100%':{ boxShadow:'0 0 0 0 rgba(0,255,157,0.5)' }, '50%':{ boxShadow:'0 0 0 6px rgba(0,255,157,0)' } },
-            'shimmer':  { '0%':{ backgroundPosition:'200% 0' }, '100%':{ backgroundPosition:'-200% 0' } },
-            'pop':      { '0%':{ transform:'scale(0) rotate(-12deg)', opacity:'0' }, '60%':{ transform:'scale(1.12) rotate(2deg)' }, '100%':{ transform:'scale(1) rotate(0)', opacity:'1' } },
-            'confetti-fall': { 'to':{ transform:'translateY(110vh) rotate(720deg)', opacity:'0' } },
-          },
-          animation: {
-            'slide-up':    'slide-up 0.5s cubic-bezier(0.22,1,0.36,1) both',
-            'fade-in':     'fade-in 0.4s ease both',
-            'step-in':     'step-in 0.35s cubic-bezier(0.22,1,0.36,1) both',
-            'step-out':    'step-out 0.2s ease forwards',
-            'pulse-dot':   'pulse-dot 2s ease-in-out infinite',
-            'shimmer':     'shimmer 2s linear infinite',
-            'pop':         'pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both',
-            'confetti-fall':'confetti-fall linear forwards',
-          },
-          backgroundImage: {
-            'noise': "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E\")",
-          }
-        }
-      }
-    }
-  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@500;700;800;900&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet"/>
   <style>
-    *{ -webkit-font-smoothing: antialiased }
-    /* ── RESET — isoler la page de global.css ── */
-    html, body { all: revert }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
-    body{ font-family: 'DM Sans', sans-serif; background: #080a0d; color: white }
-    a { text-decoration: none; color: inherit }
-    button { font-family: inherit; cursor: pointer; background: none; border: none }
-    .font-display{ font-family: 'Cabinet Grotesk', sans-serif }
+    html, body { height: 100%; overflow: hidden }
+    body { font-family: "DM Sans", sans-serif; background: #080a0d; color: #fff; -webkit-font-smoothing: antialiased }
+    a { color: inherit; text-decoration: none }
+    button { font-family: inherit; background: none; border: none; cursor: pointer; padding: 0; color: inherit }
+    input, textarea { font-family: inherit }
+    ::-webkit-scrollbar { width: 4px }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px }
+
+    .root { display: flex; flex-direction: column; height: 100vh }
+    @media (min-width:1024px) { .root { flex-direction: row } }
+
+    /* Topbar */
+    .topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 50; display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; background: rgba(8,10,13,0.92); backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255,255,255,0.06) }
+    @media (min-width:1024px) { .topbar { display: none } }
+    .logo { display: flex; align-items: center; gap: 9px }
+    .logo-mark { width: 30px; height: 30px; border-radius: 8px; background: #00ff9d; display: flex; align-items: center; justify-content: center; flex-shrink: 0 }
+    .logo-name { font-family: "Cabinet Grotesk", sans-serif; font-weight: 800; font-size: 15px }
+
+    /* Dots */
+    .dots { display: flex; align-items: center; gap: 6px }
+    .dot { height: 6px; width: 6px; border-radius: 3px; background: rgba(255,255,255,0.15); transition: all 0.3s ease }
+    .dot.active { background: #00ff9d; animation: pulsedot 2s ease-in-out infinite }
+    .dot.done   { background: #00cc7a; width: 20px; border-radius: 4px }
+    @keyframes pulsedot { 0%,100% { box-shadow: 0 0 0 0 rgba(0,255,157,0.5) } 50% { box-shadow: 0 0 0 6px rgba(0,255,157,0) } }
+
+    /* Main */
+    .main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; padding-top: 72px }
+    @media (min-width:1024px) { .main { padding-top: 0; max-width: 620px } }
+    .main-logo { display: none; padding: 32px 56px 0 }
+    @media (min-width:1024px) { .main-logo { display: flex; align-items: center } }
+    .inner { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 36px 24px 48px }
+    @media (min-width:1024px) { .inner { padding: 36px 56px } }
+    .dots-desktop { display: none; margin-bottom: 40px }
+    @media (min-width:1024px) { .dots-desktop { display: flex; align-items: center; gap: 6px } }
 
     /* Panels */
     .panel { display: none }
-    .panel.active { display: block }
-    @keyframes step-out { 0% { opacity:1; transform:translateX(0) } 100% { opacity:0; transform:translateX(-24px) } }
-    @keyframes shimmer  { 0% { background-position:200% 0 } 100% { background-position:-200% 0 } }
-    @keyframes pulse-dot { 0%,100% { box-shadow:0 0 0 0 rgba(0,255,157,0.5) } 50% { box-shadow:0 0 0 6px rgba(0,255,157,0) } }
-    .panel.leaving { animation: step-out 0.2s ease forwards; pointer-events: none }
+    .panel.active { display: block; animation: stepin 0.38s cubic-bezier(0.22,1,0.36,1) both }
+    .panel.leaving { animation: stepout 0.2s ease forwards; pointer-events: none }
+    @keyframes stepin  { from { opacity:0; transform:translateX(24px) } to { opacity:1; transform:none } }
+    @keyframes stepout { to   { opacity:0; transform:translateX(-24px) } }
+    @keyframes shimmer { 0%   { background-position:200% 0 } 100% { background-position:-200% 0 } }
 
-    /* Scrollbar */
-    ::-webkit-scrollbar { width: 4px }
-    ::-webkit-scrollbar-track { background: transparent }
-    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px }
+    /* Typography */
+    .eyebrow { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #00ff9d; margin-bottom: 14px }
+    .eyebrow::before { content: ""; display: block; width: 14px; height: 1.5px; background: #00ff9d; border-radius: 1px; flex-shrink: 0 }
+    .title { font-family: "Cabinet Grotesk", sans-serif; font-weight: 900; font-size: clamp(30px,6vw,50px); line-height: 0.97; letter-spacing: -0.03em; margin-bottom: 10px }
+    .accent { color: #00ff9d; display: block }
+    .subtitle { font-size: 15px; color: rgba(255,255,255,0.5); line-height: 1.65; margin-bottom: 30px }
+    .subtitle strong { color: rgba(255,255,255,0.8); font-weight: 500 }
+    .back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: rgba(255,255,255,0.4); margin-bottom: 28px; transition: color 0.2s }
+    .back:hover { color: #fff }
 
-    /* Input focus ring */
-    .inp:focus { outline: none; border-color: rgba(0,255,157,0.45); background: rgba(0,255,157,0.025); box-shadow: 0 0 0 3px rgba(0,255,157,0.07) }
-    .inp.ok    { border-color: #00ff9d }
-    .inp.bad   { border-color: #ff5050 }
+    /* Fields */
+    .field { margin-bottom: 16px }
+    .flabel { display: flex; align-items: center; justify-content: space-between; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.35); margin-bottom: 7px }
+    .fwrap { position: relative }
+    .fpfx { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 14px; color: rgba(255,255,255,0.35); pointer-events: none }
+    .inp { width: 100%; padding: 13px 44px 13px 14px; background: #0c0e11; border: 1.5px solid rgba(255,255,255,0.09); border-radius: 12px; color: #fff; font-size: 15px; outline: none; transition: border-color 0.2s, background 0.2s, box-shadow 0.2s }
+    .inp.pfx { padding-left: 34px }
+    .inp:focus { border-color: rgba(0,255,157,0.45); background: rgba(0,255,157,0.025); box-shadow: 0 0 0 3px rgba(0,255,157,0.07) }
+    .inp.ok  { border-color: #00ff9d }
+    .inp.bad { border-color: #ff5050 }
+    .inp::placeholder { color: rgba(255,255,255,0.18) }
+    textarea.inp { resize: none; padding-top: 13px }
+    .ficon { position: absolute; right: 13px; top: 50%; transform: translateY(-50%); font-size: 13px }
+    .fmsg { font-size: 12px; color: rgba(255,255,255,0.35); margin-top: 5px; min-height: 17px }
+    .fmsg.ok  { color: #00ff9d }
+    .fmsg.bad { color: #ff5050 }
+    .fmsg.checking { background: linear-gradient(90deg,rgba(255,255,255,0.05) 0%,rgba(255,255,255,0.15) 50%,rgba(255,255,255,0.05) 100%); background-size: 200% 100%; animation: shimmer 1.5s linear infinite; border-radius: 4px; color: transparent; height: 14px; margin-top: 6px }
 
-    /* Preset card selected ring */
+    /* CTA */
+    .cta { width: 100%; display: flex; align-items: center; justify-content: center; gap: 9px; padding: 14px 24px; background: #00ff9d; color: #000; font-family: "Cabinet Grotesk", sans-serif; font-size: 14px; font-weight: 800; border-radius: 12px; transition: all 0.18s; margin-top: 8px; letter-spacing: 0.01em }
+    .cta:hover:not(:disabled) { background: #1affa8; transform: translateY(-2px); box-shadow: 0 12px 28px rgba(0,255,157,0.22) }
+    .cta:active:not(:disabled) { transform: scale(0.98) }
+    .cta:disabled { opacity: 0.35; cursor: not-allowed }
+    .arr { transition: transform 0.2s; flex-shrink: 0 }
+    .cta:hover:not(:disabled) .arr { transform: translateX(4px) }
+
+    /* Presets */
+    .presets { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 22px }
+    .preset { position: relative; text-align: left; border: 1.5px solid rgba(255,255,255,0.09); border-radius: 16px; padding: 14px; cursor: pointer; transition: all 0.2s; background: transparent }
+    .preset:hover { border-color: rgba(255,255,255,0.2); transform: translateY(-1px) }
     .preset.selected { border-color: #00ff9d; box-shadow: 0 0 0 1px #00ff9d, 0 8px 24px rgba(0,255,157,0.12) }
-    .preset.selected .pcheck { display: grid }
+    .pcheck { position: absolute; top: 10px; right: 10px; width: 16px; height: 16px; border-radius: 50%; background: #00ff9d; display: none; align-items: center; justify-content: center }
+    .preset.selected .pcheck { display: flex }
+    .pswatch { height: 40px; border-radius: 9px; margin-bottom: 9px; position: relative; overflow: hidden }
+    .pdot { position: absolute; bottom: 7px; right: 7px; width: 9px; height: 9px; border-radius: 50% }
+    .pname { font-family: "Cabinet Grotesk", sans-serif; font-size: 13px; font-weight: 800; color: #fff }
+    .pdesc { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 2px }
 
-    /* Usage btn */
+    /* Usage / chips / NPS */
+    .ugrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 18px }
+    .ubtn { display: flex; align-items: center; gap: 9px; padding: 10px 12px; border: 1.5px solid rgba(255,255,255,0.09); border-radius: 11px; color: rgba(255,255,255,0.5); font-size: 13px; font-weight: 500; transition: all 0.15s; text-align: left; background: transparent }
+    .ubtn:hover { border-color: rgba(255,255,255,0.2); color: #fff }
     .ubtn.selected { border-color: #00ff9d; background: rgba(0,255,157,0.07); color: #00ff9d }
-
-    /* Chip */
+    .chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 18px }
+    .chip { padding: 6px 13px; border: 1.5px solid rgba(255,255,255,0.09); border-radius: 99px; color: rgba(255,255,255,0.45); font-size: 12px; font-weight: 500; transition: all 0.15s; background: transparent }
+    .chip:hover { border-color: rgba(255,255,255,0.2); color: #fff }
     .chip.selected { border-color: #00ff9d; background: rgba(0,255,157,0.07); color: #00ff9d }
+    .npsrow { display: flex; gap: 4px }
+    .npsbtn { flex: 1; height: 38px; border: 1.5px solid rgba(255,255,255,0.09); border-radius: 9px; color: rgba(255,255,255,0.45); font-size: 12px; font-weight: 700; transition: all 0.15s; background: transparent }
+    .npsbtn:hover { border-color: rgba(255,255,255,0.2); color: #fff }
+    .npsbtn.selected { background: #00ff9d; border-color: #00ff9d; color: #000; transform: scale(1.07); box-shadow: 0 4px 14px rgba(0,255,157,0.3) }
+    .nps-ends { display: flex; justify-content: space-between; margin-top: 5px; font-size: 10px; color: rgba(255,255,255,0.25) }
 
-    /* NPS */
-    .nps.selected { background: #00ff9d; border-color: #00ff9d; color: #000; transform: scale(1.08); box-shadow: 0 4px 14px rgba(0,255,157,0.3) }
+    /* Done */
+    @keyframes popin { 0% { transform:scale(0) rotate(-12deg); opacity:0 } 60% { transform:scale(1.1) rotate(2deg) } 100% { transform:scale(1); opacity:1 } }
+    .done-icon { width: 64px; height: 64px; border-radius: 50%; background: rgba(0,255,157,0.1); border: 2px solid #00ff9d; display: flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 24px; animation: popin 0.5s cubic-bezier(0.34,1.56,0.64,1) both }
+    .dactions { display: flex; flex-direction: column; gap: 10px; margin-top: 28px }
+    .dlink { display: flex; align-items: center; justify-content: space-between; padding: 13px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; border: 1.5px solid rgba(255,255,255,0.09); color: #fff; transition: all 0.2s }
+    .dlink:hover { border-color: rgba(255,255,255,0.2); transform: translateX(2px) }
+    .dlink.prim { background: #00ff9d; color: #000; border-color: transparent }
+    .dlink.prim:hover { background: #1affa8; transform: translateY(-1px); box-shadow: 0 12px 28px rgba(0,255,157,0.22) }
 
-    /* Step dot active */
-    .sdot.active { background: #00ff9d; animation: pulse-dot 2s ease-in-out infinite }
-    .sdot.done   { background: #00cc7a; width: 20px; border-radius: 4px }
+    /* Aside */
+    .aside { display: none }
+    @media (min-width:1024px) { .aside { display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; width: 400px; border-left: 1px solid rgba(255,255,255,0.06); background: #0a0c0f; padding: 40px 28px; position: relative; overflow: hidden } }
+    .aside-glow { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse 60% 50% at 50% 60%,rgba(0,255,157,0.07) 0%,transparent 70%) }
+    .aside-grid { position: absolute; inset: 0; pointer-events: none; opacity: 0.03; background-image: linear-gradient(rgba(255,255,255,0.8) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.8) 1px,transparent 1px); background-size: 40px 40px }
+    .aside-label { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.25); margin-bottom: 22px; position: relative; z-index: 1 }
+    .phone { position: relative; z-index: 1; width: 224px; border-radius: 34px; overflow: hidden; border: 1.5px solid rgba(255,255,255,0.12); box-shadow: 0 40px 80px rgba(0,0,0,0.6),inset 0 1px 0 rgba(255,255,255,0.08); transition: box-shadow 0.4s }
+    .phone:hover { box-shadow: 0 0 60px rgba(0,255,157,0.1),0 40px 80px rgba(0,0,0,0.6),inset 0 1px 0 rgba(255,255,255,0.08) }
+    .ph-notch { height: 26px; display: flex; align-items: center; justify-content: center; background: #070809 }
+    .ph-pill { width: 56px; height: 5px; background: rgba(255,255,255,0.12); border-radius: 3px }
+    .ph-screen { padding: 18px 14px 22px; display: flex; flex-direction: column; align-items: center; min-height: 380px; transition: background 0.5s }
+    .pav { width: 56px; height: 56px; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; font-family: "Cabinet Grotesk",sans-serif; font-size: 20px; font-weight: 900; margin-bottom: 9px; flex-shrink: 0; border: 2px solid #00ff9d; background: rgba(0,255,157,0.1); color: #00ff9d; transition: all 0.4s }
+    .pav img { width: 100%; height: 100%; object-fit: cover }
+    .pname { font-family: "Cabinet Grotesk",sans-serif; font-size: 14px; font-weight: 900; color: #fff; text-align: center; letter-spacing: -0.02em; margin-bottom: 2px; transition: color 0.3s }
+    .phdl { font-size: 10px; color: rgba(255,255,255,0.36); margin-bottom: 5px }
+    .pbio { font-size: 10px; color: rgba(255,255,255,0.5); text-align: center; line-height: 1.5; margin-bottom: 14px; max-width: 180px; min-height: 12px; transition: color 0.3s }
+    .plinks { width: 100%; display: flex; flex-direction: column; gap: 6px }
+    .plink { width: 100%; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; font-family: "Cabinet Grotesk",sans-serif; transition: all 0.4s }
+    .url-pill { position: relative; z-index: 1; display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 99px; font-size: 11.5px; font-weight: 600; margin-top: 18px; background: rgba(0,255,157,0.08); border: 1px solid rgba(0,255,157,0.2); color: #00ff9d; transition: all 0.3s }
+    .url-pill .grey { color: rgba(255,255,255,0.4); font-weight: 400 }
+    .testimonial { position: relative; z-index: 1; margin-top: 22px; padding: 14px 16px; border-radius: 16px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); width: 100% }
+    .testimonial p { font-size: 12px; color: rgba(255,255,255,0.4); line-height: 1.6; font-style: italic }
+    .tfoot { display: flex; align-items: center; gap: 8px; margin-top: 10px }
+    .tav { width: 24px; height: 24px; border-radius: 50%; background: rgba(0,255,157,0.2); display: flex; align-items: center; justify-content: center; font-size: 10px }
+    .tname { font-size: 11px; color: rgba(255,255,255,0.3) }
 
-    /* Shimmer loader */
-    .checking {
-      background: linear-gradient(90deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.05) 100%);
-      background-size: 200% 100%;
-      animation: shimmer 1.5s linear infinite;
-    }
+    /* Confetti */
+    .cf { position: fixed; top: -10px; pointer-events: none; z-index: 999; border-radius: 2px; animation: cffall linear forwards }
+    @keyframes cffall { to { transform: translateY(110vh) rotate(720deg); opacity: 0 } }
 
-    /* Phone glow */
-    .phone-glow { transition: box-shadow 0.4s ease }
-    .phone-glow:hover { box-shadow: 0 0 60px rgba(0,255,157,0.12), 0 40px 80px rgba(0,0,0,0.6) }
-
-    /* CTA hover arrow */
-    .cta-arrow { transition: transform 0.2s ease }
-    button:not(:disabled):hover .cta-arrow { transform: translateX(4px) }
+    /* Toast */
+    #toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); background: #160000; border: 1px solid rgba(255,80,80,0.25); color: #ff8080; padding: 10px 20px; border-radius: 12px; font-size: 13px; z-index: 999; display: none; white-space: nowrap }
+    #toast.show { display: block }
   </style>
 </head>
+<body>
+<div class="root">
 
-<body class="h-full overflow-hidden bg-noise">
-
-<!-- ══ ROOT ══════════════════════════════════════════════════════════════ -->
-<div class="flex flex-col h-full lg:flex-row">
-
-  <!-- ── Topbar (mobile) / Sidebar top (desktop) ── -->
-  <header class="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4
-    bg-[#080a0d]/90 backdrop-blur-xl border-b border-white/[0.06] lg:hidden">
-    <a href="/" class="flex items-center gap-2.5 text-white no-underline">
-      <div class="w-8 h-8 bg-[#00ff9d] rounded-[9px] grid place-items-center flex-shrink-0">
-        <svg width="15" height="15" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-      </div>
-      <span class="font-display font-extrabold text-[15px]">BioForge</span>
+  <header class="topbar">
+    <a href="/" class="logo">
+      <div class="logo-mark"><svg width="14" height="14" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div>
+      <span class="logo-name">BioForge</span>
     </a>
-    <!-- Mobile step dots -->
-    <div class="flex items-center gap-1.5" id="sdots-mobile">
-      <div class="sdot h-1.5 rounded-full bg-white/10 transition-all duration-300" style="width:6px" id="dm0"></div>
-      <div class="sdot h-1.5 rounded-full bg-white/10 transition-all duration-300" style="width:6px" id="dm1"></div>
-      <div class="sdot h-1.5 rounded-full bg-white/10 transition-all duration-300" style="width:6px" id="dm2"></div>
-      <div class="sdot h-1.5 rounded-full bg-white/10 transition-all duration-300" style="width:6px" id="dm3"></div>
+    <div class="dots" id="dots-m">
+      <div class="dot active" id="dm0"></div><div class="dot" id="dm1"></div>
+      <div class="dot" id="dm2"></div><div class="dot" id="dm3"></div>
     </div>
   </header>
 
-  <!-- ══ LEFT — Form area ══════════════════════════════════════════════ -->
-  <main class="flex-1 overflow-y-auto pt-20 pb-16 px-6 flex flex-col justify-center
-    lg:pt-0 lg:px-0 lg:max-w-[640px]">
-
-    <!-- Desktop logo — inside the form column -->
-    <div class="hidden lg:flex items-center gap-3 px-14 pt-10 pb-0 mb-auto">
-      <a href="/" class="flex items-center gap-2.5 text-white no-underline">
-        <div class="w-8 h-8 bg-[#00ff9d] rounded-[9px] grid place-items-center flex-shrink-0">
-          <svg width="15" height="15" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-        </div>
-        <span class="font-display font-extrabold text-[15px]">BioForge</span>
+  <main class="main">
+    <div class="main-logo">
+      <a href="/" class="logo">
+        <div class="logo-mark"><svg width="14" height="14" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg></div>
+        <span class="logo-name">BioForge</span>
       </a>
     </div>
-
-    <div class="flex-1 flex flex-col justify-center lg:px-14">
-
-      <!-- Step dots desktop -->
-      <div class="hidden lg:flex items-center gap-2 mb-12" id="sdots-desktop">
-        <div class="sdot h-1.5 rounded-full bg-white/10 transition-all duration-300" style="width:6px" id="dd0"></div>
-        <div class="sdot h-1.5 rounded-full bg-white/10 transition-all duration-300" style="width:6px" id="dd1"></div>
-        <div class="sdot h-1.5 rounded-full bg-white/10 transition-all duration-300" style="width:6px" id="dd2"></div>
-        <div class="sdot h-1.5 rounded-full bg-white/10 transition-all duration-300" style="width:6px" id="dd3"></div>
+    <div class="inner">
+      <div class="dots dots-desktop" id="dots-d">
+        <div class="dot active" id="dd0"></div><div class="dot" id="dd1"></div>
+        <div class="dot" id="dd2"></div><div class="dot" id="dd3"></div>
       </div>
 
-      <!-- ══ PANEL 0 — Username ══ -->
-      <div class="panel active animate-step-in" id="p0">
-        <p class="text-[11px] font-bold tracking-[0.12em] uppercase text-[#00ff9d] mb-4 flex items-center gap-2">
-          <span class="block w-4 h-px bg-[#00ff9d]"></span>Étape 1 sur 4
-        </p>
-        <h1 class="font-display font-black text-[clamp(32px,6vw,52px)] leading-[0.96] tracking-[-0.03em] mb-3">
-          Ton adresse<br/><em class="not-italic text-[#00ff9d]">sur le web</em>
-        </h1>
-        <p class="text-[15px] text-white/50 leading-relaxed mb-8">
-          Visible dans ton URL&nbsp;: <span class="text-white/80 font-medium">bioforge.click/@toi</span>
-        </p>
-
-        <!-- Username field -->
-        <div class="mb-6">
-          <label class="block text-[11px] font-bold tracking-[0.08em] uppercase text-white/35 mb-2" for="ui">
-            Pseudo
-          </label>
-          <div class="relative">
-            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-white/35 font-medium text-[15px] pointer-events-none select-none">@</span>
-            <input
-              type="text" id="ui" maxlength="24"
-              autocomplete="off" autocapitalize="off" spellcheck="false"
-              placeholder="tonsuperpseudo"
-              class="inp w-full bg-[#0c0e11] border border-white/[0.09] rounded-xl
-                pl-8 pr-11 py-3.5 text-[15px] text-white placeholder-white/20
-                transition-all duration-200 focus:outline-none"
-            />
-            <span id="u-icon" class="absolute right-4 top-1/2 -translate-y-1/2 text-sm transition-all duration-200"></span>
+      <!-- P0 — Username -->
+      <div class="panel active" id="p0">
+        <p class="eyebrow">Étape 1 sur 4</p>
+        <h1 class="title">Ton adresse<em class="accent">sur le web</em></h1>
+        <p class="subtitle">Visible dans ton URL : <strong>bioforge.click/@toi</strong></p>
+        <div class="field">
+          <label class="flabel" for="ui">Pseudo</label>
+          <div class="fwrap">
+            <span class="fpfx">@</span>
+            <input type="text" id="ui" class="inp pfx" maxlength="24" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="tonsuperpseudo"/>
+            <span class="ficon" id="u-icon"></span>
           </div>
-          <p id="u-msg" class="text-[12px] text-white/35 mt-2 min-h-[18px] transition-colors duration-200">
-            3 à 24 caractères — lettres, chiffres, _
-          </p>
+          <p class="fmsg" id="u-msg">3 à 24 caractères — lettres, chiffres, _</p>
         </div>
-
-        <button id="cta0" disabled
-          class="group w-full flex items-center justify-center gap-2.5
-            bg-[#00ff9d] text-black font-display font-extrabold text-[14px] tracking-[0.01em]
-            py-3.5 rounded-xl transition-all duration-200
-            hover:bg-[#1affa8] hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(0,255,157,0.22)]
-            active:scale-[0.98] disabled:opacity-35 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none">
+        <button class="cta" id="cta0" disabled>
           Continuer
-          <svg class="cta-arrow w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
+          <svg class="arr" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
         </button>
       </div>
 
-      <!-- ══ PANEL 1 — Profile ══ -->
+      <!-- P1 — Profil -->
       <div class="panel" id="p1">
-        <button id="back1" class="flex items-center gap-1.5 text-white/40 hover:text-white text-[13px] mb-7 transition-colors group">
-          <svg class="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 5l-7 7 7 7"/></svg>
-          Retour
-        </button>
-        <p class="text-[11px] font-bold tracking-[0.12em] uppercase text-[#00ff9d] mb-4 flex items-center gap-2">
-          <span class="block w-4 h-px bg-[#00ff9d]"></span>Étape 2 sur 4
-        </p>
-        <h1 class="font-display font-black text-[clamp(32px,6vw,52px)] leading-[0.96] tracking-[-0.03em] mb-3">
-          Qui es-<em class="not-italic text-[#00ff9d]">tu ?</em>
-        </h1>
-        <p class="text-[15px] text-white/50 leading-relaxed mb-8">
-          Un nom mémorable et une bio percutante font toute la différence.
-        </p>
-
-        <div class="space-y-4 mb-6">
-          <div>
-            <label class="block text-[11px] font-bold tracking-[0.08em] uppercase text-white/35 mb-2" for="ni">Nom affiché</label>
-            <input type="text" id="ni" maxlength="80" placeholder="Ton nom ou pseudonyme"
-              class="inp w-full bg-[#0c0e11] border border-white/[0.09] rounded-xl px-4 py-3.5 text-[15px] text-white placeholder-white/20 transition-all duration-200"/>
-          </div>
-          <div>
-            <div class="flex items-center justify-between mb-2">
-              <label class="text-[11px] font-bold tracking-[0.08em] uppercase text-white/35" for="bi">Bio</label>
-              <span class="text-[11px] text-white/25"><span id="bc">0</span>/160</span>
-            </div>
-            <textarea id="bi" maxlength="160" rows="3" placeholder="Créateur · Dev · Humain 🌱"
-              class="inp w-full bg-[#0c0e11] border border-white/[0.09] rounded-xl px-4 py-3.5 text-[15px] text-white placeholder-white/20 resize-none transition-all duration-200 focus:outline-none"></textarea>
-          </div>
+        <button class="back" id="back1"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 5l-7 7 7 7"/></svg>Retour</button>
+        <p class="eyebrow">Étape 2 sur 4</p>
+        <h1 class="title">Qui es-<em class="accent">tu ?</em></h1>
+        <p class="subtitle">Un nom mémorable et une bio percutante font toute la différence.</p>
+        <div class="field">
+          <label class="flabel" for="ni">Nom affiché</label>
+          <div class="fwrap"><input type="text" id="ni" class="inp" maxlength="80" placeholder="Ton nom ou pseudonyme"/></div>
         </div>
-
-        <button id="cta1"
-          class="group w-full flex items-center justify-center gap-2.5
-            bg-[#00ff9d] text-black font-display font-extrabold text-[14px] tracking-[0.01em]
-            py-3.5 rounded-xl transition-all duration-200
-            hover:bg-[#1affa8] hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(0,255,157,0.22)]
-            active:scale-[0.98]">
-          Continuer
-          <svg class="cta-arrow w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
-        </button>
+        <div class="field">
+          <div class="flabel"><span>Bio</span><span style="font-weight:400;text-transform:none;color:rgba(255,255,255,0.25)"><span id="bc">0</span>/160</span></div>
+          <div class="fwrap"><textarea id="bi" class="inp" rows="3" maxlength="160" placeholder="Créateur · Dev · Humain 🌱"></textarea></div>
+        </div>
+        <button class="cta" id="cta1">Continuer <svg class="arr" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg></button>
       </div>
 
-      <!-- ══ PANEL 2 — Style ══ -->
+      <!-- P2 — Style -->
       <div class="panel" id="p2">
-        <button id="back2" class="flex items-center gap-1.5 text-white/40 hover:text-white text-[13px] mb-7 transition-colors group">
-          <svg class="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 5l-7 7 7 7"/></svg>
-          Retour
-        </button>
-        <p class="text-[11px] font-bold tracking-[0.12em] uppercase text-[#00ff9d] mb-4 flex items-center gap-2">
-          <span class="block w-4 h-px bg-[#00ff9d]"></span>Étape 3 sur 4
-        </p>
-        <h1 class="font-display font-black text-[clamp(32px,6vw,52px)] leading-[0.96] tracking-[-0.03em] mb-3">
-          Ton<em class="not-italic text-[#00ff9d]">identité visuelle</em>
-        </h1>
-        <p class="text-[15px] text-white/50 leading-relaxed mb-8">
-          Un point de départ — tout est modifiable depuis Apparence.
-        </p>
-
-        <div class="grid grid-cols-2 gap-3 mb-6">
-          <button class="preset selected text-left border border-white/[0.09] rounded-2xl p-4 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 relative group" data-p="dark">
-            <div class="pcheck absolute top-2.5 right-2.5 w-4 h-4 bg-[#00ff9d] rounded-full hidden place-items-center">
-              <svg width="8" height="8" fill="none" stroke="#000" stroke-width="3.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-            </div>
-            <div class="h-10 rounded-lg mb-3 relative overflow-hidden" style="background:linear-gradient(135deg,#0a0a0a,#0f1f15)">
-              <div class="absolute bottom-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-[#00ff9d]"></div>
-            </div>
-            <div class="font-display font-bold text-[13px] text-white">Dark</div>
-            <div class="text-[11px] text-white/40 mt-0.5">Sombre · Néon</div>
+        <button class="back" id="back2"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 5l-7 7 7 7"/></svg>Retour</button>
+        <p class="eyebrow">Étape 3 sur 4</p>
+        <h1 class="title">Ton<em class="accent">identité visuelle</em></h1>
+        <p class="subtitle">Un point de départ — tout est modifiable depuis Apparence.</p>
+        <div class="presets">
+          <button class="preset selected" data-p="dark">
+            <div class="pcheck"><svg width="8" height="8" fill="none" stroke="#000" stroke-width="3.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg></div>
+            <div class="pswatch" style="background:linear-gradient(135deg,#0a0a0a,#0f1f15)"><div class="pdot" style="background:#00ff9d"></div></div>
+            <div class="pname">Dark</div><div class="pdesc">Sombre · Néon</div>
           </button>
-          <button class="preset text-left border border-white/[0.09] rounded-2xl p-4 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 relative group" data-p="neon">
-            <div class="pcheck absolute top-2.5 right-2.5 w-4 h-4 bg-[#00ff9d] rounded-full hidden place-items-center">
-              <svg width="8" height="8" fill="none" stroke="#000" stroke-width="3.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-            </div>
-            <div class="h-10 rounded-lg mb-3 relative overflow-hidden" style="background:linear-gradient(135deg,#1a0033,#0d001a)">
-              <div class="absolute bottom-1.5 right-1.5 w-2.5 h-2.5 rounded-full" style="background:#bf00ff"></div>
-            </div>
-            <div class="font-display font-bold text-[13px] text-white">Neon</div>
-            <div class="text-[11px] text-white/40 mt-0.5">Violet · Électrique</div>
+          <button class="preset" data-p="neon">
+            <div class="pcheck"><svg width="8" height="8" fill="none" stroke="#000" stroke-width="3.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg></div>
+            <div class="pswatch" style="background:linear-gradient(135deg,#1a0033,#0d001a)"><div class="pdot" style="background:#bf00ff"></div></div>
+            <div class="pname">Neon</div><div class="pdesc">Violet · Électrique</div>
           </button>
-          <button class="preset text-left border border-white/[0.09] rounded-2xl p-4 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 relative group" data-p="ocean">
-            <div class="pcheck absolute top-2.5 right-2.5 w-4 h-4 bg-[#00ff9d] rounded-full hidden place-items-center">
-              <svg width="8" height="8" fill="none" stroke="#000" stroke-width="3.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-            </div>
-            <div class="h-10 rounded-lg mb-3 relative overflow-hidden" style="background:linear-gradient(135deg,#001a33,#002244)">
-              <div class="absolute bottom-1.5 right-1.5 w-2.5 h-2.5 rounded-full" style="background:#00d4ff"></div>
-            </div>
-            <div class="font-display font-bold text-[13px] text-white">Ocean</div>
-            <div class="text-[11px] text-white/40 mt-0.5">Bleu · Profond</div>
+          <button class="preset" data-p="ocean">
+            <div class="pcheck"><svg width="8" height="8" fill="none" stroke="#000" stroke-width="3.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg></div>
+            <div class="pswatch" style="background:linear-gradient(135deg,#001a33,#002244)"><div class="pdot" style="background:#00d4ff"></div></div>
+            <div class="pname">Ocean</div><div class="pdesc">Bleu · Profond</div>
           </button>
-          <button class="preset text-left border border-white/[0.09] rounded-2xl p-4 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 relative group" data-p="light">
-            <div class="pcheck absolute top-2.5 right-2.5 w-4 h-4 bg-[#00ff9d] rounded-full hidden place-items-center">
-              <svg width="8" height="8" fill="none" stroke="#000" stroke-width="3.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-            </div>
-            <div class="h-10 rounded-lg mb-3 relative overflow-hidden" style="background:linear-gradient(135deg,#f0f0f0,#e8f0ff)">
-              <div class="absolute bottom-1.5 right-1.5 w-2.5 h-2.5 rounded-full" style="background:#0066ff"></div>
-            </div>
-            <div class="font-display font-bold text-[13px] text-white">Light</div>
-            <div class="text-[11px] text-white/40 mt-0.5">Clair · Épuré</div>
+          <button class="preset" data-p="light">
+            <div class="pcheck"><svg width="8" height="8" fill="none" stroke="#000" stroke-width="3.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg></div>
+            <div class="pswatch" style="background:linear-gradient(135deg,#f0f0f0,#e8f0ff)"><div class="pdot" style="background:#0066ff"></div></div>
+            <div class="pname">Light</div><div class="pdesc">Clair · Épuré</div>
           </button>
         </div>
-
-        <button id="cta2"
-          class="group w-full flex items-center justify-center gap-2.5
-            bg-[#00ff9d] text-black font-display font-extrabold text-[14px] tracking-[0.01em]
-            py-3.5 rounded-xl transition-all duration-200
-            hover:bg-[#1affa8] hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(0,255,157,0.22)]
-            active:scale-[0.98]">
-          Continuer
-          <svg class="cta-arrow w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
-        </button>
+        <button class="cta" id="cta2">Continuer <svg class="arr" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg></button>
       </div>
 
-      <!-- ══ PANEL 3 — Feedback ══ -->
+      <!-- P3 — Feedback -->
       <div class="panel" id="p3">
-        <button id="back3" class="flex items-center gap-1.5 text-white/40 hover:text-white text-[13px] mb-7 transition-colors group">
-          <svg class="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 5l-7 7 7 7"/></svg>
-          Retour
-        </button>
-        <p class="text-[11px] font-bold tracking-[0.12em] uppercase text-[#00ff9d] mb-4 flex items-center gap-2">
-          <span class="block w-4 h-px bg-[#00ff9d]"></span>Étape 4 sur 4
-        </p>
-        <h1 class="font-display font-black text-[clamp(28px,5vw,44px)] leading-[0.96] tracking-[-0.03em] mb-3">
-          Aide-nous à<em class="not-italic text-[#00ff9d]">progresser</em>
-        </h1>
-        <p class="text-[15px] text-white/50 leading-relaxed mb-7">30 sec · ça fait vraiment la différence pour nous 🙏</p>
-
-        <!-- Usage -->
-        <p class="text-[11px] font-bold tracking-[0.08em] uppercase text-white/35 mb-2.5">Tu utilises BioForge pour…</p>
-        <div class="grid grid-cols-2 gap-2 mb-6">
-          <button class="ubtn flex items-center gap-2.5 border border-white/[0.09] rounded-xl px-3.5 py-2.5 text-[13px] text-white/50 font-medium transition-all duration-150 hover:text-white hover:border-white/20 text-left" data-u="creator"><span class="text-base">🎥</span>Créateur</button>
-          <button class="ubtn flex items-center gap-2.5 border border-white/[0.09] rounded-xl px-3.5 py-2.5 text-[13px] text-white/50 font-medium transition-all duration-150 hover:text-white hover:border-white/20 text-left" data-u="dev"><span class="text-base">💻</span>Dev / Tech</button>
-          <button class="ubtn flex items-center gap-2.5 border border-white/[0.09] rounded-xl px-3.5 py-2.5 text-[13px] text-white/50 font-medium transition-all duration-150 hover:text-white hover:border-white/20 text-left" data-u="brand"><span class="text-base">🏢</span>Marque</button>
-          <button class="ubtn flex items-center gap-2.5 border border-white/[0.09] rounded-xl px-3.5 py-2.5 text-[13px] text-white/50 font-medium transition-all duration-150 hover:text-white hover:border-white/20 text-left" data-u="artist"><span class="text-base">🎨</span>Artiste</button>
-          <button class="ubtn flex items-center gap-2.5 border border-white/[0.09] rounded-xl px-3.5 py-2.5 text-[13px] text-white/50 font-medium transition-all duration-150 hover:text-white hover:border-white/20 text-left" data-u="free"><span class="text-base">🚀</span>Freelance</button>
-          <button class="ubtn flex items-center gap-2.5 border border-white/[0.09] rounded-xl px-3.5 py-2.5 text-[13px] text-white/50 font-medium transition-all duration-150 hover:text-white hover:border-white/20 text-left" data-u="other"><span class="text-base">✨</span>Autre</button>
+        <button class="back" id="back3"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 12H5M12 5l-7 7 7 7"/></svg>Retour</button>
+        <p class="eyebrow">Étape 4 sur 4</p>
+        <h1 class="title" style="font-size:clamp(26px,4.5vw,42px)">Aide-nous à<em class="accent">progresser</em></h1>
+        <p class="subtitle">30 secondes · vraiment utile pour nous 🙏</p>
+        <p class="flabel" style="margin-bottom:9px">Tu utilises BioForge pour…</p>
+        <div class="ugrid">
+          <button class="ubtn" data-u="creator"><span style="font-size:15px">🎥</span>Créateur</button>
+          <button class="ubtn" data-u="dev"><span style="font-size:15px">💻</span>Dev / Tech</button>
+          <button class="ubtn" data-u="brand"><span style="font-size:15px">🏢</span>Marque</button>
+          <button class="ubtn" data-u="artist"><span style="font-size:15px">🎨</span>Artiste</button>
+          <button class="ubtn" data-u="free"><span style="font-size:15px">🚀</span>Freelance</button>
+          <button class="ubtn" data-u="other"><span style="font-size:15px">✨</span>Autre</button>
         </div>
-
-        <!-- Source -->
-        <p class="text-[11px] font-bold tracking-[0.08em] uppercase text-white/35 mb-2.5">Découvert via…</p>
-        <div class="flex flex-wrap gap-2 mb-6">
-          <button class="chip border border-white/[0.09] rounded-full px-3.5 py-1.5 text-[12px] text-white/45 font-medium transition-all duration-150 hover:text-white hover:border-white/20" data-s="social">Réseaux sociaux</button>
-          <button class="chip border border-white/[0.09] rounded-full px-3.5 py-1.5 text-[12px] text-white/45 font-medium transition-all duration-150 hover:text-white hover:border-white/20" data-s="friend">Bouche à oreille</button>
-          <button class="chip border border-white/[0.09] rounded-full px-3.5 py-1.5 text-[12px] text-white/45 font-medium transition-all duration-150 hover:text-white hover:border-white/20" data-s="search">Google</button>
-          <button class="chip border border-white/[0.09] rounded-full px-3.5 py-1.5 text-[12px] text-white/45 font-medium transition-all duration-150 hover:text-white hover:border-white/20" data-s="ph">Product Hunt</button>
-          <button class="chip border border-white/[0.09] rounded-full px-3.5 py-1.5 text-[12px] text-white/45 font-medium transition-all duration-150 hover:text-white hover:border-white/20" data-s="ad">Pub</button>
-          <button class="chip border border-white/[0.09] rounded-full px-3.5 py-1.5 text-[12px] text-white/45 font-medium transition-all duration-150 hover:text-white hover:border-white/20" data-s="other">Autre</button>
+        <p class="flabel" style="margin-bottom:9px">Découvert via…</p>
+        <div class="chips">
+          <button class="chip" data-s="social">Réseaux sociaux</button>
+          <button class="chip" data-s="friend">Bouche à oreille</button>
+          <button class="chip" data-s="search">Google</button>
+          <button class="chip" data-s="ph">Product Hunt</button>
+          <button class="chip" data-s="ad">Pub</button>
+          <button class="chip" data-s="other">Autre</button>
         </div>
-
-        <!-- NPS -->
-        <div class="mb-6">
-          <div class="flex items-center justify-between mb-2.5">
-            <p class="text-[11px] font-bold tracking-[0.08em] uppercase text-white/35">Première impression</p>
-            <span id="nps-lbl" class="text-[12px] text-white/30 transition-all duration-200">noter de 0 à 10</span>
+        <div style="margin-bottom:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px">
+            <p class="flabel" style="margin-bottom:0">Première impression</p>
+            <span id="nps-lbl" style="font-size:12px;color:rgba(255,255,255,0.3);transition:all 0.2s">noter de 0 à 10</span>
           </div>
-          <div class="flex gap-1.5">
-            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="0">0</button>
-            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="1">1</button>
-            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="2">2</button>
-            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="3">3</button>
-            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="4">4</button>
-            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="5">5</button>
-            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="6">6</button>
-            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="7">7</button>
-            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="8">8</button>
-            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="9">9</button>
-            <button class="nps flex-1 h-10 rounded-lg border border-white/[0.09] text-[12px] font-bold text-white/45 transition-all duration-150 hover:text-white hover:border-white/20" data-n="10">10</button>
+          <div class="npsrow">
+            <button class="npsbtn" data-n="0">0</button><button class="npsbtn" data-n="1">1</button>
+            <button class="npsbtn" data-n="2">2</button><button class="npsbtn" data-n="3">3</button>
+            <button class="npsbtn" data-n="4">4</button><button class="npsbtn" data-n="5">5</button>
+            <button class="npsbtn" data-n="6">6</button><button class="npsbtn" data-n="7">7</button>
+            <button class="npsbtn" data-n="8">8</button><button class="npsbtn" data-n="9">9</button>
+            <button class="npsbtn" data-n="10">10</button>
           </div>
-          <div class="flex justify-between mt-1.5">
-            <span class="text-[10px] text-white/25">Pas convaincu</span>
-            <span class="text-[10px] text-white/25">Excellent 🔥</span>
-          </div>
+          <div class="nps-ends"><span>Pas convaincu</span><span>Excellent 🔥</span></div>
         </div>
-
-        <!-- Comment -->
-        <div class="mb-6">
-          <div class="flex items-center justify-between mb-2">
-            <label class="text-[11px] font-bold tracking-[0.08em] uppercase text-white/35">Un mot <span class="normal-case tracking-normal font-normal text-white/25">— optionnel</span></label>
-            <span class="text-[11px] text-white/25"><span id="fbc">0</span>/500</span>
-          </div>
-          <textarea id="fbi" rows="2" maxlength="500" placeholder="Ce que tu attends, une idée, un retour…"
-            class="inp w-full bg-[#0c0e11] border border-white/[0.09] rounded-xl px-4 py-3 text-[14px] text-white placeholder-white/20 resize-none transition-all duration-200 focus:outline-none"></textarea>
+        <div class="field">
+          <div class="flabel"><span>Un mot <span style="font-weight:400;text-transform:none;color:rgba(255,255,255,0.25)">— optionnel</span></span><span style="font-weight:400;text-transform:none"><span id="fbc">0</span>/500</span></div>
+          <div class="fwrap"><textarea id="fbi" class="inp" rows="2" maxlength="500" placeholder="Ce que tu attends, une idée, un retour…"></textarea></div>
         </div>
-
-        <button id="cta-sub"
-          class="group w-full flex items-center justify-center gap-2.5
-            bg-[#00ff9d] text-black font-display font-extrabold text-[14px] tracking-[0.01em]
-            py-3.5 rounded-xl transition-all duration-200
-            hover:bg-[#1affa8] hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(0,255,157,0.22)]
-            active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none">
-          <span id="sub-txt">Créer mon profil ✦</span>
-          <svg class="cta-arrow w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg>
-        </button>
-        <p class="text-center text-[12px] text-white/25 mt-3">Tu peux passer — vraiment 20 secondes 🙏</p>
+        <button class="cta" id="cta-sub"><span id="sub-txt">Créer mon profil ✦</span><svg class="arr" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+        <p style="text-align:center;font-size:12px;color:rgba(255,255,255,0.25);margin-top:11px">Tu peux passer — vraiment 20 secondes 🙏</p>
       </div>
 
-      <!-- ══ PANEL DONE ══ -->
+      <!-- DONE -->
       <div class="panel" id="pdone">
-        <div class="w-16 h-16 rounded-full border-2 border-[#00ff9d] bg-[#00ff9d]/10 grid place-items-center text-2xl mb-7 animate-pop">✦</div>
-        <p class="text-[11px] font-bold tracking-[0.12em] uppercase text-[#00ff9d] mb-4 flex items-center gap-2">
-          <span class="block w-4 h-px bg-[#00ff9d]"></span>C'est parti !
-        </p>
-        <h1 class="font-display font-black text-[clamp(32px,6vw,52px)] leading-[0.96] tracking-[-0.03em] mb-3">
-          Ton profil<em class="not-italic text-[#00ff9d]">est prêt</em>
-        </h1>
-        <p class="text-[15px] text-white/50 leading-relaxed mb-8">Tout est en place. Ajoute tes premiers liens et partage ton URL.</p>
-        <div class="flex flex-col gap-3">
-          <a id="done-href" href="#" target="_blank"
-            class="flex items-center justify-between px-5 py-3.5 rounded-xl
-              bg-[#00ff9d] text-black font-display font-extrabold text-[14px]
-              transition-all hover:bg-[#1affa8] hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(0,255,157,0.22)]">
-            Voir mon profil <span>→</span>
-          </a>
-          <a href="/dashboard"
-            class="flex items-center justify-between px-5 py-3.5 rounded-xl
-              border border-white/[0.09] text-white font-semibold text-[14px]
-              transition-all hover:border-white/20 hover:translate-x-0.5">
-            Aller au dashboard <span class="text-white/30">→</span>
-          </a>
-          <a href="/dashboard/appearance"
-            class="flex items-center justify-between px-5 py-3.5 rounded-xl
-              border border-white/[0.09] text-white font-semibold text-[14px]
-              transition-all hover:border-white/20 hover:translate-x-0.5">
-            Personnaliser l'apparence <span class="text-white/30">→</span>
-          </a>
+        <div class="done-icon">✦</div>
+        <p class="eyebrow">C'est parti !</p>
+        <h1 class="title">Ton profil<em class="accent">est prêt</em></h1>
+        <p class="subtitle">Tout est en place. Ajoute tes premiers liens et partage ton URL.</p>
+        <div class="dactions">
+          <a id="done-href" href="#" target="_blank" class="dlink prim"><span>Voir mon profil</span><span>→</span></a>
+          <a href="/dashboard" class="dlink"><span>Aller au dashboard</span><span style="color:rgba(255,255,255,0.3)">→</span></a>
+          <a href="/dashboard/appearance" class="dlink"><span>Personnaliser l'apparence</span><span style="color:rgba(255,255,255,0.3)">→</span></a>
         </div>
       </div>
-
-    </div><!-- /inner -->
-
-    <!-- Desktop footer -->
-    <div class="hidden lg:block px-14 pb-10 mt-auto pt-8 text-[12px] text-white/20">
-      BioForge · <a href="/privacy" class="hover:text-white/40 transition-colors">Confidentialité</a>
     </div>
-
   </main>
 
-  <!-- ══ RIGHT — Preview panel ══════════════════════════════════════════ -->
-  <aside class="hidden lg:flex flex-col items-center justify-center flex-shrink-0
-    w-[400px] border-l border-white/[0.06] relative overflow-hidden"
-    style="background: #0a0c0f">
-
-    <!-- Ambient radial glow -->
-    <div class="absolute inset-0 pointer-events-none" style="background:radial-gradient(ellipse 60% 50% at 50% 60%, rgba(0,255,157,0.07) 0%, transparent 70%)"></div>
-
-    <!-- Grid pattern -->
-    <div class="absolute inset-0 pointer-events-none opacity-[0.03]"
-      style="background-image: linear-gradient(rgba(255,255,255,0.8) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.8) 1px, transparent 1px); background-size: 40px 40px"></div>
-
-    <p class="text-[11px] font-bold tracking-[0.1em] uppercase text-white/25 mb-6 relative z-10">Aperçu de ton profil</p>
-
-    <!-- Phone mockup -->
-    <div class="phone-glow relative z-10 w-[220px] rounded-[34px] overflow-hidden"
-      style="border: 1.5px solid rgba(255,255,255,0.12); box-shadow: 0 40px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08)">
-      <!-- Notch -->
-      <div class="h-6 flex items-center justify-center" style="background:#070809">
-        <div class="w-14 h-[5px] bg-white/[0.12] rounded-full"></div>
-      </div>
-      <!-- Screen -->
-      <div id="phone-body" class="flex flex-col items-center px-3.5 pb-6 pt-4 min-h-[360px] transition-all duration-500" style="background:#0a0a0a">
-        <!-- Avatar -->
-        <div id="pav" class="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center font-display font-black text-xl mb-2.5 flex-shrink-0 border-2 transition-all duration-400" style="border-color:#00ff9d;background:rgba(0,255,157,0.1);color:#00ff9d">
+  <aside class="aside">
+    <div class="aside-glow"></div>
+    <div class="aside-grid"></div>
+    <p class="aside-label">Aperçu de ton profil</p>
+    <div class="phone">
+      <div class="ph-notch"><div class="ph-pill"></div></div>
+      <div class="ph-screen" id="phone-body">
+        <div class="pav" id="pav">
           {avatarUrl
-            ? <img src={avatarUrl} alt="" class="w-full h-full object-cover"/>
+            ? <img src={avatarUrl} alt=""/>
             : <span id="pavl">?</span>
           }
         </div>
-        <!-- Name -->
-        <div id="pname" class="font-display font-black text-[14px] text-white text-center tracking-tight mb-0.5 transition-all duration-300">@bioforge</div>
-        <div id="phdl" class="text-[10px] text-white/35 mb-1.5">@username</div>
-        <div id="pbio" class="text-[10px] text-white/50 text-center leading-relaxed mb-3.5 max-w-[180px] min-h-[12px] transition-all duration-300"></div>
-        <!-- Links -->
-        <div class="w-full space-y-1.5">
-          <div id="pl1" class="w-full h-8 rounded-[9px] flex items-center justify-center text-[10px] font-bold transition-all duration-400 font-display" style="background:#00ff9d;color:#000">Mon premier lien ✦</div>
-          <div id="pl2" class="w-full h-8 rounded-[9px] flex items-center justify-center text-[10px] font-bold transition-all duration-400" style="background:rgba(0,255,157,0.09);border:1px solid rgba(0,255,157,0.3);color:#00ff9d">Lien 2</div>
-          <div id="pl3" class="w-full h-8 rounded-[9px] flex items-center justify-center text-[10px] font-bold transition-all duration-400" style="background:rgba(0,255,157,0.09);border:1px solid rgba(0,255,157,0.3);color:#00ff9d">Lien 3</div>
+        <div class="pname" id="pname">@bioforge</div>
+        <div class="phdl" id="phdl">@username</div>
+        <div class="pbio" id="pbio"></div>
+        <div class="plinks">
+          <div class="plink" id="pl1" style="background:#00ff9d;color:#000">Mon premier lien ✦</div>
+          <div class="plink" id="pl2" style="background:rgba(0,255,157,0.09);border:1px solid rgba(0,255,157,0.3);color:#00ff9d">Lien 2</div>
+          <div class="plink" id="pl3" style="background:rgba(0,255,157,0.09);border:1px solid rgba(0,255,157,0.3);color:#00ff9d">Lien 3</div>
         </div>
       </div>
     </div>
-
-    <!-- URL pill -->
-    <div id="url-pill" class="relative z-10 mt-5 flex items-center gap-2 px-4 py-2 rounded-full text-[12px] font-medium transition-all duration-300"
-      style="background:rgba(0,255,157,0.08);border:1px solid rgba(0,255,157,0.2);color:#00ff9d">
-      <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.1-1.1"/></svg>
-      <span class="text-white/40 font-normal">bioforge.click/</span><strong id="url-slug">@username</strong>
+    <div class="url-pill" id="url-pill">
+      <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.1-1.1"/></svg>
+      <span class="grey">bioforge.click/</span><strong id="url-slug">@username</strong>
     </div>
-
-    <!-- Testimonial quote -->
-    <div class="relative z-10 mt-8 mx-6 p-4 rounded-2xl bg-white/[0.03] border border-white/[0.05]">
-      <p class="text-[12px] text-white/40 leading-relaxed italic">"J'ai mis mon profil en ligne en 3 minutes. Mes abonnés ont adoré le design."</p>
-      <div class="flex items-center gap-2 mt-2.5">
-        <div class="w-6 h-6 rounded-full bg-[#00ff9d]/20 flex items-center justify-center text-[10px]">🎙</div>
-        <span class="text-[11px] text-white/30">Créateur · 42k abonnés</span>
-      </div>
+    <div class="testimonial">
+      <p>"J'ai mis mon profil en ligne en 3 minutes. Mes abonnés ont adoré le design."</p>
+      <div class="tfoot"><div class="tav">🎙</div><span class="tname">Créateur · 42k abonnés</span></div>
     </div>
-
   </aside>
+</div>
 
-</div><!-- /root -->
-
-<!-- Confetti canvas -->
-<div id="cf-wrap" class="fixed inset-0 pointer-events-none z-50 overflow-hidden"></div>
-
-<!-- Toast -->
-<div id="toast" class="fixed bottom-7 left-1/2 -translate-x-1/2 bg-[#1a0000] border border-red-500/25 text-red-400 px-5 py-3 rounded-xl text-[13px] z-50 hidden whitespace-nowrap shadow-xl"></div>
+<div id="toast"></div>
 
 <script define:vars={{ avatarUrl, existingName, existingUsername }}>
-  /* ── STATE ──────────────────────────────────────────────────── */
-  var step=0, uValid=false, uVal='', preset='dark', usages=[], src=null, npsVal=null, timer=null;
-  var currentUsername = existingUsername || '';
-
-  var PRESETS = {
-    dark:  {bg:'#0a0a0a', pc:'#00ff9d', tc:'#fff',    b1:'#00ff9d',             b1c:'#000', b2:'rgba(0,255,157,0.09)',   b2c:'#00ff9d'},
-    neon:  {bg:'#1a0033', pc:'#bf00ff', tc:'#fff',    b1:'#bf00ff',             b1c:'#fff', b2:'rgba(191,0,255,0.09)',   b2c:'#bf00ff'},
-    ocean: {bg:'#001a33', pc:'#00d4ff', tc:'#fff',    b1:'#00d4ff',             b1c:'#000', b2:'rgba(0,212,255,0.09)',   b2c:'#00d4ff'},
-    light: {bg:'#f0f0f0', pc:'#0066ff', tc:'#0a0a0a', b1:'#0066ff',             b1c:'#fff', b2:'rgba(0,102,255,0.09)',   b2c:'#0066ff'},
+  var step=0,uValid=false,uVal='',preset='dark',usages=[],src=null,npsVal=null,timer=null;
+  var currentUsername=existingUsername||'';
+  var P={
+    dark: {bg:'#0a0a0a',pc:'#00ff9d',tc:'#fff',   b1:'#00ff9d',b1c:'#000',b2:'rgba(0,255,157,0.09)',  b2c:'#00ff9d'},
+    neon: {bg:'#1a0033',pc:'#bf00ff',tc:'#fff',   b1:'#bf00ff',b1c:'#fff',b2:'rgba(191,0,255,0.09)', b2c:'#bf00ff'},
+    ocean:{bg:'#001a33',pc:'#00d4ff',tc:'#fff',   b1:'#00d4ff',b1c:'#000',b2:'rgba(0,212,255,0.09)', b2c:'#00d4ff'},
+    light:{bg:'#f0f0f0',pc:'#0066ff',tc:'#0a0a0a',b1:'#0066ff',b1c:'#fff',b2:'rgba(0,102,255,0.09)', b2c:'#0066ff'},
   };
 
-  /* ── NAVIGATION ─────────────────────────────────────────────── */
-  function go(n) {
-    var curId = step === 99 ? 'pdone' : 'p' + step;
-    var cur = document.getElementById(curId);
-    if (cur) {
-      cur.classList.add('leaving');
-      setTimeout(function() {
-        cur.classList.remove('active', 'leaving');
-        step = n;
-        var nextId = n === 99 ? 'pdone' : 'p' + n;
-        var nxt = document.getElementById(nextId);
-        if (nxt) {
-          nxt.classList.add('active', 'animate-step-in');
-          setTimeout(function() { nxt.classList.remove('animate-step-in') }, 400);
-        }
-        syncDots();
-        if (n !== 99) {
-          var inp = nxt && nxt.querySelector('input, textarea');
-          if (inp) setTimeout(function() { inp.focus() }, 130);
-        }
-      }, 190);
-    }
+  function go(n){
+    var cur=document.getElementById(step===99?'pdone':'p'+step);
+    if(!cur)return;
+    cur.classList.add('leaving');
+    setTimeout(function(){
+      cur.classList.remove('active','leaving');
+      step=n;
+      var nxt=document.getElementById(n===99?'pdone':'p'+n);
+      if(nxt)nxt.classList.add('active');
+      syncDots();
+      if(n!==99){var i=nxt&&nxt.querySelector('input,textarea');if(i)setTimeout(function(){i.focus()},120);}
+    },190);
   }
-
-  function syncDots() {
-    ['mobile','desktop'].forEach(function(variant) {
-      for (var i = 0; i < 4; i++) {
-        var prefix = variant === 'mobile' ? 'dm' : 'dd';
-        var d = document.getElementById(prefix + i);
-        if (!d) continue;
-        d.className = 'sdot h-1.5 rounded-full transition-all duration-300 ';
-        if (i < step)      { d.className += 'done bg-[#00cc7a]'; d.style.width = '20px' }
-        else if (i===step) { d.className += 'active bg-[#00ff9d]'; d.style.width = '6px' }
-        else               { d.className += 'bg-white/10'; d.style.width = '6px' }
+  function syncDots(){
+    ['m','d'].forEach(function(p){
+      for(var i=0;i<4;i++){
+        var d=document.getElementById('d'+p+i);if(!d)continue;
+        d.className='dot';d.style.width='6px';
+        if(i<step){d.classList.add('done');d.style.width='20px';}
+        else if(i===step)d.classList.add('active');
       }
     });
   }
 
-  /* ── BACK BUTTONS ───────────────────────────────────────────── */
-  document.getElementById('back1').addEventListener('click', function() { go(0) });
-  document.getElementById('back2').addEventListener('click', function() { go(1) });
-  document.getElementById('back3').addEventListener('click', function() { go(2) });
+  document.getElementById('back1').addEventListener('click',function(){go(0);});
+  document.getElementById('back2').addEventListener('click',function(){go(1);});
+  document.getElementById('back3').addEventListener('click',function(){go(2);});
+  document.getElementById('cta1').addEventListener('click',function(){go(2);});
+  document.getElementById('cta2').addEventListener('click',function(){go(3);});
 
-  /* ── CTA BUTTONS ────────────────────────────────────────────── */
-  document.getElementById('cta1').addEventListener('click', function() { go(2) });
-  document.getElementById('cta2').addEventListener('click', function() { go(3) });
-
-  /* ── USERNAME ───────────────────────────────────────────────── */
-  var ui   = document.getElementById('ui');
-  var uic  = document.getElementById('u-icon');
-  var umsg = document.getElementById('u-msg');
-  var cta0 = document.getElementById('cta0');
-
-  ui.addEventListener('input', function() {
-    var v = ui.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
-    ui.value = v;
-    document.getElementById('phdl').textContent = '@' + (v || 'username');
-    document.getElementById('url-slug').textContent = '@' + (v || 'username');
-
-    uValid = false; cta0.disabled = true;
-    if (v.length < 3) { setState(v ? 'idle' : 'idle', v ? 'Minimum 3 caractères' : '3 à 24 caractères — lettres, chiffres, _'); return }
-    if (v.length > 24){ setState('bad', 'Maximum 24 caractères'); return }
-
-    // Pattern de settings.astro : vérification locale d'abord
-    if (v === currentUsername && currentUsername.length >= 3) {
-      uVal = v; uValid = true; cta0.disabled = false;
-      setState('ok', '@' + v + ' ✓'); return;
-    }
-
-    setState('checking', 'Vérification');
+  var ui=document.getElementById('ui'),uic=document.getElementById('u-icon'),umsg=document.getElementById('u-msg'),cta0=document.getElementById('cta0');
+  ui.addEventListener('input',function(){
+    var v=ui.value.toLowerCase().replace(/[^a-z0-9_]/g,'');
+    ui.value=v;
+    document.getElementById('phdl').textContent='@'+(v||'username');
+    document.getElementById('url-slug').textContent='@'+(v||'username');
+    uValid=false;cta0.disabled=true;
+    if(v.length<3){setU('idle',v?'Minimum 3 caractères':'3 à 24 caractères — lettres, chiffres, _');return;}
+    if(v.length>24){setU('bad','Maximum 24 caractères');return;}
+    if(v===currentUsername&&currentUsername.length>=3){uVal=v;uValid=true;cta0.disabled=false;setU('ok','@'+v+' ✓');return;}
+    setU('checking','');
     clearTimeout(timer);
-    timer = setTimeout(function() { checkUsername(v) }, 600);
+    timer=setTimeout(function(){checkU(v);},600);
   });
-  ui.addEventListener('keydown', function(e) { if (e.key === 'Enter' && uValid) go(1) });
-  cta0.addEventListener('click', function() { if (uValid) go(1) });
+  ui.addEventListener('keydown',function(e){if(e.key==='Enter'&&uValid)go(1);});
+  cta0.addEventListener('click',function(){if(uValid)go(1);});
 
-  async function checkUsername(v) {
-    try {
-      var r = await fetch('/api/profile/check-username?username=' + encodeURIComponent(v));
-      var d = await r.json();
-      var available = d.data && d.data.available;
-      if (available) {
-        uVal = v; uValid = true; cta0.disabled = false;
-        setState('ok', '@' + v + ' est disponible ✓');
-      } else {
-        setState('bad', d.data && !d.data.available ? 'Ce pseudo est déjà pris' : 'Erreur de vérification');
-      }
-    } catch { setState('bad', 'Erreur réseau') }
+  async function checkU(v){
+    try{
+      var r=await fetch('/api/profile/check-username?username='+encodeURIComponent(v));
+      var d=await r.json();
+      var ok=d.data&&d.data.available;
+      if(ok){uVal=v;uValid=true;cta0.disabled=false;setU('ok','@'+v+' est disponible ✓');}
+      else setU('bad',(d.data&&!d.data.available)?'Ce pseudo est déjà pris':'Erreur de vérification');
+    }catch{setU('bad','Erreur réseau');}
+  }
+  function setU(s,msg){
+    ui.classList.remove('ok','bad');uic.textContent='';uic.style.color='';umsg.className='fmsg';
+    if(s==='ok'){ui.classList.add('ok');uic.textContent='✓';uic.style.color='#00ff9d';umsg.classList.add('ok');}
+    else if(s==='bad'){ui.classList.add('bad');uic.textContent='✗';uic.style.color='#ff5050';umsg.classList.add('bad');}
+    else if(s==='checking'){umsg.classList.add('checking');}
+    if(s!=='checking')umsg.textContent=msg;
   }
 
-  function setState(s, msg) {
-    ui.classList.remove('ok', 'bad');
-    uic.textContent = '';
-    umsg.className = 'text-[12px] mt-2 min-h-[18px] transition-colors duration-200 ';
+  var ni=document.getElementById('ni'),bi=document.getElementById('bi');
+  if(existingName)ni.value=existingName;
+  ni.addEventListener('input',function(){
+    var v=ni.value.trim();
+    document.getElementById('pname').textContent=v||('@'+(uVal||'bioforge'));
+    if(!avatarUrl){var l=document.getElementById('pavl');if(l)l.textContent=v.charAt(0).toUpperCase()||'?';}
+    syncP();
+  });
+  bi.addEventListener('input',function(){document.getElementById('bc').textContent=String(bi.value.length);document.getElementById('pbio').textContent=bi.value.trim();});
+  document.getElementById('fbi').addEventListener('input',function(e){document.getElementById('fbc').textContent=String(e.target.value.length);});
 
-    if (s === 'ok')       { ui.classList.add('ok');  uic.textContent = '✓'; uic.style.color = '#00ff9d'; umsg.className += 'text-[#00ff9d]' }
-    else if (s === 'bad') { ui.classList.add('bad'); uic.textContent = '✗'; uic.style.color = '#ff5050'; umsg.className += 'text-red-400' }
-    else if (s === 'checking') { uic.style.color = 'rgba(255,255,255,0.3)'; uic.textContent = '…'; umsg.className += 'checking rounded text-transparent' }
-    else                  { uic.style.color = ''; umsg.className += 'text-white/35' }
-
-    if (s !== 'checking') umsg.textContent = msg;
+  document.querySelectorAll('.preset').forEach(function(b){
+    b.addEventListener('click',function(){
+      document.querySelectorAll('.preset').forEach(function(x){x.classList.remove('selected');});
+      b.classList.add('selected');preset=b.dataset.p;syncP();
+    });
+  });
+  function syncP(){
+    var p=P[preset]||P.dark;
+    document.getElementById('phone-body').style.background=p.bg;
+    document.getElementById('pname').style.color=p.tc;
+    document.getElementById('pbio').style.color=p.tc;
+    var av=document.getElementById('pav');av.style.borderColor=p.pc;av.style.color=p.pc;
+    if(!avatarUrl)av.style.background=p.pc+'18';
+    var l1=document.getElementById('pl1');l1.style.background=p.b1;l1.style.color=p.b1c;l1.style.border='none';
+    [document.getElementById('pl2'),document.getElementById('pl3')].forEach(function(el){el.style.background=p.b2;el.style.color=p.b2c;el.style.border='1px solid '+p.pc+'40';});
+    var pill=document.getElementById('url-pill');pill.style.background=p.pc+'10';pill.style.borderColor=p.pc+'28';pill.style.color=p.pc;
   }
 
-  /* ── PROFILE ────────────────────────────────────────────────── */
-  var ni = document.getElementById('ni');
-  var bi = document.getElementById('bi');
-  if (existingName) ni.value = existingName;
-
-  ni.addEventListener('input', function() {
-    var v = ni.value.trim();
-    document.getElementById('pname').textContent = v || ('@' + (uVal || 'bioforge'));
-    if (!avatarUrl) { var l = document.getElementById('pavl'); if (l) l.textContent = v.charAt(0).toUpperCase() || '?' }
-    syncPreview();
-  });
-  bi.addEventListener('input', function() {
-    document.getElementById('bc').textContent = String(bi.value.length);
-    document.getElementById('pbio').textContent = bi.value.trim();
-  });
-  document.getElementById('fbi').addEventListener('input', function(e) {
-    document.getElementById('fbc').textContent = String(e.target.value.length);
-  });
-
-  /* ── PRESETS ────────────────────────────────────────────────── */
-  document.querySelectorAll('.preset').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('.preset').forEach(function(b) { b.classList.remove('selected') });
-      btn.classList.add('selected');
-      preset = btn.dataset.p;
-      syncPreview();
-    });
-  });
-
-  function syncPreview() {
-    var p = PRESETS[preset] || PRESETS.dark;
-    var body = document.getElementById('phone-body');
-    body.style.background = p.bg;
-
-    var pname = document.getElementById('pname');
-    pname.style.color = p.tc;
-    document.getElementById('pbio').style.color = p.tc;
-
-    var av = document.getElementById('pav');
-    av.style.borderColor = p.pc; av.style.color = p.pc;
-    if (!avatarUrl) av.style.background = p.pc + '18';
-
-    var pl1 = document.getElementById('pl1');
-    pl1.style.background = p.b1; pl1.style.color = p.b1c; pl1.style.border = 'none';
-
-    [document.getElementById('pl2'), document.getElementById('pl3')].forEach(function(el) {
-      el.style.background = p.b2; el.style.color = p.b2c;
-      el.style.border = '1px solid ' + p.pc + '40';
-    });
-
-    var pill = document.getElementById('url-pill');
-    pill.style.background = p.pc + '10';
-    pill.style.borderColor = p.pc + '28';
-    pill.style.color = p.pc;
-  }
-
-  /* ── FEEDBACK ───────────────────────────────────────────────── */
-  document.querySelectorAll('.ubtn').forEach(function(b) {
-    b.addEventListener('click', function() {
-      b.classList.toggle('selected');
-      var u = b.dataset.u;
-      usages = usages.includes(u) ? usages.filter(function(x){return x!==u}) : usages.concat([u]);
-    });
-  });
-  document.querySelectorAll('.chip').forEach(function(b) {
-    b.addEventListener('click', function() {
-      document.querySelectorAll('.chip').forEach(function(c){c.classList.remove('selected')});
-      b.classList.add('selected'); src = b.dataset.s;
-    });
-  });
-  document.querySelectorAll('.nps').forEach(function(b) {
-    b.addEventListener('click', function() {
-      document.querySelectorAll('.nps').forEach(function(x){x.classList.remove('selected')});
-      b.classList.add('selected'); npsVal = parseInt(b.dataset.n);
+  document.querySelectorAll('.ubtn').forEach(function(b){b.addEventListener('click',function(){b.classList.toggle('selected');var u=b.dataset.u;usages=usages.includes(u)?usages.filter(function(x){return x!==u;}):usages.concat([u]);});});
+  document.querySelectorAll('.chip').forEach(function(b){b.addEventListener('click',function(){document.querySelectorAll('.chip').forEach(function(c){c.classList.remove('selected');});b.classList.add('selected');src=b.dataset.s;});});
+  document.querySelectorAll('.npsbtn').forEach(function(b){
+    b.addEventListener('click',function(){
+      document.querySelectorAll('.npsbtn').forEach(function(x){x.classList.remove('selected');});
+      b.classList.add('selected');npsVal=parseInt(b.dataset.n);
       var e=['😐','😐','😕','😕','😑','😐','🙂','😊','😄','🤩','🔥'];
       var t=['Très déçu','Déçu','Pas convaincu','Plutôt non','Moyen','Neutre','Bien','Bien !','Super !','Excellent !','Exceptionnel 🔥'];
-      document.getElementById('nps-lbl').textContent = e[npsVal] + ' ' + t[npsVal];
+      document.getElementById('nps-lbl').textContent=e[npsVal]+' '+t[npsVal];
     });
   });
 
-  /* ── SUBMIT ─────────────────────────────────────────────────── */
-  document.getElementById('cta-sub').addEventListener('click', async function() {
-    var btn = document.getElementById('cta-sub');
-    var txt = document.getElementById('sub-txt');
-    btn.disabled = true; txt.textContent = 'Création en cours…';
-
-    try {
-      var r = await fetch('/api/profile/onboarding', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          username:     uVal,
-          display_name: ni.value.trim() || uVal,
-          bio:          bi.value.trim() || '',
-          preset:       preset,
-          feedback:     {usages, source: src, nps: npsVal, comment: document.getElementById('fbi').value.trim() || null}
-        })
-      });
-      var d = await r.json();
-      if (!d.success) throw new Error(d.error || 'Erreur');
-      document.getElementById('done-href').href = '/@' + d.data.username;
-      launchConfetti();
-      step = 99;
-      var p3 = document.getElementById('p3');
-      p3.classList.add('leaving');
-      setTimeout(function() {
-        p3.classList.remove('active', 'leaving');
-        var done = document.getElementById('pdone');
-        done.classList.add('active', 'animate-step-in');
-        ['sdots-mobile','sdots-desktop'].forEach(function(id){
-          var el = document.getElementById(id); if (el) el.style.opacity = '0';
-        });
-      }, 190);
-    } catch(e) {
-      showToast(e.message || 'Une erreur est survenue');
-      btn.disabled = false; txt.textContent = 'Créer mon profil ✦';
-    }
+  document.getElementById('cta-sub').addEventListener('click',async function(){
+    var btn=document.getElementById('cta-sub'),txt=document.getElementById('sub-txt');
+    btn.disabled=true;txt.textContent='Création en cours…';
+    try{
+      var r=await fetch('/api/profile/onboarding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:uVal,display_name:ni.value.trim()||uVal,bio:bi.value.trim()||'',preset,feedback:{usages,source:src,nps:npsVal,comment:document.getElementById('fbi').value.trim()||null}})});
+      var d=await r.json();
+      if(!d.success)throw new Error(d.error||'Erreur');
+      document.getElementById('done-href').href='/@'+d.data.username;
+      confetti();
+      step=99;
+      var p3=document.getElementById('p3');p3.classList.add('leaving');
+      setTimeout(function(){p3.classList.remove('active','leaving');document.getElementById('pdone').classList.add('active');document.getElementById('dots-m').style.opacity='0';document.getElementById('dots-d').style.opacity='0';},190);
+    }catch(e){toast(e.message||'Une erreur est survenue');btn.disabled=false;txt.textContent='Créer mon profil ✦';}
   });
 
-  /* ── CONFETTI ───────────────────────────────────────────────── */
-  function launchConfetti() {
-    var wrap = document.getElementById('cf-wrap');
-    var cols = ['#00ff9d','#00cc7a','#ffffff','#a0ffd6','#00ff9d'];
-    for (var i = 0; i < 60; i++) {
-      (function(i) {
-        setTimeout(function() {
-          var el = document.createElement('div');
-          el.className = 'animate-confetti-fall';
-          el.style.cssText = 'position:absolute;left:' + Math.random()*100 + '%;top:-10px;background:' + cols[Math.floor(Math.random()*cols.length)] + ';width:' + (4 + Math.random()*8) + 'px;height:' + (4 + Math.random()*8) + 'px;border-radius:' + (Math.random() > 0.5 ? '50%' : '2px') + ';animation-duration:' + (2 + Math.random()*2) + 's;animation-delay:' + (Math.random()*0.4) + 's;pointer-events:none';
-          wrap.appendChild(el);
-          setTimeout(function() { el.remove() }, 4500);
-        }, i * 28);
-      })(i);
-    }
+  function confetti(){
+    var cols=['#00ff9d','#00cc7a','#fff','#a0ffd6'];
+    for(var i=0;i<60;i++){(function(i){setTimeout(function(){var el=document.createElement('div');el.className='cf';el.style.cssText='left:'+Math.random()*100+'vw;background:'+cols[Math.floor(Math.random()*cols.length)]+';width:'+(4+Math.random()*8)+'px;height:'+(4+Math.random()*8)+'px;border-radius:'+(Math.random()>.5?'50%':'2px')+';animation-duration:'+(2+Math.random()*2)+'s;animation-delay:'+(Math.random()*.4)+'s';document.body.appendChild(el);setTimeout(function(){el.remove();},4500);},i*28);})(i);}
   }
+  function toast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(function(){t.classList.remove('show');},4000);}
 
-  /* ── TOAST ──────────────────────────────────────────────────── */
-  function showToast(msg) {
-    var t = document.getElementById('toast');
-    t.textContent = msg; t.classList.remove('hidden');
-    t.style.animation = 'none'; t.offsetHeight; t.style.animation = '';
-    setTimeout(function() { t.classList.add('hidden') }, 4000);
-  }
-
-  /* ── INIT ───────────────────────────────────────────────────── */
-  syncDots();
-  syncPreview();
-  if (existingName) {
-    document.getElementById('pname').textContent = existingName;
-    if (!avatarUrl) { var l = document.getElementById('pavl'); if (l) l.textContent = existingName.charAt(0).toUpperCase() }
-  }
-  if (currentUsername) {
-    ui.value = currentUsername;
-    document.getElementById('phdl').textContent = '@' + currentUsername;
-    document.getElementById('url-slug').textContent = '@' + currentUsername;
-    uVal = currentUsername; uValid = true; cta0.disabled = false;
-    setState('ok', '@' + currentUsername + ' ✓');
-  }
-  // Focus username on load
-  setTimeout(function() { if (!currentUsername) ui.focus() }, 300);
+  syncDots();syncP();
+  if(existingName){document.getElementById('pname').textContent=existingName;if(!avatarUrl){var l=document.getElementById('pavl');if(l)l.textContent=existingName.charAt(0).toUpperCase();}}
+  if(currentUsername){ui.value=currentUsername;document.getElementById('phdl').textContent='@'+currentUsername;document.getElementById('url-slug').textContent='@'+currentUsername;uVal=currentUsername;uValid=true;cta0.disabled=false;setU('ok','@'+currentUsername+' ✓');}
+  else{setTimeout(function(){ui.focus();},300);}
 </script>
 </body>
 </html>
