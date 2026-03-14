@@ -22,9 +22,9 @@ export const POST: APIRoute = async (ctx) => {
   if (!VALID_PROVIDERS.includes(provider ?? '')) return err('Provider invalide', 400);
 
   const _pl = planLimits as any;
-  const plan = _pl?.plan ?? (profile as any)?.plan ?? 'free';
-  const PAID = ['creator', 'pro', 'enterprise', 'business', 'team'];
-  const PROS = ['pro', 'enterprise', 'business', 'team'];
+  const plan = _pl?.plan ?? (profile as any)?.plan ?? 'Free';
+  const PAID = ['Creator', 'Pro', 'Enterprise' ];
+  const PROS = ['Pro', 'Enterprise' ];
   // Check plan limits for premium integrations
   const CREATOR_PROVIDERS = ['instagram','tiktok','youtube','twitch','twitter','discord','pinterest','mailchimp','klaviyo','convertkit','brevo','googlesheets','canva','throne','patreon'];
   const PRO_PROVIDERS     = ['snapchat','stripe','beehiiv','googleanalytics','googlesearchconsole'];
