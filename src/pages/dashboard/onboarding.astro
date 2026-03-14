@@ -61,12 +61,20 @@ const existingUsername = (profile as any)?.username ?? '';
   <link href="https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@500;700;800;900&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet"/>
   <style>
     *{ -webkit-font-smoothing: antialiased }
-    body{ font-family: 'DM Sans', sans-serif; background: #080a0d }
+    /* ── RESET — isoler la page de global.css ── */
+    html, body { all: revert }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
+    body{ font-family: 'DM Sans', sans-serif; background: #080a0d; color: white }
+    a { text-decoration: none; color: inherit }
+    button { font-family: inherit; cursor: pointer; background: none; border: none }
     .font-display{ font-family: 'Cabinet Grotesk', sans-serif }
 
     /* Panels */
     .panel { display: none }
     .panel.active { display: block }
+    @keyframes step-out { 0% { opacity:1; transform:translateX(0) } 100% { opacity:0; transform:translateX(-24px) } }
+    @keyframes shimmer  { 0% { background-position:200% 0 } 100% { background-position:-200% 0 } }
+    @keyframes pulse-dot { 0%,100% { box-shadow:0 0 0 0 rgba(0,255,157,0.5) } 50% { box-shadow:0 0 0 6px rgba(0,255,157,0) } }
     .panel.leaving { animation: step-out 0.2s ease forwards; pointer-events: none }
 
     /* Scrollbar */
@@ -81,6 +89,7 @@ const existingUsername = (profile as any)?.username ?? '';
 
     /* Preset card selected ring */
     .preset.selected { border-color: #00ff9d; box-shadow: 0 0 0 1px #00ff9d, 0 8px 24px rgba(0,255,157,0.12) }
+    .preset.selected .pcheck { display: grid }
 
     /* Usage btn */
     .ubtn.selected { border-color: #00ff9d; background: rgba(0,255,157,0.07); color: #00ff9d }
@@ -265,7 +274,7 @@ const existingUsername = (profile as any)?.username ?? '';
 
         <div class="grid grid-cols-2 gap-3 mb-6">
           <button class="preset selected text-left border border-white/[0.09] rounded-2xl p-4 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 relative group" data-p="dark">
-            <div class="absolute top-2.5 right-2.5 w-4 h-4 bg-[#00ff9d] rounded-full hidden group-[.selected]:grid place-items-center">
+            <div class="pcheck absolute top-2.5 right-2.5 w-4 h-4 bg-[#00ff9d] rounded-full hidden place-items-center">
               <svg width="8" height="8" fill="none" stroke="#000" stroke-width="3.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
             </div>
             <div class="h-10 rounded-lg mb-3 relative overflow-hidden" style="background:linear-gradient(135deg,#0a0a0a,#0f1f15)">
@@ -275,7 +284,7 @@ const existingUsername = (profile as any)?.username ?? '';
             <div class="text-[11px] text-white/40 mt-0.5">Sombre · Néon</div>
           </button>
           <button class="preset text-left border border-white/[0.09] rounded-2xl p-4 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 relative group" data-p="neon">
-            <div class="absolute top-2.5 right-2.5 w-4 h-4 bg-[#00ff9d] rounded-full hidden group-[.selected]:grid place-items-center">
+            <div class="pcheck absolute top-2.5 right-2.5 w-4 h-4 bg-[#00ff9d] rounded-full hidden place-items-center">
               <svg width="8" height="8" fill="none" stroke="#000" stroke-width="3.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
             </div>
             <div class="h-10 rounded-lg mb-3 relative overflow-hidden" style="background:linear-gradient(135deg,#1a0033,#0d001a)">
@@ -285,7 +294,7 @@ const existingUsername = (profile as any)?.username ?? '';
             <div class="text-[11px] text-white/40 mt-0.5">Violet · Électrique</div>
           </button>
           <button class="preset text-left border border-white/[0.09] rounded-2xl p-4 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 relative group" data-p="ocean">
-            <div class="absolute top-2.5 right-2.5 w-4 h-4 bg-[#00ff9d] rounded-full hidden group-[.selected]:grid place-items-center">
+            <div class="pcheck absolute top-2.5 right-2.5 w-4 h-4 bg-[#00ff9d] rounded-full hidden place-items-center">
               <svg width="8" height="8" fill="none" stroke="#000" stroke-width="3.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
             </div>
             <div class="h-10 rounded-lg mb-3 relative overflow-hidden" style="background:linear-gradient(135deg,#001a33,#002244)">
@@ -295,7 +304,7 @@ const existingUsername = (profile as any)?.username ?? '';
             <div class="text-[11px] text-white/40 mt-0.5">Bleu · Profond</div>
           </button>
           <button class="preset text-left border border-white/[0.09] rounded-2xl p-4 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 relative group" data-p="light">
-            <div class="absolute top-2.5 right-2.5 w-4 h-4 bg-[#00ff9d] rounded-full hidden group-[.selected]:grid place-items-center">
+            <div class="pcheck absolute top-2.5 right-2.5 w-4 h-4 bg-[#00ff9d] rounded-full hidden place-items-center">
               <svg width="8" height="8" fill="none" stroke="#000" stroke-width="3.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
             </div>
             <div class="h-10 rounded-lg mb-3 relative overflow-hidden" style="background:linear-gradient(135deg,#f0f0f0,#e8f0ff)">
