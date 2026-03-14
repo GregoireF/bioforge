@@ -31,8 +31,8 @@ export const POST: APIRoute = async (ctx) => {
 
   const _pl    = planLimits as any;
   const plan   = _pl?.plan ?? (profile as any)?.plan ?? 'free';
-  const PAID   = ['creator', 'pro', 'enterprise', 'business', 'team'];
-  const PROS   = ['pro', 'enterprise', 'business', 'team'];
+  const PAID   = ['Creator', 'Pro', 'Enterprise'];
+  const PROS   = ['Creator', 'Pro', 'Enterprise' ];
   if (!PAID.includes(plan)) return err('Plan Creator requis pour le link shortener', 403);
 
   let body: any;
