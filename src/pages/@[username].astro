@@ -331,6 +331,7 @@ const wallpaperDim  = (theme as any).wallpaper_dim  ?? 50;
 // ── Hero mode ────────────────────────────────────────────────────────────────
 const headerStyle  = (theme as any).header_style ?? 'simple';
 const heroImage    = (theme as any).hero_image ?? '';
+const heroPosition = (theme as any).hero_position ?? 'center';
 const heroHeight   = { sm:'200px', md:'300px', lg:'420px', full:'70vh' }[(theme as any).hero_height ?? 'md'] ?? '300px';
 const heroOverlay  = (theme as any).hero_overlay ?? 40;
 const heroStyle    = (theme as any).hero_style ?? 'cinematic';
@@ -589,6 +590,23 @@ const BADGE_COLORS: Record<string, string> = {
     style={`font-family: '${theme.font_family}', system-ui, sans-serif; color: ${tc};`}>
 
     <div class="w-full" style={`max-width: ${contentMaxW};`}>
+      {/* Card layout — wraps everything in a card */}
+      {(theme as any).profile_layout === 'card' && (
+        <style>{`
+          .card-layout-wrap {
+            background: rgba(255,255,255,0.04);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 28px;
+            padding: 28px;
+            margin-top: 12px;
+          }
+        `}</style>
+      )}
+
+      <!-- HEADER + BLOCKS CARD WRAPPER -->
+      <div class={(theme as any).profile_layout === 'card' ? 'card-layout-wrap' : ''}>
 
       <!-- HEADER -->
       {headerStyle === 'hero' ? (
@@ -596,8 +614,10 @@ const BADGE_COLORS: Record<string, string> = {
         <header class="mb-10 anim-block -mx-4" style={`margin-top: -64px;`}>
           <!-- Hero image container -->
           <div class="relative overflow-hidden" style={`height: ${heroHeight};`}>
-            {heroImage ? (
-              <img src={heroImage} alt=""
+            {/* Use heroImage if set, fallback to avatar_url, then gradient */}
+            {(heroImage || profile.avatar_url) ? (
+              <img src={heroImage || profile.avatar_url}
+                alt={`Photo de profil de ${profile.display_name || profile.username}`}
                 class="w-full h-full object-cover"
                 style={`object-position: ${heroPosition ?? 'center'};`}
                 loading="eager" />
@@ -650,10 +670,13 @@ const BADGE_COLORS: Record<string, string> = {
         <!-- ── STANDARD HEADER ── -->
         <header class={`mb-10 anim-block ${(theme as any).profile_layout === 'left' ? 'text-left' : 'text-center'}`}>
           <!-- Glass / Banner wrapper -->
-          <div style={headerStyle === 'glass'
-            ? `backdrop-filter: blur(${(theme as any).glass_intensity ?? 12}px); -webkit-backdrop-filter: blur(${(theme as any).glass_intensity ?? 12}px); background: rgba(255,255,255,0.05); border-radius: 24px; padding: 28px; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 0;`
-            : headerStyle === 'banner'
-              ? `background: ${pc}15; border-radius: 24px; padding: 24px; border: 1px solid ${pc}28; margin-bottom: 0;`
+          <div style={
+              headerStyle === 'glass'
+                ? `backdrop-filter: blur(${(theme as any).glass_intensity ?? 12}px); -webkit-backdrop-filter: blur(${(theme as any).glass_intensity ?? 12}px); background: rgba(255,255,255,0.05); border-radius: 24px; padding: 28px; border: 1px solid rgba(255,255,255,0.1);`
+              : headerStyle === 'banner'
+                ? `background: ${pc}15; border-radius: 24px; padding: 24px; border: 1px solid ${pc}28;`
+              : (theme as any).profile_layout === 'card'
+                ? `background: rgba(255,255,255,0.04); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.08); border-radius: 28px; padding: 32px;`
               : ''}>
             <!-- Avatar or Logo -->
             {showLogo && logoUrl ? (
@@ -783,7 +806,7 @@ const BADGE_COLORS: Record<string, string> = {
                 ? getLinkSeparatorHtml() : '';
 
               return (
-                <Fragment>
+                <>
               {sepHtml && <div set:html={sepHtml}></div>}
               <div class={`block-dot-wrap link-block group relative ${animClass}`}
                   style={delay}
@@ -847,7 +870,7 @@ const BADGE_COLORS: Record<string, string> = {
                     </button>
                   </div>
                 </div>
-              </Fragment>
+              </>
               );
             }
 
@@ -1329,6 +1352,8 @@ const BADGE_COLORS: Record<string, string> = {
         </div>
       )}
 
+      </div>{/* end card-layout-wrap */}
+
       <!-- SHARE PROFILE BUTTON -->
       <div class="flex justify-center mb-4 -mt-2">
         <button id="share-profile-btn"
@@ -1591,7 +1616,7 @@ const BADGE_COLORS: Record<string, string> = {
   )}
 
   <!-- ===== SCRIPT ===== -->
-  <script type="module" define:vars={{ bridgeJson: bridge, animPreset: theme.animation_preset, hasAnimations: theme.animations, extraEffectsCSS }}>
+  <script type="module" define:vars={{ bridgeJson: bridge, animPreset: theme.animation_preset, hasAnimations: theme.animations }}>
 
     const bridgeParsed = JSON.parse(bridgeJson);
     const { profileId, profileUrl, profileName, primaryColor: pc, bgColor: bg, textColor: tc, qrDataUrl } = bridgeParsed;
