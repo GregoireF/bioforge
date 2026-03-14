@@ -67,13 +67,37 @@ const DEFAULT_THEME = {
   block_shadow:     true,
   glass_intensity:  12,
   spacing:          'normal',
-  // Overlays (NEW)
+  // Overlays
   overlay_top:      false,
   overlay_bottom:   false,
   overlay_color:    '#000000',
+  // Logo (Creator+)
+  show_logo:        false,
+  logo_url:         '',
+  logo_size:        'md',         // sm | md | lg (lg = Pro)
+  // Wallpaper (Creator+ = image, Pro = video)
+  wallpaper_type:   'none',       // none | image | video
+  wallpaper_url:    '',
+  wallpaper_video_url: '',
+  wallpaper_blur:   0,            // 0-20
+  wallpaper_dim:    50,           // 0-90 opacity of dim overlay
+  // Custom font (Pro)
+  custom_font_url:  '',
+  custom_font_name: '',
 };
 
-const ALLOWED_FONTS   = ['Exo 2','Orbitron','Rajdhani','Bebas Neue','Audiowide','Russo One','Space Grotesk','DM Sans','Quicksand','Figtree','Inter','Syne','Cabinet Grotesk'];
+const ALLOWED_FONTS = [
+  // Gratuites — toutes
+  'Exo 2','Orbitron','Rajdhani','Bebas Neue','Audiowide','Russo One',
+  'Space Grotesk','DM Sans','Quicksand','Figtree','Inter','Syne',
+  'Cabinet Grotesk','Outfit','Plus Jakarta Sans','Nunito','Poppins',
+  'Josefin Sans','Archivo','Barlow','Rubik','Work Sans','Manrope',
+  'Space Mono','JetBrains Mono','Fira Code',
+  // Serif
+  'Playfair Display','Lora','Merriweather','DM Serif Display',
+  // Display
+  'Bungee','Righteous','Teko','Oswald','Anton',
+];
 const ALLOWED_LAYOUTS = ['centered','left','card','minimal'] as const;
 const ALLOWED_HEADERS = ['simple','glass','banner','hero'] as const;
 
@@ -298,10 +322,10 @@ const PRESETS = [
             <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Disposition du profil</p>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
-                { id:'centered', label:'Centré',   icon:'⊙', desc:'Avatar centré, liens full-width' },
-                { id:'left',     label:'Gauche',   icon:'⊏', desc:'Avatar + texte à gauche' },
-                { id:'card',     label:'Card',     icon:'▭', desc:'Profil dans une carte' },
-                { id:'minimal',  label:'Minimal',  icon:'—', desc:'Ultra épuré, juste les liens' },
+                { id:'centered', label:'Centré',  icon:'⊙', desc:'Avatar centré' },
+                { id:'left',     label:'Gauche',  icon:'⊏', desc:'Avatar à gauche' },
+                { id:'card',     label:'Card',    icon:'▭', desc:'Dans une carte' },
+                { id:'minimal',  label:'Minimal', icon:'—', desc:'Ultra épuré' },
               ].map(l => (
                 <button class="choice-btn layout-btn flex flex-col items-center gap-2 p-3 glass border-2 border-white/10 rounded-xl hover:border-white/20 transition-all text-center"
                   data-layout={l.id} title={l.desc}>
@@ -318,13 +342,16 @@ const PRESETS = [
             <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Style du header</p>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
-                { id:'simple', label:'Simple',    icon:'○',  desc:'Avatar + nom + bio' },
-                { id:'glass',  label:'Glass Card', icon:'◫',  desc:'Carte verre dépoli' },
-                { id:'banner', label:'Banner',    icon:'▬',  desc:'Bannière colorée derrière' },
-                { id:'hero',   label:'Hero Image', icon:'🖼', desc:'Grande image en fond' },
+                { id:'simple', label:'Simple',    icon:'○',  desc:'Avatar + nom + bio', free: true },
+                { id:'glass',  label:'Glass Card', icon:'◫', desc:'Carte verre dépoli',  free: true },
+                { id:'banner', label:'Banner',    icon:'▬',  desc:'Bannière colorée',    free: true },
+                { id:'hero',   label:'Hero Image', icon:'🖼', desc:'Grande image plein header', premium: 'creator' },
               ].map(h => (
-                <button class="choice-btn header-btn flex flex-col items-center gap-2 p-3 glass border-2 border-white/10 rounded-xl hover:border-white/20 transition-all text-center"
-                  data-header={h.id} title={h.desc}>
+                <button class="choice-btn header-btn flex flex-col items-center gap-2 p-3 glass border-2 border-white/10 rounded-xl hover:border-white/20 transition-all text-center relative"
+                  data-header={h.id} data-premium={h.premium ?? ''} title={h.desc}>
+                  {h.premium && (
+                    <span class="absolute -top-1.5 -right-1.5" style={h.premium==='pro'?'':''}>{h.premium==='pro'?'⚡':'👑'}</span>
+                  )}
                   <span class="text-2xl leading-none">{h.icon}</span>
                   <span class="text-xs font-semibold text-white">{h.label}</span>
                   <span class="text-xs text-gray-600 leading-tight">{h.desc}</span>
@@ -334,49 +361,118 @@ const PRESETS = [
           </div>
 
           <!-- Hero image settings (shown when hero selected) -->
-          <div id="hero-settings" class="hidden space-y-4 p-4 rounded-xl bg-white/3 border border-white/8">
-            <p class="text-xs text-gray-400 font-medium">Image Hero</p>
+          <div id="hero-settings" class="space-y-4 p-4 rounded-xl border border-neon-green/15 bg-neon-green/3" style="display:none">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-sm font-semibold text-white">Image Hero</span>
+              <span class="badge-creator">👑 Creator</span>
+              <span class="text-xs text-gray-500">— remplace l'avatar par une grande image</span>
+            </div>
+            <!-- URL input -->
             <div class="space-y-1.5">
-              <label class="text-xs text-gray-500">URL de l'image</label>
+              <label class="text-xs text-gray-500">URL de l'image (16:9 recommandé)</label>
               <input type="url" id="hero-image-url" value={theme.hero_image} placeholder="https://…/ma-banniere.jpg"
-                class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none transition-colors" />
+                class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none transition-colors"
+                data-premium="creator" />
             </div>
-            <div class="grid grid-cols-3 gap-2">
-              {[
-                { id:'sm',   label:'Compact', h:'120px' },
-                { id:'md',   label:'Moyen',   h:'200px' },
-                { id:'lg',   label:'Grand',   h:'280px' },
-                { id:'full', label:'Pleine page', h:'100vh' },
-              ].map((s,i) => (
-                <button class="choice-btn hero-height-btn py-2 px-1 glass border-2 border-white/10 rounded-lg text-xs text-gray-400 hover:text-white transition-all" data-height={s.id}>
-                  {s.label}
-                </button>
-              ))}
+            <!-- Height -->
+            <div>
+              <p class="text-xs text-gray-500 mb-2">Hauteur du hero</p>
+              <div class="grid grid-cols-4 gap-2">
+                {[
+                  { id:'sm',   label:'Compact',  sub:'150px' },
+                  { id:'md',   label:'Moyen',    sub:'250px' },
+                  { id:'lg',   label:'Grand',    sub:'350px' },
+                  { id:'full', label:'Full page', sub:'100vh' },
+                ].map(s => (
+                  <button class="choice-btn hero-height-btn py-2.5 glass border-2 border-white/10 rounded-xl text-xs text-gray-400 hover:text-white transition-all text-center"
+                    data-height={s.id} data-premium="creator">
+                    <span class="block font-semibold text-white">{s.label}</span>
+                    <span class="text-gray-600">{s.sub}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-            <div class="grid grid-cols-3 gap-2">
+            <!-- Position + overlay -->
+            <div class="grid grid-cols-2 gap-4">
               <div>
-                <p class="text-xs text-gray-500 mb-1.5">Position image</p>
+                <p class="text-xs text-gray-500 mb-2">Position image</p>
                 <div class="flex gap-1">
-                  {['top','center','bottom'].map(pos => (
-                    <button class="choice-btn hero-pos-btn flex-1 py-1.5 text-xs glass border-2 border-white/10 rounded-lg text-gray-400 hover:text-white transition-all" data-pos={pos}>
+                  {['Haut','Centre','Bas'].map((pos, i) => (
+                    <button class={`choice-btn hero-pos-btn flex-1 py-2 text-xs glass border-2 border-white/10 rounded-lg text-gray-400 hover:text-white transition-all`}
+                      data-pos={['top','center','bottom'][i]} data-premium="creator">
                       {pos}
                     </button>
                   ))}
                 </div>
               </div>
-              <div class="col-span-2">
-                <div class="flex justify-between items-center mb-1.5">
-                  <p class="text-xs text-gray-500">Overlay sombre</p>
+              <div>
+                <div class="flex justify-between mb-2">
+                  <p class="text-xs text-gray-500">Assombrissement</p>
                   <span id="hero-overlay-val" class="text-xs font-mono text-white">{theme.hero_overlay}%</span>
                 </div>
                 <input type="range" id="hero-overlay-slider" min="0" max="80" value={theme.hero_overlay}
-                  class="w-full accent-neon-green h-1.5 rounded-full" />
+                  class="w-full accent-neon-green h-1.5 rounded-full" data-premium="creator" />
+              </div>
+            </div>
+          </div>
+
+          <!-- ── LOGO ── -->
+          <div class="space-y-3 pt-4 border-t border-white/8">
+            <div class="flex items-center gap-2">
+              <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Logo personnalisé</p>
+              <span class="badge-creator">👑 Creator</span>
+            </div>
+            <p class="text-xs text-gray-600">Remplace le nom d'utilisateur par ton logo ou image de marque.</p>
+
+            <!-- Toggle -->
+            <label class="flex items-center justify-between p-3.5 glass rounded-xl cursor-pointer hover:bg-white/3 border border-white/5 transition-all">
+              <span class="text-sm text-gray-300 font-medium">Activer le logo</span>
+              <input type="checkbox" id="show-logo" checked={theme.show_logo}
+                class="toggle w-11 h-6 rounded-full appearance-none bg-white/10 relative cursor-pointer focus:outline-none"
+                data-premium="creator" />
+            </label>
+
+            <div id="logo-settings" class={theme.show_logo ? '' : 'hidden'}>
+              <div class="space-y-3">
+                <!-- Logo URL -->
+                <div class="space-y-1.5">
+                  <label class="text-xs text-gray-500">URL du logo</label>
+                  <div class="flex items-center gap-3">
+                    <div id="logo-preview" class="shrink-0 w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
+                      {theme.logo_url
+                        ? <img src={theme.logo_url} class="w-full h-full object-contain" />
+                        : <span class="text-xl">🏷️</span>
+                      }
+                    </div>
+                    <input type="url" id="logo-url" value={theme.logo_url} placeholder="https://…/logo.png (PNG transparent conseillé)"
+                      class="flex-1 px-4 py-3 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none transition-colors"
+                      data-premium="creator" />
+                  </div>
+                </div>
+                <!-- Logo size -->
+                <div>
+                  <p class="text-xs text-gray-500 mb-2">Taille du logo</p>
+                  <div class="flex gap-2">
+                    {[
+                      { id:'sm', label:'Small',  sub:'48px',  free: true },
+                      { id:'md', label:'Medium', sub:'80px',  free: true },
+                      { id:'lg', label:'Large',  sub:'120px', premium: 'pro' },
+                    ].map(s => (
+                      <button class="choice-btn logo-size-btn flex-1 py-2.5 glass border-2 border-white/10 rounded-xl text-xs text-center hover:border-white/20 transition-all relative"
+                        data-size={s.id} data-premium={s.premium ?? ''}>
+                        {s.premium && <span class="absolute -top-1.5 -right-1 text-xs">⚡</span>}
+                        <span class="block font-semibold text-white">{s.label}</span>
+                        <span class="text-gray-600">{s.sub}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
           <!-- Content width -->
-          <div class="space-y-3">
+          <div class="space-y-3 pt-4 border-t border-white/8">
             <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Largeur du contenu</p>
             <div class="flex gap-2">
               {[
@@ -390,7 +486,7 @@ const PRESETS = [
                     <div style={`width:${['narrow','normal','wide'].indexOf(w.id)*8+12}px;height:3px;background:currentColor;border-radius:2px`}></div>
                   </div>
                   {w.label}
-                  <span class="block text-gray-600 text-xs">{w.w}</span>
+                  <span class="block text-gray-600">{w.w}</span>
                 </button>
               ))}
             </div>
@@ -520,6 +616,81 @@ const PRESETS = [
                 <span class="text-xs text-gray-500">Couleur overlay</span>
                 <input type="color" id="overlay-color" value={theme.overlay_color}
                   class="swatch w-8 h-8 rounded-lg cursor-pointer border border-white/10 p-0.5" />
+              </div>
+            </div>
+          </div>
+
+          <!-- ── WALLPAPER ── -->
+          <div class="space-y-4 pt-4 border-t border-white/8">
+            <div class="flex items-center gap-2">
+              <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Wallpaper</p>
+            </div>
+            <!-- Type selector -->
+            <div class="flex gap-2">
+              {[
+                { id:'none',  label:'Aucun',  icon:'⊘',  premium: '' },
+                { id:'image', label:'Image',  icon:'🖼',  premium: 'creator' },
+                { id:'video', label:'Vidéo',  icon:'🎬',  premium: 'pro' },
+              ].map(w => (
+                <button class="choice-btn wallpaper-type-btn flex-1 py-3 glass border-2 border-white/10 rounded-xl text-xs text-gray-400 hover:text-white transition-all text-center relative"
+                  data-wallpaper={w.id} data-premium={w.premium}>
+                  {w.premium && (
+                    <span class="absolute -top-2 right-1" style={w.premium==='pro'?'color:#c084fc;font-size:11px':'color:#00ff9d;font-size:11px'}>
+                      {w.premium==='pro'?'⚡Pro':'👑Creator'}
+                    </span>
+                  )}
+                  <span class="block text-lg mb-0.5">{w.icon}</span>
+                  <span class="font-semibold text-white block">{w.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <!-- Image wallpaper settings -->
+            <div id="wallpaper-image-settings" class="hidden space-y-3 p-4 rounded-xl bg-white/3 border border-white/8">
+              <p class="text-xs text-neon-green font-semibold flex items-center gap-1.5">🖼 Image de fond <span class="badge-creator">Creator</span></p>
+              <input type="url" id="wallpaper-url" value={theme.wallpaper_url}
+                placeholder="https://… (JPG, PNG, WebP)"
+                class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none transition-colors"
+                data-premium="creator" />
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <div class="flex justify-between mb-1.5">
+                    <span class="text-xs text-gray-500">Flou</span>
+                    <span id="wallpaper-blur-val" class="text-xs font-mono text-white">{theme.wallpaper_blur}px</span>
+                  </div>
+                  <input type="range" id="wallpaper-blur" min="0" max="20" value={theme.wallpaper_blur}
+                    class="w-full accent-neon-green h-1.5 rounded-full" data-premium="creator" />
+                </div>
+                <div>
+                  <div class="flex justify-between mb-1.5">
+                    <span class="text-xs text-gray-500">Assombrir</span>
+                    <span id="wallpaper-dim-val" class="text-xs font-mono text-white">{theme.wallpaper_dim}%</span>
+                  </div>
+                  <input type="range" id="wallpaper-dim" min="0" max="90" value={theme.wallpaper_dim}
+                    class="w-full accent-neon-green h-1.5 rounded-full" data-premium="creator" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Video wallpaper settings -->
+            <div id="wallpaper-video-settings" class="hidden space-y-3 p-4 rounded-xl bg-purple-500/5 border border-purple-500/20">
+              <p class="text-xs text-purple-400 font-semibold flex items-center gap-1.5">🎬 Vidéo de fond <span class="badge-pro">⚡ Pro</span></p>
+              <input type="url" id="wallpaper-video-url" value={theme.wallpaper_video_url}
+                placeholder="https://… (MP4, WebM — muet recommandé)"
+                class="w-full px-4 py-3 glass border border-purple-500/20 rounded-xl text-white text-sm placeholder-gray-600 focus:border-purple-500/50 focus:outline-none transition-colors"
+                data-premium="pro" />
+              <div class="p-3 rounded-xl bg-purple-500/8 border border-purple-500/15 text-xs text-purple-300/70">
+                💡 Utilise une vidéo courte en boucle (5-10s), sans son. Héberge sur Cloudinary ou Supabase Storage.
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <div class="flex justify-between mb-1.5">
+                    <span class="text-xs text-gray-500">Assombrir</span>
+                    <span id="wallpaper-dim-video-val" class="text-xs font-mono text-white">{theme.wallpaper_dim}%</span>
+                  </div>
+                  <input type="range" id="wallpaper-dim-video" min="0" max="90" value={theme.wallpaper_dim}
+                    class="w-full accent-purple h-1.5 rounded-full" style="accent-color:#a855f7" data-premium="pro" />
+                </div>
               </div>
             </div>
           </div>
@@ -742,27 +913,111 @@ const PRESETS = [
       <!-- ══ TYPOGRAPHY ══ -->
       <div class="sec-panel" id="panel-typography">
         <div class="p-5 glass rounded-2xl border border-white/8 space-y-5">
-          <p class="text-sm font-semibold text-white">Police — toutes gratuites</p>
-          <div class="grid grid-cols-2 gap-2">
+          <div class="flex items-center justify-between">
+            <p class="text-sm font-semibold text-white">Police de caractères</p>
+            <span class="text-xs text-gray-600">{ALLOWED_FONTS.length} polices disponibles</span>
+          </div>
+
+          <!-- Search filter -->
+          <div class="relative">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/></svg>
+            <input type="text" id="font-search" placeholder="Rechercher une police…"
+              class="w-full pl-8 pr-4 py-2.5 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/40 focus:outline-none transition-colors" />
+          </div>
+
+          <!-- Category tabs -->
+          <div class="flex gap-1.5 flex-wrap">
             {[
-              { name:'Exo 2',         cat:'Tech / Futuriste' },
-              { name:'Orbitron',      cat:'Sci-Fi / Gaming' },
-              { name:'Rajdhani',      cat:'Moderne / Sharp' },
-              { name:'Bebas Neue',    cat:'Display / Impact' },
-              { name:'Audiowide',     cat:'Électronique' },
-              { name:'Russo One',     cat:'Solide / Bold' },
-              { name:'Quicksand',     cat:'Friendly / Rond' },
-              { name:'Figtree',       cat:'Clean / Lisible' },
-              { name:'DM Sans',       cat:'Neutre / Pro' },
-              { name:'Space Grotesk', cat:'Géométrique' },
-              { name:'Syne',          cat:'Editorial / Unique' },
-              { name:'Inter',         cat:'Universel / App' },
+              { id:'all',     label:'Toutes' },
+              { id:'tech',    label:'Tech / Gaming' },
+              { id:'clean',   label:'Clean / Pro' },
+              { id:'serif',   label:'Serif' },
+              { id:'display', label:'Display' },
+              { id:'mono',    label:'Mono' },
+            ].map((c, i) => (
+              <button class={`font-cat-btn px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${i===0?'border-neon-green/40 bg-neon-green/8 text-white':'border-white/10 text-gray-500 hover:text-white hover:border-white/20'}`}
+                data-cat={c.id}>{c.label}</button>
+            ))}
+          </div>
+
+          <!-- Font grid -->
+          <div class="grid grid-cols-1 gap-1.5 max-h-64 overflow-y-auto scrollbar-none pr-1" id="font-grid">
+            {[
+              // Tech / Gaming
+              { name:'Exo 2',          cat:'tech',    preview:'Tech / Futuriste' },
+              { name:'Orbitron',       cat:'tech',    preview:'Sci-Fi / Gaming' },
+              { name:'Rajdhani',       cat:'tech',    preview:'Moderne / Sharp' },
+              { name:'Audiowide',      cat:'tech',    preview:'Électronique' },
+              { name:'Russo One',      cat:'tech',    preview:'Solide / Bold' },
+              { name:'Space Grotesk',  cat:'tech',    preview:'Géométrique' },
+              { name:'Bebas Neue',     cat:'display', preview:'Display / Impact' },
+              { name:'Syne',           cat:'tech',    preview:'Éditorial' },
+              // Clean / Pro
+              { name:'DM Sans',        cat:'clean',   preview:'Neutre / Pro' },
+              { name:'Inter',          cat:'clean',   preview:'Universel / App' },
+              { name:'Figtree',        cat:'clean',   preview:'Clean / Lisible' },
+              { name:'Quicksand',      cat:'clean',   preview:'Friendly / Rond' },
+              { name:'Outfit',         cat:'clean',   preview:'Moderne / Clair' },
+              { name:'Plus Jakarta Sans', cat:'clean', preview:'Élégant / Premium' },
+              { name:'Nunito',         cat:'clean',   preview:'Doux / Accessible' },
+              { name:'Poppins',        cat:'clean',   preview:'Startup / App' },
+              { name:'Josefin Sans',   cat:'clean',   preview:'Chic / Fashion' },
+              { name:'Archivo',        cat:'clean',   preview:'Editorial / News' },
+              { name:'Barlow',         cat:'clean',   preview:'Condensed / Sport' },
+              { name:'Rubik',          cat:'clean',   preview:'Playful / Round' },
+              { name:'Work Sans',      cat:'clean',   preview:'Corporate / Clean' },
+              { name:'Manrope',        cat:'clean',   preview:'Moderne / Variable' },
+              // Serif
+              { name:'Playfair Display', cat:'serif', preview:'Luxe / Magazine' },
+              { name:'Lora',           cat:'serif',   preview:'Littéraire / Élégant' },
+              { name:'Merriweather',   cat:'serif',   preview:'Classique / News' },
+              { name:'DM Serif Display', cat:'serif', preview:'Display Serif' },
+              // Display / Bold
+              { name:'Righteous',      cat:'display', preview:'Retro / Fun' },
+              { name:'Teko',           cat:'display', preview:'Compact / Sport' },
+              { name:'Oswald',         cat:'display', preview:'Bold / Impact' },
+              { name:'Anton',          cat:'display', preview:'Headlines / Choc' },
+              { name:'Bungee',         cat:'display', preview:'Street / Urban' },
+              // Mono
+              { name:'Space Mono',     cat:'mono',    preview:'Code / Dev' },
+              { name:'JetBrains Mono', cat:'mono',    preview:'IDE / Tech' },
+              { name:'Fira Code',      cat:'mono',    preview:'Code / Élégant' },
+              // Cabinet Grotesk toutes catégories
+              { name:'Cabinet Grotesk', cat:'clean',  preview:'Premium / Unique' },
             ].map(f => (
-              <button class="choice-btn font-btn flex items-center justify-between px-3 py-3 glass border-2 border-white/10 rounded-xl hover:border-white/20 transition-all" data-font={f.name}>
-                <span class="text-sm text-white font-medium" style={`font-family:'${f.name}',sans-serif`}>{f.name}</span>
-                <span class="text-xs text-gray-600">{f.cat}</span>
+              <button
+                class="choice-btn font-btn font-item flex items-center justify-between px-3 py-2.5 glass border-2 border-white/8 rounded-xl hover:border-white/20 transition-all"
+                data-font={f.name} data-font-cat={f.cat}>
+                <span class="text-sm text-white" style={`font-family:'${f.name}',sans-serif`}>{f.name}</span>
+                <span class="text-xs text-gray-600 truncate max-w-[120px]">{f.preview}</span>
               </button>
             ))}
+          </div>
+
+          <!-- Custom font (Pro) -->
+          <div class="pt-4 border-t border-white/8 space-y-3">
+            <div class="flex items-center gap-2">
+              <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Police personnalisée</p>
+              <span class="badge-pro">⚡ Pro</span>
+            </div>
+            <p class="text-xs text-gray-600">Importe n'importe quelle police Google Fonts ou via URL CSS.</p>
+            <div class="space-y-2">
+              <input type="url" id="custom-font-url"
+                value={theme.custom_font_url}
+                placeholder="https://fonts.googleapis.com/css2?family=MaPolice…"
+                class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-purple-500/40 focus:outline-none transition-colors"
+                data-premium="pro" />
+              <input type="text" id="custom-font-name"
+                value={theme.custom_font_name}
+                placeholder="Nom de la police (ex: MaPolice)"
+                class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-purple-500/40 focus:outline-none transition-colors"
+                data-premium="pro" />
+              <button id="apply-custom-font"
+                class="w-full py-2.5 rounded-xl text-sm font-semibold transition-all bg-purple-500/15 border border-purple-500/30 text-purple-300 hover:bg-purple-500/25"
+                data-premium="pro">
+                Appliquer cette police →
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1101,6 +1356,10 @@ const PRESETS = [
       return `<div style="width:100%;height:${h};position:relative;overflow:hidden;margin-bottom:0">
         <img src="${t.hero_image}" style="width:100%;height:100%;object-fit:cover;object-position:${t.hero_position ?? 'center'}" />
         <div style="position:absolute;inset:0;background:rgba(0,0,0,${ov/100})"></div>
+        <div style="position:absolute;bottom:0;left:0;right:0;padding:20px 24px;background:linear-gradient(to top,rgba(0,0,0,0.7),transparent)">
+          <div style="font-size:22px;font-weight:700;color:#fff;font-family:'${font}'">${p.display_name||p.username||'Ton Nom'}</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.6)">@${p.username||'username'}</div>
+        </div>
       </div>`;
     })();
 
@@ -1170,6 +1429,28 @@ const PRESETS = [
     const overlayBottom = t.overlay_bottom ? `<div style="position:fixed;bottom:0;left:0;right:0;height:120px;background:linear-gradient(to top,${t.overlay_color ?? '#000'}cc,transparent);z-index:0;pointer-events:none"></div>` : '';
     const blurOverlay   = t.background_style === 'blur' ? `<div style="position:fixed;inset:0;backdrop-filter:blur(60px);background:${t.background_color}88;z-index:0"></div>` : '';
 
+    // Wallpaper
+    const wallpaperHTML = (() => {
+      if (t.wallpaper_type === 'image' && t.wallpaper_url) {
+        const blur = t.wallpaper_blur > 0 ? `filter:blur(${t.wallpaper_blur}px);` : '';
+        const dim  = t.wallpaper_dim  > 0 ? `<div style="position:fixed;inset:0;background:rgba(0,0,0,${t.wallpaper_dim/100});z-index:0"></div>` : '';
+        return `<div style="position:fixed;inset:0;z-index:-1;overflow:hidden"><img src="${t.wallpaper_url}" style="width:100%;height:100%;object-fit:cover;${blur}" /></div>${dim}`;
+      }
+      if (t.wallpaper_type === 'video' && t.wallpaper_video_url) {
+        const dim = t.wallpaper_dim > 0 ? `<div style="position:fixed;inset:0;background:rgba(0,0,0,${t.wallpaper_dim/100});z-index:0"></div>` : '';
+        return `<div style="position:fixed;inset:0;z-index:-1;overflow:hidden"><video autoplay muted loop playsinline style="width:100%;height:100%;object-fit:cover" src="${t.wallpaper_video_url}"></video></div>${dim}`;
+      }
+      return '';
+    })();
+
+    // Logo vs name
+    const logoSize = { sm:'40px', md:'72px', lg:'120px' }[t.logo_size ?? 'md'] ?? '72px';
+    const nameOrLogoHTML = t.show_logo && t.logo_url
+      ? `<div style="margin:${isLeft?'0 0 8px':'0 auto 14px'};width:${logoSize};height:${logoSize};overflow:hidden;display:flex;align-items:center;justify-content:center">
+           <img src="${t.logo_url}" style="max-width:100%;max-height:100%;object-fit:contain" />
+         </div>`
+      : `<div class="name">${p.display_name || p.username || 'Ton Nom'}</div>`;
+
     const links = ['✦ Mon Portfolio','✦ Twitter / X','✦ Dernier projet'];
 
     return `<!DOCTYPE html><html><head>
@@ -1191,21 +1472,26 @@ ${hoverCSS}
 ${animCSS}
 ${isCard?'.page{padding:0;}.page-inner{margin:20px;background:rgba(255,255,255,0.04);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);border-radius:24px;padding:28px}':''}
 </style></head><body>
-${blurOverlay}${overlayTop}${overlayBottom}
+${wallpaperHTML}${blurOverlay}${overlayTop}${overlayBottom}
 ${heroHTML}
 <div class="page">
 ${isCard?'<div class="page-inner">':''}
+${t.header_style !== 'hero' ? `
 <div class="header">
   <div class="avatar-wrap">
     <div class="avatar">${p.avatar_url?`<img src="${p.avatar_url}" style="width:100%;height:100%;object-fit:cover" />`:'👤'}</div>
     <div>
-      <div class="name">${p.display_name || p.username || 'Ton Nom'}</div>
+      ${nameOrLogoHTML}
       <div class="handle">@${p.username || 'username'}</div>
       ${!isLeft?`<div class="bio">${p.bio || 'Ta bio ici ✨'}</div>`:''}
     </div>
   </div>
   ${isLeft?`<div class="bio" style="margin-top:8px">${p.bio || 'Ta bio ici ✨'}</div>`:''}
-</div>
+</div>` : `
+<div style="padding:20px;margin-bottom:20px">
+  ${nameOrLogoHTML ? `<div style="margin-bottom:8px">${nameOrLogoHTML}</div>` : ''}
+  <div class="bio">${p.bio || 'Ta bio ici ✨'}</div>
+</div>`}
 <div class="links">${links.map(l=>`<div class="link-item"><button>${l}</button></div>`).join('')}</div>
 ${isCard?'</div>':''}
 </div></body></html>`;
@@ -1670,10 +1956,41 @@ ${isCard?'</div>':''}
     activateBtn('.bio-style-btn',     'bioStyle', theme.bio_style);
     activateBtn('.width-btn',         'width',    theme.content_width);
 
+    activateBtn('.logo-size-btn',     'size',     theme.logo_size);
+    activateBtn('.wallpaper-type-btn','wallpaper',theme.wallpaper_type);
+    activateBtn('.hero-height-btn',   'height',   theme.hero_height);
+    activateBtn('.hero-pos-btn',      'pos',      theme.hero_position);
+
+    // Hero settings visibility — use style.display not classList (because of hidden vs display:none conflict)
+    const heroSett = document.getElementById('hero-settings');
+    if (heroSett) heroSett.style.display = theme.header_style === 'hero' ? '' : 'none';
+
+    // Logo
+    const showLogoEl = document.getElementById('show-logo') as HTMLInputElement | null;
+    if (showLogoEl) showLogoEl.checked = theme.show_logo ?? false;
+    document.getElementById('logo-settings')?.classList.toggle('hidden', !theme.show_logo);
+    const logoUrlEl = document.getElementById('logo-url') as HTMLInputElement | null;
+    if (logoUrlEl) logoUrlEl.value = theme.logo_url ?? '';
+    const logoPrev = document.getElementById('logo-preview');
+    if (logoPrev) logoPrev.innerHTML = theme.logo_url
+      ? `<img src="${theme.logo_url}" style="width:100%;height:100%;object-fit:contain" />`
+      : '<span style="font-size:20px">🏷️</span>';
+
+    // Wallpaper
+    document.getElementById('wallpaper-image-settings')?.classList.toggle('hidden', theme.wallpaper_type !== 'image');
+    document.getElementById('wallpaper-video-settings')?.classList.toggle('hidden', theme.wallpaper_type !== 'video');
+    const wUrlEl  = document.getElementById('wallpaper-url')       as HTMLInputElement|null;
+    const wVidEl  = document.getElementById('wallpaper-video-url') as HTMLInputElement|null;
+    const wBlurEl = document.getElementById('wallpaper-blur')      as HTMLInputElement|null;
+    const wDimEl  = document.getElementById('wallpaper-dim')       as HTMLInputElement|null;
+    if (wUrlEl)  wUrlEl.value  = theme.wallpaper_url ?? '';
+    if (wVidEl)  wVidEl.value  = theme.wallpaper_video_url ?? '';
+    if (wBlurEl) { wBlurEl.value = String(theme.wallpaper_blur??0); const v=document.getElementById('wallpaper-blur-val'); if(v) v.textContent=`${theme.wallpaper_blur??0}px`; }
+    if (wDimEl)  { wDimEl.value  = String(theme.wallpaper_dim??50);  const v=document.getElementById('wallpaper-dim-val');  if(v) v.textContent=`${theme.wallpaper_dim??50}%`; }
+
     document.getElementById('gradient-builder')?.classList.toggle('hidden', theme.background_style !== 'gradient');
     document.getElementById('pattern-opacity-wrap')?.classList.toggle('hidden', theme.pattern === 'none');
     document.getElementById('angle-wrap')?.classList.toggle('hidden', theme.gradient_type !== 'linear');
-    document.getElementById('hero-settings')?.classList.toggle('hidden', theme.header_style !== 'hero');
 
     if (cssEditor) { cssEditor.value = theme.custom_css ?? ''; if(cssCount) cssCount.textContent=`${cssEditor.value.length} / 4000`; }
 
@@ -1714,9 +2031,109 @@ ${isCard?'</div>':''}
     });
   }
 
-  // ── Save ──────────────────────────────────────────────────────────────────────
-  let lastSave = 0;
+  // ═══════════════════════════════════════════════════════════════════════════
+  // TEST MODE — fonctionnalités premium testables, non sauvegardables
+  // ═══════════════════════════════════════════════════════════════════════════
+  const PREMIUM_FIELDS = {
+    creator: ['hero_image','hero_height','hero_position','hero_overlay','show_logo','logo_url','logo_size',
+              'wallpaper_type','wallpaper_url','wallpaper_blur','wallpaper_dim','wallpaper_video_url'],
+    pro:     ['wallpaper_video_url','logo_size_lg','custom_font_url','custom_font_name','custom_css'],
+  };
+
+  let testModeActive   = false;
+  let testModeFeatures: string[] = [];
+
+  function requiresPremium(key: string): 'creator'|'pro'|null {
+    if (PREMIUM_FIELDS.pro.includes(key))     return 'pro';
+    if (PREMIUM_FIELDS.creator.includes(key)) return 'creator';
+    return null;
+  }
+
+  function setThemeField(key: string, value: any) {
+    const needed = requiresPremium(key);
+    // Logo size lg is pro
+    if (key === 'logo_size' && value === 'lg') {
+      if (!isPro) {
+        activateTestMode('pro', key);
+        theme[key] = value;
+        schedulePreview();
+        return;
+      }
+    }
+    if (needed === 'pro' && !isPro) {
+      activateTestMode('pro', key);
+    } else if (needed === 'creator' && !isCreator) {
+      activateTestMode('creator', key);
+    }
+    theme[key] = value;
+    schedulePreview();
+  }
+
+  function activateTestMode(tier: string, feature: string) {
+    if (!testModeFeatures.includes(feature)) testModeFeatures.push(feature);
+    if (!testModeActive) {
+      testModeActive = true;
+      showTestBanner(tier);
+    }
+  }
+
+  function showTestBanner(tier: string) {
+    const banner = document.getElementById('test-mode-banner');
+    if (!banner) return;
+    banner.classList.remove('hidden');
+    banner.style.cssText = tier === 'pro'
+      ? 'display:flex;background:linear-gradient(90deg,rgba(168,85,247,0.12),rgba(168,85,247,0.06));border:1px solid rgba(168,85,247,0.3);border-radius:16px;padding:12px 16px;align-items:center;gap:12px;margin-bottom:16px;'
+      : 'display:flex;background:linear-gradient(90deg,rgba(0,255,157,0.08),rgba(0,255,157,0.04));border:1px solid rgba(0,255,157,0.25);border-radius:16px;padding:12px 16px;align-items:center;gap:12px;margin-bottom:16px;';
+    const icon    = tier === 'pro' ? '⚡' : '👑';
+    const label   = tier === 'pro' ? 'Pro' : 'Creator';
+    const color   = tier === 'pro' ? '#c084fc' : '#00ff9d';
+    banner.innerHTML = `
+      <span style="font-size:1.5rem;flex-shrink:0">${icon}</span>
+      <div style="flex:1">
+        <p style="font-size:13px;font-weight:700;color:white">Mode aperçu <span style="color:${color}">${label}</span> actif</p>
+        <p style="font-size:11px;color:#6b7280;margin-top:2px">Tu testes des fonctionnalités ${label}. Passe au plan supérieur pour sauvegarder.</p>
+      </div>
+      <a href="/dashboard/billing" style="flex-shrink:0;padding:8px 16px;border-radius:10px;background:${color};color:black;font-size:12px;font-weight:700;text-decoration:none;transition:opacity 0.2s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+        Upgrader →
+      </a>
+      <button onclick="dismissTestMode()" style="flex-shrink:0;background:none;border:none;color:#4b5563;cursor:pointer;font-size:18px;padding:2px 6px" title="Annuler les changements premium">✕</button>`;
+  }
+
+  function dismissTestMode() {
+    testModeActive   = false;
+    testModeFeatures = [];
+    document.getElementById('test-mode-banner')?.classList.add('hidden');
+    // Reset premium fields back to defaults
+    theme.hero_image       = '';
+    theme.show_logo        = false;
+    theme.logo_url         = '';
+    theme.logo_size        = 'md';
+    theme.wallpaper_type   = 'none';
+    theme.wallpaper_url    = '';
+    theme.wallpaper_video_url = '';
+    theme.custom_font_url  = '';
+    theme.custom_font_name = '';
+    // Reset header if it was hero
+    if (theme.header_style === 'hero') theme.header_style = 'simple';
+    schedulePreview();
+    syncUIToTheme();
+    toast.success('Aperçu premium réinitialisé');
+  }
+  (window as any).dismissTestMode = dismissTestMode;
+
+  // Save btn — bloqué si test mode actif + non payant
   document.getElementById('save-btn')?.addEventListener('click', async () => {
+    // Check if test mode is on and user can't save
+    if (testModeActive && testModeFeatures.length > 0) {
+      const hasPro      = testModeFeatures.some(f => PREMIUM_FIELDS.pro.includes(f));
+      const needUpgrade = hasPro ? !isPro : !isCreator;
+      if (needUpgrade) {
+        const tier = hasPro ? 'Pro' : 'Creator';
+        // Show upsell modal
+        showUpsellModal(hasPro ? 'pro' : 'creator');
+        return;
+      }
+    }
     if (Date.now()-lastSave < 2000) { toast.error('Attends avant de sauvegarder'); return; }
     const btn = document.getElementById('save-btn');
     const txt = document.getElementById('save-btn-text');
@@ -1727,6 +2144,9 @@ ${isCard?'</div>':''}
       if (!r.ok) throw new Error((await r.json().catch(()=>({}))).error||`HTTP ${r.status}`);
       lastSave = Date.now();
       pushHistory(theme);
+      testModeActive   = false;
+      testModeFeatures = [];
+      document.getElementById('test-mode-banner')?.classList.add('hidden');
       toast.success('Thème sauvegardé ! ✓');
     } catch(err: any) {
       toast.error(err.message||'Erreur de sauvegarde');
@@ -1736,9 +2156,171 @@ ${isCard?'</div>':''}
     }
   });
 
+  // ── Upsell modal ──────────────────────────────────────────────────────────────
+  function showUpsellModal(tier: 'creator'|'pro') {
+    const isPro = tier === 'pro';
+    const color = isPro ? '#a855f7' : '#00ff9d';
+    const label = isPro ? 'Pro' : 'Creator';
+    const icon  = isPro ? '⚡' : '👑';
+    const feats = isPro
+      ? ['Vidéo de fond en boucle','Grande logo (120px)','Police personnalisée','CSS custom avancé','Tout Creator inclus']
+      : ['Image Hero remplaçant l\'avatar','Logo personnalisé','Wallpaper image de fond','Toutes les polices','Patterns & motifs avancés'];
+
+    let modal = document.getElementById('upsell-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'upsell-modal';
+      modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.75);backdrop-filter:blur(8px);padding:16px';
+      modal.addEventListener('click', e => { if (e.target === modal) modal!.remove(); });
+      document.body.appendChild(modal);
+    }
+    modal.innerHTML = `
+      <div style="background:#111113;border:1px solid ${color}40;border-radius:24px;padding:32px;max-width:400px;width:100%;box-shadow:0 0 60px ${color}20;animation:modalIn 0.25s ease">
+        <div style="text-align:center;margin-bottom:24px">
+          <div style="font-size:3rem;margin-bottom:12px">${icon}</div>
+          <h2 style="font-size:20px;font-weight:700;color:white;margin-bottom:8px">Passe en ${label}</h2>
+          <p style="font-size:13px;color:#6b7280">Tu as testé des features ${label} — sauvegarde-les pour de vrai.</p>
+        </div>
+        <ul style="space-y:8px;margin-bottom:24px">
+          ${feats.map(f => `<li style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:13px;color:#d1d5db">
+            <span style="color:${color};flex-shrink:0">✓</span>${f}
+          </li>`).join('')}
+        </ul>
+        <a href="/dashboard/billing" style="display:block;width:100%;padding:14px;border-radius:14px;background:${color};color:${isPro?'#fff':'#000'};font-size:15px;font-weight:700;text-align:center;text-decoration:none;transition:opacity 0.2s" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+          Passer en ${label} →
+        </a>
+        <button onclick="document.getElementById('upsell-modal').remove()" style="display:block;width:100%;margin-top:12px;padding:10px;background:none;border:none;color:#4b5563;font-size:13px;cursor:pointer">
+          Continuer à prévisualiser
+        </button>
+      </div>`;
+  }
+
+  // ── Logo handlers ─────────────────────────────────────────────────────────────
+  document.getElementById('show-logo')?.addEventListener('change', (e: any) => {
+    setThemeField('show_logo', e.target.checked);
+    document.getElementById('logo-settings')?.classList.toggle('hidden', !e.target.checked);
+  });
+
+  document.getElementById('logo-url')?.addEventListener('input', (e: any) => {
+    setThemeField('logo_url', e.target.value.trim());
+    const preview = document.getElementById('logo-preview');
+    if (preview) {
+      preview.innerHTML = e.target.value.trim()
+        ? `<img src="${e.target.value.trim()}" style="width:100%;height:100%;object-fit:contain" onerror="this.parentElement.innerHTML='<span style=font-size:20px>🏷️</span>'" />`
+        : '<span style="font-size:20px">🏷️</span>';
+    }
+  });
+
+  document.querySelectorAll('.logo-size-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const size = (btn as HTMLElement).dataset.size!;
+      setThemeField('logo_size', size);
+      document.querySelectorAll('.logo-size-btn').forEach(b => b.classList.toggle('active', b === btn));
+    });
+  });
+
+  // ── Wallpaper handlers ────────────────────────────────────────────────────────
+  document.querySelectorAll('.wallpaper-type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const type = (btn as HTMLElement).dataset.wallpaper!;
+      setThemeField('wallpaper_type', type);
+      document.querySelectorAll('.wallpaper-type-btn').forEach(b => b.classList.toggle('active', b === btn));
+      document.getElementById('wallpaper-image-settings')?.classList.toggle('hidden', type !== 'image');
+      document.getElementById('wallpaper-video-settings')?.classList.toggle('hidden', type !== 'video');
+    });
+  });
+
+  document.getElementById('wallpaper-url')?.addEventListener('input', (e: any) => setThemeField('wallpaper_url', e.target.value.trim()));
+  document.getElementById('wallpaper-video-url')?.addEventListener('input', (e: any) => setThemeField('wallpaper_video_url', e.target.value.trim()));
+
+  document.getElementById('wallpaper-blur')?.addEventListener('input', (e: any) => {
+    setThemeField('wallpaper_blur', +e.target.value);
+    const v = document.getElementById('wallpaper-blur-val');
+    if (v) v.textContent = `${e.target.value}px`;
+  });
+  document.getElementById('wallpaper-dim')?.addEventListener('input', (e: any) => {
+    setThemeField('wallpaper_dim', +e.target.value);
+    const v = document.getElementById('wallpaper-dim-val');
+    if (v) v.textContent = `${e.target.value}%`;
+  });
+  document.getElementById('wallpaper-dim-video')?.addEventListener('input', (e: any) => {
+    setThemeField('wallpaper_dim', +e.target.value);
+    const v = document.getElementById('wallpaper-dim-video-val');
+    if (v) v.textContent = `${e.target.value}%`;
+  });
+
+  // ── Hero handlers ────────────────────────────────────────────────────────────
+  document.getElementById('hero-image-url')?.addEventListener('input', (e: any) => {
+    setThemeField('hero_image', e.target.value.trim());
+  });
+
+  // ── Font search & category filter ────────────────────────────────────────────
+  const fontGrid = document.getElementById('font-grid');
+  document.getElementById('font-search')?.addEventListener('input', (e: any) => {
+    const q = e.target.value.toLowerCase().trim();
+    fontGrid?.querySelectorAll<HTMLElement>('.font-item').forEach(btn => {
+      const name = btn.dataset.font?.toLowerCase() ?? '';
+      btn.style.display = (!q || name.includes(q)) ? '' : 'none';
+    });
+  });
+
+  document.querySelectorAll('.font-cat-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cat = (btn as HTMLElement).dataset.cat!;
+      document.querySelectorAll('.font-cat-btn').forEach(b => {
+        b.classList.toggle('active', b === btn);
+        (b as HTMLElement).style.cssText = b === btn
+          ? 'border-color:rgba(0,255,157,0.4);background:rgba(0,255,157,0.08);color:white;'
+          : 'border-color:rgba(255,255,255,0.1);color:#6b7280;';
+      });
+      fontGrid?.querySelectorAll<HTMLElement>('.font-item').forEach(item => {
+        item.style.display = (cat === 'all' || item.dataset.fontCat === cat) ? '' : 'none';
+      });
+    });
+  });
+
+  // ── Custom font (Pro) ─────────────────────────────────────────────────────────
+  document.getElementById('apply-custom-font')?.addEventListener('click', () => {
+    const url  = (document.getElementById('custom-font-url')  as HTMLInputElement)?.value.trim();
+    const name = (document.getElementById('custom-font-name') as HTMLInputElement)?.value.trim();
+    if (!url || !name) { toast.error('URL et nom requis'); return; }
+    setThemeField('custom_font_url',  url);
+    setThemeField('custom_font_name', name);
+    theme.font_family = name;
+    schedulePreview();
+    toast.success(`Police "${name}" appliquée !`);
+  });
+
+  // ── Sync UI to theme (after reset/history restore) ────────────────────────────
+  function syncUIToTheme() {
+    // Hero / logo UI
+    const heroSettings = document.getElementById('hero-settings');
+    if (heroSettings) heroSettings.style.display = theme.header_style === 'hero' ? '' : 'none';
+    document.getElementById('logo-settings')?.classList.toggle('hidden', !theme.show_logo);
+    // Wallpaper UI
+    document.getElementById('wallpaper-image-settings')?.classList.toggle('hidden', theme.wallpaper_type !== 'image');
+    document.getElementById('wallpaper-video-settings')?.classList.toggle('hidden', theme.wallpaper_type !== 'video');
+    // Logo preview
+    const logoPrev = document.getElementById('logo-preview');
+    if (logoPrev) {
+      logoPrev.innerHTML = theme.logo_url
+        ? `<img src="${theme.logo_url}" style="width:100%;height:100%;object-fit:contain" />`
+        : '<span style="font-size:20px">🏷️</span>';
+    }
+    // Wallpaper sliders display
+    const wbv = document.getElementById('wallpaper-blur-val');
+    const wdv = document.getElementById('wallpaper-dim-val');
+    if (wbv) wbv.textContent = `${theme.wallpaper_blur ?? 0}px`;
+    if (wdv) wdv.textContent = `${theme.wallpaper_dim ?? 50}%`;
+    // Font search clear
+    (document.getElementById('font-search') as HTMLInputElement)?.value && ((document.getElementById('font-search') as HTMLInputElement).value = '');
+    fontGrid?.querySelectorAll<HTMLElement>('.font-item').forEach(i => i.style.display = '');
+  }
+
   // ── Reset ─────────────────────────────────────────────────────────────────────
   document.getElementById('reset-btn')?.addEventListener('click', () => {
     if (!confirm('Réinitialiser au thème par défaut ?')) return;
+    dismissTestMode();
     applyFullTheme({
       preset:'dark', background_color:'#0a0a0a', primary_color:'#00ff9d', text_color:'#ffffff',
       gradient_color_2:'#1a1a2e', background_style:'solid', gradient_type:'linear', gradient_angle:135,
@@ -1751,8 +2333,13 @@ ${isCard?'</div>':''}
       social_icon_style:'round', bio_size:'sm', bio_style:'normal', show_username:true,
       scroll_reveal:true, click_ripple:false, overlay_top:false, overlay_bottom:false,
       overlay_color:'#000000', custom_css:'',
+      show_logo:false, logo_url:'', logo_size:'md',
+      wallpaper_type:'none', wallpaper_url:'', wallpaper_video_url:'', wallpaper_blur:0, wallpaper_dim:50,
+      custom_font_url:'', custom_font_name:'',
     });
+    syncUIToTheme();
     toast.success('Réinitialisé !');
+  });
   });
 
   // ── Export / Import ───────────────────────────────────────────────────────────
@@ -1793,7 +2380,31 @@ ${isCard?'</div>':''}
   });
 
   // ── INIT ──────────────────────────────────────────────────────────────────────
+  // Inject test mode banner in DOM before left panel
+  (() => {
+    const banner = document.createElement('div');
+    banner.id = 'test-mode-banner';
+    banner.classList.add('hidden');
+    const leftPanel = document.querySelector('.lg\\:col-span-3');
+    leftPanel?.parentElement?.insertBefore(banner, leftPanel.parentElement.firstChild);
+  })();
+
+  // Inject upsell modal keyframe
+  const style = document.createElement('style');
+  style.textContent = `@keyframes modalIn{from{opacity:0;transform:scale(0.94) translateY(12px)}to{opacity:1;transform:none}}`;
+  document.head.appendChild(style);
+
   applyFullTheme(theme);
+  syncUIToTheme();
   renderHistory();
   document.querySelector('.prog-dot[data-for="presets"]')?.classList.add('active');
+
+  // Init hero-settings visibility
+  const heroSettings = document.getElementById('hero-settings');
+  if (heroSettings) heroSettings.style.display = theme.header_style === 'hero' ? '' : 'none';
+  // Init wallpaper panels
+  document.getElementById('wallpaper-image-settings')?.classList.toggle('hidden', theme.wallpaper_type !== 'image');
+  document.getElementById('wallpaper-video-settings')?.classList.toggle('hidden', theme.wallpaper_type !== 'video');
+  // Init logo settings
+  document.getElementById('logo-settings')?.classList.toggle('hidden', !theme.show_logo);
 </script>
