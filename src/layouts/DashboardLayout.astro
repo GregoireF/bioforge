@@ -29,7 +29,7 @@ try {
 } catch {}
 
 // ── Plan helpers ───────────────────────────────────────────────────────────────
-const PAID_PLANS   = ['Pro', 'Business', 'Enterprise'];
+const PAID_PLANS   = ['Creator', 'Pro', 'Enterprise'];
 const plan         = profile?.plan ?? 'Free';
 const isPaid       = PAID_PLANS.includes(plan);
 const isBasicOrFree = !isPaid;
