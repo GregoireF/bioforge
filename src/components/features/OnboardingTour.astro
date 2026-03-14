@@ -1,217 +1,342 @@
 ---
-//
+// src/components/features/OnboardingTour.astro
+// Tour de découverte du dashboard — affiché une seule fois après le premier login
 ---
 
-<div id="onboarding-tour" class="hidden">
+<div id="ob-tour" style="display:none">
+
   <!-- Overlay -->
-  <div id="tour-overlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9998]"></div>
-
-  <!-- Spotlight (highlights current element) -->
-  <div id="tour-spotlight" class="fixed z-[9999] pointer-events-none"></div>
-
-  <!-- Tooltip -->
-  <div id="tour-tooltip" class="fixed z-[9999] glass-strong border border-neon-green/30 rounded-2xl p-6 max-w-md shadow-2xl">
-    <div class="mb-4">
-      <h3 id="tour-title" class="text-xl font-bold text-white mb-2"></h3>
-      <p id="tour-description" class="text-gray-300"></p>
-    </div>
-
-    <div class="flex items-center justify-between">
-      <div class="text-sm text-gray-400">
-        <span id="tour-step-current">1</span> of <span id="tour-step-total">5</span>
-      </div>
-
-      <div class="flex items-center space-x-2">
-        <button id="tour-skip" class="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">
-          Skip
-        </button>
-        <button id="tour-prev" class="px-4 py-2 text-sm glass border border-white/10 rounded-lg hover:bg-white/5 transition-colors">
-          Previous
-        </button>
-        <button id="tour-next" class="px-4 py-2 text-sm bg-neon-green text-black font-medium rounded-lg hover:bg-neon-green/90 transition-colors">
-          Next
-        </button>
-      </div>
-    </div>
+  <div id="ob-overlay"
+    style="position:fixed;inset:0;z-index:9990;background:rgba(0,0,0,0);backdrop-filter:blur(0px);transition:background 0.35s ease,backdrop-filter 0.35s ease;pointer-events:none">
   </div>
+
+  <!-- Spotlight ring -->
+  <div id="ob-spotlight"
+    style="position:fixed;z-index:9991;pointer-events:none;border-radius:14px;border:2px solid #00ff9d;box-shadow:0 0 0 9999px rgba(0,0,0,0.55);opacity:0;transition:all 0.35s cubic-bezier(0.22,1,0.36,1)">
+  </div>
+
+  <!-- Tooltip card -->
+  <div id="ob-tooltip"
+    style="position:fixed;z-index:9995;width:340px;opacity:0;transform:translateY(8px);transition:opacity 0.3s ease,transform 0.3s ease">
+
+    <!-- Card -->
+    <div style="background:#0d1014;border:1px solid rgba(0,255,157,0.2);border-radius:20px;padding:22px 22px 18px;box-shadow:0 32px 64px rgba(0,0,0,0.6),0 0 0 1px rgba(255,255,255,0.04),0 0 40px rgba(0,255,157,0.06)">
+
+      <!-- Progress bar -->
+      <div style="display:flex;gap:4px;margin-bottom:18px">
+        <div class="ob-prog-bar" data-idx="0" style="flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,0.1);overflow:hidden">
+          <div style="height:100%;width:0%;background:#00ff9d;border-radius:2px;transition:width 0.4s ease"></div>
+        </div>
+        <div class="ob-prog-bar" data-idx="1" style="flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,0.1);overflow:hidden">
+          <div style="height:100%;width:0%;background:#00ff9d;border-radius:2px;transition:width 0.4s ease"></div>
+        </div>
+        <div class="ob-prog-bar" data-idx="2" style="flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,0.1);overflow:hidden">
+          <div style="height:100%;width:0%;background:#00ff9d;border-radius:2px;transition:width 0.4s ease"></div>
+        </div>
+        <div class="ob-prog-bar" data-idx="3" style="flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,0.1);overflow:hidden">
+          <div style="height:100%;width:0%;background:#00ff9d;border-radius:2px;transition:width 0.4s ease"></div>
+        </div>
+        <div class="ob-prog-bar" data-idx="4" style="flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,0.1);overflow:hidden">
+          <div style="height:100%;width:0%;background:#00ff9d;border-radius:2px;transition:width 0.4s ease"></div>
+        </div>
+      </div>
+
+      <!-- Icon + step -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span id="ob-icon" style="font-size:24px;line-height:1"></span>
+        <span id="ob-counter" style="font-size:11px;font-weight:600;letter-spacing:0.08em;color:rgba(255,255,255,0.28);text-transform:uppercase"></span>
+      </div>
+
+      <!-- Title -->
+      <h3 id="ob-title" style="font-family:'Cabinet Grotesk',system-ui,sans-serif;font-size:18px;font-weight:900;color:#fff;letter-spacing:-0.02em;margin-bottom:7px;line-height:1.15"></h3>
+
+      <!-- Description -->
+      <p id="ob-desc" style="font-size:13.5px;color:rgba(255,255,255,0.52);line-height:1.65;margin-bottom:20px"></p>
+
+      <!-- Tip pill (optional) -->
+      <div id="ob-tip" style="display:none;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;background:rgba(0,255,157,0.07);border:1px solid rgba(0,255,157,0.15);margin-bottom:18px">
+        <span style="font-size:13px">💡</span>
+        <span id="ob-tip-text" style="font-size:12px;color:rgba(0,255,157,0.85);line-height:1.5"></span>
+      </div>
+
+      <!-- Actions -->
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <button id="ob-skip" style="font-size:12px;color:rgba(255,255,255,0.3);background:none;border:none;cursor:pointer;padding:0;font-family:inherit;transition:color 0.2s"
+          onmouseover="this.style.color='rgba(255,255,255,0.6)'" onmouseout="this.style.color='rgba(255,255,255,0.3)'">
+          Passer le tour
+        </button>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button id="ob-prev"
+            style="display:none;padding:7px 14px;font-size:12px;font-weight:600;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:9px;color:rgba(255,255,255,0.65);cursor:pointer;font-family:inherit;transition:all 0.15s"
+            onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.06)'">
+            ← Retour
+          </button>
+          <button id="ob-next"
+            style="padding:8px 18px;font-size:13px;font-weight:800;background:#00ff9d;color:#000;border:none;border-radius:9px;cursor:pointer;font-family:'Cabinet Grotesk',system-ui,sans-serif;transition:all 0.18s;letter-spacing:0.01em"
+            onmouseover="this.style.background='#20ffaa';this.style.transform='translateY(-1px)'" onmouseout="this.style.background='#00ff9d';this.style.transform='none'">
+            Suivant →
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Arrow pointer -->
+    <div id="ob-arrow" style="position:absolute;width:10px;height:10px;background:#0d1014;border:1px solid rgba(0,255,157,0.2);transform:rotate(45deg);display:none"></div>
+  </div>
+
 </div>
 
 <script>
-  // Onboarding tour steps
-  const steps = [
-    {
-      title: '👋 Welcome to BioForge!',
-      description: 'Let\'s take a quick tour to help you get started. We\'ll show you the key features.',
-      target: null, // No specific target, just show tooltip
-      position: 'center'
-    },
-    {
-      title: '📦 Manage Your Blocks',
-      description: 'Click here to add, edit, and organize your blocks. Drag and drop to reorder them.',
-      target: 'a[href="/dashboard/blocks"]',
-      position: 'right'
-    },
-    {
-      title: '🎨 Customize Appearance',
-      description: 'Make your profile unique! Choose themes, colors, and styles that match your brand.',
-      target: 'a[href="/dashboard/appearance"]',
-      position: 'right'
-    },
-    {
-      title: '📊 Track Analytics',
-      description: 'See how many people visit your profile and which blocks get the most clicks.',
-      target: 'a[href="/dashboard/analytics"]',
-      position: 'right'
-    },
-    {
-      title: '🚀 You\'re All Set!',
-      description: 'That\'s it! Start building your page and share it with the world. Press ⌘K anytime for quick actions.',
-      target: null,
-      position: 'center'
-    }
-  ];
+  (function () {
+    const STORAGE_KEY = 'bf_tour_done_v2';
 
-  let currentStep = 0;
+    // ── Steps ───────────────────────────────────────────────────────────────────
+    const STEPS = [
+      {
+        icon:   '👋',
+        title:  'Bienvenue sur ton dashboard !',
+        desc:   'En quelques secondes, on te montre les points clés pour bien démarrer. Tu pourras toujours passer.',
+        tip:    null,
+        target: null,
+        pos:    'center',
+      },
+      {
+        icon:   '📦',
+        title:  'Gère tes blocs',
+        desc:   'Ajoute des liens, vidéos, countdowns, sondages… Glisse-dépose pour réorganiser ta page.',
+        tip:    'Astuce : clique sur le ⚙️ d\'un bloc pour l\'éditer en direct.',
+        target: 'a[href="/dashboard/blocks"]',
+        pos:    'right',
+      },
+      {
+        icon:   '🎨',
+        title:  'Personnalise l\'apparence',
+        desc:   'Choisis ton thème, tes couleurs, ta typographie. La preview en direct te montre le résultat immédiatement.',
+        tip:    'Plus de 35 polices + wallpapers + mode hero photo disponibles.',
+        target: 'a[href="/dashboard/appearance"]',
+        pos:    'right',
+      },
+      {
+        icon:   '📊',
+        title:  'Suis tes stats',
+        desc:   'Vues, clics, taux de clic — vois exactement ce qui performe sur ta page.',
+        tip:    null,
+        target: 'a[href="/dashboard/analytics"]',
+        pos:    'right',
+      },
+      {
+        icon:   '🚀',
+        title:  'C\'est parti !',
+        desc:   'Ton profil est prêt. Partage ton URL et commence à gagner des abonnés.',
+        tip:    'Astuce : utilise ⌘K (ou Ctrl+K) pour accéder rapidement à n\'importe quelle action.',
+        target: null,
+        pos:    'center',
+      },
+    ];
 
-  // Elements
-  const tour = document.getElementById('onboarding-tour');
-  const overlay = document.getElementById('tour-overlay');
-  const spotlight = document.getElementById('tour-spotlight');
-  const tooltip = document.getElementById('tour-tooltip');
-  const titleEl = document.getElementById('tour-title');
-  const descEl = document.getElementById('tour-description');
-  const stepCurrent = document.getElementById('tour-step-current');
-  const stepTotal = document.getElementById('tour-step-total');
-  const skipBtn = document.getElementById('tour-skip');
-  const prevBtn = document.getElementById('tour-prev');
-  const nextBtn = document.getElementById('tour-next');
+    // ── DOM refs ────────────────────────────────────────────────────────────────
+    const tour      = document.getElementById('ob-tour');
+    const overlay   = document.getElementById('ob-overlay');
+    const spotlight = document.getElementById('ob-spotlight');
+    const tooltip   = document.getElementById('ob-tooltip');
+    const iconEl    = document.getElementById('ob-icon');
+    const titleEl   = document.getElementById('ob-title');
+    const descEl    = document.getElementById('ob-desc');
+    const counterEl = document.getElementById('ob-counter');
+    const tipWrap   = document.getElementById('ob-tip');
+    const tipText   = document.getElementById('ob-tip-text');
+    const skipBtn   = document.getElementById('ob-skip');
+    const prevBtn   = document.getElementById('ob-prev');
+    const nextBtn   = document.getElementById('ob-next');
+    const arrow     = document.getElementById('ob-arrow');
+    const progBars  = document.querySelectorAll('.ob-prog-bar');
 
-  // Check if tour was completed
-  function checkTourCompleted() {
-    return localStorage.getItem('onboarding-completed') === 'true';
-  }
+    if (!tour || !tooltip) return;
+    if (localStorage.getItem(STORAGE_KEY)) return;
 
-  // Start tour
-  function startTour() {
-    if (checkTourCompleted()) return;
+    let step = 0;
+    let rafId = null;
 
-    currentStep = 0;
-    tour?.classList.remove('hidden');
-    showStep(currentStep);
-  }
-
-  // Show step
-  function showStep(index: number) {
-    const step = steps[index];
-    if (!step) return;
-
-    // Update content
-    if (titleEl) titleEl.textContent = step.title;
-    if (descEl) descEl.textContent = step.description;
-    if (stepCurrent) stepCurrent.textContent = (index + 1).toString();
-    if (stepTotal) stepTotal.textContent = steps.length.toString();
-
-    // Update buttons
-    if (prevBtn) {
-      prevBtn.style.display = index === 0 ? 'none' : 'block';
-    }
-    if (nextBtn) {
-      nextBtn.textContent = index === steps.length - 1 ? 'Finish' : 'Next';
+    // ── Show tour ───────────────────────────────────────────────────────────────
+    function start() {
+      tour.style.display = 'block';
+      overlay.style.pointerEvents = 'auto';
+      showStep(0);
     }
 
-    // Position tooltip and spotlight
-    if (step.target) {
-      const target = document.querySelector(step.target) as HTMLElement;
-      if (target) {
-        positionElements(target, step.position);
-      }
-    } else {
-      // Center position
-      if (tooltip) {
-        tooltip.style.top = '50%';
-        tooltip.style.left = '50%';
-        tooltip.style.transform = 'translate(-50%, -50%)';
-      }
-      if (spotlight) {
-        spotlight.style.display = 'none';
-      }
+    // ── Show step ────────────────────────────────────────────────────────────────
+    function showStep(idx) {
+      const s = STEPS[idx];
+      if (!s) return;
+
+      // Fade out tooltip
+      tooltip.style.opacity = '0';
+      tooltip.style.transform = 'translateY(8px)';
+
+      setTimeout(function () {
+        // Content
+        if (iconEl)    iconEl.textContent    = s.icon;
+        if (titleEl)   titleEl.textContent   = s.title;
+        if (descEl)    descEl.textContent    = s.desc;
+        if (counterEl) counterEl.textContent = (idx + 1) + ' / ' + STEPS.length;
+
+        // Tip
+        if (s.tip && tipWrap && tipText) {
+          tipText.textContent = s.tip;
+          tipWrap.style.display = 'flex';
+        } else if (tipWrap) {
+          tipWrap.style.display = 'none';
+        }
+
+        // Buttons
+        if (prevBtn) prevBtn.style.display = idx === 0 ? 'none' : 'inline-block';
+        if (nextBtn) nextBtn.textContent   = idx === STEPS.length - 1 ? 'Terminer ✓' : 'Suivant →';
+
+        // Progress bars
+        progBars.forEach(function (bar, i) {
+          var inner = bar.querySelector('div');
+          if (inner) inner.style.width = i <= idx ? '100%' : '0%';
+        });
+
+        // Overlay + spotlight + position
+        overlay.style.background = 'rgba(0,0,0,0.6)';
+        overlay.style.backdropFilter = 'blur(2px)';
+
+        if (s.target) {
+          var target = document.querySelector(s.target);
+          if (target) {
+            positionSpotlight(target);
+            positionTooltip(target, s.pos);
+          } else {
+            centerTooltip();
+            hideSpotlight();
+          }
+        } else {
+          centerTooltip();
+          hideSpotlight();
+        }
+
+        // Fade in tooltip
+        requestAnimationFrame(function () {
+          tooltip.style.opacity = '1';
+          tooltip.style.transform = 'translateY(0)';
+        });
+      }, idx === 0 ? 0 : 180);
     }
-  }
 
-  // Position elements
-  function positionElements(target: HTMLElement, position: string) {
-    const rect = target.getBoundingClientRect();
-    const padding = 8;
-
-    // Spotlight
-    if (spotlight) {
-      spotlight.style.display = 'block';
-      spotlight.style.top = `${rect.top - padding}px`;
-      spotlight.style.left = `${rect.left - padding}px`;
-      spotlight.style.width = `${rect.width + padding * 2}px`;
-      spotlight.style.height = `${rect.height + padding * 2}px`;
-      spotlight.style.border = '3px solid #00ff9d';
-      spotlight.style.borderRadius = '12px';
-      spotlight.style.boxShadow = '0 0 0 9999px rgba(0, 0, 0, 0.6)';
+    // ── Spotlight ────────────────────────────────────────────────────────────────
+    function positionSpotlight(el) {
+      var rect = el.getBoundingClientRect();
+      var pad  = 6;
+      spotlight.style.opacity  = '1';
+      spotlight.style.top      = (rect.top    - pad) + 'px';
+      spotlight.style.left     = (rect.left   - pad) + 'px';
+      spotlight.style.width    = (rect.width  + pad * 2) + 'px';
+      spotlight.style.height   = (rect.height + pad * 2) + 'px';
+    }
+    function hideSpotlight() {
+      spotlight.style.opacity = '0';
     }
 
-    // Tooltip
-    if (tooltip) {
-      if (position === 'right') {
-        tooltip.style.top = `${rect.top + rect.height / 2}px`;
-        tooltip.style.left = `${rect.right + 20}px`;
+    // ── Tooltip position ─────────────────────────────────────────────────────────
+    function centerTooltip() {
+      tooltip.style.top       = '50%';
+      tooltip.style.left      = '50%';
+      tooltip.style.transform = 'translate(-50%, -50%)';
+      tooltip.style.maxWidth  = '380px';
+      if (arrow) arrow.style.display = 'none';
+    }
+
+    function positionTooltip(el, side) {
+      var rect    = el.getBoundingClientRect();
+      var tw      = 340;
+      var margin  = 18;
+      var vw      = window.innerWidth;
+      var vh      = window.innerHeight;
+
+      // Reset transform
+      tooltip.style.transform = 'translateY(0)';
+
+      var top  = 0;
+      var left = 0;
+      var arrowSide = null;
+
+      if (side === 'right' && rect.right + tw + margin < vw) {
+        left = rect.right + margin;
+        top  = rect.top + rect.height / 2;
+        tooltip.style.top    = top + 'px';
+        tooltip.style.left   = left + 'px';
         tooltip.style.transform = 'translateY(-50%)';
-      } else if (position === 'bottom') {
-        tooltip.style.top = `${rect.bottom + 20}px`;
-        tooltip.style.left = `${rect.left + rect.width / 2}px`;
-        tooltip.style.transform = 'translateX(-50%)';
+        arrowSide = 'left';
+      } else if (side === 'left' && rect.left - tw - margin > 0) {
+        left = rect.left - tw - margin;
+        top  = rect.top + rect.height / 2;
+        tooltip.style.top    = top + 'px';
+        tooltip.style.left   = left + 'px';
+        tooltip.style.transform = 'translateY(-50%)';
+        arrowSide = 'right';
+      } else {
+        // Fallback: below
+        left = Math.min(Math.max(rect.left + rect.width / 2 - tw / 2, 16), vw - tw - 16);
+        top  = rect.bottom + margin;
+        // Clamp to viewport
+        if (top + 300 > vh) top = rect.top - 300 - margin;
+        tooltip.style.top    = top + 'px';
+        tooltip.style.left   = left + 'px';
+        arrowSide = 'top';
+      }
+
+      // Arrow
+      if (arrow) {
+        if (arrowSide === 'left') {
+          arrow.style.display  = 'block';
+          arrow.style.top      = '50%';
+          arrow.style.left     = '-6px';
+          arrow.style.right    = 'auto';
+          arrow.style.bottom   = 'auto';
+          arrow.style.transform = 'translateY(-50%) rotate(45deg)';
+          arrow.style.borderRight = 'none';
+          arrow.style.borderTop   = 'none';
+        } else {
+          arrow.style.display = 'none';
+        }
       }
     }
-  }
 
-  // Next step
-  function nextStep() {
-    if (currentStep < steps.length - 1) {
-      currentStep++;
-      showStep(currentStep);
-    } else {
-      completeTour();
+    // ── Navigate ─────────────────────────────────────────────────────────────────
+    function next() {
+      if (step < STEPS.length - 1) { step++; showStep(step); }
+      else done();
     }
-  }
-
-  // Previous step
-  function prevStep() {
-    if (currentStep > 0) {
-      currentStep--;
-      showStep(currentStep);
+    function prev() {
+      if (step > 0) { step--; showStep(step); }
     }
-  }
-
-  // Complete tour
-  function completeTour() {
-    localStorage.setItem('onboarding-completed', 'true');
-    tour?.classList.add('hidden');
-  }
-
-  // Skip tour
-  function skipTour() {
-    completeTour();
-  }
-
-  // Event listeners
-  nextBtn?.addEventListener('click', nextStep);
-  prevBtn?.addEventListener('click', prevStep);
-  skipBtn?.addEventListener('click', skipTour);
-
-  // Close on ESC
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !tour?.classList.contains('hidden')) {
-      skipTour();
+    function done() {
+      // Fade everything out
+      tooltip.style.opacity  = '0';
+      spotlight.style.opacity = '0';
+      overlay.style.background     = 'rgba(0,0,0,0)';
+      overlay.style.backdropFilter = 'blur(0px)';
+      setTimeout(function () {
+        tour.style.display = 'none';
+        localStorage.setItem(STORAGE_KEY, 'true');
+      }, 350);
     }
-  });
 
-  // Start tour on page load (after 1 second)
-  setTimeout(() => {
-    startTour();
-  }, 1000);
+    // ── Listeners ────────────────────────────────────────────────────────────────
+    if (nextBtn) nextBtn.addEventListener('click', next);
+    if (prevBtn) prevBtn.addEventListener('click', prev);
+    if (skipBtn) skipBtn.addEventListener('click', done);
+    overlay.addEventListener('click', done);
+    document.addEventListener('keydown', function (e) {
+      if (tour.style.display === 'none') return;
+      if (e.key === 'Escape')     done();
+      if (e.key === 'ArrowRight') next();
+      if (e.key === 'ArrowLeft')  prev();
+    });
+
+    // ── Start after 1.2s ─────────────────────────────────────────────────────────
+    setTimeout(start, 1200);
+  })();
 </script>
