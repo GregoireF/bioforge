@@ -9,8 +9,10 @@ if (!authResult.success || !authResult.data) {
 }
 const { user, profile } = authResult.data;
 
-// Si déjà onboardé (username défini), rediriger vers le dashboard
-if (profile?.username) {
+// Si déjà onboardé, rediriger vers le dashboard
+// On utilise onboarding_completed_at comme signal fiable
+// (le username peut être auto-généré par Supabase depuis l'email)
+if ((profile as any)?.onboarding_completed_at) {
   return Astro.redirect('/dashboard');
 }
 
