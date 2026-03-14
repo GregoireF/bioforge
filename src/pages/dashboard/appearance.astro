@@ -1761,7 +1761,7 @@ const PRESETS = [
       if (sep === 'gradient') return `<div style="height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent);margin:2px 0"></div>`;
       if (sep === 'glow')     return `<div style="height:1px;margin:2px auto;width:50%;background:${t.primary_color}60;box-shadow:0 0 8px ${t.primary_color}50;border-radius:1px"></div>`;
       return '';
-    });
+    })();
 
     // Hero cinématique même sans image (utilise la couleur primaire)
     const heroHTMLCinematic = (() => {

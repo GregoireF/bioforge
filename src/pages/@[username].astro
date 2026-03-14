@@ -1,5 +1,5 @@
 ---
-import ProfileLayout from '@/layouts/ProfileLayout.astro';
+import BaseLayout from '@/layouts/BaseLayout.astro';
 import { getProfileByUsername, getActiveBlocks } from '@/lib/supabase/queries';
 import QRCode from 'qrcode';
 import CookieBanner from '@/components/ui/CookieBanner.astro';
@@ -51,11 +51,15 @@ function sanitizeInt(val: unknown, min: number, max: number, fallback: number): 
 
 // ── Font allowlist — union appearance v2 + legacy ────────────────────────────
 const ALLOWED_FONTS = [
-  // appearance v2
+  // appearance v3 - all fonts
   'Exo 2','Orbitron','Rajdhani','Bebas Neue','Audiowide','Russo One',
   'Space Grotesk','DM Sans','Quicksand','Figtree',
-  // legacy (old profiles)
-  'Inter','Poppins','Roboto','Montserrat','Open Sans','Lato','Geist','Afacad',
+  'Outfit','Plus Jakarta Sans','Nunito','Poppins','Josefin Sans','Archivo',
+  'Barlow','Rubik','Work Sans','Manrope','Space Mono','JetBrains Mono','Fira Code',
+  'Playfair Display','Lora','Merriweather','DM Serif Display',
+  'Bungee','Righteous','Teko','Oswald','Anton','Syne','Cabinet Grotesk',
+  // legacy
+  'Inter','Roboto','Montserrat','Open Sans','Lato','Geist','Afacad',
 ];
 
 // ==================== THEME ====================
@@ -71,18 +75,60 @@ const DEFAULT_THEME = {
   gradient_type:    'linear',
   pattern:          'none',
   pattern_opacity:  15,
+  // Wallpaper
+  wallpaper_type:   'none',
+  wallpaper_url:    '',
+  wallpaper_video_url: '',
+  wallpaper_blur:   0,
+  wallpaper_dim:    50,
+  // Overlays
+  overlay_top:      false,
+  overlay_bottom:   false,
+  overlay_color:    '#000000',
+  // Layout
+  profile_layout:   'centered',
+  content_width:    'normal',
+  header_style:     'simple',
+  hero_image:       '',
+  hero_position:    'center',
+  hero_height:      'md',
+  hero_overlay:     40,
+  hero_style:       'cinematic',
   // Button
   button_style:     'filled',
   border_radius:    14,
   block_shadow:     true,
+  button_width:     'full',
+  hover_effect:     'lift',
+  shadow_intensity: 3,
+  // Links
+  link_separator:   'none',
+  link_icon_pos:    'left',
+  link_hover_fill:  false,
+  // Logo
+  show_logo:        false,
+  logo_url:         '',
+  logo_size:        'md',
   // Typography
   font_family:      'Exo 2',
+  custom_font_url:  '',
+  custom_font_name: '',
   // Profile
   avatar_shape:     'circle',
+  avatar_size:      'md',
+  avatar_border:    'glow',
+  bio_size:         'sm',
+  bio_style:        'normal',
+  show_username:    true,
+  social_icon_style: 'round',
   spacing:          'normal',
   // Effects
   animations:       true,
   animation_preset: 'fade',
+  scroll_reveal:    true,
+  click_ripple:     false,
+  hover_scale:      3,
+  glass_intensity:  12,
 };
 
 let theme = { ...DEFAULT_THEME };
@@ -110,6 +156,36 @@ if (profile.theme) {
       animation_preset: ['none','fade','slide','bounce','stagger'].includes(raw.animation_preset) ? raw.animation_preset : 'fade',
       block_shadow:     typeof raw.block_shadow === 'boolean' ? raw.block_shadow : true,
       animations:       typeof raw.animations   === 'boolean' ? raw.animations   : true,
+      // New fields v3
+      profile_layout:   ['centered','left','card','minimal'].includes(raw.profile_layout) ? raw.profile_layout : 'centered',
+      content_width:    ['narrow','normal','wide'].includes(raw.content_width) ? raw.content_width : 'normal',
+      header_style:     ['simple','glass','banner','hero'].includes(raw.header_style) ? raw.header_style : 'simple',
+      hero_height:      ['sm','md','lg','full'].includes(raw.hero_height) ? raw.hero_height : 'md',
+      hero_position:    ['top','center','bottom'].includes(raw.hero_position) ? raw.hero_position : 'center',
+      hero_style:       ['cinematic','centered','minimal'].includes(raw.hero_style) ? raw.hero_style : 'cinematic',
+      hero_overlay:     sanitizeInt(raw.hero_overlay, 0, 90, 40),
+      wallpaper_type:   ['none','image','video'].includes(raw.wallpaper_type) ? raw.wallpaper_type : 'none',
+      wallpaper_blur:   sanitizeInt(raw.wallpaper_blur, 0, 20, 0),
+      wallpaper_dim:    sanitizeInt(raw.wallpaper_dim, 0, 90, 50),
+      avatar_size:      ['sm','md','lg'].includes(raw.avatar_size) ? raw.avatar_size : 'md',
+      avatar_border:    ['none','solid','glow','gradient','double'].includes(raw.avatar_border) ? raw.avatar_border : 'glow',
+      bio_size:         ['xs','sm','md','lg'].includes(raw.bio_size) ? raw.bio_size : 'sm',
+      bio_style:        ['normal','italic'].includes(raw.bio_style) ? raw.bio_style : 'normal',
+      show_username:    typeof raw.show_username === 'boolean' ? raw.show_username : true,
+      social_icon_style:['round','square','pill','ghost','colored'].includes(raw.social_icon_style) ? raw.social_icon_style : 'round',
+      hover_effect:     ['none','lift','glow','slide','ripple'].includes(raw.hover_effect) ? raw.hover_effect : 'lift',
+      button_width:     ['full','auto'].includes(raw.button_width) ? raw.button_width : 'full',
+      link_separator:   ['none','line','dots','gradient','glow'].includes(raw.link_separator) ? raw.link_separator : 'none',
+      link_icon_pos:    ['left','right','none'].includes(raw.link_icon_pos) ? raw.link_icon_pos : 'left',
+      link_hover_fill:  typeof raw.link_hover_fill === 'boolean' ? raw.link_hover_fill : false,
+      logo_size:        ['sm','md','lg'].includes(raw.logo_size) ? raw.logo_size : 'md',
+      shadow_intensity: sanitizeInt(raw.shadow_intensity, 0, 5, 3),
+      glass_intensity:  sanitizeInt(raw.glass_intensity, 4, 32, 12),
+      hover_scale:      sanitizeInt(raw.hover_scale, 0, 5, 3),
+      scroll_reveal:    typeof raw.scroll_reveal === 'boolean' ? raw.scroll_reveal : true,
+      click_ripple:     typeof raw.click_ripple  === 'boolean' ? raw.click_ripple  : false,
+      overlay_top:      typeof raw.overlay_top    === 'boolean' ? raw.overlay_top    : false,
+      overlay_bottom:   typeof raw.overlay_bottom === 'boolean' ? raw.overlay_bottom : false,
     };
   } catch { /* keep defaults */ }
 }
@@ -190,8 +266,93 @@ switch (theme.avatar_shape) {
 // Spacing gap
 const blockGap = theme.spacing === 'compact' ? '8px' : theme.spacing === 'spacious' ? '20px' : '12px';
 
+// ── Avatar size ─────────────────────────────────────────────────────────────
+const avSize = { sm: '64px', md: '96px', lg: '128px' }[(theme as any).avatar_size ?? 'md'] ?? '96px';
+
+// ── Avatar border (richer styles) ───────────────────────────────────────────
+const avBorder = (() => {
+  const p = pc;
+  switch ((theme as any).avatar_border ?? 'glow') {
+    case 'none':     return `border-radius: 50%;`;
+    case 'solid':    return `border-radius: 50%; border: 3px solid ${p};`;
+    case 'gradient': return `border-radius: 50%; border: 3px solid transparent; box-shadow: 0 0 0 3px ${p}60;`;
+    case 'double':   return `border-radius: 50%; border: 2px solid ${p}; box-shadow: 0 0 0 4px ${bg}, 0 0 0 6px ${p}60;`;
+    default:         return `border-radius: 50%; border: 3px solid ${p}; box-shadow: 0 0 40px ${p}50;`;
+  }
+})();
+// Merge with shape
+let avatarStyleFull = avatarStyle;
+if ((theme as any).avatar_shape === 'circle' || (theme as any).avatar_shape === 'square') {
+  avatarStyleFull = avBorder.replace('border-radius: 50%', (theme as any).avatar_shape === 'square' ? 'border-radius: 20px' : 'border-radius: 50%');
+}
+
+// ── Bio ──────────────────────────────────────────────────────────────────────
+const bioFontSize  = { xs: '12px', sm: '14px', md: '16px', lg: '18px' }[(theme as any).bio_size ?? 'sm'] ?? '14px';
+const bioFontStyle = (theme as any).bio_style === 'italic' ? 'italic' : 'normal';
+
+// ── Content width ────────────────────────────────────────────────────────────
+const contentMaxW = { narrow: '380px', normal: '512px', wide: '640px' }[(theme as any).content_width ?? 'normal'] ?? '512px';
+
+// ── Button width ─────────────────────────────────────────────────────────────
+const btnWidthStyle = (theme as any).button_width === 'auto' ? 'width: auto; padding-left: 32px; padding-right: 32px;' : 'width: 100%;';
+const btnStyleFull  = btnStyle.replace('display: block; width: 100%;', `display: block; ${btnWidthStyle}`);
+
+// ── Link separator CSS ───────────────────────────────────────────────────────
+function getLinkSeparatorHtml(): string {
+  switch ((theme as any).link_separator ?? 'none') {
+    case 'line':     return `<div style="height:1px;background:rgba(255,255,255,0.08);margin:2px 0"></div>`;
+    case 'dots':     return `<div style="text-align:center;color:rgba(255,255,255,0.2);font-size:10px;letter-spacing:4px;margin:3px 0;line-height:1">· · ·</div>`;
+    case 'gradient': return `<div style="height:1px;background:linear-gradient(90deg,transparent,${pc}40,transparent);margin:2px 0"></div>`;
+    case 'glow':     return `<div style="height:1px;width:40%;margin:4px auto;background:${pc}60;box-shadow:0 0 8px ${pc}50;border-radius:1px"></div>`;
+    default:         return '';
+  }
+}
+
+// ── Social icon style ────────────────────────────────────────────────────────
+function getSocialBtnStyle(url?: string): string {
+  const style = (theme as any).social_icon_style ?? 'round';
+  const base  = `width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; transition: transform 0.15s ease;`;
+  switch (style) {
+    case 'square':  return `${base} background-color: ${pc}22; border: 1px solid ${pc}40; border-radius: 12px; color: ${pc};`;
+    case 'pill':    return `${base} background-color: ${pc}22; border: 1px solid ${pc}40; border-radius: 24px; color: ${pc};`;
+    case 'ghost':   return `${base} background-color: transparent; border: 1.5px solid ${tc}30; border-radius: 50%; color: ${tc}; opacity: 0.65;`;
+    case 'colored': return `${base} background-color: ${pc}; border-radius: 50%; color: ${bg};${(theme as any).block_shadow ? ` box-shadow: 0 4px 16px ${pc}60;` : ''}`;
+    default:        return `${base} background-color: ${pc}; color: ${bg}; border-radius: 50%;${(theme as any).block_shadow ? ` box-shadow: 0 4px 16px ${pc}60;` : ''}`;
+  }
+}
+
+// ── Wallpaper ────────────────────────────────────────────────────────────────
+const wallpaperType = (theme as any).wallpaper_type ?? 'none';
+const wallpaperUrl  = (theme as any).wallpaper_url  ?? '';
+const wallpaperVideoUrl = (theme as any).wallpaper_video_url ?? '';
+const wallpaperBlur = (theme as any).wallpaper_blur ?? 0;
+const wallpaperDim  = (theme as any).wallpaper_dim  ?? 50;
+
+// ── Hero mode ────────────────────────────────────────────────────────────────
+const headerStyle  = (theme as any).header_style ?? 'simple';
+const heroImage    = (theme as any).hero_image ?? '';
+const heroHeight   = { sm:'200px', md:'300px', lg:'420px', full:'70vh' }[(theme as any).hero_height ?? 'md'] ?? '300px';
+const heroOverlay  = (theme as any).hero_overlay ?? 40;
+const heroStyle    = (theme as any).hero_style ?? 'cinematic';
+
+const heroOverlayCSS = (() => {
+  switch (heroStyle) {
+    case 'centered': return `radial-gradient(circle at center,transparent 20%,rgba(0,0,0,${heroOverlay/100}) 80%)`;
+    case 'minimal':  return `linear-gradient(to top,rgba(0,0,0,0.75) 0%,transparent 35%)`;
+    default:         return `linear-gradient(to top,rgba(0,0,0,${Math.min(heroOverlay/100+0.2,0.9)}) 0%,rgba(0,0,0,0.15) 50%,transparent 100%)`;
+  }
+})();
+
+// ── Logo ─────────────────────────────────────────────────────────────────────
+const showLogo  = (theme as any).show_logo ?? false;
+const logoUrl   = (theme as any).logo_url  ?? '';
+const logoSize  = { sm: '48px', md: '80px', lg: '120px' }[(theme as any).logo_size ?? 'md'] ?? '80px';
+
+// ── Overlay top/bottom ───────────────────────────────────────────────────────
+const overlayColor = (theme as any).overlay_color ?? '#000000';
+
 // Social button style
-const socialBtnStyle = `background-color: ${pc}; color: ${bg}; border-radius: 50%; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;${theme.block_shadow ? ` box-shadow: 0 4px 16px ${pc}60;` : ''}`;
+const socialBtnStyle = getSocialBtnStyle();
 
 // ==================== SEO DATA ====================
 const profileUrl = `https://bioforge.click/@${profile.username}`;
@@ -264,7 +425,7 @@ const BADGE_COLORS: Record<string, string> = {
 };
 ---
 
-<ProfileLayout title={pageTitle}>
+<BaseLayout title={pageTitle}>
 
   <!-- ===== SEO HEAD ===== -->
   <meta name="description" content={pageDesc} slot="head" />
@@ -303,13 +464,41 @@ const BADGE_COLORS: Record<string, string> = {
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href={fontUrl} />
+  {(theme as any).custom_font_url && (
+    <link rel="stylesheet" href={(theme as any).custom_font_url} />
+  )}
 
   <!-- Bridge -->
   <div id="page-data" class="hidden" data-bridge={bridge}></div>
 
   <!-- ===== BACKGROUND LAYERS ===== -->
-  <!-- Base background -->
-  <div class="fixed inset-0 z-0 pointer-events-none" style={computedBg}></div>
+  <!-- Wallpaper image -->
+  {wallpaperType === 'image' && wallpaperUrl && (
+    <div class="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+      <img src={wallpaperUrl} alt="" class="w-full h-full object-cover"
+        style={`${wallpaperBlur > 0 ? `filter: blur(${wallpaperBlur}px) scale(1.05);` : ''}`} />
+      <div class="absolute inset-0" style={`background: rgba(0,0,0,${wallpaperDim/100})`}></div>
+    </div>
+  )}
+  <!-- Wallpaper video -->
+  {wallpaperType === 'video' && wallpaperVideoUrl && (
+    <div class="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+      <video autoplay muted loop playsinline class="w-full h-full object-cover"
+        src={wallpaperVideoUrl} style="transform: scale(1.02);"></video>
+      <div class="absolute inset-0" style={`background: rgba(0,0,0,${wallpaperDim/100})`}></div>
+    </div>
+  )}
+  <!-- Base background (shown unless wallpaper covers) -->
+  <div class="fixed inset-0 z-0 pointer-events-none" style={`${computedBg}${wallpaperType !== 'none' ? ' opacity: 0.15;' : ''}`}></div>
+
+  <!-- Overlay top -->
+  {(theme as any).overlay_top && (
+    <div class="fixed top-0 left-0 right-0 z-0 pointer-events-none" style={`height: 140px; background: linear-gradient(to bottom, ${overlayColor}CC, transparent);`}></div>
+  )}
+  <!-- Overlay bottom -->
+  {(theme as any).overlay_bottom && (
+    <div class="fixed bottom-0 left-0 right-0 z-0 pointer-events-none" style={`height: 140px; background: linear-gradient(to top, ${overlayColor}CC, transparent);`}></div>
+  )}
 
   <!-- Pattern overlay (if any) -->
   {theme.pattern !== 'none' && theme.pattern !== 'noise' && (
@@ -340,42 +529,120 @@ const BADGE_COLORS: Record<string, string> = {
   <div class="min-h-screen flex flex-col items-center justify-start px-4 py-16 relative z-10"
     style={`font-family: '${theme.font_family}', system-ui, sans-serif; color: ${tc};`}>
 
-    <div class="w-full max-w-xl">
+    <div class="w-full" style={`max-width: ${contentMaxW};`}>
 
       <!-- HEADER -->
-      <header class="text-center mb-10 anim-block">
-        {profile.avatar_url ? (
-          <img src={profile.avatar_url}
-            alt={`Photo de profil de ${profile.display_name || profile.username}`}
-            class="w-24 h-24 lg:w-28 lg:h-28 mx-auto mb-5 object-cover"
-            style={avatarStyle}
-            loading="eager" />
-        ) : (
-          <div class="w-24 h-24 lg:w-28 lg:h-28 mx-auto mb-5 flex items-center justify-center text-4xl font-bold"
-            style={`${avatarStyle} background: linear-gradient(135deg, ${pc}, ${pc}80); color: ${bg};`}>
-            {(profile.display_name || profile.username || '?').charAt(0).toUpperCase()}
+      {headerStyle === 'hero' ? (
+        <!-- ── HERO MODE ── -->
+        <header class="mb-10 anim-block -mx-4" style={`margin-top: -64px;`}>
+          <!-- Hero image container -->
+          <div class="relative overflow-hidden" style={`height: ${heroHeight};`}>
+            {heroImage ? (
+              <img src={heroImage} alt=""
+                class="w-full h-full object-cover"
+                style={`object-position: ${heroPosition ?? 'center'};`}
+                loading="eager" />
+            ) : (
+              <div class="w-full h-full"
+                style={`background: linear-gradient(135deg, ${bg}, ${pc}30, ${bg});`}></div>
+            )}
+            <!-- Cinematic overlay -->
+            <div class="absolute inset-0" style={`background: ${heroOverlayCSS};`}></div>
+            <!-- Hero content -->
+            <div class={`absolute inset-0 flex flex-col ${heroStyle === 'centered' ? 'items-center justify-center' : 'items-start justify-end'} p-6`}>
+              {heroStyle === 'centered' && (
+                <div class="mb-4" style={`width: ${avSize}; height: ${avSize}; border-radius: 50%; overflow: hidden; ${avatarStyleFull} flex-shrink: 0; display: flex; align-items: center; justify-content: center;`}>
+                  {profile.avatar_url
+                    ? <img src={profile.avatar_url} alt="" class="w-full h-full object-cover" loading="eager" />
+                    : <span class="text-4xl font-bold" style={`color: ${bg};`}>{(profile.display_name || profile.username || '?').charAt(0).toUpperCase()}</span>
+                  }
+                </div>
+              )}
+              {showLogo && logoUrl ? (
+                <img src={logoUrl} alt={profile.display_name || profile.username || ''}
+                  style={`height: ${logoSize}; width: auto; max-width: 240px; object-fit: contain; filter: drop-shadow(0 2px 12px rgba(0,0,0,0.5));`} />
+              ) : (
+                <div>
+                  <h1 class="font-bold tracking-tight text-white flex items-center gap-2"
+                    style={`font-size: ${heroStyle === 'centered' ? '24px' : '28px'}; text-shadow: 0 2px 20px rgba(0,0,0,0.6);`}>
+                    {profile.display_name || `@${profile.username}`}
+                    {(profile as any).is_verified === true && (
+                      <svg class="verified-badge shrink-0" width="24" height="24" viewBox="0 0 28 28"><circle cx="14" cy="14" r="13" fill={pc}/><path d="M8 14.5 L11.8 18.5 L20 10.5" fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    )}
+                  </h1>
+                  {(theme as any).show_username !== false && (
+                    <p style="font-size: 13px; color: rgba(255,255,255,0.55); margin-top: 3px;">@{profile.username}</p>
+                  )}
+                </div>
+              )}
+              {heroStyle !== 'centered' && profile.bio && (
+                <p class="mt-2 max-w-sm" style={`font-size: ${bioFontSize}; font-style: ${bioFontStyle}; color: rgba(255,255,255,0.7); text-shadow: 0 1px 8px rgba(0,0,0,0.5);`}>{profile.bio}</p>
+              )}
+            </div>
           </div>
-        )}
-        <h1 class="text-2xl lg:text-3xl font-bold mb-2 tracking-tight inline-flex items-center justify-center gap-2 flex-wrap"
-          style={`color: ${tc};`}>
-          <span>{profile.display_name || `@${profile.username}`}</span>
-          {(profile as any).is_verified === true && (
-            <svg class="verified-badge shrink-0" width="28" height="28" viewBox="0 0 28 28"
-              xmlns="http://www.w3.org/2000/svg" title="Compte vérifié BioForge" aria-label="Compte vérifié">
-              <circle cx="14" cy="14" r="13" fill={pc}/>
-              <path d="M8 14.5 L11.8 18.5 L20 10.5" fill="none" stroke="#ffffff" stroke-width="2.8"
-                stroke-linecap="round" stroke-linejoin="round"
-                style="stroke:#ffffff !important; stroke-width:2.8px !important;"/>
-            </svg>
+          <!-- Below hero: centered info for non-cinematic -->
+          {heroStyle === 'centered' && profile.bio && (
+            <div class="text-center px-4 mt-4">
+              <p style={`font-size: ${bioFontSize}; font-style: ${bioFontStyle}; color: ${tc}; opacity: 0.75;`}>{profile.bio}</p>
+            </div>
           )}
-        </h1>
-        {profile.bio && (
-          <p class="text-sm lg:text-base leading-relaxed max-w-sm mx-auto"
-            style={`color: ${tc}; opacity: 0.75;`}>
-            {profile.bio}
-          </p>
-        )}
-      </header>
+        </header>
+      ) : (
+        <!-- ── STANDARD HEADER ── -->
+        <header class={`mb-10 anim-block ${(theme as any).profile_layout === 'left' ? 'text-left' : 'text-center'}`}>
+          <!-- Glass / Banner wrapper -->
+          <div style={headerStyle === 'glass'
+            ? `backdrop-filter: blur(${(theme as any).glass_intensity ?? 12}px); -webkit-backdrop-filter: blur(${(theme as any).glass_intensity ?? 12}px); background: rgba(255,255,255,0.05); border-radius: 24px; padding: 28px; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 0;`
+            : headerStyle === 'banner'
+              ? `background: ${pc}15; border-radius: 24px; padding: 24px; border: 1px solid ${pc}28; margin-bottom: 0;`
+              : ''}>
+            <!-- Avatar or Logo -->
+            {showLogo && logoUrl ? (
+              <div class={`mb-5 ${(theme as any).profile_layout === 'left' ? '' : 'flex justify-center'}`}>
+                <img src={logoUrl} alt={profile.display_name || profile.username || ''}
+                  style={`height: ${logoSize}; width: auto; max-width: 220px; object-fit: contain;`} />
+              </div>
+            ) : (
+              <div class={`mb-5 ${(theme as any).profile_layout === 'left' ? '' : 'flex justify-center'}`}>
+                {profile.avatar_url ? (
+                  <img src={profile.avatar_url}
+                    alt={`Photo de profil de ${profile.display_name || profile.username}`}
+                    loading="eager"
+                    style={`width: ${avSize}; height: ${avSize}; object-fit: cover; display: block; ${avatarStyleFull}`} />
+                ) : (
+                  <div style={`width: ${avSize}; height: ${avSize}; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 700; background: linear-gradient(135deg, ${pc}, ${pc}80); color: ${bg}; ${avatarStyleFull}`}>
+                    {(profile.display_name || profile.username || '?').charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </div>
+            )}
+            <!-- Name -->
+            <h1 class="text-2xl lg:text-3xl font-bold mb-2 tracking-tight inline-flex items-center gap-2 flex-wrap"
+              style={`color: ${tc}; ${(theme as any).profile_layout === 'left' ? '' : 'justify-content: center; width: 100%;'}`}>
+              <span>{profile.display_name || `@${profile.username}`}</span>
+              {(profile as any).is_verified === true && (
+                <svg class="verified-badge shrink-0" width="28" height="28" viewBox="0 0 28 28"
+                  xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="14" cy="14" r="13" fill={pc}/>
+                  <path d="M8 14.5 L11.8 18.5 L20 10.5" fill="none" stroke="#ffffff" stroke-width="2.8"
+                    stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              )}
+            </h1>
+            <!-- Username handle -->
+            {(theme as any).show_username !== false && (
+              <p class="text-sm mb-2 opacity-40" style={`color: ${tc}; ${(theme as any).profile_layout === 'left' ? '' : 'text-align: center;'}`}>@{profile.username}</p>
+            )}
+            <!-- Bio -->
+            {profile.bio && (
+              <p class="leading-relaxed"
+                style={`color: ${tc}; opacity: 0.75; font-size: ${bioFontSize}; font-style: ${bioFontStyle}; ${(theme as any).profile_layout === 'left' ? 'max-width: 480px;' : 'text-align: center; max-width: 440px; margin: 0 auto;'}`}>
+                {profile.bio}
+              </p>
+            )}
+          </div>
+        </header>
+      )}
 
       <!-- CAUSE BANNERS -->
       {(() => {
@@ -453,13 +720,15 @@ const BADGE_COLORS: Record<string, string> = {
               const hasIcon = Boolean(iconUrl);
 
               return (
-                <div class={`block-dot-wrap group relative ${animClass}`} style={delay}
+                <div class={`block-dot-wrap link-block group relative ${animClass}`}
+                  style={delay}
+                  data-sep={(theme as any).link_separator ?? 'none'}
                   data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
                   {/* Link button — icon absolute left, text always truly centered */}
                   <a href={url} target="_blank" rel="noopener noreferrer"
                     data-block-id={block.id}
-                    class={`relative flex items-center justify-center w-full ${theme.animations ? 'hover:scale-[1.02] active:scale-[0.98]' : ''} transition-transform`}
-                    style={btnStyle}>
+                    class={`relative flex items-center justify-center ${(theme as any).button_width === 'auto' ? '' : 'w-full'} ${theme.animations ? 'hover:scale-[1.02] active:scale-[0.98]' : ''} transition-transform ${(theme as any).link_hover_fill ? 'link-hover-fill-item' : ''}`}
+                    style={btnStyleFull}>
                     {hasIcon && (
                       <div class="absolute left-4 top-1/2 -translate-y-1/2 shrink-0 w-9 h-9 rounded-full overflow-hidden border-2 z-10"
                         style={`border-color: ${bg}40;`}>
@@ -566,7 +835,7 @@ const BADGE_COLORS: Record<string, string> = {
                     return (
                       <a href={url} target="_blank" rel="noopener noreferrer" data-block-id={block.id}
                         class={`transition-all ${theme.animations ? 'hover:scale-110 active:scale-95' : ''}`}
-                        style={socialBtnStyle}>
+                        style={getSocialBtnStyle(url)}>
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                           <path d={getSocialIconPath(url)} />
                         </svg>
@@ -1207,6 +1476,34 @@ const BADGE_COLORS: Record<string, string> = {
     /* ── Share modal ── */
     #share-modal.open { display: flex; }
 
+    /* ── Link separators ── */
+    .link-block[data-sep="line"]::before,
+    .link-block[data-sep="dots"]::before,
+    .link-block[data-sep="gradient"]::before,
+    .link-block[data-sep="glow"]::before {
+      content: '';
+      display: block;
+      margin-bottom: 8px;
+    }
+    .link-block + .link-block[data-sep="line"]::before     { border-top: 1px solid rgba(255,255,255,0.08); }
+    .link-block + .link-block[data-sep="gradient"]::before { border-top: 1px solid; border-image: linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent) 1; }
+
+    /* Dots separator via pseudo-element on the gap */
+    .link-block + .link-block[data-sep="dots"] { position: relative; }
+    .link-block + .link-block[data-sep="dots"]::before {
+      content: '· · ·';
+      display: block;
+      text-align: center;
+      font-size: 10px;
+      letter-spacing: 4px;
+      color: rgba(255,255,255,0.2);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    /* ── Link hover fill ── */
+    .link-hover-fill a:hover { filter: brightness(1.08); }
+
     /* ── Misc ── */
     .scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
     .scrollbar-none::-webkit-scrollbar { display: none; }
@@ -1620,4 +1917,3 @@ const BADGE_COLORS: Record<string, string> = {
     });
 
   </script>
-</ProfileLayout>
