@@ -975,12 +975,19 @@ const profileJson = JSON.stringify({
   let theme   = JSON.parse(sd?.dataset.theme   ?? '{}');
   const prof  = JSON.parse(sd?.dataset.profile ?? '{}');
 
-  const ALLOWED_FONTS = ['Exo 2','Orbitron','Rajdhani','Bebas Neue','Audiowide','Russo One','Space Grotesk','DM Sans','Quicksand','Figtree'];
+  const ALLOWED_FONTS = [
+    'Exo 2','Orbitron','Rajdhani','Bebas Neue','Audiowide','Russo One',
+    'Space Grotesk','DM Sans','Quicksand','Figtree','Inter','Syne','Cabinet Grotesk',
+    'Outfit','Plus Jakarta Sans','Nunito','Poppins','Josefin Sans','Archivo',
+    'Barlow','Rubik','Work Sans','Manrope','Space Mono','JetBrains Mono','Fira Code',
+    'Playfair Display','Lora','Merriweather','DM Serif Display',
+    'Bungee','Righteous','Teko','Oswald','Anton',
+  ];
   const HISTORY_KEY   = 'bf_theme_history_v2';
-  let aiSuggestedTheme = null;
+  let aiSuggestedTheme: any = null;
 
   // ── RAF-debounced preview ────────────────────────────────────────────────────
-  let rafId = null;
+  let rafId: number | null = null;
   const schedulePreview = () => {
     if (rafId) cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(renderPreview);
