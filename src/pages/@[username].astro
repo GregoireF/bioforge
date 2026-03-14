@@ -1,5 +1,5 @@
 ---
-import BaseLayout from '@/layouts/BaseLayout.astro';
+import ProfileLayout from '@/layouts/ProfileLayout.astro';
 import { getProfileByUsername, getActiveBlocks } from '@/lib/supabase/queries';
 import QRCode from 'qrcode';
 import CookieBanner from '@/components/ui/CookieBanner.astro';
@@ -354,6 +354,61 @@ const overlayColor = (theme as any).overlay_color ?? '#000000';
 // Social button style
 const socialBtnStyle = getSocialBtnStyle();
 
+// ── Hover effect CSS ─────────────────────────────────────────────────────────
+const hoverEffect     = (theme as any).hover_effect  ?? 'lift';
+const shadowIntensity = (theme as any).shadow_intensity ?? 3;
+const hoverScale      = (theme as any).hover_scale ?? 3;
+
+// Augment btnStyleFull with shadow_intensity
+const shadowVal = shadowIntensity > 0
+  ? `box-shadow: 0 ${shadowIntensity * 2}px ${shadowIntensity * 8}px rgba(0,0,0,${shadowIntensity * 0.07 + 0.12});`
+  : '';
+const btnStyleWithShadow = theme.block_shadow
+  ? btnStyleFull.replace(/(border: none;|border: [^;]+;)(\s*color:)/, `$1 ${shadowVal}$2`)
+  : btnStyleFull;
+
+// hover CSS class based on effect
+const hoverClass = (() => {
+  if (!theme.animations) return '';
+  switch (hoverEffect) {
+    case 'lift':   return 'hover:scale-[1.02] hover:-translate-y-0.5 active:scale-[0.98]';
+    case 'glow':   return 'hover:scale-[1.01] active:scale-[0.99]';
+    case 'slide':  return 'hover:scale-[1.02] active:scale-[0.98]';
+    case 'ripple': return 'hover:scale-[1.01] active:scale-[0.98]';
+    default:       return '';
+  }
+})();
+
+// ── Link icon position ───────────────────────────────────────────────────────
+const linkIconPos = (theme as any).link_icon_pos ?? 'left';
+
+// ── Scroll reveal CSS (added inline via style tag) ───────────────────────────
+const scrollReveal  = (theme as any).scroll_reveal  ?? true;
+const clickRipple   = (theme as any).click_ripple   ?? false;
+
+// ── Extra effects CSS ─────────────────────────────────────────────────────────
+const extraEffectsCSS = (() => {
+  let css = '';
+  if (hoverEffect === 'glow' && theme.animations) {
+    css += `.anim-block a:hover { box-shadow: 0 0 ${shadowIntensity * 6}px ${pc}60 !important; }`;
+  }
+  if (clickRipple) {
+    css += `
+      .ripple-btn { position: relative; overflow: hidden; }
+      .ripple-btn::after { content:''; position:absolute; border-radius:50%; background:rgba(255,255,255,0.25);
+        width:100px; height:100px; top:50%; left:50%; transform:translate(-50%,-50%) scale(0);
+        pointer-events:none; }
+      .ripple-btn:active::after { animation: ripple-anim 0.4s ease forwards; }
+      @keyframes ripple-anim { to { transform:translate(-50%,-50%) scale(4); opacity:0; } }`;
+  }
+  if (scrollReveal) {
+    css += `
+      .scroll-reveal { opacity:0; transform:translateY(16px); transition:opacity 0.5s ease, transform 0.5s ease; }
+      .scroll-reveal.visible { opacity:1; transform:none; }`;
+  }
+  return css;
+})();
+
 // ==================== SEO DATA ====================
 const profileUrl = `https://bioforge.click/@${profile.username}`;
 const pageTitle  = profile.display_name
@@ -390,6 +445,10 @@ const bridge = JSON.stringify({
   bgColor:      bg,
   textColor:    tc,
   qrDataUrl,
+  hoverEffect,
+  scrollReveal,
+  clickRipple,
+  linkIconPos,
 });
 
 // ==================== SOCIAL ICONS ====================
@@ -425,7 +484,7 @@ const BADGE_COLORS: Record<string, string> = {
 };
 ---
 
-<BaseLayout title={pageTitle}>
+<ProfileLayout title={pageTitle}>
 
   <!-- ===== SEO HEAD ===== -->
   <meta name="description" content={pageDesc} slot="head" />
@@ -714,30 +773,42 @@ const BADGE_COLORS: Record<string, string> = {
             if (block.type === 'spacer') return <div style="height: 20px;"></div>;
 
             // ── LINK ──
+            // ── LINK ──
             if (block.type === 'link') {
               const url     = block.config?.url || '#';
               const iconUrl = block.config?.icon_url || null;
               const hasIcon = Boolean(iconUrl);
+              // Separator before consecutive links
+              const sepHtml = index > 0 && groupedBlocks[index - 1]?.type === 'link'
+                ? getLinkSeparatorHtml() : '';
 
               return (
-                <div class={`block-dot-wrap link-block group relative ${animClass}`}
+                <Fragment>
+              {sepHtml && <div set:html={sepHtml}></div>}
+              <div class={`block-dot-wrap link-block group relative ${animClass}`}
                   style={delay}
                   data-sep={(theme as any).link_separator ?? 'none'}
                   data-show-from={showFrom ?? undefined} data-show-until={showUntil ?? undefined}>
                   {/* Link button — icon absolute left, text always truly centered */}
                   <a href={url} target="_blank" rel="noopener noreferrer"
                     data-block-id={block.id}
-                    class={`relative flex items-center justify-center ${(theme as any).button_width === 'auto' ? '' : 'w-full'} ${theme.animations ? 'hover:scale-[1.02] active:scale-[0.98]' : ''} transition-transform ${(theme as any).link_hover_fill ? 'link-hover-fill-item' : ''}`}
-                    style={btnStyleFull}>
+                    class={`relative flex items-center justify-center ${(theme as any).button_width === 'auto' ? '' : 'w-full'} ${hoverClass} transition-all ${clickRipple ? 'ripple-btn' : ''} ${(theme as any).link_hover_fill ? 'link-hover-fill-item' : ''}`}
+                    style={btnStyleWithShadow}>
                     {hasIcon && (
                       <div class="absolute left-4 top-1/2 -translate-y-1/2 shrink-0 w-9 h-9 rounded-full overflow-hidden border-2 z-10"
                         style={`border-color: ${bg}40;`}>
                         <img src={iconUrl} alt="" class="w-full h-full object-cover" loading="lazy" />
                       </div>
                     )}
-                    <span class="text-center px-14 leading-tight">
+                    {linkIconPos === 'left' && !hasIcon && (
+                      <span class="absolute left-4 top-1/2 -translate-y-1/2 opacity-50 text-sm shrink-0">🔗</span>
+                    )}
+                    <span class={`leading-tight ${hasIcon || linkIconPos !== 'none' ? 'px-12' : 'px-4'} text-center`}>
                       {(block.title || 'Link').trim()}
                     </span>
+                    {linkIconPos === 'right' && !hasIcon && (
+                      <span class="absolute right-12 top-1/2 -translate-y-1/2 opacity-40 text-sm shrink-0">→</span>
+                    )}
                   </a>
                   <!-- 3-dot button -->
                   <button
@@ -776,6 +847,7 @@ const BADGE_COLORS: Record<string, string> = {
                     </button>
                   </div>
                 </div>
+              </Fragment>
               );
             }
 
@@ -1504,16 +1576,29 @@ const BADGE_COLORS: Record<string, string> = {
     /* ── Link hover fill ── */
     .link-hover-fill a:hover { filter: brightness(1.08); }
 
+    /* ── Extra effects (injected from theme) ── */
+    /* Populated via extraEffectsCSS in <style> tag below */
+
     /* ── Misc ── */
     .scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
     .scrollbar-none::-webkit-scrollbar { display: none; }
     .dot-dropdown button:hover { background: rgba(255,255,255,0.06); }
   </style>
 
-  <!-- ===== SCRIPT ===== -->
-  <script type="module" define:vars={{ bridgeJson: bridge, animPreset: theme.animation_preset, hasAnimations: theme.animations }}>
+  <!-- Extra effects CSS from theme -->
+  {extraEffectsCSS && (
+    <style set:html={extraEffectsCSS}></style>
+  )}
 
-    const { profileId, profileUrl, profileName, primaryColor: pc, bgColor: bg, textColor: tc, qrDataUrl } = JSON.parse(bridgeJson);
+  <!-- ===== SCRIPT ===== -->
+  <script type="module" define:vars={{ bridgeJson: bridge, animPreset: theme.animation_preset, hasAnimations: theme.animations, extraEffectsCSS }}>
+
+    const bridgeParsed = JSON.parse(bridgeJson);
+    const { profileId, profileUrl, profileName, primaryColor: pc, bgColor: bg, textColor: tc, qrDataUrl } = bridgeParsed;
+    const hoverEffect  = bridgeParsed.hoverEffect  ?? 'lift';
+    const scrollReveal = bridgeParsed.scrollReveal  ?? true;
+    const clickRipple  = bridgeParsed.clickRipple   ?? false;
+    const linkIconPos  = bridgeParsed.linkIconPos   ?? 'left';
 
     // ── Apply animation preset ───────────────────────────────────────────────
     if (hasAnimations && animPreset !== 'none') {
@@ -1539,6 +1624,39 @@ const BADGE_COLORS: Record<string, string> = {
         `;
         document.head.appendChild(style);
       }
+    }
+
+    // ── Scroll reveal ────────────────────────────────────────────────────────
+    if (scrollReveal) {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+          if (e.isIntersecting) {
+            e.target.classList.add('visible');
+            observer.unobserve(e.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      // Add scroll-reveal class to blocks that don't already have anim-block
+      document.querySelectorAll('.block-dot-wrap, .anim-block').forEach((el, i) => {
+        if (i > 2) { // skip first 3 (above fold)
+          el.classList.add('scroll-reveal');
+          observer.observe(el);
+        }
+      });
+    }
+
+    // ── Hover glow effect (applied via JS for dynamic color) ─────────────────
+    if (hoverEffect === 'glow') {
+      document.querySelectorAll('a[data-block-id]').forEach(a => {
+        const el = a as HTMLElement;
+        el.addEventListener('mouseenter', () => {
+          el.style.boxShadow = `0 0 24px ${pc}55, ${el.style.boxShadow || ''}`;
+        });
+        el.addEventListener('mouseleave', () => {
+          el.style.boxShadow = el.style.boxShadow?.replace(/0 0 24px [^,]+,?\s*/g, '') || '';
+        });
+      });
     }
 
     // ── View tracking ────────────────────────────────────────────────────────
@@ -1917,3 +2035,4 @@ const BADGE_COLORS: Record<string, string> = {
     });
 
   </script>
+</ProfileLayout>

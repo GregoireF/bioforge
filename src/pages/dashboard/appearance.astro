@@ -12,9 +12,9 @@ if (!authResult.success || !authResult.data) {
 const { profile, planLimits } = authResult.data;
 
 // ── Plan detection ──────────────────────────────────────────────────────────
-const PAID_TIERS = ['creator','pro','enterprise','business','team'];
-const PRO_TIERS  = ['pro','enterprise','business','team'];
-const plan: string = (planLimits as any)?.plan ?? (profile as any)?.plan ?? 'free';
+const PAID_TIERS = ['Creator','Pro','Enterprise' ];
+const PRO_TIERS  = ['Pro','Enterprise' ];
+const plan: string = (planLimits as any)?.plan ?? (profile as any)?.plan ?? 'Free';
 const isCreator = PAID_TIERS.includes(plan);
 const isPro     = PRO_TIERS.includes(plan);
 
