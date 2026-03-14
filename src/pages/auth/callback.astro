@@ -58,28 +58,12 @@ try {
     .select('onboarding_completed_at')
     .eq('id', user.id)
     .maybeSingle();
-
+ 
   if (!profile?.onboarding_completed_at) {
     return Astro.redirect('/dashboard/onboarding');
   }
 } catch {
   // En cas d'erreur, continuer vers le dashboard normalement
-}
-
-// ==================== ONBOARDING DETECTION ====================
-// Signal fiable : onboarding_completed_at (username peut être auto-généré par Supabase)
-try {
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('onboarding_completed_at')
-    .eq('id', user.id)
-    .maybeSingle();
-
-  if (!profile?.onboarding_completed_at) {
-    return Astro.redirect('/dashboard/onboarding');
-  }
-} catch {
-  // En cas d'erreur DB, continuer normalement vers le dashboard
 }
 
 return Astro.redirect('/dashboard');
