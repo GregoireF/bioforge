@@ -1,0 +1,1201 @@
+---
+// src/pages/dashboard/onboarding.astro
+// Onboarding first-login — 4 steps: username → profile → style → done
+import { withAuth } from '@/lib/auth/auth';
+
+const authResult = await withAuth({ cookies: Astro.cookies, request: Astro.request });
+if (!authResult.success || !authResult.data) {
+  return Astro.redirect('/signin');
+}
+const { user, profile } = authResult.data;
+
+// Si déjà onboardé (username défini), rediriger vers le dashboard
+if (profile?.username) {
+  return Astro.redirect('/dashboard');
+}
+
+const userEmail  = user?.email ?? '';
+const avatarUrl  = profile?.avatar_url ?? '';
+const existingName = profile?.display_name ?? '';
+---
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bienvenue sur BioForge ✦</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:   #00ff9d;
+      --green-d: #00cc7a;
+      --bg:      #080a0c;
+      --bg2:     #0e1115;
+      --border:  rgba(255,255,255,0.07);
+      --text:    #ffffff;
+      --muted:   rgba(255,255,255,0.45);
+      --error:   #ff4f4f;
+    }
+
+    html, body {
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      overflow-x: hidden;
+    }
+
+    /* ── Background ── */
+    .bg-glow {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    }
+    .bg-glow::before {
+      content: '';
+      position: absolute;
+      width: 700px; height: 700px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,255,157,0.07) 0%, transparent 65%);
+      top: -200px; left: 50%; transform: translateX(-50%);
+      animation: glowPulse 6s ease-in-out infinite;
+    }
+    .bg-glow::after {
+      content: '';
+      position: absolute;
+      width: 400px; height: 400px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,255,157,0.04) 0%, transparent 70%);
+      bottom: 0; right: -100px;
+      animation: glowPulse 8s ease-in-out infinite reverse;
+    }
+    @keyframes glowPulse {
+      0%,100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
+      50%      { opacity: 1;   transform: translateX(-50%) scale(1.1); }
+    }
+
+    /* ── Layout ── */
+    .shell {
+      position: relative; z-index: 1;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr;
+    }
+    @media (min-width: 1024px) {
+      .shell { grid-template-columns: 1fr 420px; grid-template-rows: 1fr; }
+    }
+
+    /* ── Header / Logo ── */
+    .top-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 24px 32px;
+      grid-column: 1 / -1;
+    }
+    @media (min-width: 1024px) { .top-bar { grid-column: 1 / -1; } }
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      font-family: 'Syne', sans-serif; font-weight: 800; font-size: 20px;
+      color: var(--text); text-decoration: none;
+    }
+    .logo-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: var(--green); display: flex; align-items: center; justify-content: center;
+    }
+    .logo-icon svg { width: 18px; height: 18px; }
+    .step-pill {
+      font-size: 12px; color: var(--muted);
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      padding: 6px 14px; border-radius: 20px;
+    }
+    .step-pill span { color: var(--green); font-weight: 600; }
+
+    /* ── Main form area ── */
+    .form-area {
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: flex-start;
+      padding: 32px 40px 60px;
+      max-width: 560px; width: 100%;
+      margin: 0 auto;
+    }
+    @media (min-width: 1024px) {
+      .form-area { padding: 40px 64px 40px; max-width: 100%; margin: 0; }
+    }
+
+    /* ── Progress bar ── */
+    .progress-wrap {
+      width: 100%; margin-bottom: 48px;
+    }
+    .progress-steps {
+      display: flex; gap: 8px; margin-bottom: 12px;
+    }
+    .pstep {
+      flex: 1; height: 3px; border-radius: 2px;
+      background: rgba(255,255,255,0.1);
+      transition: background 0.4s ease;
+      overflow: hidden;
+    }
+    .pstep.done { background: var(--green); }
+    .pstep.active {
+      background: rgba(255,255,255,0.1);
+      position: relative;
+    }
+    .pstep.active::after {
+      content: '';
+      position: absolute; top: 0; left: 0; height: 100%;
+      background: var(--green);
+      width: 60%;
+      border-radius: 2px;
+      animation: fillBar 0.6s ease forwards;
+    }
+    @keyframes fillBar {
+      from { width: 0% }
+      to   { width: 60% }
+    }
+    .progress-label {
+      font-size: 12px; color: var(--muted);
+    }
+
+    /* ── Step panel ── */
+    .step-panel {
+      display: none; width: 100%;
+      animation: stepIn 0.35s cubic-bezier(0.22,1,0.36,1) both;
+    }
+    .step-panel.active { display: block; }
+    @keyframes stepIn {
+      from { opacity: 0; transform: translateX(28px); }
+      to   { opacity: 1; transform: none; }
+    }
+    .step-panel.leaving {
+      animation: stepOut 0.2s ease forwards;
+    }
+    @keyframes stepOut {
+      to { opacity: 0; transform: translateX(-28px); }
+    }
+
+    /* ── Typography ── */
+    .step-eyebrow {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--green);
+      margin-bottom: 12px;
+    }
+    .step-title {
+      font-family: 'Syne', sans-serif;
+      font-size: clamp(28px, 5vw, 40px);
+      font-weight: 800; line-height: 1.1;
+      letter-spacing: -0.02em;
+      margin-bottom: 10px;
+    }
+    .step-title em { font-style: normal; color: var(--green); }
+    .step-sub {
+      font-size: 15px; color: var(--muted); line-height: 1.6;
+      margin-bottom: 36px;
+    }
+
+    /* ── Input ── */
+    .input-group { margin-bottom: 20px; }
+    .input-label {
+      display: block; font-size: 13px; font-weight: 500;
+      color: rgba(255,255,255,0.6); margin-bottom: 8px;
+    }
+    .input-wrap {
+      position: relative;
+    }
+    .input-prefix {
+      position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+      color: var(--muted); font-size: 15px; pointer-events: none;
+      font-weight: 500;
+    }
+    .input-field {
+      width: 100%; padding: 14px 48px 14px 16px;
+      background: rgba(255,255,255,0.05);
+      border: 1.5px solid var(--border);
+      border-radius: 14px;
+      color: var(--text); font-size: 16px;
+      font-family: 'DM Sans', sans-serif;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+    }
+    .input-field.has-prefix { padding-left: 42px; }
+    .input-field:focus {
+      border-color: rgba(0,255,157,0.5);
+      background: rgba(0,255,157,0.04);
+      box-shadow: 0 0 0 3px rgba(0,255,157,0.08);
+    }
+    .input-field.valid { border-color: var(--green); }
+    .input-field.invalid { border-color: var(--error); }
+    .input-field::placeholder { color: rgba(255,255,255,0.2); }
+    textarea.input-field { resize: none; padding-top: 14px; }
+
+    .input-status {
+      position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+      font-size: 16px; transition: all 0.2s;
+    }
+    .char-count {
+      text-align: right; font-size: 11px; color: var(--muted);
+      margin-top: 5px;
+    }
+    .field-hint {
+      font-size: 12px; color: var(--muted); margin-top: 6px;
+    }
+    .field-hint.error { color: var(--error); }
+    .field-hint.success { color: var(--green); }
+
+    /* ── Presets grid ── */
+    .presets-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 12px; margin-bottom: 32px;
+    }
+    .preset-card {
+      position: relative;
+      border: 2px solid var(--border);
+      border-radius: 18px;
+      padding: 20px 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+      overflow: hidden;
+      background: transparent;
+    }
+    .preset-card:hover { border-color: rgba(255,255,255,0.2); transform: translateY(-2px); }
+    .preset-card.selected {
+      border-color: var(--green) !important;
+      box-shadow: 0 0 0 1px var(--green), 0 8px 32px rgba(0,255,157,0.1);
+    }
+    .preset-card .selected-check {
+      position: absolute; top: 10px; right: 10px;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--green);
+      display: none; align-items: center; justify-content: center;
+    }
+    .preset-card.selected .selected-check { display: flex; }
+    .preset-swatch {
+      height: 48px; border-radius: 10px; margin-bottom: 12px;
+      position: relative; overflow: hidden;
+    }
+    .preset-swatch-dot {
+      position: absolute; bottom: 8px; right: 8px;
+      width: 12px; height: 12px; border-radius: 50%;
+    }
+    .preset-name {
+      font-family: 'Syne', sans-serif;
+      font-size: 14px; font-weight: 700; color: var(--text);
+    }
+    .preset-desc {
+      font-size: 11px; color: var(--muted); margin-top: 2px;
+    }
+
+    /* ── CTA Button ── */
+    .btn-primary {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      width: 100%; padding: 16px 24px;
+      background: var(--green); color: #000;
+      font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700;
+      border: none; border-radius: 14px;
+      cursor: pointer; transition: all 0.2s;
+      margin-top: 8px; letter-spacing: 0.01em;
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: #1affa8; transform: translateY(-1px);
+      box-shadow: 0 8px 24px rgba(0,255,157,0.25);
+    }
+    .btn-primary:active:not(:disabled) { transform: scale(0.98); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary .arrow { transition: transform 0.2s; }
+    .btn-primary:hover:not(:disabled) .arrow { transform: translateX(3px); }
+
+    .btn-back {
+      display: flex; align-items: center; gap: 6px;
+      background: none; border: none; padding: 0;
+      color: var(--muted); font-size: 13px; cursor: pointer;
+      margin-bottom: 28px; transition: color 0.2s;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .btn-back:hover { color: var(--text); }
+
+    /* ── Avatar in step 2 ── */
+    .avatar-preview {
+      width: 64px; height: 64px; border-radius: 50%;
+      border: 2px solid var(--green);
+      overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,255,157,0.1);
+      font-size: 24px; font-weight: 700; color: var(--green);
+      margin-bottom: 28px; flex-shrink: 0;
+    }
+    .avatar-preview img { width: 100%; height: 100%; object-fit: cover; }
+
+    /* ── Preview panel (desktop) ── */
+    .preview-panel {
+      display: none;
+    }
+    @media (min-width: 1024px) {
+      .preview-panel {
+        display: flex; flex-direction: column;
+        justify-content: center; align-items: center;
+        padding: 40px 32px;
+        border-left: 1px solid var(--border);
+        position: relative;
+      }
+    }
+    .preview-label {
+      font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 20px; font-weight: 600;
+    }
+    .phone-mockup {
+      width: 260px; height: 480px;
+      border-radius: 32px;
+      border: 1.5px solid rgba(255,255,255,0.12);
+      overflow: hidden;
+      position: relative;
+      transition: all 0.4s ease;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+    }
+    .phone-inner {
+      width: 100%; height: 100%;
+      display: flex; flex-direction: column;
+      align-items: center;
+      padding: 28px 16px 20px;
+      overflow: hidden;
+      transition: background 0.5s ease;
+    }
+    .prev-avatar {
+      width: 64px; height: 64px; border-radius: 50%;
+      overflow: hidden; margin-bottom: 10px; flex-shrink: 0;
+      border: 2px solid var(--green);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; font-weight: 700;
+    }
+    .prev-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .prev-name {
+      font-family: 'Syne', sans-serif;
+      font-size: 15px; font-weight: 800;
+      color: #fff; margin-bottom: 2px;
+      transition: all 0.3s; text-align: center;
+    }
+    .prev-handle {
+      font-size: 11px; color: rgba(255,255,255,0.4);
+      margin-bottom: 6px;
+    }
+    .prev-bio {
+      font-size: 11px; color: rgba(255,255,255,0.55);
+      text-align: center; line-height: 1.5; margin-bottom: 14px;
+      max-width: 200px;
+      transition: all 0.3s;
+      min-height: 16px;
+    }
+    .prev-links { width: 100%; display: flex; flex-direction: column; gap: 7px; }
+    .prev-link {
+      width: 100%; height: 36px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 600;
+      transition: background 0.4s, color 0.4s, border-color 0.4s;
+    }
+
+    /* ── Feedback step ── */
+    .usage-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
+    .usage-btn {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px; border-radius: 14px;
+      background: rgba(255,255,255,0.04);
+      border: 1.5px solid var(--border);
+      color: var(--text); font-size: 13px; font-weight: 500;
+      cursor: pointer; transition: all 0.15s;
+      text-align: left; font-family: 'DM Sans', sans-serif;
+    }
+    .usage-btn:hover { border-color: rgba(255,255,255,0.2); background: rgba(255,255,255,0.07); }
+    .usage-btn.selected {
+      border-color: var(--green); background: rgba(0,255,157,0.07);
+      color: var(--green);
+    }
+    .usage-icon { font-size: 18px; flex-shrink: 0; }
+    .usage-label { font-size: 12px; line-height: 1.3; }
+
+    .source-chips {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;
+    }
+    .chip {
+      padding: 7px 14px; border-radius: 20px;
+      background: rgba(255,255,255,0.05);
+      border: 1.5px solid var(--border);
+      color: var(--muted); font-size: 12px; font-weight: 500;
+      cursor: pointer; transition: all 0.15s;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .chip:hover { border-color: rgba(255,255,255,0.2); color: var(--text); }
+    .chip.selected {
+      border-color: var(--green); color: var(--green);
+      background: rgba(0,255,157,0.07);
+    }
+
+    .nps-row {
+      display: flex; gap: 5px; flex-wrap: wrap;
+    }
+    .nps-btn {
+      flex: 1; min-width: 28px; height: 38px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.05);
+      border: 1.5px solid var(--border);
+      color: var(--muted); font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .nps-btn:hover { border-color: rgba(255,255,255,0.25); color: var(--text); }
+    .nps-btn.selected {
+      background: var(--green); border-color: var(--green);
+      color: #000; transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(0,255,157,0.25);
+    }
+    .nps-btn[data-score="9"].selected,
+    .nps-btn[data-score="10"].selected {
+      box-shadow: 0 4px 16px rgba(0,255,157,0.4);
+    }
+
+    /* ── Done step ── */
+    .done-icon {
+      width: 80px; height: 80px; border-radius: 50%;
+      background: rgba(0,255,157,0.1);
+      border: 2px solid var(--green);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 36px; margin-bottom: 28px;
+      animation: popIn 0.5s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+    @keyframes popIn {
+      from { transform: scale(0) rotate(-10deg); opacity: 0; }
+      to   { transform: scale(1); opacity: 1; }
+    }
+    .done-links { display: flex; flex-direction: column; gap: 10px; margin-top: 32px; }
+    .done-link-btn {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px;
+      border-radius: 14px; text-decoration: none;
+      font-size: 14px; font-weight: 600;
+      transition: all 0.2s;
+      border: 1.5px solid var(--border);
+      color: var(--text);
+      cursor: pointer; background: none; width: 100%; text-align: left;
+    }
+    .done-link-btn:hover { border-color: rgba(255,255,255,0.2); transform: translateX(3px); }
+    .done-link-btn.primary {
+      background: var(--green); color: #000; border-color: transparent;
+    }
+    .done-link-btn.primary:hover { background: #1affa8; transform: translateY(-1px); }
+    .done-link-icon { opacity: 0.5; }
+
+    /* ── Confetti ── */
+    .confetti-piece {
+      position: fixed; width: 8px; height: 8px;
+      border-radius: 2px; top: -10px;
+      animation: confettiFall linear forwards;
+      pointer-events: none; z-index: 100;
+    }
+    @keyframes confettiFall {
+      to { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+    }
+
+    /* ── Error toast ── */
+    .error-toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: #1a0000; border: 1px solid rgba(255,79,79,0.4);
+      color: #ff8080; padding: 12px 20px; border-radius: 12px;
+      font-size: 13px; z-index: 999;
+      display: none; white-space: nowrap;
+      animation: toastIn 0.3s ease;
+    }
+    @keyframes toastIn { from { opacity:0; transform: translateX(-50%) translateY(8px); } }
+    .error-toast.show { display: block; }
+
+    /* ── Skeleton loader for username check ── */
+    @keyframes shimmer {
+      from { opacity: 0.4 } to { opacity: 1 }
+    }
+    .checking { animation: shimmer 0.7s ease-in-out infinite alternate; }
+  </style>
+</head>
+
+<body>
+  <div class="bg-glow"></div>
+  <div class="shell">
+
+    <!-- Top bar -->
+    <div class="top-bar">
+      <a href="/" class="logo">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5">
+            <path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        BioForge
+      </a>
+      <div class="step-pill">Étape <span id="step-label">1</span> sur 4</div>
+    </div>
+
+    <!-- Form area -->
+    <div class="form-area">
+
+      <!-- Progress -->
+      <div class="progress-wrap">
+        <div class="progress-steps">
+          <div class="pstep active" id="prog-0"></div>
+          <div class="pstep" id="prog-1"></div>
+          <div class="pstep" id="prog-2"></div>
+          <div class="pstep" id="prog-3"></div>
+        </div>
+        <div class="progress-label" id="progress-label">Choisis ton pseudo</div>
+      </div>
+
+      <!-- ═══ STEP 1 — Username ═══ -->
+      <div class="step-panel active" id="step-0">
+        <div class="step-eyebrow">✦ Première étape</div>
+        <h1 class="step-title">Choisis ton<br/><em>pseudo unique</em></h1>
+        <p class="step-sub">Il apparaîtra dans ton URL : <strong>bioforge.click/@toi</strong></p>
+
+        <div class="input-group">
+          <label class="input-label" for="username-input">Ton pseudo</label>
+          <div class="input-wrap">
+            <span class="input-prefix">@</span>
+            <input
+              type="text"
+              id="username-input"
+              class="input-field has-prefix"
+              placeholder="pseudo"
+              maxlength="24"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+            />
+            <span class="input-status" id="username-status"></span>
+          </div>
+          <p class="field-hint" id="username-hint">3 à 24 caractères — lettres, chiffres, _</p>
+        </div>
+
+        <button class="btn-primary" id="btn-next-0" disabled>
+          Continuer
+          <svg class="arrow" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- ═══ STEP 2 — Profile ═══ -->
+      <div class="step-panel" id="step-1">
+        <button class="btn-back" onclick="goBack()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 12H5M12 5l-7 7 7 7"/>
+          </svg>
+          Retour
+        </button>
+
+        {avatarUrl ? (
+          <div class="avatar-preview">
+            <img src={avatarUrl} alt="Avatar" />
+          </div>
+        ) : (
+          <div class="avatar-preview" id="avatar-initial">?</div>
+        )}
+
+        <div class="step-eyebrow">✦ Deuxième étape</div>
+        <h1 class="step-title">Présente-<em>toi</em></h1>
+        <p class="step-sub">Un nom et une bio mémorables font tout.</p>
+
+        <div class="input-group">
+          <label class="input-label" for="name-input">Nom affiché</label>
+          <div class="input-wrap">
+            <input
+              type="text"
+              id="name-input"
+              class="input-field"
+              placeholder="Ton nom ou pseudonyme"
+              maxlength="80"
+              value={existingName}
+            />
+          </div>
+        </div>
+
+        <div class="input-group">
+          <label class="input-label" for="bio-input">Bio <span style="color:var(--muted)">(optionnel)</span></label>
+          <div class="input-wrap">
+            <textarea
+              id="bio-input"
+              class="input-field"
+              placeholder="Créateur de contenu · Développeur · Humain 🌱"
+              maxlength="160"
+              rows="3"
+            ></textarea>
+          </div>
+          <div class="char-count"><span id="bio-count">0</span>/160</div>
+        </div>
+
+        <button class="btn-primary" id="btn-next-1">
+          Continuer
+          <svg class="arrow" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- ═══ STEP 3 — Style ═══ -->
+      <div class="step-panel" id="step-2">
+        <button class="btn-back" onclick="goBack()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 12H5M12 5l-7 7 7 7"/>
+          </svg>
+          Retour
+        </button>
+
+        <div class="step-eyebrow">✦ Dernière étape</div>
+        <h1 class="step-title">Ton <em>style</em></h1>
+        <p class="step-sub">Choisis une ambiance de départ — tu pourras tout personnaliser ensuite.</p>
+
+        <div class="presets-grid">
+          <button class="preset-card selected" data-preset="dark" onclick="selectPreset(this, 'dark')">
+            <div class="selected-check">
+              <svg width="10" height="10" fill="none" stroke="#000" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+            <div class="preset-swatch" style="background:linear-gradient(135deg,#0a0a0a,#0f1f15)">
+              <div class="preset-swatch-dot" style="background:#00ff9d"></div>
+            </div>
+            <div class="preset-name">Dark</div>
+            <div class="preset-desc">Sombre & Néon vert</div>
+          </button>
+
+          <button class="preset-card" data-preset="neon" onclick="selectPreset(this, 'neon')">
+            <div class="selected-check">
+              <svg width="10" height="10" fill="none" stroke="#000" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+            <div class="preset-swatch" style="background:linear-gradient(135deg,#1a0033,#0d001a)">
+              <div class="preset-swatch-dot" style="background:#bf00ff"></div>
+            </div>
+            <div class="preset-name">Neon</div>
+            <div class="preset-desc">Violet intense</div>
+          </button>
+
+          <button class="preset-card" data-preset="ocean" onclick="selectPreset(this, 'ocean')">
+            <div class="selected-check">
+              <svg width="10" height="10" fill="none" stroke="#000" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+            <div class="preset-swatch" style="background:linear-gradient(135deg,#001a33,#002244)">
+              <div class="preset-swatch-dot" style="background:#00d4ff"></div>
+            </div>
+            <div class="preset-name">Ocean</div>
+            <div class="preset-desc">Bleu profond</div>
+          </button>
+
+          <button class="preset-card" data-preset="light" onclick="selectPreset(this, 'light')">
+            <div class="selected-check">
+              <svg width="10" height="10" fill="none" stroke="#000" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+            <div class="preset-swatch" style="background:linear-gradient(135deg,#f8f8f8,#e8f0ff)">
+              <div class="preset-swatch-dot" style="background:#0066ff"></div>
+            </div>
+            <div class="preset-name">Light</div>
+            <div class="preset-desc">Clair & Épuré</div>
+          </button>
+        </div>
+
+        <button class="btn-primary" id="btn-next-2" onclick="goToStep(3)">
+          Continuer
+          <svg class="arrow" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- ═══ STEP 4 — Feedback ═══ -->
+      <div class="step-panel" id="step-3">
+        <button class="btn-back" onclick="goBack()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 12H5M12 5l-7 7 7 7"/>
+          </svg>
+          Retour
+        </button>
+
+        <div class="step-eyebrow">✦ Aide-nous à s'améliorer</div>
+        <h1 class="step-title">Une dernière<br/><em>question</em></h1>
+        <p class="step-sub">30 secondes pour nous aider à construire le meilleur outil pour toi.</p>
+
+        <!-- Usage type -->
+        <div style="margin-bottom:28px">
+          <p class="input-label" style="margin-bottom:12px">Tu utilises BioForge principalement pour…</p>
+          <div class="usage-grid">
+            <button class="usage-btn" data-usage="creator" onclick="toggleUsage(this)">
+              <span class="usage-icon">🎥</span>
+              <span class="usage-label">Créateur de contenu</span>
+            </button>
+            <button class="usage-btn" data-usage="dev" onclick="toggleUsage(this)">
+              <span class="usage-icon">💻</span>
+              <span class="usage-label">Dev / Tech</span>
+            </button>
+            <button class="usage-btn" data-usage="brand" onclick="toggleUsage(this)">
+              <span class="usage-icon">🏢</span>
+              <span class="usage-label">Marque / Entreprise</span>
+            </button>
+            <button class="usage-btn" data-usage="artist" onclick="toggleUsage(this)">
+              <span class="usage-icon">🎨</span>
+              <span class="usage-label">Artiste / Créatif</span>
+            </button>
+            <button class="usage-btn" data-usage="freelance" onclick="toggleUsage(this)">
+              <span class="usage-icon">🚀</span>
+              <span class="usage-label">Freelance / Indep.</span>
+            </button>
+            <button class="usage-btn" data-usage="other" onclick="toggleUsage(this)">
+              <span class="usage-icon">✨</span>
+              <span class="usage-label">Autre</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- NPS -->
+        <div style="margin-bottom:28px">
+          <p class="input-label" style="margin-bottom:4px">Comment as-tu entendu parler de BioForge ?</p>
+          <div class="source-chips">
+            <button class="chip" data-src="social" onclick="selectSource(this)">Réseaux sociaux</button>
+            <button class="chip" data-src="friend" onclick="selectSource(this)">Bouche à oreille</button>
+            <button class="chip" data-src="search" onclick="selectSource(this)">Google / Recherche</button>
+            <button class="chip" data-src="product_hunt" onclick="selectSource(this)">Product Hunt</button>
+            <button class="chip" data-src="ad" onclick="selectSource(this)">Pub</button>
+            <button class="chip" data-src="other" onclick="selectSource(this)">Autre</button>
+          </div>
+        </div>
+
+        <!-- NPS score -->
+        <div style="margin-bottom:28px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <p class="input-label" style="margin-bottom:0">Première impression ?</p>
+            <span id="nps-label" style="font-size:12px;color:var(--muted)">Glisse pour noter</span>
+          </div>
+          <div class="nps-row">
+            <button class="nps-btn" data-score="0" onclick="selectNps(this,0)">0</button>
+            <button class="nps-btn" data-score="1" onclick="selectNps(this,1)">1</button>
+            <button class="nps-btn" data-score="2" onclick="selectNps(this,2)">2</button>
+            <button class="nps-btn" data-score="3" onclick="selectNps(this,3)">3</button>
+            <button class="nps-btn" data-score="4" onclick="selectNps(this,4)">4</button>
+            <button class="nps-btn" data-score="5" onclick="selectNps(this,5)">5</button>
+            <button class="nps-btn" data-score="6" onclick="selectNps(this,6)">6</button>
+            <button class="nps-btn" data-score="7" onclick="selectNps(this,7)">7</button>
+            <button class="nps-btn" data-score="8" onclick="selectNps(this,8)">8</button>
+            <button class="nps-btn" data-score="9" onclick="selectNps(this,9)">9</button>
+            <button class="nps-btn" data-score="10" onclick="selectNps(this,10)">10</button>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:6px">
+            <span style="font-size:10px;color:var(--muted)">Pas du tout</span>
+            <span style="font-size:10px;color:var(--muted)">Excellent 🔥</span>
+          </div>
+        </div>
+
+        <!-- Free comment -->
+        <div class="input-group" style="margin-bottom:28px">
+          <label class="input-label" for="feedback-comment">Un mot à nous dire ? <span style="color:var(--muted)">(optionnel)</span></label>
+          <div class="input-wrap">
+            <textarea id="feedback-comment" class="input-field" rows="2"
+              placeholder="Ce que tu attends de BioForge, une idée, un retour…"
+              maxlength="500"></textarea>
+          </div>
+          <div class="char-count"><span id="fb-count">0</span>/500</div>
+        </div>
+
+        <button class="btn-primary" id="btn-submit" onclick="submitOnboarding()">
+          <span id="submit-text">Créer mon profil ✦</span>
+          <svg class="arrow" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 12h14M12 5l7 7-7 7"/>
+          </svg>
+        </button>
+
+        <p style="text-align:center;font-size:12px;color:var(--muted);margin-top:12px">
+          Tu peux passer cette étape — ça ne prend que 20 secondes 🙏
+        </p>
+      </div>
+
+      <!-- ═══ DONE ═══ -->
+      <div class="step-panel" id="step-done">
+        <div class="done-icon">✦</div>
+        <div class="step-eyebrow">Bienvenue sur BioForge !</div>
+        <h1 class="step-title">Ton profil<br/>est <em>prêt</em></h1>
+        <p class="step-sub">Tout est en place. Ajoute tes premiers liens et partage ton URL.</p>
+
+        <div class="done-links">
+          <a id="done-view-profile" href="#" class="done-link-btn primary" target="_blank">
+            <span>Voir mon profil</span>
+            <span>→</span>
+          </a>
+          <a href="/dashboard" class="done-link-btn">
+            <span>Aller au dashboard</span>
+            <span class="done-link-icon">→</span>
+          </a>
+          <a href="/dashboard/appearance" class="done-link-btn">
+            <span>Personnaliser l'apparence</span>
+            <span class="done-link-icon">→</span>
+          </a>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Preview panel (desktop) -->
+    <div class="preview-panel">
+      <div class="preview-label">Aperçu de ton profil</div>
+      <div class="phone-mockup">
+        <div class="phone-inner" id="phone-inner" style="background:#0a0a0a">
+          <div class="prev-avatar" id="prev-avatar" style="border-color:#00ff9d; background:rgba(0,255,157,0.1); color:#00ff9d">
+            {avatarUrl
+              ? <img src={avatarUrl} alt="" />
+              : <span id="prev-avatar-letter">?</span>
+            }
+          </div>
+          <div class="prev-name" id="prev-name">@bioforge</div>
+          <div class="prev-handle" id="prev-handle">@username</div>
+          <div class="prev-bio" id="prev-bio"></div>
+          <div class="prev-links">
+            <div class="prev-link" id="prev-link-1" style="background:#00ff9d;color:#000">Mon premier lien ✦</div>
+            <div class="prev-link" style="background:rgba(0,255,157,0.1);border:1px solid rgba(0,255,157,0.3);color:#00ff9d">Lien 2</div>
+            <div class="prev-link" style="background:rgba(0,255,157,0.1);border:1px solid rgba(0,255,157,0.3);color:#00ff9d">Lien 3</div>
+          </div>
+        </div>
+      </div>
+      <p style="font-size:11px;color:rgba(255,255,255,0.2);margin-top:16px;text-align:center">
+        Personnalisable à l'infini depuis l'onglet Apparence
+      </p>
+    </div>
+
+  </div>
+
+  <!-- Error toast -->
+  <div class="error-toast" id="error-toast"></div>
+
+  <script define:vars={{ avatarUrl, existingName }}>
+    // ── State ──────────────────────────────────────────────────────────────
+    let currentStep = 0;
+    let usernameValid = false;
+    let usernameValue = '';
+    let selectedPreset = 'dark';
+    let checkTimer = null;
+
+    const STEPS = ['step-0', 'step-1', 'step-2', 'step-3', 'step-done'];
+    const LABELS = ['Choisis ton pseudo', 'Présente-toi', 'Choisis ton style', 'Une dernière chose', 'C\'est parti !'];
+    const PRESETS = {
+      dark:  { bg: '#0a0a0a', pc: '#00ff9d', tc: '#fff',    g2: '#0f1f15', btnBg: '#00ff9d', btnC: '#000' },
+      neon:  { bg: '#1a0033', pc: '#bf00ff', tc: '#fff',    g2: '#0d001a', btnBg: '#bf00ff', btnC: '#fff' },
+      ocean: { bg: '#001a33', pc: '#00d4ff', tc: '#fff',    g2: '#002244', btnBg: '#00d4ff', btnC: '#000' },
+      light: { bg: '#f8f8f8', pc: '#0066ff', tc: '#0a0a0a', g2: '#e8f0ff', btnBg: '#0066ff', btnC: '#fff' },
+    };
+
+    // ── Init ───────────────────────────────────────────────────────────────
+    if (existingName) {
+      const nameInput = document.getElementById('name-input');
+      if (nameInput) nameInput.value = existingName;
+      updatePreview();
+    }
+    if (avatarUrl) {
+      updatePreview();
+    }
+
+    // ── Navigation ────────────────────────────────────────────────────────
+    function goToStep(n) {
+      const old = document.getElementById(STEPS[currentStep]);
+      old?.classList.add('leaving');
+      setTimeout(() => {
+        old?.classList.remove('active', 'leaving');
+        currentStep = n;
+        const next = document.getElementById(STEPS[currentStep]);
+        next?.classList.add('active');
+
+        // Update progress
+        document.getElementById('step-label').textContent =
+          currentStep < 3 ? String(currentStep + 1) : '✓';
+        document.getElementById('progress-label').textContent = LABELS[currentStep];
+
+        for (let i = 0; i < 4; i++) {
+          const p = document.getElementById('prog-' + i);
+          if (!p) continue;
+          p.className = 'pstep ' + (i < currentStep ? 'done' : i === currentStep ? 'active' : '');
+        }
+
+        // Focus first input
+        const input = next?.querySelector('input, textarea');
+        if (input && currentStep < 3) setTimeout(() => input.focus(), 100);
+      }, 180);
+    }
+
+    function goBack() {
+      if (currentStep > 0) goToStep(currentStep - 1);
+    }
+
+    // ── Step 1: Username ──────────────────────────────────────────────────
+    const usernameInput = document.getElementById('username-input');
+    const usernameStatus = document.getElementById('username-status');
+    const usernameHint = document.getElementById('username-hint');
+    const btnNext0 = document.getElementById('btn-next-0');
+
+    usernameInput?.addEventListener('input', () => {
+      const val = usernameInput.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+      usernameInput.value = val;
+      document.getElementById('prev-handle').textContent = '@' + (val || 'username');
+
+      if (val.length < 3) {
+        setUsernameState('idle', val.length > 0 ? 'Minimum 3 caractères' : '3 à 24 caractères — lettres, chiffres, _');
+        return;
+      }
+      if (val.length > 24) {
+        setUsernameState('error', 'Maximum 24 caractères');
+        return;
+      }
+      setUsernameState('checking', 'Vérification...');
+      clearTimeout(checkTimer);
+      checkTimer = setTimeout(() => checkUsername(val), 500);
+    });
+
+    usernameInput?.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && usernameValid) goToStep(1);
+    });
+
+    async function checkUsername(val) {
+      try {
+        const r = await fetch('/api/profile/check-username?username=' + encodeURIComponent(val));
+        const data = await r.json();
+        if (data.success && data.data?.available) {
+          setUsernameState('valid', '@' + val + ' est disponible ✓');
+          usernameValue = val;
+        } else if (data.success && !data.data?.available) {
+          setUsernameState('error', 'Ce pseudo est déjà pris');
+        }
+      } catch {
+        setUsernameState('error', 'Erreur de vérification');
+      }
+    }
+
+    function setUsernameState(state, msg) {
+      usernameInput.className = 'input-field has-prefix';
+      usernameHint.className = 'field-hint';
+      usernameStatus.textContent = '';
+      usernameValid = false;
+      btnNext0.disabled = true;
+
+      if (state === 'valid') {
+        usernameInput.classList.add('valid');
+        usernameHint.classList.add('success');
+        usernameStatus.textContent = '✓';
+        usernameValid = true;
+        btnNext0.disabled = false;
+      } else if (state === 'error') {
+        usernameInput.classList.add('invalid');
+        usernameHint.classList.add('error');
+        usernameStatus.textContent = '✗';
+      } else if (state === 'checking') {
+        usernameHint.classList.add('checking');
+        usernameStatus.textContent = '…';
+      }
+      usernameHint.textContent = msg;
+    }
+
+    document.getElementById('btn-next-0')?.addEventListener('click', () => {
+      if (usernameValid) goToStep(1);
+    });
+
+    // ── Step 2: Profile ───────────────────────────────────────────────────
+    const nameInput = document.getElementById('name-input');
+    const bioInput  = document.getElementById('bio-input');
+    const bioCount  = document.getElementById('bio-count');
+
+    nameInput?.addEventListener('input', () => {
+      updatePreview();
+      const av = document.getElementById('avatar-initial');
+      if (av) av.textContent = nameInput.value.charAt(0).toUpperCase() || '?';
+      document.getElementById('prev-avatar-letter') &&
+        (document.getElementById('prev-avatar-letter').textContent = nameInput.value.charAt(0).toUpperCase() || '?');
+    });
+
+    bioInput?.addEventListener('input', () => {
+      bioCount.textContent = String(bioInput.value.length);
+      updatePreview();
+    });
+
+    document.getElementById('btn-next-1')?.addEventListener('click', () => goToStep(2));
+
+    // ── Step 3: Preset ────────────────────────────────────────────────────
+    function selectPreset(btn, preset) {
+      document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedPreset = preset;
+      updatePreview();
+    }
+
+    // ── Preview sync ──────────────────────────────────────────────────────
+    function updatePreview() {
+      const p = PRESETS[selectedPreset] || PRESETS.dark;
+      const phone = document.getElementById('phone-inner');
+      if (phone) {
+        phone.style.background = p.bg;
+        phone.style.color = p.tc;
+      }
+
+      const prevName = document.getElementById('prev-name');
+      if (prevName) {
+        const n = nameInput?.value.trim() || usernameValue || 'Ton nom';
+        prevName.textContent = n;
+        prevName.style.color = p.tc;
+      }
+
+      const prevHandle = document.getElementById('prev-handle');
+      if (prevHandle) {
+        prevHandle.textContent = '@' + (usernameValue || 'username');
+      }
+
+      const prevBio = document.getElementById('prev-bio');
+      if (prevBio) {
+        prevBio.textContent = bioInput?.value.trim() || '';
+        prevBio.style.color = p.tc;
+      }
+
+      // Avatar border color
+      const prevAv = document.getElementById('prev-avatar');
+      if (prevAv) {
+        prevAv.style.borderColor = p.pc;
+        prevAv.style.color = p.pc;
+        if (!avatarUrl) prevAv.style.background = p.pc + '18';
+      }
+
+      // Link preview
+      const link1 = document.getElementById('prev-link-1');
+      if (link1) {
+        link1.style.background = p.btnBg;
+        link1.style.color = p.btnC;
+      }
+      document.querySelectorAll('.prev-link:not(:first-child)').forEach(l => {
+        l.style.background = p.pc + '18';
+        l.style.border = '1px solid ' + p.pc + '40';
+        l.style.color = p.pc;
+      });
+    }
+
+    // ── Feedback state ───────────────────────────────────────────────────
+    let selectedUsages = [];
+    let selectedSource = null;
+    let selectedNps    = null;
+
+    function toggleUsage(btn) {
+      btn.classList.toggle('selected');
+      const u = btn.dataset.usage;
+      if (selectedUsages.includes(u)) {
+        selectedUsages = selectedUsages.filter(x => x !== u);
+      } else {
+        selectedUsages.push(u);
+      }
+    }
+
+    function selectSource(btn) {
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedSource = btn.dataset.src;
+    }
+
+    function selectNps(btn, score) {
+      document.querySelectorAll('.nps-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedNps = score;
+      const labels = ['😐','😐','😕','😕','😑','😐','🙂','😊','😄','🤩','🔥'];
+      const texts  = ['Très déçu','Déçu','Pas convaincu','Plutôt non','Moyen','Neutre','Bien','Bien !','Super !','Excellent !','Exceptionnel 🔥'];
+      const el = document.getElementById('nps-label');
+      if (el) el.textContent = (labels[score] || '') + ' ' + (texts[score] || '');
+    }
+
+    document.getElementById('feedback-comment')?.addEventListener('input', e => {
+      const el = document.getElementById('fb-count');
+      if (el) el.textContent = String(e.target.value.length);
+    });
+
+    // ── Submit ────────────────────────────────────────────────────────────
+    async function submitOnboarding() {
+      const btn = document.getElementById('btn-submit');
+      const txt = document.getElementById('submit-text');
+      btn.disabled = true;
+      txt.textContent = 'Création en cours…';
+
+      const comment = document.getElementById('feedback-comment')?.value.trim() || '';
+
+      try {
+        const r = await fetch('/api/profile/onboarding', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username:     usernameValue,
+            display_name: nameInput?.value.trim() || usernameValue,
+            bio:          bioInput?.value.trim() || '',
+            preset:       selectedPreset,
+            feedback: {
+              usages:  selectedUsages,
+              source:  selectedSource,
+              nps:     selectedNps,
+              comment: comment || null,
+            },
+          }),
+        });
+        const data = await r.json();
+        if (!data.success) throw new Error(data.error || 'Erreur');
+
+        // Update done step
+        const profileUrl = '/@' + data.data.username;
+        document.getElementById('done-view-profile').href = profileUrl;
+
+        // Confetti !
+        launchConfetti();
+
+        goToStep(4);  // done step is now index 4
+
+        // Hide progress/step pill
+        document.querySelector('.progress-wrap').style.display = 'none';
+        document.querySelector('.step-pill').style.opacity = '0';
+
+      } catch (e) {
+        showError(e.message || 'Une erreur est survenue');
+        btn.disabled = false;
+        txt.textContent = 'Créer mon profil ✦';
+      }
+    }
+
+    // ── Confetti ──────────────────────────────────────────────────────────
+    function launchConfetti() {
+      const colors = ['#00ff9d','#00cc7a','#ffffff','#a0ffd6','#00ff9d33'];
+      for (let i = 0; i < 60; i++) {
+        setTimeout(() => {
+          const el = document.createElement('div');
+          el.className = 'confetti-piece';
+          el.style.left = Math.random() * 100 + 'vw';
+          el.style.background = colors[Math.floor(Math.random() * colors.length)];
+          el.style.width = (4 + Math.random() * 8) + 'px';
+          el.style.height = (4 + Math.random() * 8) + 'px';
+          el.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+          el.style.animationDuration = (2 + Math.random() * 2) + 's';
+          el.style.animationDelay = (Math.random() * 0.5) + 's';
+          document.body.appendChild(el);
+          setTimeout(() => el.remove(), 4000);
+        }, i * 30);
+      }
+    }
+
+    // ── Error toast ───────────────────────────────────────────────────────
+    function showError(msg) {
+      const t = document.getElementById('error-toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 4000);
+    }
+
+    // ── Init preview ──────────────────────────────────────────────────────
+    updatePreview();
+  </script>
+</body>
+</html>
