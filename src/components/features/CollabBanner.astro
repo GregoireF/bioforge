@@ -1,0 +1,191 @@
+---
+// src/components/features/CollabBanner.astro
+// Bannière collab/partenariat dans la sidebar
+// Props: pour switcher entre différents partenaires facilement
+
+interface Props {
+  partner?: 'discord' | 'custom';
+  // Pour custom:
+  name?:       string;
+  tagline?:    string;
+  description?: string;
+  ctaLabel?:   string;
+  ctaUrl?:     string;
+  logoEmoji?:  string;
+  accentColor?: string;
+  // Pour dismissal
+  dismissable?: boolean;
+}
+
+const {
+  partner      = 'discord',
+  name,
+  tagline,
+  description,
+  ctaLabel,
+  ctaUrl,
+  logoEmoji,
+  accentColor,
+  dismissable  = true,
+} = Astro.props;
+
+// ── Partner definitions ────────────────────────────────────────────────────
+interface PartnerDef {
+  name:        string;
+  tagline:     string;
+  description: string;
+  ctaLabel:    string;
+  ctaUrl:      string;
+  logoEmoji:   string;
+  accent:      string;
+  accentRgb:   string;
+  badge:       string;
+}
+
+const PARTNERS: Record<string, PartnerDef> = {
+  discord: {
+    name:        'Serveur Discord',
+    tagline:     'Partenaire officiel',
+    description: 'Crée ton serveur Discord + bot en quelques clics. Communauté, modération, intégrations.',
+    ctaLabel:    'Créer mon serveur →',
+    ctaUrl:      'https://discord.com',  // ← remplacer par le lien affili
+    logoEmoji:   '🤖',
+    accent:      '#5865F2',
+    accentRgb:   '88,101,242',
+    badge:       'Partenaire',
+  },
+};
+
+const P = PARTNERS[partner] ?? {
+  name:        name        ?? 'Partenaire',
+  tagline:     tagline     ?? 'Offre exclusive',
+  description: description ?? '',
+  ctaLabel:    ctaLabel    ?? 'En savoir plus',
+  ctaUrl:      ctaUrl      ?? '#',
+  logoEmoji:   logoEmoji   ?? '✦',
+  accent:      accentColor ?? '#00ff9d',
+  accentRgb:   '0,255,157',
+  badge:       'Partenaire',
+};
+
+const storageKey = `bf_collab_${partner}_dismissed`;
+---
+
+<div
+  id="collab-banner"
+  data-storage-key={storageKey}
+  style={`
+    margin: 10px 10px 4px;
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid ${P.accent}22;
+    background: linear-gradient(135deg, ${P.accent}0f 0%, rgba(0,0,0,0) 60%);
+    position: relative;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  `}
+>
+  <!-- Dismiss button -->
+  {dismissable && (
+    <button
+      id="collab-dismiss"
+      aria-label="Masquer"
+      style={`
+        position: absolute; top: 8px; right: 8px; z-index: 1;
+        width: 20px; height: 20px; border-radius: 6px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.08);
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; color: rgba(255,255,255,0.35);
+        transition: all 0.15s; font-size: 10px; line-height: 1;
+      `}
+    >
+      ✕
+    </button>
+  )}
+
+  <div style="padding: 12px 12px 11px">
+    <!-- Badge + logo -->
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:9px">
+      <div style={`
+        width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
+        background: ${P.accent}18;
+        border: 1px solid ${P.accent}25;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 15px;
+      `}>
+        {P.logoEmoji}
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;gap:5px">
+          <span style={`font-size:12px;font-weight:800;color:#fff;font-family:'Cabinet Grotesk',system-ui,sans-serif;letter-spacing:-0.01em`}>
+            {P.name}
+          </span>
+        </div>
+        <div style={`font-size:10px;font-weight:600;color:${P.accent};letter-spacing:0.06em;text-transform:uppercase`}>
+          {P.tagline}
+        </div>
+      </div>
+    </div>
+
+    <!-- Description -->
+    <p style="font-size:11.5px;color:rgba(255,255,255,0.45);line-height:1.55;margin-bottom:10px">
+      {P.description}
+    </p>
+
+    <!-- CTA -->
+    <a
+      href={P.ctaUrl}
+      target="_blank"
+      rel="noopener noreferrer sponsored"
+      style={`
+        display: flex; align-items: center; justify-content: center;
+        width: 100%;
+        padding: 8px 12px;
+        background: ${P.accent};
+        color: ${partner === 'discord' ? '#fff' : '#000'};
+        border-radius: 10px;
+        font-size: 12px; font-weight: 800;
+        font-family: 'Cabinet Grotesk', system-ui, sans-serif;
+        letter-spacing: 0.01em;
+        text-decoration: none;
+        transition: all 0.18s ease;
+        box-shadow: 0 4px 12px ${P.accent}30;
+      `}
+      onmouseover={`this.style.opacity='0.88';this.style.transform='translateY(-1px)'`}
+      onmouseout={`this.style.opacity='1';this.style.transform='none'`}
+    >
+      {P.ctaLabel}
+    </a>
+
+    <!-- Mention sponsored -->
+    <p style="text-align:center;font-size:10px;color:rgba(255,255,255,0.18);margin-top:7px">
+      Lien affilié · sponsorisé
+    </p>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var banner  = document.getElementById('collab-banner');
+    var dismiss = document.getElementById('collab-dismiss');
+    if (!banner) return;
+
+    var key = banner.dataset.storageKey || 'bf_collab_dismissed';
+
+    // Check si déjà dismissé
+    if (sessionStorage.getItem(key)) {
+      banner.style.display = 'none';
+      return;
+    }
+
+    // Dismiss handler
+    if (dismiss) {
+      dismiss.addEventListener('click', function () {
+        banner.style.opacity = '0';
+        banner.style.transform = 'scale(0.96)';
+        setTimeout(function () { banner.style.display = 'none'; }, 300);
+        sessionStorage.setItem(key, '1');  // Session seulement — réapparaît à chaque session
+      });
+    }
+  })();
+</script>

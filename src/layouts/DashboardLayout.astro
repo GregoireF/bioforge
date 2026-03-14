@@ -1,11 +1,13 @@
 ---
-// src/layouts/DashboardLayout.astro — v5 (mise à jour Groq – mars 2026)
+// src/layouts/DashboardLayout.astro — v6
 // Auth-aware layout : nav centralisée, Carbon Ads (Free/Base), user menu riche,
-// Billing + # dans la nav, bottom nav mobile, plan badge
+// Collab banner, FeedbackWidget, OnboardingTour amélioré, bottom nav mobile, plan badge
 
 import CommandPalette from '@/components/features/CommandPalette.astro';
-import OnboardingTour from '@/components/features/OnboardingTour.astro';
-import UpgradeModal from '@/components/features/UpgradeModal.astro';
+import OnboardingTour  from '@/components/features/OnboardingTour.astro';
+import UpgradeModal    from '@/components/features/UpgradeModal.astro';
+import FeedbackWidget  from '@/components/features/FeedbackWidget.astro';
+import CollabBanner    from '@/components/features/CollabBanner.astro';
 import '@/styles/global.css';
 import { Image } from 'astro:assets';
 import { withAuth } from '@/lib/auth/auth';
@@ -29,7 +31,7 @@ try {
 } catch {}
 
 // ── Plan helpers ───────────────────────────────────────────────────────────────
-const PAID_PLANS   = ['Creator', 'Pro', 'Enterprise'];
+const PAID_PLANS   = ['Pro', 'Business', 'Enterprise'];
 const plan         = profile?.plan ?? 'Free';
 const isPaid       = PAID_PLANS.includes(plan);
 const isBasicOrFree = !isPaid;
@@ -93,7 +95,7 @@ const NAV_SECONDARY = [
     icon:  'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z',
   },
   {
-    href:  '/dashboard/roadmap',
+    href:  '/dashboard/#',
     label: 'Roadmap',
     exact: false,
     icon:  'M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7',
@@ -168,6 +170,9 @@ function navClass(href: string, exact: boolean): string {
         ))}
       </div>
     </nav>
+
+    <!-- Collab banner — toujours visible -->
+    <CollabBanner partner="discord" />
 
     <!-- AdSense (Free / Basic only) -->
     {showAds && (
@@ -374,6 +379,9 @@ function navClass(href: string, exact: boolean): string {
       </div>
     </nav>
 
+    <!-- Collab banner mobile -->
+    <CollabBanner partner="discord" />
+
     {showAds && (
       <div class="px-3 pb-2" id="adsense-mobile-wrap" style="display:none;">
         <div class="p-3 glass border border-white/8 rounded-xl">
@@ -441,6 +449,7 @@ function navClass(href: string, exact: boolean): string {
 <CommandPalette />
 <OnboardingTour />
 <UpgradeModal />
+<FeedbackWidget />
 
 <!-- Toast -->
 <div id="toast-container" class="fixed bottom-20 right-4 lg:bottom-4 z-[9999] space-y-2"></div>
@@ -449,7 +458,7 @@ function navClass(href: string, exact: boolean): string {
 
 <!-- Bouton flottant -->
 <button id="chat-trigger"
-  class="fixed bottom-20 right-5 lg:bottom-6 lg:right-6 z-[8000] w-[52px] h-[52px] rounded-2xl
+  class="fixed bottom-20 right-5 lg:bottom-6 lg:right-6 z-[8000] w-13 h-13 w-[52px] h-[52px] rounded-2xl
          flex items-center justify-center shadow-2xl transition-all duration-200
          hover:scale-110 active:scale-95"
   style="background: linear-gradient(135deg,#7c3aed,#4f46e5); box-shadow: 0 8px 32px rgba(124,58,237,0.45);"
@@ -488,7 +497,7 @@ function navClass(href: string, exact: boolean): string {
       <p class="text-sm font-semibold text-white">Assistant BioForge</p>
       <div class="flex items-center gap-1.5 mt-0.5">
         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400" style="animation: pulse 2s infinite;"></span>
-        <p class="text-xs" style="color:rgba(255,255,255,0.35);">IA rapide · Grok</p>
+        <p class="text-xs" style="color:rgba(255,255,255,0.35);">IA · toujours disponible</p>
       </div>
     </div>
     <button id="chat-clear"
@@ -620,7 +629,7 @@ function navClass(href: string, exact: boolean): string {
 </style>
 
 <script>
-  // ── Mobile menu, dropdowns, command palette (inchangé) ───────────────────────
+  // ── Mobile menu ──────────────────────────────────────────────────────────────
   const mobileMenu     = document.getElementById('mobile-menu');
   const mobileBackdrop = document.getElementById('mobile-menu-backdrop');
 
@@ -632,6 +641,7 @@ function navClass(href: string, exact: boolean): string {
   document.getElementById('mobile-menu-close')?.addEventListener('click', closeMobile);
   mobileBackdrop?.addEventListener('click', closeMobile);
 
+  // ── Sidebar user dropdown ────────────────────────────────────────────────────
   const sidebarUserBtn  = document.getElementById('sidebar-user-btn');
   const sidebarUserMenu = document.getElementById('sidebar-user-menu');
   sidebarUserBtn?.addEventListener('click', (e) => {
@@ -639,6 +649,7 @@ function navClass(href: string, exact: boolean): string {
     sidebarUserMenu?.classList.toggle('hidden');
   });
 
+  // ── Topbar user dropdown ─────────────────────────────────────────────────────
   const topbarUserBtn  = document.getElementById('topbar-user-btn');
   const topbarUserMenu = document.getElementById('topbar-user-menu');
   topbarUserBtn?.addEventListener('click', (e) => {
@@ -652,6 +663,7 @@ function navClass(href: string, exact: boolean): string {
     topbarUserMenu?.classList.add('hidden');
   });
 
+  // ── Command palette ──────────────────────────────────────────────────────────
   document.getElementById('command-palette-trigger')?.addEventListener('click', () => {
     window.openCommandPalette?.();
   });
@@ -703,7 +715,7 @@ function navClass(href: string, exact: boolean): string {
     wrap.innerHTML = `${botAvatar}
       <div class="rounded-2xl rounded-tl-md px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap"
         style="background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.82); max-width:85%;"
-      >${text.replace(/</g, '&lt;').replace(/\n/g, '<br>')}</div>`;
+      >${text.replace(/</g, '&lt;')}</div>`;
     msgBox?.appendChild(wrap);
     scrollBottom();
   }
@@ -714,7 +726,7 @@ function navClass(href: string, exact: boolean): string {
     wrap.innerHTML = `
       <div class="rounded-2xl rounded-tr-md px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap"
         style="background:linear-gradient(135deg,#7c3aed,#4f46e5); color:#fff; max-width:85%;"
-      >${text.replace(/</g, '&lt;').replace(/\n/g, '<br>')}</div>`;
+      >${text.replace(/</g, '&lt;')}</div>`;
     msgBox?.appendChild(wrap);
     scrollBottom();
   }
@@ -745,7 +757,7 @@ function navClass(href: string, exact: boolean): string {
     panel?.classList.add('open');
     iconOff?.classList.add('hidden');
     iconOn?.classList.remove('hidden');
-    pulse?.remove();
+    pulse?.remove();          // Stoppe le ring d'attention
     input?.focus();
     scrollBottom();
   }
@@ -765,6 +777,7 @@ function navClass(href: string, exact: boolean): string {
     text = text.trim();
     if (!text || loading) return;
 
+    // Cache les suggestions dès le 1er envoi
     if (suggsEl) suggsEl.style.display = 'none';
 
     loading = true;
@@ -777,39 +790,26 @@ function navClass(href: string, exact: boolean): string {
     addTyping();
 
     try {
-      const res = await fetch('/api/chatbot/chat', {
+      const res = await fetch('/api/chat', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ messages: history.slice(-15), context: ctx }),
+        body:    JSON.stringify({ messages: history.slice(-12), context: ctx }),
       });
 
       removeTyping();
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(`HTTP ${res.status} – ${errData.error || 'Erreur inconnue'}`);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data  = await res.json();
       const reply = data.content?.[0]?.text
-        ?? "Désolé, je n'ai pas pu répondre correctement. Réessaie !";
+        ?? "Désolé, je n'ai pas pu répondre. Réessaie dans un instant !";
 
       addBotMsg(reply);
       history.push({ role: 'assistant', content: reply });
 
     } catch (err) {
       removeTyping();
-
-      let userMessage = "Une erreur s'est produite 🙏 Réessaie dans un instant.";
-      if (err.message?.includes('429')) {
-        userMessage = "Trop de messages envoyés trop vite 😅 Attends 10-30 secondes et réessaie.";
-      } else if (err.message?.includes('401') || err.message?.includes('403')) {
-        userMessage = "Problème d'accès à l'IA – contacte le support si ça persiste.";
-      } else if (err.message?.includes('504') || err.message?.includes('timeout')) {
-        userMessage = "L'assistant met trop de temps… Réessaie dans quelques secondes.";
-      }
-
-      addBotMsg(userMessage);
+      addBotMsg("Une erreur s'est produite 🙏 Vérifie ta connexion et réessaie.");
       console.error('[BioForge Chat]', err);
     }
 
@@ -821,10 +821,7 @@ function navClass(href: string, exact: boolean): string {
   sendBtn?.addEventListener('click', () => send(input?.value ?? ''));
 
   input?.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      send(input.value);
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input.value); }
   });
 
   // Auto-resize textarea
@@ -850,7 +847,7 @@ function navClass(href: string, exact: boolean): string {
           ${botAvatar}
           <div class="rounded-2xl rounded-tl-md px-3.5 py-2.5 text-sm leading-relaxed"
             style="background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.82); max-width:85%;">
-            Conversation réinitialisée 🔄<br>Comment puis-je t'aider aujourd'hui ?
+            Conversation réinitialisée 🔄 Comment puis-je t'aider ?
           </div>
         </div>`;
     }

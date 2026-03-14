@@ -1,0 +1,288 @@
+---
+// src/components/features/FeedbackWidget.astro
+// Widget feedback périodique — s'ouvre après X visites, bottom-right, non-intrusif
+---
+ 
+<div id="fw-root" style="display:none">
+ 
+  <!-- Bubble trigger (visible quand fermé) -->
+  <button id="fw-bubble"
+    aria-label="Donner un retour"
+    style="
+      position:fixed;bottom:28px;right:24px;z-index:9980;
+      width:48px;height:48px;border-radius:50%;
+      background:linear-gradient(135deg,#00ff9d,#00cc7a);
+      border:none;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 8px 24px rgba(0,255,157,0.3),0 0 0 0 rgba(0,255,157,0.4);
+      transition:transform 0.2s ease,box-shadow 0.2s ease;
+      animation:fwpulse 3s ease-in-out infinite;
+    "
+    onmouseover="this.style.transform='scale(1.1)';this.style.boxShadow='0 12px 32px rgba(0,255,157,0.4),0 0 0 0 rgba(0,255,157,0)'"
+    onmouseout="this.style.transform='scale(1)';this.style.boxShadow='0 8px 24px rgba(0,255,157,0.3),0 0 0 0 rgba(0,255,157,0.4)'"
+  >
+    <svg width="20" height="20" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+    </svg>
+    <!-- Notification dot -->
+    <span style="position:absolute;top:2px;right:2px;width:10px;height:10px;background:#fff;border-radius:50%;border:2px solid #00ff9d"></span>
+  </button>
+ 
+  <!-- Panel -->
+  <div id="fw-panel"
+    style="
+      position:fixed;bottom:90px;right:24px;z-index:9981;
+      width:340px;
+      background:linear-gradient(160deg,#0e1317 0%,#090c0f 100%);
+      border:1px solid rgba(255,255,255,0.09);
+      border-top:1px solid rgba(255,255,255,0.14);
+      border-radius:22px;
+      padding:22px;
+      box-shadow:0 32px 72px rgba(0,0,0,0.65),0 0 0 1px rgba(0,0,0,0.5),0 0 50px rgba(0,255,157,0.04);
+      backdrop-filter:blur(24px);
+      display:none;
+      transform:translateY(12px) scale(0.97);
+      opacity:0;
+      transition:opacity 0.28s cubic-bezier(0.22,1,0.36,1),transform 0.28s cubic-bezier(0.22,1,0.36,1);
+    "
+    role="dialog" aria-label="Feedback BioForge"
+  >
+ 
+    <!-- ── ÉTAT 1 — Question ── -->
+    <div id="fw-state-question">
+      <!-- Header -->
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+            <div style="width:28px;height:28px;border-radius:8px;background:rgba(0,255,157,0.1);border:1px solid rgba(0,255,157,0.18);display:flex;align-items:center;justify-content:center;font-size:14px">✦</div>
+            <span style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#00ff9d">Feedback</span>
+          </div>
+          <h3 style="font-family:'Cabinet Grotesk',system-ui,sans-serif;font-size:16px;font-weight:900;color:#fff;letter-spacing:-0.02em;line-height:1.2">
+            Comment tu trouves<br/>BioForge jusqu'ici ?
+          </h3>
+        </div>
+        <button id="fw-close"
+          style="width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgba(255,255,255,0.4);flex-shrink:0;transition:all 0.15s"
+          onmouseover="this.style.background='rgba(255,255,255,0.1)';this.style.color='#fff'"
+          onmouseout="this.style.background='rgba(255,255,255,0.05)';this.style.color='rgba(255,255,255,0.4)'"
+          aria-label="Fermer">
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+ 
+      <!-- Emoji reactions -->
+      <div style="display:flex;justify-content:space-between;margin-bottom:18px;gap:6px">
+        <button class="fw-emoji-btn" data-score="1" style="flex:1;padding:10px 6px;border-radius:14px;border:1.5px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.02);cursor:pointer;transition:all 0.15s;display:flex;flex-direction:column;align-items:center;gap:4px" onmouseover="this.style.borderColor='rgba(255,255,255,0.2)';this.style.background='rgba(255,255,255,0.05)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.08)';this.style.background='rgba(255,255,255,0.02)';this.style.transform='none'">
+          <span style="font-size:22px;line-height:1">😞</span>
+          <span style="font-size:10px;color:rgba(255,255,255,0.3);font-weight:500">Déçu</span>
+        </button>
+        <button class="fw-emoji-btn" data-score="2" style="flex:1;padding:10px 6px;border-radius:14px;border:1.5px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.02);cursor:pointer;transition:all 0.15s;display:flex;flex-direction:column;align-items:center;gap:4px" onmouseover="this.style.borderColor='rgba(255,255,255,0.2)';this.style.background='rgba(255,255,255,0.05)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.08)';this.style.background='rgba(255,255,255,0.02)';this.style.transform='none'">
+          <span style="font-size:22px;line-height:1">😐</span>
+          <span style="font-size:10px;color:rgba(255,255,255,0.3);font-weight:500">Moyen</span>
+        </button>
+        <button class="fw-emoji-btn" data-score="3" style="flex:1;padding:10px 6px;border-radius:14px;border:1.5px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.02);cursor:pointer;transition:all 0.15s;display:flex;flex-direction:column;align-items:center;gap:4px" onmouseover="this.style.borderColor='rgba(255,255,255,0.2)';this.style.background='rgba(255,255,255,0.05)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.08)';this.style.background='rgba(255,255,255,0.02)';this.style.transform='none'">
+          <span style="font-size:22px;line-height:1">🙂</span>
+          <span style="font-size:10px;color:rgba(255,255,255,0.3);font-weight:500">Bien</span>
+        </button>
+        <button class="fw-emoji-btn" data-score="4" style="flex:1;padding:10px 6px;border-radius:14px;border:1.5px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.02);cursor:pointer;transition:all 0.15s;display:flex;flex-direction:column;align-items:center;gap:4px" onmouseover="this.style.borderColor='rgba(255,255,255,0.2)';this.style.background='rgba(255,255,255,0.05)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.08)';this.style.background='rgba(255,255,255,0.02)';this.style.transform='none'">
+          <span style="font-size:22px;line-height:1">😄</span>
+          <span style="font-size:10px;color:rgba(255,255,255,0.3);font-weight:500">Super</span>
+        </button>
+        <button class="fw-emoji-btn" data-score="5" style="flex:1;padding:10px 6px;border-radius:14px;border:1.5px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.02);cursor:pointer;transition:all 0.15s;display:flex;flex-direction:column;align-items:center;gap:4px" onmouseover="this.style.borderColor='rgba(255,255,255,0.2)';this.style.background='rgba(255,255,255,0.05)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.08)';this.style.background='rgba(255,255,255,0.02)';this.style.transform='none'">
+          <span style="font-size:22px;line-height:1">🤩</span>
+          <span style="font-size:10px;color:rgba(255,255,255,0.3);font-weight:500">Excellent</span>
+        </button>
+      </div>
+ 
+      <!-- Optional comment -->
+      <div id="fw-comment-wrap" style="display:none;margin-bottom:14px">
+        <textarea id="fw-comment" rows="2" maxlength="400"
+          placeholder="Dis-nous ce que tu penses (optionnel)…"
+          style="width:100%;padding:11px 13px;background:rgba(255,255,255,0.04);border:1.5px solid rgba(255,255,255,0.08);border-radius:12px;color:#fff;font-size:13px;font-family:inherit;resize:none;outline:none;transition:border-color 0.2s"
+          onfocus="this.style.borderColor='rgba(0,255,157,0.4)'" onblur="this.style.borderColor='rgba(255,255,255,0.08)'"></textarea>
+        <div style="display:flex;justify-content:space-between;margin-top:6px">
+          <span style="font-size:11px;color:rgba(255,255,255,0.25)"><span id="fw-charcount">0</span>/400</span>
+          <button id="fw-submit"
+            style="padding:7px 16px;font-size:12px;font-weight:800;background:#00ff9d;color:#000;border:none;border-radius:9px;cursor:pointer;font-family:'Cabinet Grotesk',system-ui,sans-serif;transition:all 0.18s;letter-spacing:0.01em"
+            onmouseover="this.style.background='#20ffaa';this.style.transform='translateY(-1px)'" onmouseout="this.style.background='#00ff9d';this.style.transform='none'">
+            Envoyer ✦
+          </button>
+        </div>
+      </div>
+ 
+      <!-- Footer -->
+      <p style="font-size:11px;color:rgba(255,255,255,0.2);text-align:center">
+        Tes retours nous aident à construire ce qu'il te faut 🙏
+      </p>
+    </div>
+ 
+    <!-- ── ÉTAT 2 — Merci ── -->
+    <div id="fw-state-thanks" style="display:none;text-align:center;padding:8px 0">
+      <div style="font-size:40px;margin-bottom:14px;animation:fwpopin 0.45s cubic-bezier(0.34,1.56,0.64,1) both" id="fw-thanks-emoji">✦</div>
+      <h3 style="font-family:'Cabinet Grotesk',system-ui,sans-serif;font-size:18px;font-weight:900;color:#fff;letter-spacing:-0.02em;margin-bottom:7px">Merci beaucoup !</h3>
+      <p style="font-size:13px;color:rgba(255,255,255,0.45);line-height:1.6;margin-bottom:20px">Ton retour nous aide vraiment à améliorer BioForge pour tout le monde.</p>
+      <button id="fw-close-thanks"
+        style="padding:9px 22px;font-size:13px;font-weight:800;background:#00ff9d;color:#000;border:none;border-radius:10px;cursor:pointer;font-family:'Cabinet Grotesk',system-ui,sans-serif;transition:all 0.18s;box-shadow:0 4px 14px rgba(0,255,157,0.2)"
+        onmouseover="this.style.background='#20ffaa'" onmouseout="this.style.background='#00ff9d'">
+        Fermer
+      </button>
+    </div>
+ 
+  </div>
+</div>
+ 
+<style>
+  @keyframes fwpulse {
+    0%,100% { box-shadow: 0 8px 24px rgba(0,255,157,0.3), 0 0 0 0 rgba(0,255,157,0.35) }
+    60%      { box-shadow: 0 8px 24px rgba(0,255,157,0.3), 0 0 0 10px rgba(0,255,157,0) }
+  }
+  @keyframes fwpopin {
+    0%   { transform: scale(0) rotate(-10deg); opacity: 0 }
+    60%  { transform: scale(1.15) rotate(2deg) }
+    100% { transform: scale(1); opacity: 1 }
+  }
+  .fw-emoji-btn.selected {
+    border-color: #00ff9d !important;
+    background: rgba(0,255,157,0.1) !important;
+    transform: translateY(-3px) scale(1.05) !important;
+    box-shadow: 0 6px 16px rgba(0,255,157,0.2);
+  }
+</style>
+ 
+<script>
+  (function () {
+    const STORAGE_KEY  = 'bf_fw_last';
+    const SNOOZE_DAYS  = 14;   // Réapparition après 14 jours
+    const VISIT_THRESH = 3;    // S'ouvre après 3 visites
+    const VISIT_KEY    = 'bf_fw_visits';
+ 
+    var root     = document.getElementById('fw-root');
+    var bubble   = document.getElementById('fw-bubble');
+    var panel    = document.getElementById('fw-panel');
+    var closeBtn = document.getElementById('fw-close');
+    var closeThanks = document.getElementById('fw-close-thanks');
+    var submitBtn = document.getElementById('fw-submit');
+    var commentEl = document.getElementById('fw-comment');
+    var commentWrap = document.getElementById('fw-comment-wrap');
+    var stateQ   = document.getElementById('fw-state-question');
+    var stateThanks = document.getElementById('fw-state-thanks');
+    var thanksEmoji = document.getElementById('fw-thanks-emoji');
+    var charcount = document.getElementById('fw-charcount');
+ 
+    if (!root) return;
+ 
+    var selectedScore = null;
+ 
+    // ── Timing check ──────────────────────────────────────────────────────────
+    function shouldShow() {
+      var last = localStorage.getItem(STORAGE_KEY);
+      if (last) {
+        var diff = (Date.now() - parseInt(last)) / 86400000;
+        if (diff < SNOOZE_DAYS) return false;
+      }
+      // Visit counter
+      var visits = parseInt(localStorage.getItem(VISIT_KEY) || '0') + 1;
+      localStorage.setItem(VISIT_KEY, String(visits));
+      return visits >= VISIT_THRESH;
+    }
+ 
+    // ── Show / Hide panel ──────────────────────────────────────────────────────
+    function openPanel() {
+      panel.style.display = 'block';
+      requestAnimationFrame(function () {
+        panel.style.opacity = '1';
+        panel.style.transform = 'translateY(0) scale(1)';
+      });
+      bubble.style.display = 'none';
+    }
+    function closePanel(snoozed) {
+      panel.style.opacity = '0';
+      panel.style.transform = 'translateY(12px) scale(0.97)';
+      setTimeout(function () {
+        panel.style.display = 'none';
+        root.style.display = 'none';
+      }, 300);
+      if (snoozed) localStorage.setItem(STORAGE_KEY, String(Date.now()));
+    }
+ 
+    // ── Emoji selection ────────────────────────────────────────────────────────
+    document.querySelectorAll('.fw-emoji-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('.fw-emoji-btn').forEach(function (b) {
+          b.classList.remove('selected');
+        });
+        btn.classList.add('selected');
+        selectedScore = parseInt(btn.dataset.score);
+ 
+        // Show comment box with small delay
+        setTimeout(function () {
+          if (commentWrap) {
+            commentWrap.style.display = 'block';
+            commentEl && commentEl.focus();
+          }
+        }, 150);
+      });
+    });
+ 
+    // ── Char count ─────────────────────────────────────────────────────────────
+    if (commentEl) {
+      commentEl.addEventListener('input', function () {
+        if (charcount) charcount.textContent = String(commentEl.value.length);
+      });
+    }
+ 
+    // ── Submit ─────────────────────────────────────────────────────────────────
+    async function submitFeedback() {
+      if (!selectedScore) return;
+ 
+      var comment = commentEl ? commentEl.value.trim() : '';
+      var emojiMap = { 1:'😞', 2:'😐', 3:'🙂', 4:'😄', 5:'🤩' };
+ 
+      // Optimistic UI
+      if (stateQ) stateQ.style.display = 'none';
+      if (stateThanks) stateThanks.style.display = 'block';
+      if (thanksEmoji) thanksEmoji.textContent = emojiMap[selectedScore] || '✦';
+ 
+      // Save & snooze
+      localStorage.setItem(STORAGE_KEY, String(Date.now()));
+      localStorage.setItem(VISIT_KEY, '0');
+ 
+      // API call (non-blocking)
+      try {
+        await fetch('/api/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            score:   selectedScore,
+            comment: comment || null,
+            source:  'dashboard_widget',
+            url:     window.location.pathname,
+          }),
+        });
+      } catch (_) { /* silent — feedback non critique */ }
+    }
+ 
+    if (submitBtn) submitBtn.addEventListener('click', submitFeedback);
+    if (commentEl) {
+      commentEl.addEventListener('keydown', function (e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') submitFeedback();
+      });
+    }
+ 
+    // ── Close buttons ──────────────────────────────────────────────────────────
+    if (closeBtn)     closeBtn.addEventListener('click', function () { closePanel(true); });
+    if (closeThanks)  closeThanks.addEventListener('click', function () { closePanel(false); });
+    if (bubble)       bubble.addEventListener('click', openPanel);
+ 
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && panel && panel.style.display !== 'none') closePanel(true);
+    });
+ 
+    // ── Init ───────────────────────────────────────────────────────────────────
+    if (shouldShow()) {
+      root.style.display = 'block';
+      // Auto-open after 4s
+      setTimeout(openPanel, 4000);
+    }
+  })();
+</script>
