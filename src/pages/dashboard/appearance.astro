@@ -1136,6 +1136,12 @@ ${blurOverlay}
     });
   }
 
+  function activateBtn(selector: string, attr: string, val: string) {
+    document.querySelectorAll(selector).forEach(b => {
+      b.classList.toggle('active', (b as HTMLElement).dataset[attr] === val);
+    });
+  }
+
   // ── Section nav ──────────────────────────────────────────────────────────────
   document.querySelectorAll('.sec-tab').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1289,13 +1295,13 @@ ${blurOverlay}
     schedulePreview();
   });
 
-  // ── Fonts ────────────────────────────────────────────────────────────────────
+  // ── Typography ────────────────────────────────────────────────────────────────
   document.querySelectorAll('.font-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      if (!ALLOWED_FONTS.includes(btn.dataset.font)) return;
-      theme.font_family = btn.dataset.font;
-      document.querySelectorAll('.font-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      const f = (btn as HTMLElement).dataset.font!;
+      if (!ALLOWED_FONTS.includes(f)) return;
+      theme.font_family = f;
+      activateBtn('.font-btn','font',f);
       schedulePreview();
     });
   });
