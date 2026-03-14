@@ -157,22 +157,25 @@ const profileJson = JSON.stringify({
 
 // All presets — ALL FREE
 const PRESETS = [
-  { id:'dark',     label:'Dark',     bg:'#0a0a0a', p:'#00ff9d', t:'#ffffff', g2:'#0f1f15' },
-  { id:'neon',     label:'Neon',     bg:'#1a0033', p:'#bf00ff', t:'#ffffff', g2:'#0d001a' },
-  { id:'ocean',    label:'Ocean',    bg:'#001a33', p:'#00d4ff', t:'#ffffff', g2:'#002244' },
-  { id:'sunset',   label:'Sunset',   bg:'#1a0800', p:'#ff6b00', t:'#ffffff', g2:'#2d0a00' },
-  { id:'light',    label:'Light',    bg:'#f8f8f8', p:'#0066ff', t:'#0a0a0a', g2:'#e8f0ff' },
-  { id:'forest',   label:'Forest',   bg:'#0d1f0d', p:'#00cc66', t:'#ffffff', g2:'#0a1a0a' },
-  { id:'rose',     label:'Rose',     bg:'#1a0a0f', p:'#ff2d78', t:'#ffffff', g2:'#0d0508' },
-  { id:'gold',     label:'Gold',     bg:'#120d00', p:'#ffd700', t:'#ffffff', g2:'#1f1500' },
-  { id:'cyber',    label:'Cyber',    bg:'#000d1a', p:'#00ffff', t:'#ffffff', g2:'#001433' },
-  { id:'obsidian', label:'Obsidian', bg:'#0d0d0d', p:'#6366f1', t:'#ffffff', g2:'#13111a' },
-  { id:'aurora',   label:'Aurora',   bg:'#04080f', p:'#00ff9d', t:'#ffffff', g2:'#0a1628' },
-  { id:'sand',     label:'Sand',     bg:'#1a1510', p:'#e8a84c', t:'#f5e6d0', g2:'#120f08' },
-  { id:'midnight', label:'Midnight', bg:'#000010', p:'#4f46e5', t:'#e0e0ff', g2:'#100020' },
-  { id:'blood',    label:'Blood',    bg:'#0d0000', p:'#ef4444', t:'#ffe0e0', g2:'#200000' },
-  { id:'matrix',   label:'Matrix',   bg:'#000a00', p:'#00ff41', t:'#ccffcc', g2:'#001a00' },
-  { id:'hologram', label:'Hologram', bg:'#010115', p:'#a78bfa', t:'#ffffff', g2:'#0a0a30' },
+  // ── Free (4 presets) ────────────────────────────────────────────────────────
+  { id:'dark',     label:'Dark',     bg:'#0a0a0a', p:'#00ff9d', t:'#ffffff', g2:'#0f1f15',  tier:'free' },
+  { id:'light',    label:'Light',    bg:'#f8f8f8', p:'#0066ff', t:'#0a0a0a', g2:'#e8f0ff',  tier:'free' },
+  { id:'neon',     label:'Neon',     bg:'#1a0033', p:'#bf00ff', t:'#ffffff', g2:'#0d001a',  tier:'free' },
+  { id:'ocean',    label:'Ocean',    bg:'#001a33', p:'#00d4ff', t:'#ffffff', g2:'#002244',  tier:'free' },
+  // ── Creator ─────────────────────────────────────────────────────────────────
+  { id:'sunset',   label:'Sunset',   bg:'#1a0800', p:'#ff6b00', t:'#ffffff', g2:'#2d0a00',  tier:'creator' },
+  { id:'forest',   label:'Forest',   bg:'#0d1f0d', p:'#00cc66', t:'#ffffff', g2:'#0a1a0a',  tier:'creator' },
+  { id:'rose',     label:'Rose',     bg:'#1a0a0f', p:'#ff2d78', t:'#ffffff', g2:'#0d0508',  tier:'creator' },
+  { id:'gold',     label:'Gold',     bg:'#120d00', p:'#ffd700', t:'#ffffff', g2:'#1f1500',  tier:'creator' },
+  { id:'cyber',    label:'Cyber',    bg:'#000d1a', p:'#00ffff', t:'#ffffff', g2:'#001433',  tier:'creator' },
+  { id:'obsidian', label:'Obsidian', bg:'#0d0d0d', p:'#6366f1', t:'#ffffff', g2:'#13111a',  tier:'creator' },
+  { id:'aurora',   label:'Aurora',   bg:'#04080f', p:'#00ff9d', t:'#ffffff', g2:'#0a1628',  tier:'creator' },
+  { id:'sand',     label:'Sand',     bg:'#1a1510', p:'#e8a84c', t:'#f5e6d0', g2:'#120f08',  tier:'creator' },
+  // ── Pro ─────────────────────────────────────────────────────────────────────
+  { id:'midnight', label:'Midnight', bg:'#000010', p:'#4f46e5', t:'#e0e0ff', g2:'#100020',  tier:'pro' },
+  { id:'blood',    label:'Blood',    bg:'#0d0000', p:'#ef4444', t:'#ffe0e0', g2:'#200000',  tier:'pro' },
+  { id:'matrix',   label:'Matrix',   bg:'#000a00', p:'#00ff41', t:'#ccffcc', g2:'#001a00',  tier:'pro' },
+  { id:'hologram', label:'Hologram', bg:'#010115', p:'#a78bfa', t:'#ffffff', g2:'#0a0a30',  tier:'pro' },
 ];
 ---
 
@@ -289,25 +292,76 @@ const PRESETS = [
 
       <!-- ══ PRESETS ══ -->
       <div class="sec-panel active" id="panel-presets">
-        <div class="p-5 glass rounded-2xl border border-white/8 space-y-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm font-semibold text-white">Thèmes prédéfinis</p>
-              <p class="text-xs text-gray-500 mt-0.5">Tous gratuits — point de départ modifiable</p>
+        <div class="p-5 glass rounded-2xl border border-white/8 space-y-5">
+          <div>
+            <p class="text-sm font-semibold text-white">Thèmes prédéfinis</p>
+            <p class="text-xs text-gray-500 mt-0.5">4 thèmes gratuits · 8 Creator · 4 Pro — tous testables</p>
+          </div>
+
+          {/* Free */}
+          <div>
+            <p class="text-xs text-gray-600 uppercase tracking-widest font-medium mb-2">Gratuits</p>
+            <div class="grid grid-cols-4 gap-2">
+              {PRESETS.filter(p => p.tier === 'free').map(p => (
+                <button class="preset-btn group flex flex-col rounded-xl overflow-hidden border-2 border-white/8 hover:border-white/25 transition-all hover:scale-[1.04] active:scale-[0.97]"
+                  data-preset={p.id} data-bg={p.bg} data-primary={p.p} data-text={p.t} data-g2={p.g2} data-tier="free">
+                  <div class="h-12 w-full relative" style={`background:linear-gradient(135deg,${p.bg},${p.g2})`}>
+                    <div class="absolute bottom-2 right-2 w-3 h-3 rounded-full" style={`background:${p.p}`}></div>
+                  </div>
+                  <div class="py-1.5 text-center bg-white/4">
+                    <span class="text-xs text-gray-400" style="font-size:10px">{p.label}</span>
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
-          <div class="grid grid-cols-4 sm:grid-cols-8 gap-2">
-            {PRESETS.map(p => (
-              <button class="preset-btn group flex flex-col rounded-xl overflow-hidden border-2 border-white/8 hover:border-white/25 transition-all hover:scale-[1.04] active:scale-[0.97]"
-                data-preset={p.id} data-bg={p.bg} data-primary={p.p} data-text={p.t} data-g2={p.g2} title={p.label}>
-                <div class="h-10 w-full" style={`background:linear-gradient(135deg,${p.bg},${p.g2});position:relative`}>
-                  <div style={`position:absolute;bottom:4px;right:4px;width:14px;height:14px;border-radius:50%;background:${p.p}`}></div>
-                </div>
-                <div class="py-1 text-center" style="background:rgba(255,255,255,0.04)">
-                  <span class="text-xs text-gray-500" style="font-size:9px">{p.label}</span>
-                </div>
-              </button>
-            ))}
+
+          {/* Creator */}
+          <div>
+            <div class="flex items-center gap-2 mb-2">
+              <p class="text-xs text-gray-600 uppercase tracking-widest font-medium">Creator</p>
+              <span class="badge-creator">👑</span>
+              {!isCreator && <span class="text-xs text-gray-600">— testables, non sauvegardables</span>}
+            </div>
+            <div class="grid grid-cols-4 gap-2">
+              {PRESETS.filter(p => p.tier === 'creator').map(p => (
+                <button class="preset-btn group flex flex-col rounded-xl overflow-hidden border-2 transition-all hover:scale-[1.04] active:scale-[0.97] relative"
+                  style={isCreator ? 'border-color:rgba(0,255,157,0.15)' : 'border-color:rgba(255,255,255,0.08)'}
+                  data-preset={p.id} data-bg={p.bg} data-primary={p.p} data-text={p.t} data-g2={p.g2} data-tier="creator">
+                  <div class="h-12 w-full relative" style={`background:linear-gradient(135deg,${p.bg},${p.g2})`}>
+                    <div class="absolute bottom-2 right-2 w-3 h-3 rounded-full" style={`background:${p.p}`}></div>
+                    {!isCreator && <div class="absolute inset-0 flex items-center justify-center bg-black/40"><span style="font-size:14px">👑</span></div>}
+                  </div>
+                  <div class="py-1.5 text-center bg-white/4">
+                    <span class="text-xs text-gray-400" style="font-size:10px">{p.label}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Pro */}
+          <div>
+            <div class="flex items-center gap-2 mb-2">
+              <p class="text-xs text-gray-600 uppercase tracking-widest font-medium">Pro</p>
+              <span class="badge-pro">⚡</span>
+              {!isPro && <span class="text-xs text-gray-600">— testables, non sauvegardables</span>}
+            </div>
+            <div class="grid grid-cols-4 gap-2">
+              {PRESETS.filter(p => p.tier === 'pro').map(p => (
+                <button class="preset-btn group flex flex-col rounded-xl overflow-hidden border-2 transition-all hover:scale-[1.04] active:scale-[0.97] relative"
+                  style={isPro ? 'border-color:rgba(168,85,247,0.25)' : 'border-color:rgba(255,255,255,0.08)'}
+                  data-preset={p.id} data-bg={p.bg} data-primary={p.p} data-text={p.t} data-g2={p.g2} data-tier="pro">
+                  <div class="h-12 w-full relative" style={`background:linear-gradient(135deg,${p.bg},${p.g2})`}>
+                    <div class="absolute bottom-2 right-2 w-3 h-3 rounded-full" style={`background:${p.p}`}></div>
+                    {!isPro && <div class="absolute inset-0 flex items-center justify-center bg-black/50"><span style="font-size:14px">⚡</span></div>}
+                  </div>
+                  <div class="py-1.5 text-center bg-white/4">
+                    <span class="text-xs text-gray-400" style="font-size:10px">{p.label}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -907,6 +961,74 @@ const PRESETS = [
               </label>
             ))}
           </div>
+
+          <!-- ── HERO PHOTO ── -->
+          <div class="space-y-3 pt-4 border-t border-white/8">
+            <div class="flex items-center gap-2">
+              <p class="text-xs text-gray-500 uppercase tracking-widest font-medium">Mode Hero Photo</p>
+              <span class="badge-creator">👑 Creator</span>
+            </div>
+            <p class="text-xs text-gray-600 leading-relaxed">
+              Ta photo de profil en pleine largeur avec fondu cinématique — nom intégré dans l'image.
+            </p>
+            <div class="rounded-xl overflow-hidden border border-white/10 relative select-none" style="height:100px;background:linear-gradient(135deg,#1a0a0f,#0a0a0a)">
+              <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
+              <div class="absolute inset-0 flex items-center justify-center">
+                <div class="w-14 h-14 rounded-full bg-neon-green/15 border-2 border-neon-green/30 flex items-center justify-center text-xl opacity-70">👤</div>
+              </div>
+              <div class="absolute bottom-2.5 left-3.5">
+                <p class="text-white text-xs font-bold">Ton Nom ✦</p>
+                <p class="text-white/40 text-xs" style="font-size:9px">@username · Creator</p>
+              </div>
+            </div>
+            <label class="flex items-center justify-between p-3.5 glass rounded-xl cursor-pointer hover:bg-white/3 border border-white/5 transition-all">
+              <div>
+                <span class="text-sm text-gray-300 font-medium block">Activer Hero Photo</span>
+                <span class="text-xs text-gray-600">Applique le style cinématique à ton profil</span>
+              </div>
+              <input type="checkbox" id="hero-mode-toggle"
+                class="toggle w-11 h-6 rounded-full appearance-none bg-white/10 relative cursor-pointer focus:outline-none"
+                data-premium="creator" />
+            </label>
+            <div id="hero-mode-settings" class="hidden space-y-3">
+              <div class="space-y-1.5">
+                <label class="text-xs text-gray-500">Image hero (laisser vide = photo de profil)</label>
+                <input type="url" id="hero-photo-url" placeholder="https://…"
+                  class="w-full px-4 py-3 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none transition-colors" />
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-2">Style dégradé</p>
+                <div class="grid grid-cols-3 gap-2">
+                  {[
+                    { id:'cinematic', label:'Cinéma',  desc:'Gauche bas' },
+                    { id:'centered',  label:'Centré',  desc:'Radial centre' },
+                    { id:'minimal',   label:'Minimal', desc:'Fine bande' },
+                  ].map(hs => (
+                    <button class="choice-btn hero-style-btn py-2 glass border-2 border-white/10 rounded-xl text-center hover:border-white/20 transition-all"
+                      data-hero-style={hs.id}>
+                      <span class="block text-xs font-semibold text-white">{hs.label}</span>
+                      <span class="block text-xs text-gray-600">{hs.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p class="text-xs text-gray-500 mb-2">Hauteur</p>
+                <div class="flex gap-2">
+                  {[{id:'sm',label:'240px'},{id:'md',label:'320px'},{id:'lg',label:'440px'},{id:'full',label:'100vh'}].map(hh => (
+                    <button class="choice-btn hero-height-btn flex-1 py-2 glass border-2 border-white/10 rounded-xl text-xs text-gray-400 hover:text-white transition-all text-center" data-height={hh.id}>{hh.label}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between mb-1.5">
+                  <p class="text-xs text-gray-500">Intensité du fondu</p>
+                  <span id="hero-overlay-val" class="text-xs font-mono text-white">{theme.hero_overlay}%</span>
+                </div>
+                <input type="range" id="hero-overlay-slider" min="0" max="90" value={theme.hero_overlay} class="w-full accent-neon-green h-1.5 rounded-full" />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1233,6 +1355,21 @@ const PRESETS = [
     <!-- ═══ RIGHT: PHONE PREVIEW ═══ -->
     <div class="lg:col-span-2">
       <div class="sticky top-6 space-y-4">
+
+        <!-- Test mode badge (shown when testing premium) -->
+        <div id="test-mode-pill" class="hidden items-center gap-2.5 px-3 py-2.5 rounded-2xl border text-xs font-semibold transition-all">
+          <span id="test-mode-icon" class="text-base shrink-0"></span>
+          <div class="flex-1 min-w-0">
+            <span id="test-mode-label" class="block text-white"></span>
+            <span class="block text-gray-500 font-normal" style="font-size:10px">Aperçu uniquement — non sauvegardable</span>
+          </div>
+          <a href="/dashboard/billing" id="test-mode-cta"
+            class="shrink-0 px-2.5 py-1 rounded-lg text-xs font-bold transition-opacity hover:opacity-80"
+            style="font-size:10px">Upgrade</a>
+          <button onclick="dismissTestMode()" class="shrink-0 text-gray-600 hover:text-white transition-colors" title="Annuler">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
         <div class="flex items-center justify-between px-1">
           <p class="text-xs text-gray-500 font-medium uppercase tracking-widest">Aperçu</p>
           <div class="flex items-center gap-1">
@@ -1293,7 +1430,14 @@ const PRESETS = [
   const isPro    = sd?.dataset.isPro    === 'true';
   const isCreator = sd?.dataset.isCreator === 'true';
 
-  const ALLOWED_FONTS = ['Exo 2','Orbitron','Rajdhani','Bebas Neue','Audiowide','Russo One','Space Grotesk','DM Sans','Quicksand','Figtree','Inter','Syne','Cabinet Grotesk'];
+  const ALLOWED_FONTS = [
+    'Exo 2','Orbitron','Rajdhani','Bebas Neue','Audiowide','Russo One',
+    'Space Grotesk','DM Sans','Quicksand','Figtree','Inter','Syne','Cabinet Grotesk',
+    'Outfit','Plus Jakarta Sans','Nunito','Poppins','Josefin Sans','Archivo',
+    'Barlow','Rubik','Work Sans','Manrope','Space Mono','JetBrains Mono','Fira Code',
+    'Playfair Display','Lora','Merriweather','DM Serif Display',
+    'Bungee','Righteous','Teko','Oswald','Anton',
+  ];
   const HISTORY_KEY   = 'bf_theme_history_v3';
   let aiSuggestedTheme: any = null;
 
@@ -1429,16 +1573,20 @@ const PRESETS = [
     const overlayBottom = t.overlay_bottom ? `<div style="position:fixed;bottom:0;left:0;right:0;height:120px;background:linear-gradient(to top,${t.overlay_color ?? '#000'}cc,transparent);z-index:0;pointer-events:none"></div>` : '';
     const blurOverlay   = t.background_style === 'blur' ? `<div style="position:fixed;inset:0;backdrop-filter:blur(60px);background:${t.background_color}88;z-index:0"></div>` : '';
 
-    // Wallpaper
+    // Wallpaper — position:absolute dans body (fonctionne dans srcdoc iframe)
     const wallpaperHTML = (() => {
       if (t.wallpaper_type === 'image' && t.wallpaper_url) {
-        const blur = t.wallpaper_blur > 0 ? `filter:blur(${t.wallpaper_blur}px);` : '';
-        const dim  = t.wallpaper_dim  > 0 ? `<div style="position:fixed;inset:0;background:rgba(0,0,0,${t.wallpaper_dim/100});z-index:0"></div>` : '';
-        return `<div style="position:fixed;inset:0;z-index:-1;overflow:hidden"><img src="${t.wallpaper_url}" style="width:100%;height:100%;object-fit:cover;${blur}" /></div>${dim}`;
+        const blur = t.wallpaper_blur > 0 ? `filter:blur(${t.wallpaper_blur}px) scale(1.05);` : '';
+        return `<div id="wp" style="position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none">
+          <img src="${t.wallpaper_url}" style="width:100%;height:100%;object-fit:cover;${blur}" />
+          <div style="position:absolute;inset:0;background:rgba(0,0,0,${(t.wallpaper_dim??50)/100})"></div>
+        </div>`;
       }
       if (t.wallpaper_type === 'video' && t.wallpaper_video_url) {
-        const dim = t.wallpaper_dim > 0 ? `<div style="position:fixed;inset:0;background:rgba(0,0,0,${t.wallpaper_dim/100});z-index:0"></div>` : '';
-        return `<div style="position:fixed;inset:0;z-index:-1;overflow:hidden"><video autoplay muted loop playsinline style="width:100%;height:100%;object-fit:cover" src="${t.wallpaper_video_url}"></video></div>${dim}`;
+        return `<div id="wp" style="position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none">
+          <video autoplay muted loop playsinline style="width:100%;height:100%;object-fit:cover" src="${t.wallpaper_video_url}"></video>
+          <div style="position:absolute;inset:0;background:rgba(0,0,0,${(t.wallpaper_dim??50)/100})"></div>
+        </div>`;
       }
       return '';
     })();
@@ -1458,7 +1606,7 @@ const PRESETS = [
 <link rel="stylesheet" href="${fontUrl}">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{min-height:100%;font-family:'${font}',sans-serif;background:${bg};${patternCSS}color:${t.text_color}}
+html{min-height:100%}body{min-height:100vh;position:relative;font-family:'${font}',sans-serif;background:${bg};${patternCSS}color:${t.text_color}}
 .page{position:relative;z-index:1;max-width:${maxW};margin:0 auto;padding:${heroHTML?'0':'36px'} 20px 36px}
 .header{${headerWrap};text-align:${headerAlign}}
 .avatar-wrap{${isLeft?'display:flex;align-items:center;gap:16px;':''}}
@@ -1612,7 +1760,10 @@ ${isCard?'</div>':''}
   // ── Presets ───────────────────────────────────────────────────────────────────
   document.querySelectorAll('.preset-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      const { preset, bg, primary, text, g2 } = (btn as HTMLElement).dataset;
+      const { preset, bg, primary, text, g2, tier } = (btn as HTMLElement).dataset;
+      // Test mode for premium presets
+      if (tier === 'pro' && !isPro)          activateTestMode('pro', `preset_${preset}`);
+      else if (tier === 'creator' && !isCreator) activateTestMode('creator', `preset_${preset}`);
       theme = { ...theme, preset, background_color:bg, primary_color:primary, text_color:text, gradient_color_2:g2||bg };
       syncColor('background_color',bg!); syncColor('gradient_color_1',bg!);
       syncColor('primary_color',primary!); syncColor('text_color',text!);
@@ -1993,6 +2144,7 @@ ${isCard?'</div>':''}
     document.getElementById('angle-wrap')?.classList.toggle('hidden', theme.gradient_type !== 'linear');
 
     if (cssEditor) { cssEditor.value = theme.custom_css ?? ''; if(cssCount) cssCount.textContent=`${cssEditor.value.length} / 4000`; }
+    syncHeroToggle();
 
     schedulePreview();
   }
@@ -2078,31 +2230,28 @@ ${isCard?'</div>':''}
   }
 
   function showTestBanner(tier: string) {
-    const banner = document.getElementById('test-mode-banner');
-    if (!banner) return;
-    banner.classList.remove('hidden');
-    banner.style.cssText = tier === 'pro'
-      ? 'display:flex;background:linear-gradient(90deg,rgba(168,85,247,0.12),rgba(168,85,247,0.06));border:1px solid rgba(168,85,247,0.3);border-radius:16px;padding:12px 16px;align-items:center;gap:12px;margin-bottom:16px;'
-      : 'display:flex;background:linear-gradient(90deg,rgba(0,255,157,0.08),rgba(0,255,157,0.04));border:1px solid rgba(0,255,157,0.25);border-radius:16px;padding:12px 16px;align-items:center;gap:12px;margin-bottom:16px;';
-    const icon    = tier === 'pro' ? '⚡' : '👑';
-    const label   = tier === 'pro' ? 'Pro' : 'Creator';
-    const color   = tier === 'pro' ? '#c084fc' : '#00ff9d';
-    banner.innerHTML = `
-      <span style="font-size:1.5rem;flex-shrink:0">${icon}</span>
-      <div style="flex:1">
-        <p style="font-size:13px;font-weight:700;color:white">Mode aperçu <span style="color:${color}">${label}</span> actif</p>
-        <p style="font-size:11px;color:#6b7280;margin-top:2px">Tu testes des fonctionnalités ${label}. Passe au plan supérieur pour sauvegarder.</p>
-      </div>
-      <a href="/dashboard/billing" style="flex-shrink:0;padding:8px 16px;border-radius:10px;background:${color};color:black;font-size:12px;font-weight:700;text-decoration:none;transition:opacity 0.2s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
-        Upgrader →
-      </a>
-      <button onclick="dismissTestMode()" style="flex-shrink:0;background:none;border:none;color:#4b5563;cursor:pointer;font-size:18px;padding:2px 6px" title="Annuler les changements premium">✕</button>`;
+    const pill  = document.getElementById('test-mode-pill');
+    const icon  = document.getElementById('test-mode-icon');
+    const label = document.getElementById('test-mode-label');
+    const cta   = document.getElementById('test-mode-cta') as HTMLAnchorElement | null;
+    if (!pill) return;
+
+    const isPro  = tier === 'pro';
+    const color  = isPro ? '#c084fc' : '#00ff9d';
+    const bgCol  = isPro ? 'rgba(168,85,247,0.12)' : 'rgba(0,255,157,0.08)';
+    const border = isPro ? 'rgba(168,85,247,0.3)'  : 'rgba(0,255,157,0.25)';
+
+    pill.style.cssText   = `display:flex;background:${bgCol};border:1px solid ${border};border-radius:16px;`;
+    if (icon)  icon.textContent  = isPro ? '⚡' : '👑';
+    if (label) { label.textContent = `Mode aperçu ${isPro ? 'Pro' : 'Creator'}`; label.style.color = color; }
+    if (cta)   { cta.style.cssText = `background:${color};color:${isPro?'#fff':'#000'};padding:4px 10px;border-radius:8px;font-size:10px;font-weight:700;text-decoration:none;flex-shrink:0`; }
+    pill.classList.remove('hidden');
   }
 
   function dismissTestMode() {
     testModeActive   = false;
     testModeFeatures = [];
-    document.getElementById('test-mode-banner')?.classList.add('hidden');
+    document.getElementById('test-mode-pill')?.classList.add('hidden');
     // Reset premium fields back to defaults
     theme.hero_image       = '';
     theme.show_logo        = false;
@@ -2146,7 +2295,7 @@ ${isCard?'</div>':''}
       pushHistory(theme);
       testModeActive   = false;
       testModeFeatures = [];
-      document.getElementById('test-mode-banner')?.classList.add('hidden');
+      document.getElementById('test-mode-pill')?.classList.add('hidden');
       toast.success('Thème sauvegardé ! ✓');
     } catch(err: any) {
       toast.error(err.message||'Erreur de sauvegarde');
@@ -2193,6 +2342,45 @@ ${isCard?'</div>':''}
           Continuer à prévisualiser
         </button>
       </div>`;
+  }
+
+
+  // ── Hero Mode (profile panel) ────────────────────────────────────────────────
+  document.getElementById('hero-mode-toggle')?.addEventListener('change', (e: any) => {
+    const on = e.target.checked;
+    setThemeField('header_style', on ? 'hero' : 'simple');
+    document.getElementById('hero-mode-settings')?.classList.toggle('hidden', !on);
+    // Sync the header-btn active state
+    document.querySelectorAll('.header-btn').forEach(b =>
+      b.classList.toggle('active', (b as HTMLElement).dataset.header === (on ? 'hero' : 'simple'))
+    );
+  });
+
+  document.getElementById('hero-photo-url')?.addEventListener('input', (e: any) => {
+    setThemeField('hero_image', e.target.value.trim());
+  });
+
+  document.querySelectorAll('.hero-style-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const style = (btn as HTMLElement).dataset.heroStyle!;
+      theme.hero_style = style;
+      document.querySelectorAll('.hero-style-btn').forEach(b => b.classList.toggle('active', b === btn));
+      schedulePreview();
+    });
+  });
+
+  document.getElementById('hero-overlay-slider')?.addEventListener('input', (e: any) => {
+    theme.hero_overlay = +e.target.value;
+    const v = document.getElementById('hero-overlay-val');
+    if (v) v.textContent = `${theme.hero_overlay}%`;
+    schedulePreview();
+  });
+
+  // Sync hero-mode-toggle with header_style changes from layout panel
+  function syncHeroToggle() {
+    const tog = document.getElementById('hero-mode-toggle') as HTMLInputElement | null;
+    if (tog) tog.checked = theme.header_style === 'hero';
+    document.getElementById('hero-mode-settings')?.classList.toggle('hidden', theme.header_style !== 'hero');
   }
 
   // ── Logo handlers ─────────────────────────────────────────────────────────────
@@ -2293,6 +2481,7 @@ ${isCard?'</div>':''}
 
   // ── Sync UI to theme (after reset/history restore) ────────────────────────────
   function syncUIToTheme() {
+    syncHeroToggle();
     // Hero / logo UI
     const heroSettings = document.getElementById('hero-settings');
     if (heroSettings) heroSettings.style.display = theme.header_style === 'hero' ? '' : 'none';
@@ -2379,15 +2568,6 @@ ${isCard?'</div>':''}
   });
 
   // ── INIT ──────────────────────────────────────────────────────────────────────
-  // Inject test mode banner in DOM before left panel
-  (() => {
-    const banner = document.createElement('div');
-    banner.id = 'test-mode-banner';
-    banner.classList.add('hidden');
-    const leftPanel = document.querySelector('.lg\\:col-span-3');
-    leftPanel?.parentElement?.insertBefore(banner, leftPanel.parentElement.firstChild);
-  })();
-
   // Inject upsell modal keyframe
   const style = document.createElement('style');
   style.textContent = `@keyframes modalIn{from{opacity:0;transform:scale(0.94) translateY(12px)}to{opacity:1;transform:none}}`;
