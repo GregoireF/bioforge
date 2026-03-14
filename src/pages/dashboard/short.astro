@@ -28,8 +28,8 @@ const plan: string = profile?.plan ?? 'Free';
 const planLimRow  = (planLimits as any)?.plan_limits ?? planLimits ?? {};
 const isCreator   = PAID_TIERS.includes(plan);
 const isPro       = PRO_TIERS.includes(plan);
-const canUse    = plan === 'creator' || plan === 'pro';
-const maxLinks  = plan === 'pro' ? -1 : plan === 'creator' ? 50 : 0;
+const canUse    = plan === 'Creator' || plan === 'Pro' || plan === 'Entreprise';
+const maxLinks  = plan === 'Entreprise' ? -1 : plan === 'Creator' ? 50 : 0;
 
 const { data: links, count } = await supabase
   .from('short_links')
