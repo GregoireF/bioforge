@@ -592,21 +592,6 @@ const BADGE_COLORS: Record<string, string> = {
     style={`font-family: '${theme.font_family}', system-ui, sans-serif; color: ${tc};`}>
 
     <div class="w-full" style={`max-width: ${contentMaxW};`}>
-      {/* Card layout — wraps everything in a card */}
-      {(theme as any).profile_layout === 'card' && (
-        <style>{`
-          .card-layout-wrap {
-            background: rgba(255,255,255,0.04);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 28px;
-            padding: 28px;
-            margin-top: 12px;
-          }
-        `}</style>
-      )}
-
       <!-- HEADER + BLOCKS CARD WRAPPER -->
       <div class={(theme as any).profile_layout === 'card' ? 'card-layout-wrap' : ''}>
 
@@ -1572,6 +1557,17 @@ const BADGE_COLORS: Record<string, string> = {
 
     /* ── Share modal ── */
     #share-modal.open { display: flex; }
+
+    /* ── Card layout ── */
+    .card-layout-wrap {
+      background: rgba(255,255,255,0.04);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 28px;
+      padding: 32px 28px;
+      margin-top: 0;
+    }
 
     /* ── Link separators ── */
     .link-block[data-sep="line"]::before,
