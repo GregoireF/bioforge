@@ -258,6 +258,110 @@ if (isPro && utmData.length > 0) {
   }
 }
 
+// ── v5: PREVIOUS PERIOD (for delta comparisons) ─────────────────────────────
+const prevSince = new Date(since);
+prevSince.setDate(prevSince.getDate() - days);
+const { data: prevRpcRaw } = await supabase.rpc('get_profile_analytics', {
+  p_profile_id: profileId,
+  p_days: days * 2,
+});
+// We use the difference: total over 2x period minus current period ≈ previous period
+// Simpler: fetch with prev window
+const { data: prevConvRows } = await supabase.from('conversion_events')
+  .select('type, value, created_at').eq('profile_id', profileId)
+  .gte('created_at', prevSince.toISOString()).lt('created_at', since.toISOString());
+const prevConv = prevConvRows ?? [];
+
+// Prev period proxied from doubled RPC minus current
+const prevRpc = prevRpcRaw as typeof rpcData;
+const prevViews    = Math.max(0, (prevRpc?.total_views     ?? 0) - summary.totalViews);
+const prevClicks   = Math.max(0, (prevRpc?.total_clicks    ?? 0) - summary.totalClicks);
+const prevUniques  = Math.max(0, (prevRpc?.unique_visitors ?? 0) - summary.uniqueVisitors);
+const prevLeads    = prevConv.filter(r => r.type === 'lead').length;
+const prevSales    = prevConv.filter(r => r.type === 'sale').length;
+const prevRevenue  = prevConv.filter(r => r.type === 'sale').reduce((s, r) => s + (r.value ?? 0), 0);
+
+function pctDelta(curr: number, prev: number): { val: number; pos: boolean; neutral: boolean } {
+  if (prev === 0) return { val: curr > 0 ? 100 : 0, pos: curr > 0, neutral: curr === 0 };
+  const v = Math.round(((curr - prev) / prev) * 100);
+  return { val: Math.abs(v), pos: v >= 0, neutral: v === 0 };
+}
+const deltaViews   = pctDelta(summary.totalViews,  prevViews);
+const deltaClicks  = pctDelta(summary.totalClicks, prevClicks);
+const deltaUniques = pctDelta(summary.uniqueVisitors, prevUniques);
+const deltaLeads   = pctDelta(leads,   prevLeads);
+const deltaRevenue = pctDelta(revenue, prevRevenue);
+
+// ── v5: PERFORMANCE SCORE IA (deterministic, no API call) ────────────────────
+function scoreMetric(val: number, thresholds: [number, number, number, number]): number {
+  if (val >= thresholds[3]) return 25;
+  if (val >= thresholds[2]) return 20;
+  if (val >= thresholds[1]) return 12;
+  if (val >= thresholds[0]) return 5;
+  return 0;
+}
+const scoreCTR        = scoreMetric(summary.clickRate,   [1, 3, 7, 12]);
+const scoreGrowth     = scoreMetric(deltaViews.pos ? deltaViews.val : -deltaViews.val, [-20, 0, 10, 25]);
+const scoreConversion = scoreMetric(convRate,            [0, 5, 15, 30]);
+const scoreRevenue    = scoreMetric(revenue,             [0, 50, 200, 1000]);
+const perfScore       = Math.min(100, scoreCTR + scoreGrowth + scoreConversion + scoreRevenue);
+const perfGrade       = perfScore >= 80 ? 'A' : perfScore >= 60 ? 'B' : perfScore >= 40 ? 'C' : 'D';
+const perfColor       = perfScore >= 80 ? '#00ff9d' : perfScore >= 60 ? '#38bdf8' : perfScore >= 40 ? '#f59e0b' : '#f87171';
+
+const perfRecos: string[] = [];
+if (summary.clickRate < 5)  perfRecos.push("Améliore tes titres de liens — un CTR < 5% signale un manque d'accroche.");
+if (summary.clickRate >= 5) perfRecos.push('Bon CTR ! Teste des variantes de CTA pour encore progresser.');
+if (deltaViews.pos === false && deltaViews.val > 10) perfRecos.push('Trafic en baisse vs période préc. — relance une campagne ou poste plus fréquemment.');
+if (channels.length <= 1) perfRecos.push("Diversifie tes sources : tu dépends d'un seul canal, risqué.");
+if (leads === 0 && summary.totalClicks > 20) perfRecos.push('Beaucoup de clics mais 0 lead — ajoute un formulaire ou une offre directe.');
+if (revenue > 0 && convRate < 10) perfRecos.push(`Taux de conv. ${convRate.toFixed(1)}% — teste une page de vente plus courte ou une offre à durée limitée.`);
+if (perfRecos.length < 3) perfRecos.push('Continue sur cette lancée — ta cohérence est ta meilleure arme de croissance.');
+const topRecos = perfRecos.slice(0, 3);
+
+// ── v5: PREDICTIONS (linear regression on daily views last 7d) ───────────────
+const last7Views  = chartViews.slice(-7);
+const last7Clicks = chartClicks.slice(-7);
+function linReg(data: number[]): { slope: number; intercept: number } {
+  const n = data.length;
+  if (n < 2) return { slope: 0, intercept: data[0] ?? 0 };
+  const sumX = data.reduce((s, _, i) => s + i, 0);
+  const sumY = data.reduce((s, v) => s + v, 0);
+  const sumXY = data.reduce((s, v, i) => s + i * v, 0);
+  const sumX2 = data.reduce((s, _, i) => s + i * i, 0);
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+  return { slope, intercept };
+}
+const regViews  = linReg(last7Views);
+const regClicks = linReg(last7Clicks);
+// Project 30 days ahead
+const proj30Views  = Math.max(0, Math.round((regViews.intercept  + regViews.slope  * (last7Views.length  + 22)) * 30));
+const proj30Clicks = Math.max(0, Math.round((regClicks.intercept + regClicks.slope * (last7Clicks.length + 22)) * 30));
+const proj30Revenue = revenue > 0 && days > 0 ? Math.round((revenue / days) * 30) : 0;
+// Sparkline for predictions (extended)
+function sparklinePred(data: number[], slope: number, intercept: number, color: string): string {
+  const W = 200, H = 36;
+  const extended = [...data];
+  for (let i = data.length; i < data.length + 14; i++) {
+    extended.push(Math.max(0, intercept + slope * i));
+  }
+  const max = Math.max(...extended, 1);
+  const pts = data.map((v, i) => `${((i / (extended.length - 1)) * W).toFixed(1)},${(H - (v / max) * H).toFixed(1)}`).join(' ');
+  const predPts = extended.slice(data.length - 1).map((v, i) => `${(((data.length - 1 + i) / (extended.length - 1)) * W).toFixed(1)},${(H - (v / max) * H).toFixed(1)}`).join(' ');
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" fill="none"><polyline points="${pts}" stroke="${color}" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/><polyline points="${predPts}" stroke="${color}" stroke-width="1.5" stroke-dasharray="4 3" stroke-linecap="round" opacity="0.5"/></svg>`;
+}
+const predSparkViews  = sparklinePred(last7Views,  regViews.slope,  regViews.intercept,  '#00ff9d');
+const predSparkClicks = sparklinePred(last7Clicks, regClicks.slope, regClicks.intercept, '#38bdf8');
+
+// ── v5: HEATMAP data for blocks by position ───────────────────────────────────
+const heatmapBlocks = blocks.map((b, i) => {
+  const found    = topBlocks.find(tb => tb.block_id === b.id);
+  const clicks   = found?.clicks ?? 0;
+  const maxClicks = topBlocks[0]?.clicks ?? 1;
+  const intensity = maxClicks > 0 ? clicks / maxClicks : 0;
+  return { id: b.id, title: b.title || 'Untitled', type: b.type, clicks, intensity, position: i + 1, active: b.active };
+});
+
 const exportedChart    = { labels: chartLabels, views: chartViews, clicks: chartClicks, rates: chartRates };
 const exportedDevices  = deviceData;
 const exportedDays     = days;
@@ -296,7 +400,6 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
   .scrollbar-none::-webkit-scrollbar { display:none; }
   .d-0{animation-delay:0ms} .d-1{animation-delay:60ms} .d-2{animation-delay:120ms}
   .d-3{animation-delay:180ms} .d-4{animation-delay:240ms} .d-5{animation-delay:300ms}
-  /* v4: channel badges */
   .ch-google  { background:rgba(66,133,244,.12);  color:#60a5fa; border:.5px solid rgba(66,133,244,.2); }
   .ch-meta    { background:rgba(24,119,242,.12);   color:#818cf8; border:.5px solid rgba(99,102,241,.2); }
   .ch-tiktok  { background:rgba(0,0,0,.3);         color:#f0abfc; border:.5px solid rgba(240,171,252,.2); }
@@ -305,9 +408,25 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
   .ch-infl    { background:rgba(251,113,133,.1);   color:#fb7185; border:.5px solid rgba(251,113,133,.2); }
   .ch-direct  { background:rgba(255,255,255,.06);  color:#9ca3af; border:.5px solid rgba(255,255,255,.1); }
   .ch-other   { background:rgba(255,255,255,.04);  color:#6b7280; border:.5px solid rgba(255,255,255,.08); }
-  /* v4: plan badges */
   .badge-creator { display:inline-flex;align-items:center;gap:2px;padding:1px 5px;border-radius:5px;font-size:9px;font-weight:700;background:rgba(0,255,157,.12);color:#00ff9d;border:1px solid rgba(0,255,157,.3); }
   .badge-pro     { display:inline-flex;align-items:center;gap:2px;padding:1px 5px;border-radius:5px;font-size:9px;font-weight:700;background:rgba(168,85,247,.15);color:#c084fc;border:1px solid rgba(168,85,247,.35); }
+  /* Delta badges */
+  .delta-pos { color:#00ff9d; font-size:11px; font-weight:700; }
+  .delta-neg { color:#f87171; font-size:11px; font-weight:700; }
+  .delta-neu { color:rgba(255,255,255,.25); font-size:11px; }
+  /* Goals bar */
+  .goal-bar-fill { height:100%; border-radius:9999px; transition:width .8s cubic-bezier(.16,1,.3,1); }
+  /* @media print */
+  @media print {
+    @page { margin:16mm; size:A4; }
+    .no-print, #export-csv-btn, #export-pdf-btn, #edit-goals-btn,
+    #map-container, [id^="map-zoom"], #map-reset { display:none!important; }
+    .glass { background:#f8f8f8!important; border:1px solid #e0e0e0!important; box-shadow:none!important; }
+    .kpi-card::before { display:none; }
+    .bar-fill,.fade-slide { animation:none!important; opacity:1!important; transform:none!important; }
+    .insight-panel { display:block!important; }
+    .pro-overlay { display:none!important; }
+  }
 </style>
 
   <!-- HEADER -->
@@ -335,16 +454,20 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
           </a>
         ))}
       </div>
-      <button id="export-csv-btn" class="flex items-center gap-1.5 px-3 py-2 glass border border-white/10 rounded-xl text-xs text-gray-400 hover:text-white hover:border-white/20 transition-all">
+      <button id="export-csv-btn" class="no-print flex items-center gap-1.5 px-3 py-2 glass border border-white/10 rounded-xl text-xs text-gray-400 hover:text-white hover:border-white/20 transition-all">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-        Export CSV
+        CSV
+      </button>
+      <button id="export-pdf-btn" class="no-print flex items-center gap-1.5 px-3 py-2 glass border border-white/10 rounded-xl text-xs text-gray-400 hover:text-white hover:border-white/20 transition-all">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+        PDF
       </button>
     </div>
   </div>
 
   {rpcError && <Alert variant="danger" title="Données indisponibles"><p>{rpcError}</p></Alert>}
 
-  <!-- KPI ROW: v3 (4 cards) + v4 (Leads + Revenue) -->
+  <!-- KPI ROW: 4 v3 cards + Leads + Revenue + delta badges -->
   <div class="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-6">
 
     <div class="kpi-card fade-slide d-0 p-5 glass rounded-2xl border border-white/8 cursor-default" style="--glow:#00ff9d">
@@ -356,7 +479,10 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
       </div>
       <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">{summary.totalViews.toLocaleString('fr-FR')}</div>
       <p class="text-xs text-gray-500 mt-1.5 font-medium">Vues totales</p>
-      <p class="text-xs text-gray-600 mt-0.5">{summary.avgPerDay.toLocaleString('fr-FR')}/j en moy.</p>
+      <div class="flex items-center justify-between mt-1">
+        <p class="text-xs text-gray-600">{summary.avgPerDay}/j moy.</p>
+        {deltaViews.neutral ? <span class="delta-neu">—</span> : deltaViews.pos ? <span class="delta-pos">↑ {deltaViews.val}%</span> : <span class="delta-neg">↓ {deltaViews.val}%</span>}
+      </div>
     </div>
 
     <div class="kpi-card fade-slide d-1 p-5 glass rounded-2xl border border-white/8" style="--glow:#00aaff">
@@ -364,11 +490,14 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
         <div class="w-8 h-8 rounded-lg bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center">
           <svg class="w-3.5 h-3.5 text-neon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
         </div>
-        {summary.totalViews > 0 && <span class="text-xs text-neon-blue/70 bg-neon-blue/8 px-2 py-0.5 rounded-full border border-neon-blue/15 font-mono mt-1">{Math.round((summary.uniqueVisitors / summary.totalViews) * 100)}%</span>}
+        {summary.totalViews > 0 && <span class="text-xs text-neon-blue/70 bg-neon-blue/8 px-2 py-0.5 rounded-full border border-neon-blue/15 font-mono mt-1">{Math.round((summary.uniqueVisitors/summary.totalViews)*100)}%</span>}
       </div>
       <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">{summary.uniqueVisitors.toLocaleString('fr-FR')}</div>
       <p class="text-xs text-gray-500 mt-1.5 font-medium">Visiteurs uniques</p>
-      <p class="text-xs text-gray-600 mt-0.5">{summary.cleanViews.toLocaleString('fr-FR')} vues nettes</p>
+      <div class="flex items-center justify-between mt-1">
+        <p class="text-xs text-gray-600">{summary.cleanViews.toLocaleString('fr-FR')} nettes</p>
+        {deltaUniques.neutral ? <span class="delta-neu">—</span> : deltaUniques.pos ? <span class="delta-pos">↑ {deltaUniques.val}%</span> : <span class="delta-neg">↓ {deltaUniques.val}%</span>}
+      </div>
     </div>
 
     <div class="kpi-card fade-slide d-2 p-5 glass rounded-2xl border border-white/8" style="--glow:#bf00ff">
@@ -380,7 +509,10 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
       </div>
       <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">{summary.totalClicks.toLocaleString('fr-FR')}</div>
       <p class="text-xs text-gray-500 mt-1.5 font-medium">Clics sur liens</p>
-      <p class="text-xs text-gray-600 mt-0.5">sur {blocks.filter((b) => b.active).length} blocs actifs</p>
+      <div class="flex items-center justify-between mt-1">
+        <p class="text-xs text-gray-600">CTR {summary.clickRate.toFixed(1)}%</p>
+        {deltaClicks.neutral ? <span class="delta-neu">—</span> : deltaClicks.pos ? <span class="delta-pos">↑ {deltaClicks.val}%</span> : <span class="delta-neg">↓ {deltaClicks.val}%</span>}
+      </div>
     </div>
 
     <div class="kpi-card fade-slide d-3 p-5 glass rounded-2xl border border-white/8" style="--glow:#ff6b6b">
@@ -394,10 +526,9 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
       </div>
       <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">{summary.clickRate.toFixed(1)}<span class="text-lg text-gray-400">%</span></div>
       <p class="text-xs text-gray-500 mt-1.5 font-medium">Taux de clic</p>
-      <p class="text-xs text-gray-600 mt-0.5">clics / vues</p>
+      <p class="text-xs text-gray-600 mt-1">clics / vues</p>
     </div>
 
-    <!-- v4: Leads -->
     <div class="kpi-card fade-slide d-4 p-5 glass rounded-2xl border border-white/8 cursor-default" style="--glow:#f59e0b">
       <div class="flex items-start justify-between mb-4">
         <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2)">
@@ -407,10 +538,12 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
       </div>
       <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">{leads.toLocaleString('fr-FR')}</div>
       <p class="text-xs text-gray-500 mt-1.5 font-medium">Leads</p>
-      <p class="text-xs text-gray-600 mt-0.5">{sales} vente{sales !== 1 ? 's' : ''} · {convRate.toFixed(1)}% conv.</p>
+      <div class="flex items-center justify-between mt-1">
+        <p class="text-xs text-gray-600">{sales} ventes · {convRate.toFixed(1)}%</p>
+        {deltaLeads.neutral ? <span class="delta-neu">—</span> : deltaLeads.pos ? <span class="delta-pos">↑ {deltaLeads.val}%</span> : <span class="delta-neg">↓ {deltaLeads.val}%</span>}
+      </div>
     </div>
 
-    <!-- v4: Revenue -->
     <div class="kpi-card fade-slide d-5 p-5 glass rounded-2xl border border-white/8 cursor-default" style="--glow:#a78bfa">
       <div class="flex items-start justify-between mb-4">
         <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2)">
@@ -419,36 +552,34 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
         <div set:html={revenueSparkline} class="opacity-60 mt-1"></div>
       </div>
       <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">
-        {revenue > 0 ? revenue.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }) : '—'}
+        {revenue > 0 ? revenue.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : '—'}
       </div>
       <p class="text-xs text-gray-500 mt-1.5 font-medium">Revenue</p>
-      <p class="text-xs text-gray-600 mt-0.5">{sales > 0 ? `CPA ${(revenue / sales).toFixed(0)}€` : 'Aucune vente'}</p>
+      <div class="flex items-center justify-between mt-1">
+        <p class="text-xs text-gray-600">{sales > 0 ? `CPA ${(revenue/sales).toFixed(0)}€` : 'Aucune vente'}</p>
+        {deltaRevenue.neutral ? <span class="delta-neu">—</span> : deltaRevenue.pos ? <span class="delta-pos">↑ {deltaRevenue.val}%</span> : <span class="delta-neg">↓ {deltaRevenue.val}%</span>}
+      </div>
     </div>
 
   </div>
 
-  <!-- v4: FUNNEL -->
+  <!-- FUNNEL -->
   <div class="fade-slide d-1 p-5 glass rounded-2xl border border-white/8 mb-6">
     <div class="flex items-center justify-between mb-5">
-      <div>
-        <h3 class="text-sm font-semibold text-white">Funnel de conversion</h3>
-        <p class="text-xs text-gray-500 mt-0.5">De la visite à la vente · {days}j</p>
-      </div>
+      <div><h3 class="text-sm font-semibold text-white">Funnel de conversion</h3><p class="text-xs text-gray-500 mt-0.5">De la visite à la vente · {days}j</p></div>
     </div>
     <div class="space-y-3">
       {funnelSteps.map((step, i) => {
-        const prev     = i > 0 ? funnelSteps[i - 1].value : step.value;
-        const dropPct  = prev > 0 && i > 0 ? (1 - step.value / prev) * 100 : 0;
-        const widthPct = funnelSteps[0].value > 0 ? (step.value / funnelSteps[0].value) * 100 : 0;
+        const prev     = i > 0 ? funnelSteps[i-1].value : step.value;
+        const dropPct  = prev > 0 && i > 0 ? (1 - step.value/prev)*100 : 0;
+        const widthPct = funnelSteps[0].value > 0 ? (step.value/funnelSteps[0].value)*100 : 0;
         return (
           <div>
             <div class="flex items-center justify-between mb-1.5">
               <div class="flex items-center gap-2.5">
-                <div class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shrink-0" style={`background:${step.color}18;border:.5px solid ${step.color}35;color:${step.color}`}>{i + 1}</div>
+                <div class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shrink-0" style={`background:${step.color}18;border:.5px solid ${step.color}35;color:${step.color}`}>{i+1}</div>
                 <span class="text-sm font-semibold text-white">{step.label}</span>
-                {i > 0 && dropPct > 0 && (
-                  <span class="text-xs px-2 py-0.5 rounded-full" style="color:rgba(248,113,113,.7);background:rgba(248,113,113,.08);border:.5px solid rgba(248,113,113,.15)">↓ {dropPct.toFixed(0)}% drop</span>
-                )}
+                {i > 0 && dropPct > 0 && <span class="text-xs px-2 py-0.5 rounded-full" style="color:rgba(248,113,113,.7);background:rgba(248,113,113,.08);border:.5px solid rgba(248,113,113,.15)">↓ {dropPct.toFixed(0)}% drop</span>}
               </div>
               <span class="text-sm font-bold tabular-nums" style={`color:${step.color}`}>{step.value.toLocaleString('fr-FR')}</span>
             </div>
@@ -461,7 +592,111 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
     </div>
   </div>
 
-  <!-- CHART + DEVICES (v3 intact) -->
+  <!-- SCORE IA + PRÉDICTIONS + OBJECTIFS -->
+  <div class="grid lg:grid-cols-3 gap-4 mb-6">
+
+    <!-- Score IA -->
+    <div class="fade-slide d-2 p-5 glass rounded-2xl border border-white/8 flex flex-col gap-4">
+      <div class="flex items-center justify-between">
+        <div><h3 class="text-sm font-semibold text-white">Score de performance</h3><p class="text-xs text-gray-500 mt-0.5">Analyse · {days}j</p></div>
+        <div class="flex flex-col items-center justify-center w-14 h-14 rounded-2xl border-2" style={`border-color:${perfColor}40;background:${perfColor}10`}>
+          <span class="text-xl font-black" style={`color:${perfColor}`}>{perfGrade}</span>
+          <span class="text-xs font-bold tabular-nums" style={`color:${perfColor};opacity:.7`}>{perfScore}</span>
+        </div>
+      </div>
+      <div>
+        <div class="flex justify-between mb-1.5 text-xs"><span class="text-gray-500">Score global</span><span class="font-bold tabular-nums" style={`color:${perfColor}`}>{perfScore}/100</span></div>
+        <div class="bar-track" style="height:6px"><div class="bar-fill" style={`width:${perfScore}%;background:${perfColor};animation-delay:200ms`}></div></div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        {[
+          { label:'CTR',        val:scoreCTR },
+          { label:'Croissance', val:scoreGrowth },
+          { label:'Conversion', val:scoreConversion },
+          { label:'Revenue',    val:scoreRevenue },
+        ].map(s => (
+          <div class="p-2 rounded-xl" style="background:rgba(255,255,255,.04)">
+            <div class="flex justify-between text-xs mb-1"><span class="text-gray-500">{s.label}</span><span class="text-white font-semibold">{s.val}/25</span></div>
+            <div class="bar-track" style="height:3px"><div class="bar-fill" style={`width:${(s.val/25)*100}%;background:${perfColor};opacity:.7`}></div></div>
+          </div>
+        ))}
+      </div>
+      <div class="space-y-2 pt-2 border-t border-white/6">
+        <p class="text-xs text-gray-600 uppercase tracking-widest font-medium">Recommandations</p>
+        {topRecos.map(r => (
+          <div class="flex gap-2 text-xs text-gray-400 leading-relaxed">
+            <span class="shrink-0 mt-0.5" style={`color:${perfColor}`}>→</span><span>{r}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <!-- Prédictions 30j -->
+    <div class="fade-slide d-3 p-5 glass rounded-2xl border border-white/8 flex flex-col gap-4">
+      <div><h3 class="text-sm font-semibold text-white">Prédictions 30 jours</h3><p class="text-xs text-gray-500 mt-0.5">Tendance · ligne pleine = réel · tirets = projection</p></div>
+      {proj30Views === 0 && proj30Clicks === 0 ? (
+        <div class="flex-1 flex items-center justify-center text-gray-700 text-sm text-center py-8">Pas assez de données<br/>(min 3 jours d'historique)</div>
+      ) : (
+        <div class="space-y-5">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs text-gray-500">Vues estimées / 30j</span>
+              <span class="text-sm font-bold tabular-nums" style="color:#00ff9d">{proj30Views.toLocaleString('fr-FR')}</span>
+            </div>
+            <div set:html={predSparkViews}></div>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs text-gray-500">Clics estimés / 30j</span>
+              <span class="text-sm font-bold tabular-nums" style="color:#38bdf8">{proj30Clicks.toLocaleString('fr-FR')}</span>
+            </div>
+            <div set:html={predSparkClicks}></div>
+          </div>
+          {proj30Revenue > 0 && (
+            <div class="p-3 rounded-xl border" style="background:rgba(167,139,250,.06);border-color:rgba(167,139,250,.15)">
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-500">Revenue projeté / 30j</span>
+                <span class="text-sm font-bold" style="color:#a78bfa">{proj30Revenue.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0})}</span>
+              </div>
+              <p class="text-xs text-gray-700 mt-1">basé sur le rythme actuel</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+
+    <!-- Objectifs (Goals) -->
+    <div class="fade-slide d-4 p-5 glass rounded-2xl border border-white/8 flex flex-col gap-3">
+      <div class="flex items-center justify-between">
+        <div><h3 class="text-sm font-semibold text-white">Objectifs</h3><p class="text-xs text-gray-500 mt-0.5">Cibles pour la période</p></div>
+        <button id="edit-goals-btn" class="no-print text-xs text-gray-500 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-white/8">Modifier</button>
+      </div>
+      <div id="goals-list" class="space-y-3 flex-1">
+        <div class="flex items-center justify-center h-20 text-gray-700 text-xs text-center">Chargement…</div>
+      </div>
+      <div id="goals-editor" class="hidden space-y-3 pt-3 border-t border-white/6">
+        <p class="text-xs text-gray-600 uppercase tracking-widest font-medium">Définir tes objectifs</p>
+        {[
+          { id:'goal-views',   label:'Vues cibles',    ph:'ex: 5000'  },
+          { id:'goal-clicks',  label:'Clics cibles',   ph:'ex: 500'   },
+          { id:'goal-leads',   label:'Leads cibles',   ph:'ex: 50'    },
+          { id:'goal-revenue', label:'Revenue cible €', ph:'ex: 1000' },
+        ].map(g => (
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-gray-500 w-28 shrink-0">{g.label}</label>
+            <input type="number" id={g.id} placeholder={g.ph} min="0"
+              class="flex-1 px-3 py-1.5 glass border border-white/10 rounded-lg text-white text-xs focus:border-neon-green/40 focus:outline-none" />
+          </div>
+        ))}
+        <button id="save-goals-btn" class="w-full py-2 rounded-xl text-xs font-bold transition-all" style="background:rgba(0,255,157,.1);border:1px solid rgba(0,255,157,.25);color:#00ff9d">
+          Sauvegarder
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- TRAFIC + DEVICES -->
   <div class="bento bento-main mb-6">
     <div class="fade-slide d-2 p-5 glass rounded-2xl border border-white/8">
       <div class="flex items-center justify-between mb-5">
@@ -489,7 +724,7 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
               { key:'tablet',  label:'Tablet',  color:'#00aaff', icon:'M12 18h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
             ].map(dev => {
               const val = deviceData[dev.key as keyof typeof deviceData];
-              const pct = deviceTotal > 0 ? Math.round((val / deviceTotal) * 100) : 0;
+              const pct = deviceTotal > 0 ? Math.round((val/deviceTotal)*100) : 0;
               if (val === 0) return null;
               return (
                 <div>
@@ -509,14 +744,14 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
       </div>
       {chartLabels.length > 0 && (
         <div class="fade-slide d-4 p-5 glass rounded-2xl border border-white/8">
-          <h3 class="text-sm font-semibold text-white mb-1">Taux de clic / jour</h3>
+          <h3 class="text-sm font-semibold text-white mb-1">CTR / jour</h3>
           <canvas id="rate-chart" style="max-height:80px;width:100%"></canvas>
         </div>
       )}
     </div>
   </div>
 
-  <!-- v4: ATTRIBUTION PAR CANAL -->
+  <!-- ATTRIBUTION PAR CANAL -->
   <div class="fade-slide d-2 p-5 glass rounded-2xl border border-white/8 mb-6">
     <div class="flex items-center justify-between mb-5">
       <div><h3 class="text-sm font-semibold text-white">Attribution par canal</h3><p class="text-xs text-gray-500 mt-0.5">Organic · Paid · Email · Influenceurs</p></div>
@@ -534,8 +769,8 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
           <span class="col-span-3 text-xs text-gray-600 font-medium uppercase tracking-wider text-right">Part</span>
         </div>
         {channels.map((ch, i) => {
-          const sharePct = totalChViews > 0 ? Math.round((ch.views / totalChViews) * 100) : 0;
-          const chClass  = ch.name.includes('Google') ? 'ch-google' : ch.name.includes('Meta') ? 'ch-meta' : ch.name.includes('TikTok') ? 'ch-tiktok' : (ch.name.includes('Organic') || ch.name === 'SEO') ? 'ch-organic' : ch.name === 'Email' ? 'ch-email' : ch.name === 'Influenceurs' ? 'ch-infl' : ch.name === 'Direct' ? 'ch-direct' : 'ch-other';
+          const sharePct = totalChViews > 0 ? Math.round((ch.views/totalChViews)*100) : 0;
+          const chClass  = ch.name.includes('Google') ? 'ch-google' : ch.name.includes('Meta') ? 'ch-meta' : ch.name.includes('TikTok') ? 'ch-tiktok' : (ch.name.includes('Organic')||ch.name==='SEO') ? 'ch-organic' : ch.name==='Email' ? 'ch-email' : ch.name==='Influenceurs' ? 'ch-infl' : ch.name==='Direct' ? 'ch-direct' : 'ch-other';
           return (
             <div class="grid grid-cols-12 gap-2 items-center px-3 py-2.5 rounded-xl hover:bg-white/3 transition-colors">
               <div class="col-span-3"><span class={`text-xs font-bold px-2 py-0.5 rounded-full ${chClass}`}>{ch.name}</span></div>
@@ -559,21 +794,22 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
     )}
   </div>
 
-  <!-- INSIGHTS TABBED (v3 intact) -->
+  <!-- INSIGHTS TABBED -->
   <div class="fade-slide d-3 p-5 glass rounded-2xl border border-white/8 mb-6">
     <div class="flex items-center gap-1 mb-6 border-b border-white/8 pb-3 -mt-1 overflow-x-auto scrollbar-none">
       {[
         { id:'geo',     label:'Géographie', icon:'M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064' },
         { id:'sources', label:'Sources',    icon:'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.1-1.1m-.757-4.9a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1' },
-        { id:'blocks',  label:'Top Blocks', icon:'M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5' },
+        { id:'blocks',  label:'Heatmap Blocs', icon:'M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5' },
       ].map((tab, i) => (
-        <button class={`insight-tab flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${i === 0 ? 'text-white bg-white/8' : 'text-gray-500 hover:text-gray-300'}`} data-tab={tab.id}>
+        <button class={`insight-tab flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${i===0?'text-white bg-white/8':'text-gray-500 hover:text-gray-300'}`} data-tab={tab.id}>
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={tab.icon}/></svg>
           {tab.label}
         </button>
       ))}
     </div>
 
+    <!-- Geo -->
     <div class="insight-panel active" id="panel-geo">
       {topCountries.length === 0 ? (
         <div class="flex flex-col items-center justify-center py-16 gap-3 text-gray-600">
@@ -587,26 +823,28 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
             <svg id="world-map" style="width:100%;height:340px;display:block;opacity:0;transition:opacity 0.5s;cursor:grab;"></svg>
             <div id="map-tooltip" class="pointer-events-none absolute hidden z-20 bg-black/95 border border-neon-green/25 text-white text-xs px-3 py-2 rounded-lg backdrop-blur-sm shadow-xl whitespace-nowrap"></div>
             <div class="absolute bottom-3 right-3 z-20 flex flex-col gap-1">
-              <button id="map-zoom-in"  class="w-7 h-7 rounded-lg glass border border-white/10 text-gray-400 hover:text-neon-green hover:border-neon-green/30 transition-all flex items-center justify-center text-base leading-none" title="Zoom +">+</button>
-              <button id="map-zoom-out" class="w-7 h-7 rounded-lg glass border border-white/10 text-gray-400 hover:text-neon-green hover:border-neon-green/30 transition-all flex items-center justify-center text-base leading-none" title="Zoom −">−</button>
-              <button id="map-reset"    class="w-7 h-7 rounded-lg glass border border-white/10 text-gray-400 hover:text-neon-green hover:border-neon-green/30 transition-all flex items-center justify-center" title="Reset"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button>
+              <button id="map-zoom-in"  class="w-7 h-7 rounded-lg glass border border-white/10 text-gray-400 hover:text-neon-green hover:border-neon-green/30 transition-all flex items-center justify-center text-base leading-none">+</button>
+              <button id="map-zoom-out" class="w-7 h-7 rounded-lg glass border border-white/10 text-gray-400 hover:text-neon-green hover:border-neon-green/30 transition-all flex items-center justify-center text-base leading-none">−</button>
+              <button id="map-reset"    class="w-7 h-7 rounded-lg glass border border-white/10 text-gray-400 hover:text-neon-green hover:border-neon-green/30 transition-all flex items-center justify-center">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+              </button>
             </div>
             <div class="absolute bottom-3 left-3 text-xs text-gray-700 select-none">Scroll · Glisser</div>
           </div>
           <div class="grid sm:grid-cols-2 gap-2">
-            {topCountries.slice(0, 8).map((ctry, i) => {
-              const pct = Math.round((ctry.views / maxCountryViews) * 100);
+            {topCountries.slice(0,8).map((ctry, i) => {
+              const pct = Math.round((ctry.views/maxCountryViews)*100);
               return (
                 <div class="country-row flex items-center gap-2.5 px-3 py-2 rounded-xl border border-white/5 hover:border-neon-green/20 hover:bg-neon-green/3 transition-all cursor-default group" data-iso={ctry.country}>
                   <span class="text-base leading-none shrink-0 w-6 text-center">{countryFlag(ctry.country ?? '')}</span>
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center justify-between gap-2 mb-1">
-                      <span class="text-xs text-gray-300 font-medium group-hover:text-neon-green transition-colors truncate">{ctry.country || '??'}</span>
+                      <span class="text-xs text-gray-300 font-medium group-hover:text-neon-green transition-colors truncate">{ctry.country||'??'}</span>
                       <span class="text-xs text-gray-600 tabular-nums font-mono shrink-0">{ctry.views.toLocaleString('fr-FR')}</span>
                     </div>
                     <div class="bar-track"><div class="bar-fill" style={`width:${pct}%;background:linear-gradient(90deg,#00ff9d,#00ff9d40);animation-delay:${i*50}ms`}></div></div>
                   </div>
-                  <span class="text-xs shrink-0 w-5 text-right opacity-50">{i < 3 ? ['🥇','🥈','🥉'][i] : `#${i+1}`}</span>
+                  <span class="text-xs shrink-0 w-5 text-right opacity-50">{i<3?['🥇','🥈','🥉'][i]:`#${i+1}`}</span>
                 </div>
               );
             })}
@@ -615,18 +853,19 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
       )}
     </div>
 
+    <!-- Sources -->
     <div class="insight-panel" id="panel-sources">
       {aggregatedReferrers.length === 0 ? (
         <p class="text-sm text-gray-600 text-center py-8">Aucune source identifiée</p>
       ) : (
         <div class="space-y-3">
           {aggregatedReferrers.map((r, i) => {
-            const pct   = Math.round((r.views / maxReferrerViews) * 100);
+            const pct   = Math.round((r.views/maxReferrerViews)*100);
             const color = CAT_COLORS[r.category] ?? '#9ca3af';
             const label = CAT_LABELS[r.category] ?? r.category;
             return (
               <div class="flex items-center gap-3">
-                <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold text-gray-600 border border-white/8 bg-white/3">{i + 1}</div>
+                <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold text-gray-600 border border-white/8 bg-white/3">{i+1}</div>
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center justify-between mb-1">
                     <div class="flex items-center gap-2 min-w-0">
@@ -635,7 +874,7 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
                     </div>
                     <span class="text-xs text-gray-500 tabular-nums font-mono ml-2 shrink-0">{r.views.toLocaleString('fr-FR')}</span>
                   </div>
-                  <div class="bar-track"><div class="bar-fill" style={`width:${pct}%;background:${color}70;animation-delay:${i * 60}ms`}></div></div>
+                  <div class="bar-track"><div class="bar-fill" style={`width:${pct}%;background:${color}70;animation-delay:${i*60}ms`}></div></div>
                 </div>
               </div>
             );
@@ -644,47 +883,67 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
       )}
     </div>
 
+    <!-- Heatmap Blocs -->
     <div class="insight-panel" id="panel-blocks">
-      {topBlocks.length === 0 ? (
+      {heatmapBlocks.length === 0 ? (
         <div class="text-center py-8">
           <p class="text-sm text-gray-600 mb-2">Aucun clic enregistré</p>
           <a href="/dashboard/blocks" class="text-xs text-neon-green hover:underline">Ajouter des blocs →</a>
         </div>
       ) : (
-        <div class="space-y-2">
-          {topBlocks.map((block, i) => {
-            const ctr     = summary.totalViews > 0 ? ((block.clicks / summary.totalViews) * 100).toFixed(1) : '0.0';
-            const barPct  = Math.round((block.clicks / (topBlocks[0]?.clicks ?? 1)) * 100);
-            const isFirst = i === 0;
-            return (
-              <div class={`flex items-center gap-3 p-3 rounded-xl border transition-all ${isFirst ? 'border-neon-green/20 bg-neon-green/3' : 'border-white/5 hover:border-white/10'}`}>
-                <div class={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 border ${i < 3 ? ['rank-1','rank-2','rank-3'][i] : 'text-gray-600 bg-white/3 border-white/8'}`}>{i + 1}</div>
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2 mb-1">
-                    <Badge variant="default" size="sm">{block.type}</Badge>
-                    <span class="text-sm text-white font-medium truncate">{block.title || 'Untitled'}</span>
+        <div>
+          <p class="text-xs text-gray-600 uppercase tracking-widest font-medium mb-3">Heatmap clics par position</p>
+          <div class="grid grid-cols-1 gap-1.5 mb-4">
+            {heatmapBlocks.map((block, i) => {
+              const ctr   = summary.totalViews > 0 ? ((block.clicks/summary.totalViews)*100).toFixed(1) : '0.0';
+              const alpha = block.intensity > 0 ? Math.max(0.06, block.intensity*0.85) : 0.03;
+              const bdr   = block.intensity > 0.5 ? `rgba(0,255,157,${Math.min(0.55,block.intensity)})` : 'rgba(255,255,255,.06)';
+              const heat  = block.intensity >= 0.8 ? '🔥' : block.intensity >= 0.5 ? '↑' : '';
+              return (
+                <div class="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all" style={`background:rgba(0,255,157,${alpha});border:.5px solid ${bdr}`}>
+                  <div class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 border"
+                    style={block.intensity>0.5?'background:rgba(0,255,157,.15);border-color:rgba(0,255,157,.3);color:#00ff9d':'background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:#6b7280'}>
+                    {block.position}
                   </div>
-                  <div class="bar-track"><div class="bar-fill" style={`width:${barPct}%;background:${isFirst ? '#00ff9d' : '#00ff9d50'};animation-delay:${i * 50}ms`}></div></div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-1.5">
+                      <Badge variant="default" size="sm">{block.type}</Badge>
+                      <span class="text-sm font-medium truncate" style={`color:${block.intensity>0?'#fff':'rgba(255,255,255,.4)'}`}>{block.title}</span>
+                      {heat && <span class="text-xs shrink-0">{heat}</span>}
+                    </div>
+                    <div class="relative h-2 rounded-full overflow-hidden" style="background:rgba(255,255,255,.04)">
+                      <div class="h-full rounded-full" style={`width:${(block.intensity*100).toFixed(1)}%;background:linear-gradient(90deg,rgba(0,255,157,${Math.max(.3,block.intensity)}),rgba(0,255,157,${Math.max(.1,block.intensity*.4)}));animation:barGrow .9s cubic-bezier(.16,1,.3,1) both;animation-delay:${i*60}ms`}></div>
+                    </div>
+                  </div>
+                  <div class="text-right shrink-0 pl-1">
+                    <div class="text-sm font-bold tabular-nums" style={`color:${block.intensity>.5?'#00ff9d':block.intensity>0?'#fff':'rgba(255,255,255,.3)'}`}>{block.clicks.toLocaleString('fr-FR')}</div>
+                    <div class="text-xs text-gray-600">{ctr}%</div>
+                  </div>
                 </div>
-                <div class="text-right shrink-0 pl-2">
-                  <div class={`text-sm font-bold tabular-nums ${isFirst ? 'text-neon-green' : 'text-white'}`}>{block.clicks.toLocaleString('fr-FR')}</div>
-                  <div class="text-xs text-gray-600">{ctr}%</div>
-                </div>
+              );
+            })}
+          </div>
+          <div class="flex items-center gap-3 pt-3 border-t border-white/6">
+            <span class="text-xs text-gray-700">Intensité :</span>
+            {[.1,.3,.6,.85,1].map(v => (
+              <div class="flex items-center gap-1">
+                <div class="w-4 h-4 rounded" style={`background:rgba(0,255,157,${Math.max(.06,v*.85)})`}></div>
+                <span class="text-xs text-gray-700">{Math.round(v*100)}%</span>
               </div>
-            );
-          })}
+            ))}
+          </div>
         </div>
       )}
     </div>
   </div>
 
-  <!-- v4: SHORT URL TRACKER (Creator+) -->
+  <!-- SHORT URL TRACKER (Creator+) -->
   {isCreator && (
     <div class="fade-slide d-3 p-5 glass rounded-2xl border border-white/8 mb-6">
       <div class="flex items-center justify-between mb-5">
         <div>
           <h3 class="text-sm font-semibold text-white flex items-center gap-2">Short URL Tracker <span class="badge-creator">👑 Creator</span></h3>
-          <p class="text-xs text-gray-500 mt-0.5">Performance de chaque lien court · {shortUrls.length} lien{shortUrls.length !== 1 ? 's' : ''}</p>
+          <p class="text-xs text-gray-500 mt-0.5">Performance de chaque lien court · {shortUrls.length} lien{shortUrls.length!==1?'s':''}</p>
         </div>
         <a href="/dashboard/links" class="text-xs text-neon-green/70 hover:text-neon-green transition-colors">Gérer →</a>
       </div>
@@ -708,19 +967,19 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
             <tbody>
               {shortUrls.map((link, i) => {
                 const maxC   = shortUrls[0]?.click_count ?? 1;
-                const barPct = maxC > 0 ? Math.round((link.click_count / maxC) * 100) : 0;
+                const barPct = maxC > 0 ? Math.round((link.click_count/maxC)*100) : 0;
                 return (
                   <tr class="border-b border-white/4 last:border-0 hover:bg-white/2 transition-colors">
                     <td class="py-3 px-2">
                       <div class="flex items-center gap-2">
-                        {i === 0 && <span class="text-yellow-400 text-xs shrink-0">★</span>}
+                        {i===0 && <span class="text-yellow-400 text-xs shrink-0">★</span>}
                         <span class="font-mono text-neon-green text-xs font-semibold">/{link.slug}</span>
                         {link.title && <span class="text-gray-500 text-xs truncate max-w-[90px] hidden sm:inline">{link.title}</span>}
                       </div>
                     </td>
                     <td class="py-3 px-2 hidden sm:table-cell"><span class="text-gray-500 text-xs">{link.target_url?.replace(/^https?:\/\/(www\.)?/,'').slice(0,36)}</span></td>
-                    <td class="py-3 px-2 text-right"><span class={`font-semibold tabular-nums ${link.click_count > 0 ? 'text-neon-green' : 'text-gray-700'}`}>{(link.click_count ?? 0).toLocaleString('fr-FR')}</span></td>
-                    <td class="py-3 px-2 text-right text-gray-600 text-xs hidden md:table-cell">{new Date(link.created_at).toLocaleDateString('fr-FR', {day:'2-digit',month:'short'})}</td>
+                    <td class="py-3 px-2 text-right"><span class={`font-semibold tabular-nums ${link.click_count>0?'text-neon-green':'text-gray-700'}`}>{(link.click_count??0).toLocaleString('fr-FR')}</span></td>
+                    <td class="py-3 px-2 text-right text-gray-600 text-xs hidden md:table-cell">{new Date(link.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})}</td>
                     <td class="py-3 px-2 hidden lg:table-cell"><div class="bar-track" style="height:4px"><div class="bar-fill" style={`width:${barPct}%;background:#00ff9d60;animation-delay:${i*40}ms`}></div></div></td>
                   </tr>
                 );
@@ -732,7 +991,7 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
     </div>
   )}
 
-  <!-- v4: UTM CAMPAIGNS (Pro gate) -->
+  <!-- UTM CAMPAIGNS (Pro gate) -->
   <div class="fade-slide d-4 p-5 glass rounded-2xl border border-white/8 mb-6" style="position:relative;overflow:hidden">
     <div class="flex items-center justify-between mb-4">
       <div>
@@ -746,7 +1005,7 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
         <div class="text-center px-8 py-6">
           <div class="text-3xl mb-3">⚡</div>
           <p class="text-sm font-bold text-white mb-1">Tracking UTM avancé</p>
-          <p class="text-xs text-gray-500 mb-5 max-w-xs mx-auto">Suis chaque campagne Google, Meta, TikTok avec source / medium / device / pays et calcule ROAS et CPA.</p>
+          <p class="text-xs text-gray-500 mb-5 max-w-xs mx-auto">Suis chaque campagne Google, Meta, TikTok avec source / medium / device / pays et calcule automatiquement ROAS et CPA.</p>
           <a href="/dashboard/billing" style="display:inline-flex;padding:10px 20px;border-radius:12px;background:rgba(168,85,247,.2);border:1px solid rgba(168,85,247,.4);color:#c084fc;font-size:14px;font-weight:700;text-decoration:none">Passer Pro →</a>
         </div>
         <div class="w-full px-5 pb-4" style="visibility:hidden;pointer-events:none">
@@ -768,19 +1027,19 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
           </thead>
           <tbody>
             {utmCamps.map(c => {
-              const cpa    = c.sales > 0 ? `${(c.revenue/c.sales).toFixed(0)}€` : '—';
-              const chCls  = c.medium?.toLowerCase().includes('cpc') ? 'ch-google' : 'ch-organic';
+              const cpa   = c.sales > 0 ? `${(c.revenue/c.sales).toFixed(0)}€` : '—';
+              const chCls = c.medium?.toLowerCase().includes('cpc') ? 'ch-google' : 'ch-organic';
               return (
                 <tr class="border-b border-white/4 last:border-0 hover:bg-white/2 transition-colors">
                   <td class="py-2.5 px-2 text-white text-xs font-medium max-w-[110px] truncate">{c.campaign}</td>
                   <td class="py-2.5 px-2"><span class={`text-xs font-semibold px-2 py-0.5 rounded-full ${chCls}`}>{c.source||'—'}</span></td>
                   <td class="py-2.5 px-2 text-gray-500 text-xs">{c.medium||'—'}</td>
                   <td class="py-2.5 px-2 tabular-nums font-semibold text-white">{c.views.toLocaleString('fr-FR')}</td>
-                  <td class="py-2.5 px-2 tabular-nums text-xs" style="color:#f59e0b">{c.leads > 0 ? c.leads : <span class="text-gray-700">—</span>}</td>
-                  <td class="py-2.5 px-2 tabular-nums text-xs" style="color:#a78bfa">{c.revenue > 0 ? c.revenue.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : <span class="text-gray-700">—</span>}</td>
+                  <td class="py-2.5 px-2 tabular-nums text-xs" style="color:#f59e0b">{c.leads>0?c.leads:<span class="text-gray-700">—</span>}</td>
+                  <td class="py-2.5 px-2 tabular-nums text-xs" style="color:#a78bfa">{c.revenue>0?c.revenue.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}):<span class="text-gray-700">—</span>}</td>
                   <td class="py-2.5 px-2 tabular-nums text-gray-400 text-xs">{cpa}</td>
                   <td class="py-2.5 px-2 text-gray-400 text-xs capitalize">{c.topDevice}</td>
-                  <td class="py-2.5 px-2 text-gray-400 text-xs">{c.topCountry !== '—' ? `${countryFlag(c.topCountry)} ${c.topCountry}` : '—'}</td>
+                  <td class="py-2.5 px-2 text-gray-400 text-xs">{c.topCountry!=='—'?`${countryFlag(c.topCountry)} ${c.topCountry}`:'—'}</td>
                 </tr>
               );
             })}
@@ -790,10 +1049,10 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
     )}
   </div>
 
-  <!-- ALL BLOCKS TABLE (v3 intact) -->
+  <!-- TOUS LES BLOCS -->
   <div class="fade-slide d-4 p-5 glass rounded-2xl border border-white/8">
     <div class="flex items-center justify-between mb-5">
-      <div><h3 class="text-sm font-semibold text-white">Tous les blocs</h3><p class="text-xs text-gray-500 mt-0.5">Performance complète · {blocks.length} bloc{blocks.length !== 1 ? 's' : ''}</p></div>
+      <div><h3 class="text-sm font-semibold text-white">Tous les blocs</h3><p class="text-xs text-gray-500 mt-0.5">Performance complète · {blocks.length} bloc{blocks.length!==1?'s':''}</p></div>
       <a href="/dashboard/blocks" class="text-xs text-neon-green/70 hover:text-neon-green transition-colors">Gérer →</a>
     </div>
     {blocks.length === 0 ? (
@@ -813,23 +1072,22 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
             {blocks.map((block, i) => {
               const found       = topBlocks.find((tb) => tb.block_id === block.id);
               const blockClicks = found?.clicks ?? 0;
-              const ctr         = summary.totalViews > 0 ? ((blockClicks / summary.totalViews) * 100).toFixed(1) : '0.0';
-              const isTop       = !!found;
+              const ctr         = summary.totalViews > 0 ? ((blockClicks/summary.totalViews)*100).toFixed(1) : '0.0';
               return (
                 <tr class="group border-b border-white/4 last:border-0 hover:bg-white/2 transition-colors">
                   <td class="py-3 px-2">
                     <div class="flex items-center gap-2.5">
                       <Badge variant="default" size="sm">{block.type}</Badge>
-                      <span class="text-white font-medium truncate max-w-[200px]">{block.title || 'Untitled'}</span>
-                      {i === 0 && topBlocks.length > 0 && isTop && <span class="text-xs text-yellow-400/70">★</span>}
+                      <span class="text-white font-medium truncate max-w-[200px]">{block.title||'Untitled'}</span>
+                      {i===0 && topBlocks.length>0 && !!found && <span class="text-xs text-yellow-400/70">★</span>}
                     </div>
                   </td>
-                  <td class="py-3 px-2 text-right"><span class={`font-semibold tabular-nums ${blockClicks > 0 ? 'text-neon-green' : 'text-gray-700'}`}>{blockClicks.toLocaleString('fr-FR')}</span></td>
+                  <td class="py-3 px-2 text-right"><span class={`font-semibold tabular-nums ${blockClicks>0?'text-neon-green':'text-gray-700'}`}>{blockClicks.toLocaleString('fr-FR')}</span></td>
                   <td class="py-3 px-2 text-right text-gray-500 tabular-nums">{ctr}%</td>
                   <td class="py-3 px-2 text-center">
-                    <span class={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${block.active ? 'text-neon-green bg-neon-green/10' : 'text-gray-600 bg-white/5'}`}>
-                      <span class={`w-1.5 h-1.5 rounded-full ${block.active ? 'bg-neon-green' : 'bg-gray-600'}`}></span>
-                      {block.active ? 'Actif' : 'Inactif'}
+                    <span class={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${block.active?'text-neon-green bg-neon-green/10':'text-gray-600 bg-white/5'}`}>
+                      <span class={`w-1.5 h-1.5 rounded-full ${block.active?'bg-neon-green':'bg-gray-600'}`}></span>
+                      {block.active?'Actif':'Inactif'}
                     </span>
                   </td>
                 </tr>
@@ -841,7 +1099,7 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
     )}
   </div>
 
-  <!-- DATA BRIDGE (v3 keys + v4 channels + isPro) -->
+  <!-- DATA BRIDGE -->
   <div aria-hidden="true" class="contents">
     <div id="chart-data" class="hidden"
       data-chart={JSON.stringify(exportedChart)}
@@ -849,21 +1107,24 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
       data-days={String(exportedDays)}
       data-countries={JSON.stringify(topCountries)}
       data-channels={JSON.stringify(exportedChannels)}
-      data-is-pro={String(isPro)}>
+      data-is-pro={String(isPro)}
+      data-goals-views={String(summary.totalViews)}
+      data-goals-clicks={String(summary.totalClicks)}
+      data-goals-leads={String(leads)}
+      data-goals-revenue={String(revenue)}>
     </div>
   </div>
 
-  <!-- SCRIPT (v3 intact + ROAS chart + Export CSV) -->
   <script>
     (async () => {
       const el = document.getElementById('chart-data');
       if (!el) return;
       const exportedChart    = JSON.parse(el.dataset.chart    ?? '{}');
-      const exportedDevices  = JSON.parse(el.dataset.devices  ?? '{}');
-      const exportedDays     = Number(el.dataset.days ?? 7);
       const exportedChannels = JSON.parse(el.dataset.channels ?? '[]');
+      const exportedDays     = Number(el.dataset.days ?? 7);
       const isPro            = el.dataset.isPro === 'true';
 
+      // Chart.js
       await new Promise((resolve, reject) => {
         if (typeof Chart !== 'undefined') { resolve(null); return; }
         const s = document.createElement('script');
@@ -877,7 +1138,7 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
       const GREEN  = '#00ff9d';
       const PURPLE = '#bf00ff';
 
-      // Traffic chart (v3 intact)
+      // Traffic chart
       const trafficCtx = document.getElementById('traffic-chart');
       if (trafficCtx && exportedChart.labels?.length > 0) {
         new Chart(trafficCtx, {
@@ -888,77 +1149,159 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
               {
                 label: 'Vues', data: exportedChart.views, borderColor: GREEN,
                 backgroundColor: (ctx) => { const g = ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height); g.addColorStop(0,GREEN+'22'); g.addColorStop(1,GREEN+'00'); return g; },
-                borderWidth: 2, tension: 0.4, fill: true, pointRadius: 0, pointHoverRadius: 4,
-                pointHoverBackgroundColor: GREEN, pointHoverBorderColor: '#0a0a0a', pointHoverBorderWidth: 2,
+                borderWidth:2, tension:0.4, fill:true, pointRadius:0, pointHoverRadius:4,
+                pointHoverBackgroundColor:GREEN, pointHoverBorderColor:'#0a0a0a', pointHoverBorderWidth:2,
               },
               {
                 label: 'Clics', data: exportedChart.clicks, borderColor: PURPLE,
                 backgroundColor: (ctx) => { const g = ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height); g.addColorStop(0,PURPLE+'22'); g.addColorStop(1,PURPLE+'00'); return g; },
-                borderWidth: 2, tension: 0.4, fill: true, pointRadius: 0, pointHoverRadius: 4,
-                pointHoverBackgroundColor: PURPLE, pointHoverBorderColor: '#0a0a0a', pointHoverBorderWidth: 2,
+                borderWidth:2, tension:0.4, fill:true, pointRadius:0, pointHoverRadius:4,
+                pointHoverBackgroundColor:PURPLE, pointHoverBorderColor:'#0a0a0a', pointHoverBorderWidth:2,
               },
             ],
           },
           options: {
-            responsive: true, maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
-            plugins: { legend: { display: false }, tooltip: { backgroundColor: '#111115', titleColor: '#fff', bodyColor: '#9ca3af', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1, padding: 12, displayColors: true, boxWidth: 8, boxHeight: 8, boxPadding: 4, usePointStyle: true } },
-            scales: {
-              y: { beginAtZero: true, ticks: { color: '#4b5563', font: { size: 10 }, maxTicksLimit: 5 }, grid: { color: GRID }, border: { display: false } },
-              x: { ticks: { color: '#4b5563', font: { size: 10 }, maxTicksLimit: exportedDays === 7 ? 7 : exportedDays === 30 ? 10 : 12, maxRotation: 0 }, grid: { display: false }, border: { display: false } },
+            responsive:true, maintainAspectRatio:false,
+            interaction:{mode:'index',intersect:false},
+            plugins:{
+              legend:{display:false},
+              tooltip:{backgroundColor:'#111115',titleColor:'#fff',bodyColor:'#9ca3af',borderColor:'rgba(255,255,255,0.08)',borderWidth:1,padding:12,displayColors:true,boxWidth:8,boxHeight:8,boxPadding:4,usePointStyle:true},
+            },
+            scales:{
+              y:{beginAtZero:true,ticks:{color:'#4b5563',font:{size:10},maxTicksLimit:5},grid:{color:GRID},border:{display:false}},
+              x:{ticks:{color:'#4b5563',font:{size:10},maxTicksLimit:exportedDays===7?7:exportedDays===30?10:12,maxRotation:0},grid:{display:false},border:{display:false}},
             },
           },
         });
       }
 
-      // CTR mini bar (v3 intact)
+      // CTR mini bar
       const rateCtx = document.getElementById('rate-chart');
       if (rateCtx && exportedChart.labels?.length > 0) {
         new Chart(rateCtx, {
-          type: 'bar',
-          data: { labels: exportedChart.labels, datasets: [{ data: exportedChart.rates, backgroundColor: GREEN+'30', borderColor: GREEN+'70', borderWidth: 1, borderRadius: 3 }] },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false }, tooltip: { backgroundColor: '#111115', titleColor: '#fff', bodyColor: '#9ca3af', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1, callbacks: { label: (ctx) => ` ${ctx.parsed.y}%` } } },
-            scales: { y: { display: false, beginAtZero: true, grid: { display: false }, border: { display: false } }, x: { display: false, grid: { display: false }, border: { display: false } } },
+          type:'bar',
+          data:{labels:exportedChart.labels,datasets:[{data:exportedChart.rates,backgroundColor:GREEN+'30',borderColor:GREEN+'70',borderWidth:1,borderRadius:3}]},
+          options:{
+            responsive:true,maintainAspectRatio:false,
+            plugins:{legend:{display:false},tooltip:{backgroundColor:'#111115',titleColor:'#fff',bodyColor:'#9ca3af',borderColor:'rgba(255,255,255,0.08)',borderWidth:1,callbacks:{label:(ctx)=>` ${ctx.parsed.y}%`}}},
+            scales:{y:{display:false,beginAtZero:true,grid:{display:false},border:{display:false}},x:{display:false,grid:{display:false},border:{display:false}}},
           },
         });
       }
 
-      // ROAS chart (v4 new — Pro only)
+      // ROAS chart (Pro)
       const roasCtx = document.getElementById('roas-chart');
       if (roasCtx && isPro && exportedChannels?.length > 0) {
-        const chWithRev = exportedChannels.filter(c => c.revenue > 0);
-        if (chWithRev.length > 0) {
-          const COLORS = ['#a78bfa','#38bdf8','#00ff9d','#f59e0b','#fb7185','#34d399'];
+        const chR = exportedChannels.filter(c => c.revenue > 0);
+        if (chR.length > 0) {
+          const COLS = ['#a78bfa','#38bdf8','#00ff9d','#f59e0b','#fb7185','#34d399'];
           new Chart(roasCtx, {
-            type: 'bar',
-            data: { labels: chWithRev.map(c => c.name), datasets: [{ label: 'Revenue', data: chWithRev.map(c => c.revenue), backgroundColor: COLORS.slice(0, chWithRev.length).map(c => c+'44'), borderColor: COLORS.slice(0, chWithRev.length), borderWidth: 1.5, borderRadius: 6 }] },
-            options: {
-              responsive: true, maintainAspectRatio: false,
-              plugins: { legend: { display: false }, tooltip: { backgroundColor: '#111115', titleColor: '#fff', bodyColor: '#9ca3af', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1, callbacks: { label: (ctx) => ` ${Number(ctx.parsed.y).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}` } } },
-              scales: {
-                y: { beginAtZero: true, ticks: { color: '#4b5563', font: { size: 10 }, maxTicksLimit: 4, callback: (v) => v >= 1000 ? `${Math.round(v/1000)}k€` : `${v}€` }, grid: { color: GRID }, border: { display: false } },
-                x: { ticks: { color: '#4b5563', font: { size: 10 } }, grid: { display: false }, border: { display: false } },
+            type:'bar',
+            data:{labels:chR.map(c=>c.name),datasets:[{label:'Revenue',data:chR.map(c=>c.revenue),backgroundColor:COLS.slice(0,chR.length).map(c=>c+'44'),borderColor:COLS.slice(0,chR.length),borderWidth:1.5,borderRadius:6}]},
+            options:{
+              responsive:true,maintainAspectRatio:false,
+              plugins:{legend:{display:false},tooltip:{backgroundColor:'#111115',titleColor:'#fff',bodyColor:'#9ca3af',borderColor:'rgba(255,255,255,0.08)',borderWidth:1,callbacks:{label:(ctx)=>` ${Number(ctx.parsed.y).toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0})}`}}},
+              scales:{
+                y:{beginAtZero:true,ticks:{color:'#4b5563',font:{size:10},maxTicksLimit:4,callback:(v)=>v>=1000?`${Math.round(v/1000)}k€`:`${v}€`},grid:{color:GRID},border:{display:false}},
+                x:{ticks:{color:'#4b5563',font:{size:10}},grid:{display:false},border:{display:false}},
               },
             },
           });
         }
       }
 
-      // Export CSV (v4 new)
+      // Export CSV
       document.getElementById('export-csv-btn')?.addEventListener('click', () => {
         if (!exportedChart?.labels?.length) { alert('Aucune donnée à exporter'); return; }
         const rows = [['Date','Vues','Clics','CTR%']];
         exportedChart.labels.forEach((l, i) => rows.push([l, exportedChart.views[i], exportedChart.clicks[i], exportedChart.rates[i]]));
         const csv  = rows.map(r => r.join(',')).join('\n');
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
         const url  = URL.createObjectURL(blob);
-        Object.assign(document.createElement('a'), { href: url, download: `analytics-${exportedDays}j.csv` }).click();
+        Object.assign(document.createElement('a'),{href:url,download:`analytics-${exportedDays}j.csv`}).click();
         URL.revokeObjectURL(url);
       });
 
-      // D3 Map (v3 intact)
+      // Export PDF
+      document.getElementById('export-pdf-btn')?.addEventListener('click', () => { window.print(); });
+
+      // Goals (localStorage)
+      const GOALS_KEY = 'bf_analytics_goals_v1';
+      function loadGoals() { try { return JSON.parse(localStorage.getItem(GOALS_KEY) ?? '{}'); } catch { return {}; } }
+      function saveGoals(g) { localStorage.setItem(GOALS_KEY, JSON.stringify(g)); }
+
+      function renderGoals() {
+        const goals  = loadGoals();
+        const actual = {
+          views:   Number(el.dataset.goalsViews   ?? 0),
+          clicks:  Number(el.dataset.goalsClicks  ?? 0),
+          leads:   Number(el.dataset.goalsLeads   ?? 0),
+          revenue: Number(el.dataset.goalsRevenue ?? 0),
+        };
+        const items = [
+          { key:'views',   label:'Vues',    color:'#00ff9d' },
+          { key:'clicks',  label:'Clics',   color:'#38bdf8' },
+          { key:'leads',   label:'Leads',   color:'#f59e0b' },
+          { key:'revenue', label:'Revenue', color:'#a78bfa' },
+        ];
+        const list = document.getElementById('goals-list');
+        if (!list) return;
+
+        const hasGoals = Object.values(goals).some(v => Number(v) > 0);
+        if (!hasGoals) {
+          list.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:80px;gap:8px;color:rgba(255,255,255,0.25);font-size:12px;text-align:center"><span style="font-size:20px;opacity:.4">🎯</span>Aucun objectif défini<br>Clique sur "Modifier"</div>';
+          return;
+        }
+
+        list.innerHTML = items.map(item => {
+          const g   = Number(goals[item.key] ?? 0);
+          if (!g) return '';
+          const a   = actual[item.key] ?? 0;
+          const pct = Math.min(100, g > 0 ? Math.round((a/g)*100) : 0);
+          const done = pct >= 100;
+          return `<div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+              <span style="font-size:11px;color:rgba(255,255,255,.4)">${item.label}</span>
+              <div style="display:flex;align-items:center;gap:6px">
+                ${done?'<span style="font-size:10px;font-weight:700;color:#00ff9d">✓ Atteint</span>':''}
+                <span style="font-size:11px;font-weight:700;color:${done?'#00ff9d':item.color};font-variant-numeric:tabular-nums">${pct}%</span>
+              </div>
+            </div>
+            <div style="background:rgba(255,255,255,.04);border-radius:9999px;height:5px;overflow:hidden">
+              <div style="height:100%;border-radius:9999px;width:${pct}%;background:${done?'#00ff9d':item.color};opacity:${done?1:.7};transition:width .8s cubic-bezier(.16,1,.3,1)"></div>
+            </div>
+            <div style="font-size:10px;color:rgba(255,255,255,.2);margin-top:3px">${a.toLocaleString('fr-FR')} / ${g.toLocaleString('fr-FR')}</div>
+          </div>`;
+        }).join('');
+      }
+
+      document.getElementById('edit-goals-btn')?.addEventListener('click', () => {
+        const ed = document.getElementById('goals-editor');
+        if (!ed) return;
+        const hidden = ed.classList.contains('hidden');
+        ed.classList.toggle('hidden', !hidden);
+        if (!hidden) return;
+        const g = loadGoals();
+        ['views','clicks','leads','revenue'].forEach(k => {
+          const inp = document.getElementById(`goal-${k}`);
+          if (inp && g[k]) inp.value = g[k];
+        });
+      });
+
+      document.getElementById('save-goals-btn')?.addEventListener('click', () => {
+        const g = {};
+        ['views','clicks','leads','revenue'].forEach(k => {
+          const val = parseInt(document.getElementById(`goal-${k}`)?.value ?? '0');
+          if (val > 0) g[k] = val;
+        });
+        saveGoals(g);
+        document.getElementById('goals-editor')?.classList.add('hidden');
+        renderGoals();
+      });
+
+      renderGoals();
+
+      // D3 Choropleth Map
       const countriesData = JSON.parse(el.dataset.countries ?? '[]');
       const mapSvgEl   = document.getElementById('world-map');
       const mapLoader  = document.getElementById('world-map-loader');
@@ -969,141 +1312,111 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
 
       if (mapSvgEl) {
         await Promise.all([
-          new Promise((res, rej) => { if (window.d3) { res(null); return; } const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s); }),
-          new Promise((res, rej) => { if (window.topojson) { res(null); return; } const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/topojson@3.0.2/dist/topojson.min.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s); }),
+          new Promise((res,rej)=>{ if(window.d3){res(null);return;} const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s); }),
+          new Promise((res,rej)=>{ if(window.topojson){res(null);return;} const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/topojson@3.0.2/dist/topojson.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s); }),
         ]);
 
-        const world = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json').then(r => r.json());
+        const world = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json').then(r=>r.json());
+        const ISO2_NUM = {AF:'4',AL:'8',DZ:'12',AO:'24',AR:'32',AU:'36',AT:'40',AZ:'31',BD:'50',BE:'56',BJ:'204',BO:'68',BR:'76',BG:'100',CA:'124',CL:'152',CN:'156',CO:'170',CD:'180',CR:'188',HR:'191',CZ:'203',DK:'208',EG:'818',ET:'231',FI:'246',FR:'250',DE:'276',GH:'288',GR:'300',HK:'344',HU:'348',IN:'356',ID:'360',IR:'364',IQ:'368',IE:'372',IL:'376',IT:'380',CI:'384',JP:'392',JO:'400',KZ:'398',KE:'404',KR:'410',KW:'414',LB:'422',LY:'434',MA:'504',MX:'484',MM:'104',NL:'528',NZ:'554',NG:'566',NO:'578',PK:'586',PE:'604',PH:'608',PL:'616',PT:'620',QA:'634',RO:'642',RU:'643',SA:'682',SN:'686',SG:'702',SK:'703',SI:'705',SO:'706',ZA:'710',ES:'724',SE:'752',CH:'756',SY:'760',TW:'158',TZ:'834',TH:'764',TN:'788',TR:'792',UA:'804',AE:'784',GB:'826',US:'840',UY:'858',VE:'862',VN:'704',YE:'887',ZW:'716',MG:'450',CM:'120',GN:'324',ML:'466',TD:'148',NE:'562',LK:'144',KH:'116',MN:'496',IS:'352',LV:'428',LT:'440',EE:'233',RS:'688',BA:'70',MK:'807',GE:'268',BY:'112',MD:'498',AM:'51',UZ:'860',TM:'795',KG:'417',TJ:'762',LU:'442',CY:'196',MT:'470',MZ:'508',ZM:'894',MW:'454',UG:'800',RW:'646',BI:'108',SS:'728',SD:'729',LR:'430',SL:'694',BF:'854',GW:'624',GM:'270',CV:'132',GQ:'226',GA:'266',CG:'178',CF:'140',ER:'232',DJ:'262',KM:'174',SC:'690',MU:'480',MR:'478',LI:'438',MC:'492',SM:'674',VA:'336',AD:'20',ME:'499',XK:'383'};
 
-        const ISO2_NUM = {
-          AF:'4',AL:'8',DZ:'12',AO:'24',AR:'32',AU:'36',AT:'40',AZ:'31',BD:'50',BE:'56',BJ:'204',BO:'68',BR:'76',BG:'100',CA:'124',CL:'152',
-          CN:'156',CO:'170',CD:'180',CR:'188',HR:'191',CZ:'203',DK:'208',EG:'818',ET:'231',FI:'246',FR:'250',DE:'276',GH:'288',GR:'300',
-          HK:'344',HU:'348',IN:'356',ID:'360',IR:'364',IQ:'368',IE:'372',IL:'376',IT:'380',CI:'384',JP:'392',JO:'400',KZ:'398',KE:'404',
-          KR:'410',KW:'414',LB:'422',LY:'434',MA:'504',MX:'484',MM:'104',NL:'528',NZ:'554',NG:'566',NO:'578',PK:'586',PE:'604',PH:'608',
-          PL:'616',PT:'620',QA:'634',RO:'642',RU:'643',SA:'682',SN:'686',SG:'702',SK:'703',SI:'705',SO:'706',ZA:'710',ES:'724',SE:'752',
-          CH:'756',SY:'760',TW:'158',TZ:'834',TH:'764',TN:'788',TR:'792',UA:'804',AE:'784',GB:'826',US:'840',UY:'858',VE:'862',VN:'704',
-          YE:'887',ZW:'716',MG:'450',CM:'120',GN:'324',ML:'466',TD:'148',NE:'562',LK:'144',KH:'116',MN:'496',IS:'352',LV:'428',LT:'440',
-          EE:'233',RS:'688',BA:'70',MK:'807',GE:'268',BY:'112',MD:'498',AM:'51',UZ:'860',TM:'795',KG:'417',TJ:'762',LU:'442',CY:'196',
-          MT:'470',MZ:'508',ZM:'894',MW:'454',UG:'800',RW:'646',BI:'108',SS:'728',SD:'729',LR:'430',SL:'694',BF:'854',GW:'624',GM:'270',
-          CV:'132',GQ:'226',GA:'266',CG:'178',CF:'140',ER:'232',DJ:'262',KM:'174',SC:'690',MU:'480',MR:'478',LI:'438',MC:'492',SM:'674',
-          VA:'336',AD:'20',ME:'499',XK:'383',
-        };
+        const maxViews = countriesData.length>0?countriesData[0].views:1;
+        const viewsMap=new Map(),iso2Map=new Map(),labelMap=new Map();
+        countriesData.forEach(row=>{ const num=ISO2_NUM[row.country];if(!num)return;viewsMap.set(+num,row.views);iso2Map.set(+num,row.country);labelMap.set(+num,row.country); });
 
-        const maxViews = countriesData.length > 0 ? countriesData[0].views : 1;
-        const viewsMap = new Map(); const iso2Map = new Map(); const labelMap = new Map();
-        countriesData.forEach(row => {
-          const num = ISO2_NUM[row.country]; if (!num) return;
-          viewsMap.set(+num, row.views); iso2Map.set(+num, row.country); labelMap.set(+num, row.country);
+        const colorScale = maxViews>1 ? d3.scaleSequentialLog().domain([1,maxViews]).interpolator(d3.interpolate('#0f2a1a','#00ff9d')) : ()=>'#0f2a1a';
+        const W=mapSvgEl.clientWidth||720,H=340;
+        const svg=d3.select(mapSvgEl).attr('width',W).attr('height',H);
+        const projection=d3.geoNaturalEarth1().scale(W/6.1).translate([W/2,H/2+15]);
+        const pathGen=d3.geoPath().projection(projection);
+        const g=svg.append('g').attr('class','map-root');
+
+        g.append('path').datum({type:'Sphere'}).attr('d',pathGen).attr('fill','#060d0a').attr('stroke','rgba(0,255,157,0.04)').attr('stroke-width',0.8);
+        g.append('path').datum(d3.geoGraticule().step([20,20])()).attr('d',pathGen).attr('fill','none').attr('stroke','rgba(255,255,255,0.025)').attr('stroke-width',0.4);
+
+        const countries=topojson.feature(world,world.objects.countries);
+        g.selectAll('.country').data(countries.features).join('path').attr('class','country').attr('d',pathGen)
+          .attr('fill',d=>{const v=viewsMap.get(+d.id);return v?colorScale(v):'#101f16';})
+          .attr('stroke','#0c1a12').attr('stroke-width',0.4);
+        g.append('path').datum(topojson.mesh(world,world.objects.countries,(a,b)=>a!==b)).attr('d',pathGen).attr('fill','none').attr('stroke','rgba(0,255,157,0.07)').attr('stroke-width',0.5);
+
+        const dotsG=g.append('g');
+        countriesData.slice(0,6).forEach((row,idx)=>{
+          const num=ISO2_NUM[row.country];if(!num)return;
+          const feat=countries.features.find(f=>+f.id===+num);if(!feat)return;
+          const cen=pathGen.centroid(feat);if(!cen||isNaN(cen[0])||isNaN(cen[1]))return;
+          const intensity=row.views/maxViews,r=2.5+intensity*5.5;
+          dotsG.append('circle').attr('cx',cen[0]).attr('cy',cen[1]).attr('r',r+6).attr('fill',`rgba(0,255,157,${0.06+intensity*0.08})`).attr('pointer-events','none');
+          dotsG.append('circle').attr('cx',cen[0]).attr('cy',cen[1]).attr('r',r).attr('fill',idx===0?'#00ff9d':`rgba(0,255,157,${0.5+intensity*0.4})`).attr('stroke',idx===0?'rgba(0,255,157,0.4)':'none').attr('stroke-width',1.5).attr('pointer-events','none');
         });
 
-        const colorScale = maxViews > 1
-          ? d3.scaleSequentialLog().domain([1, maxViews]).interpolator(d3.interpolate('#0f2a1a', '#00ff9d'))
-          : () => '#0f2a1a';
-
-        const W = mapSvgEl.clientWidth || 720, H = 340;
-        const svg = d3.select(mapSvgEl).attr('width', W).attr('height', H);
-        const projection = d3.geoNaturalEarth1().scale(W / 6.1).translate([W / 2, H / 2 + 15]);
-        const pathGen = d3.geoPath().projection(projection);
-        const g = svg.append('g').attr('class', 'map-root');
-
-        g.append('path').datum({ type: 'Sphere' }).attr('d', pathGen).attr('fill', '#060d0a').attr('stroke', 'rgba(0,255,157,0.04)').attr('stroke-width', 0.8);
-        g.append('path').datum(d3.geoGraticule().step([20, 20])()).attr('d', pathGen).attr('fill', 'none').attr('stroke', 'rgba(255,255,255,0.025)').attr('stroke-width', 0.4);
-
-        const countries = topojson.feature(world, world.objects.countries);
-        g.selectAll('.country').data(countries.features).join('path').attr('class', 'country').attr('d', pathGen)
-          .attr('fill', d => { const v = viewsMap.get(+d.id); return v ? colorScale(v) : '#101f16'; })
-          .attr('stroke', '#0c1a12').attr('stroke-width', 0.4);
-
-        g.append('path').datum(topojson.mesh(world, world.objects.countries, (a, b) => a !== b)).attr('d', pathGen).attr('fill', 'none').attr('stroke', 'rgba(0,255,157,0.07)').attr('stroke-width', 0.5);
-
-        const dotsGroup = g.append('g').attr('class', 'dots');
-        countriesData.slice(0, 6).forEach((row, idx) => {
-          const num  = ISO2_NUM[row.country]; if (!num) return;
-          const feat = countries.features.find(f => +f.id === +num); if (!feat) return;
-          const cen  = pathGen.centroid(feat); if (!cen || isNaN(cen[0]) || isNaN(cen[1])) return;
-          const intensity = row.views / maxViews;
-          const r = 2.5 + intensity * 5.5;
-          dotsGroup.append('circle').attr('cx', cen[0]).attr('cy', cen[1]).attr('r', r + 6).attr('fill', `rgba(0,255,157,${0.06 + intensity * 0.08})`).attr('pointer-events', 'none');
-          dotsGroup.append('circle').attr('cx', cen[0]).attr('cy', cen[1]).attr('r', r).attr('fill', idx === 0 ? '#00ff9d' : `rgba(0,255,157,${0.5 + intensity * 0.4})`).attr('stroke', idx === 0 ? 'rgba(0,255,157,0.4)' : 'none').attr('stroke-width', 1.5).attr('pointer-events', 'none');
-        });
-
-        g.selectAll('.country-hit').data(countries.features).join('path').attr('class', 'country-hit').attr('d', pathGen).attr('fill', 'transparent').attr('stroke', 'none')
-          .attr('cursor', d => viewsMap.has(+d.id) ? 'pointer' : 'default')
-          .on('mousemove', function(event, d) {
-            const views = viewsMap.get(+d.id); if (!views || !mapTooltip) return;
-            const iso2 = iso2Map.get(+d.id) || ''; const name = labelMap.get(+d.id) || iso2;
-            const pct  = ((views / maxViews) * 100).toFixed(0);
-            const rect = mapSvgEl.getBoundingClientRect();
-            mapTooltip.innerHTML = `<span style="color:#00ff9d;font-weight:700">${iso2} — ${name}</span><span style="color:#4b5563;margin:0 6px">·</span><span style="color:#e5e7eb">${views.toLocaleString('fr-FR')} vues</span><span style="color:#374151;margin-left:6px">${pct}%</span>`;
-            let tx = event.clientX - rect.left + 14; let ty = event.clientY - rect.top - 38;
-            if (tx + 240 > W) tx = tx - 260; if (ty < 4) ty = event.clientY - rect.top + 18;
-            mapTooltip.style.left = tx + 'px'; mapTooltip.style.top = ty + 'px'; mapTooltip.classList.remove('hidden');
-            d3.select(this.parentNode).selectAll('.country').filter(fd => fd === d).attr('fill', v => { const val = viewsMap.get(+v.id); return val ? d3.color(colorScale(val)).brighter(0.8).formatHex() : '#1e3525'; });
+        g.selectAll('.country-hit').data(countries.features).join('path').attr('class','country-hit').attr('d',pathGen).attr('fill','transparent').attr('stroke','none')
+          .attr('cursor',d=>viewsMap.has(+d.id)?'pointer':'default')
+          .on('mousemove',function(event,d){
+            const views=viewsMap.get(+d.id);if(!views||!mapTooltip)return;
+            const iso2=iso2Map.get(+d.id)||'',name=labelMap.get(+d.id)||iso2,pct=((views/maxViews)*100).toFixed(0);
+            const rect=mapSvgEl.getBoundingClientRect();
+            mapTooltip.innerHTML=`<span style="color:#00ff9d;font-weight:700">${iso2} — ${name}</span><span style="color:#4b5563;margin:0 6px">·</span><span style="color:#e5e7eb">${views.toLocaleString('fr-FR')} vues</span><span style="color:#374151;margin-left:6px">${pct}%</span>`;
+            let tx=event.clientX-rect.left+14,ty=event.clientY-rect.top-38;
+            if(tx+240>W)tx=tx-260;if(ty<4)ty=event.clientY-rect.top+18;
+            mapTooltip.style.left=tx+'px';mapTooltip.style.top=ty+'px';mapTooltip.classList.remove('hidden');
+            d3.select(this.parentNode).selectAll('.country').filter(fd=>fd===d).attr('fill',v=>{const val=viewsMap.get(+v.id);return val?d3.color(colorScale(val)).brighter(0.8).formatHex():'#1e3525';});
           })
-          .on('mouseleave', function(event, d) {
-            if (mapTooltip) mapTooltip.classList.add('hidden');
-            d3.select(this.parentNode).selectAll('.country').filter(fd => fd === d).attr('fill', fd => { const v = viewsMap.get(+fd.id); return v ? colorScale(v) : '#101f16'; });
+          .on('mouseleave',function(event,d){
+            if(mapTooltip)mapTooltip.classList.add('hidden');
+            d3.select(this.parentNode).selectAll('.country').filter(fd=>fd===d).attr('fill',fd=>{const v=viewsMap.get(+fd.id);return v?colorScale(v):'#101f16';});
           });
 
-        const zoom = d3.zoom().scaleExtent([0.9, 12]).translateExtent([[-W * 0.5, -H * 0.5], [W * 1.5, H * 1.5]])
-          .filter(event => { if (event.type === 'dblclick') return false; return true; })
-          .on('zoom', (event) => {
-            g.attr('transform', event.transform);
-            const k = event.transform.k;
-            g.selectAll('.country').attr('stroke-width', Math.max(0.2, 0.4 / k));
-            g.selectAll('.country-hit').attr('d', pathGen);
-            mapSvgEl.style.cursor = event.sourceEvent?.buttons ? 'grabbing' : 'grab';
+        const zoom=d3.zoom().scaleExtent([0.9,12]).translateExtent([[-W*.5,-H*.5],[W*1.5,H*1.5]])
+          .filter(event=>{if(event.type==='dblclick')return false;return true;})
+          .on('zoom',(event)=>{
+            g.attr('transform',event.transform);
+            const k=event.transform.k;
+            g.selectAll('.country').attr('stroke-width',Math.max(0.2,0.4/k));
+            g.selectAll('.country-hit').attr('d',pathGen);
+            mapSvgEl.style.cursor=event.sourceEvent?.buttons?'grabbing':'grab';
           });
         svg.call(zoom);
+        const smoothZoom=(f)=>svg.transition().duration(300).call(zoom.scaleBy,f);
+        btnZoomIn?.addEventListener('click',()=>smoothZoom(1.6));
+        btnZoomOut?.addEventListener('click',()=>smoothZoom(0.625));
+        btnReset?.addEventListener('click',()=>svg.transition().duration(450).call(zoom.transform,d3.zoomIdentity));
 
-        const smoothZoom = (factor) => svg.transition().duration(300).call(zoom.scaleBy, factor);
-        btnZoomIn?.addEventListener('click',  () => smoothZoom(1.6));
-        btnZoomOut?.addEventListener('click', () => smoothZoom(0.625));
-        btnReset?.addEventListener('click',   () => svg.transition().duration(450).call(zoom.transform, d3.zoomIdentity));
-
-        document.querySelectorAll('.country-row').forEach(row => {
-          row.addEventListener('mouseenter', () => {
-            const iso2 = row.getAttribute('data-iso'); const num = ISO2_NUM[iso2]; if (!num) return;
-            const feat = countries.features.find(f => +f.id === +num); if (!feat) return;
-            g.selectAll('.country').classed('highlighted', fd => +fd.id === +num);
-            const bounds = pathGen.bounds(feat);
-            const dx = bounds[1][0] - bounds[0][0]; const dy = bounds[1][1] - bounds[0][1];
-            const cx = (bounds[0][0] + bounds[1][0]) / 2; const cy = (bounds[0][1] + bounds[1][1]) / 2;
-            const scale = Math.max(1.2, Math.min(8, 0.85 / Math.max(dx / W, dy / H)));
-            const t = d3.zoomIdentity.translate(W / 2 - scale * cx, H / 2 - scale * cy).scale(scale);
-            svg.transition().duration(550).ease(d3.easeCubicOut).call(zoom.transform, t);
+        document.querySelectorAll('.country-row').forEach(row=>{
+          row.addEventListener('mouseenter',()=>{
+            const iso2=row.getAttribute('data-iso'),num=ISO2_NUM[iso2];if(!num)return;
+            const feat=countries.features.find(f=>+f.id===+num);if(!feat)return;
+            g.selectAll('.country').classed('highlighted',fd=>+fd.id===+num);
+            const b=pathGen.bounds(feat),dx=b[1][0]-b[0][0],dy=b[1][1]-b[0][1];
+            const cx=(b[0][0]+b[1][0])/2,cy=(b[0][1]+b[1][1])/2;
+            const scale=Math.max(1.2,Math.min(8,0.85/Math.max(dx/W,dy/H)));
+            svg.transition().duration(550).ease(d3.easeCubicOut).call(zoom.transform,d3.zoomIdentity.translate(W/2-scale*cx,H/2-scale*cy).scale(scale));
           });
-          row.addEventListener('mouseleave', () => {
-            g.selectAll('.country').classed('highlighted', false);
-            svg.transition().duration(450).ease(d3.easeCubicOut).call(zoom.transform, d3.zoomIdentity);
+          row.addEventListener('mouseleave',()=>{
+            g.selectAll('.country').classed('highlighted',false);
+            svg.transition().duration(450).ease(d3.easeCubicOut).call(zoom.transform,d3.zoomIdentity);
           });
         });
 
-        mapSvgEl.style.opacity = '1';
-        if (mapLoader) mapLoader.style.display = 'none';
-
-        const ro = new ResizeObserver(() => {
-          const nW = mapSvgEl.clientWidth; if (!nW) return;
-          projection.scale(nW / 6.1).translate([nW / 2, H / 2 + 15]);
-          svg.attr('width', nW); g.selectAll('path').attr('d', pathGen);
-        });
+        mapSvgEl.style.opacity='1';
+        if(mapLoader)mapLoader.style.display='none';
+        const ro=new ResizeObserver(()=>{ const nW=mapSvgEl.clientWidth;if(!nW)return;projection.scale(nW/6.1).translate([nW/2,H/2+15]);svg.attr('width',nW);g.selectAll('path').attr('d',pathGen); });
         ro.observe(mapSvgEl);
 
-      } else if (mapLoader) {
-        mapLoader.innerHTML = '<p style="color:#374151;font-size:12px;padding:24px">Carte non disponible</p>';
+      } else if(mapLoader) {
+        mapLoader.innerHTML='<p style="color:#374151;font-size:12px;padding:24px">Carte non disponible</p>';
       }
 
-      // Insight tabs (v3 intact)
-      document.querySelectorAll('.insight-tab').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const target = btn.getAttribute('data-tab');
-          document.querySelectorAll('.insight-tab').forEach(b => {
-            b.classList.toggle('text-white', b === btn);
-            b.classList.toggle('bg-white/8', b === btn);
-            b.classList.toggle('text-gray-500', b !== btn);
+      // Insight tabs
+      document.querySelectorAll('.insight-tab').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+          const target=btn.getAttribute('data-tab');
+          document.querySelectorAll('.insight-tab').forEach(b=>{
+            b.classList.toggle('text-white',b===btn);
+            b.classList.toggle('bg-white/8',b===btn);
+            b.classList.toggle('text-gray-500',b!==btn);
           });
-          document.querySelectorAll('.insight-panel').forEach(p => {
-            p.classList.toggle('active', p.id === `panel-${target}`);
+          document.querySelectorAll('.insight-panel').forEach(p=>{
+            p.classList.toggle('active',p.id===`panel-${target}`);
           });
         });
       });
