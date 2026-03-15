@@ -229,6 +229,35 @@ function countryFlag(code: string): string {
 const CAT_COLORS: Record<string, string> = { direct: '#00ff9d', social: '#bf00ff', search: '#00aaff', other: '#ff6b6b' };
 const CAT_LABELS: Record<string, string> = { direct: 'Direct', social: 'Social', search: 'Recherche', other: 'Autre' };
 
+// UTM campaigns aggregated (computed in frontmatter — no TS generics in JSX)
+const utmCamps: { source:string; medium:string; campaign:string; views:number; leads:number; sales:number; revenue:number; topDevice:string; topCountry:string }[] = [];
+if (isPro && utmData.length > 0) {
+  const cm = new Map<string, { source:string; medium:string; campaign:string; views:number; leads:number; sales:number; revenue:number; devices:Record<string,number>; countries:Record<string,number> }>();
+  for (const row of utmData) {
+    const key = `${row.source}|${row.medium}|${row.campaign ?? '(none)'}`;
+    const e   = cm.get(key) ?? { source:row.source??'', medium:row.medium??'', campaign:row.campaign??'(none)', views:0, leads:0, sales:0, revenue:0, devices:{} as Record<string,number>, countries:{} as Record<string,number> };
+    e.views++;
+    if (row.converted)   e.leads++;
+    if (row.revenue > 0) { e.sales++; e.revenue += row.revenue; }
+    if (row.device)  e.devices[row.device]  = (e.devices[row.device]  ?? 0) + 1;
+    if (row.country) e.countries[row.country] = (e.countries[row.country] ?? 0) + 1;
+    cm.set(key, e);
+  }
+  for (const c of Array.from(cm.values()).sort((a,b) => b.views - a.views).slice(0, 10)) {
+    utmCamps.push({
+      source:     c.source,
+      medium:     c.medium,
+      campaign:   c.campaign,
+      views:      c.views,
+      leads:      c.leads,
+      sales:      c.sales,
+      revenue:    c.revenue,
+      topDevice:  Object.entries(c.devices).sort((a,b)=>b[1]-a[1])[0]?.[0] ?? '—',
+      topCountry: Object.entries(c.countries).sort((a,b)=>b[1]-a[1])[0]?.[0] ?? '—',
+    });
+  }
+}
+
 const exportedChart    = { labels: chartLabels, views: chartViews, clicks: chartClicks, rates: chartRates };
 const exportedDevices  = deviceData;
 const exportedDays     = days;
@@ -733,49 +762,30 @@ const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, reve
       </div>
     ) : (
       <div class="overflow-x-auto -mx-1 scrollbar-none">
-        {(() => {
-          type CS = { source:string; medium:string; campaign:string; views:number; leads:number; sales:number; revenue:number; devices:Record<string,number>; countries:Record<string,number> };
-          const cm = new Map<string, CS>();
-          for (const row of utmData) {
-            const key = `${row.source}|${row.medium}|${row.campaign ?? '(none)'}`;
-            const e   = cm.get(key) ?? { source:row.source??'', medium:row.medium??'', campaign:row.campaign??'(none)', views:0, leads:0, sales:0, revenue:0, devices:{}, countries:{} };
-            e.views++;
-            if (row.converted)   e.leads++;
-            if (row.revenue > 0) { e.sales++; e.revenue += row.revenue; }
-            if (row.device)  e.devices[row.device]  = (e.devices[row.device]  ?? 0) + 1;
-            if (row.country) e.countries[row.country] = (e.countries[row.country] ?? 0) + 1;
-            cm.set(key, e);
-          }
-          const camps = Array.from(cm.values()).sort((a,b) => b.views - a.views).slice(0, 10);
-          return (
-            <table class="w-full text-sm min-w-[680px]">
-              <thead>
-                <tr>{['Campaign','Source','Medium','Vues','Leads','Revenue','CPA','Device','Pays'].map(h => <th class="text-left pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5 whitespace-nowrap">{h}</th>)}</tr>
-              </thead>
-              <tbody>
-                {camps.map(c => {
-                  const topDev  = Object.entries(c.devices).sort((a,b)=>b[1]-a[1])[0]?.[0] ?? '—';
-                  const topCtry = Object.entries(c.countries).sort((a,b)=>b[1]-a[1])[0]?.[0] ?? '—';
-                  const cpa     = c.sales > 0 ? `${(c.revenue/c.sales).toFixed(0)}€` : '—';
-                  const chCls   = c.medium?.toLowerCase().includes('cpc') ? 'ch-google' : 'ch-organic';
-                  return (
-                    <tr class="border-b border-white/4 last:border-0 hover:bg-white/2 transition-colors">
-                      <td class="py-2.5 px-2 text-white text-xs font-medium max-w-[110px] truncate">{c.campaign}</td>
-                      <td class="py-2.5 px-2"><span class={`text-xs font-semibold px-2 py-0.5 rounded-full ${chCls}`}>{c.source||'—'}</span></td>
-                      <td class="py-2.5 px-2 text-gray-500 text-xs">{c.medium||'—'}</td>
-                      <td class="py-2.5 px-2 tabular-nums font-semibold text-white">{c.views.toLocaleString('fr-FR')}</td>
-                      <td class="py-2.5 px-2 tabular-nums text-xs" style="color:#f59e0b">{c.leads > 0 ? c.leads : <span class="text-gray-700">—</span>}</td>
-                      <td class="py-2.5 px-2 tabular-nums text-xs" style="color:#a78bfa">{c.revenue > 0 ? c.revenue.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : <span class="text-gray-700">—</span>}</td>
-                      <td class="py-2.5 px-2 tabular-nums text-gray-400 text-xs">{cpa}</td>
-                      <td class="py-2.5 px-2 text-gray-400 text-xs capitalize">{topDev}</td>
-                      <td class="py-2.5 px-2 text-gray-400 text-xs">{topCtry !== '—' ? `${countryFlag(topCtry)} ${topCtry}` : '—'}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          );
-        })()}
+        <table class="w-full text-sm min-w-[680px]">
+          <thead>
+            <tr>{['Campaign','Source','Medium','Vues','Leads','Revenue','CPA','Device','Pays'].map(h => <th class="text-left pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5 whitespace-nowrap">{h}</th>)}</tr>
+          </thead>
+          <tbody>
+            {utmCamps.map(c => {
+              const cpa    = c.sales > 0 ? `${(c.revenue/c.sales).toFixed(0)}€` : '—';
+              const chCls  = c.medium?.toLowerCase().includes('cpc') ? 'ch-google' : 'ch-organic';
+              return (
+                <tr class="border-b border-white/4 last:border-0 hover:bg-white/2 transition-colors">
+                  <td class="py-2.5 px-2 text-white text-xs font-medium max-w-[110px] truncate">{c.campaign}</td>
+                  <td class="py-2.5 px-2"><span class={`text-xs font-semibold px-2 py-0.5 rounded-full ${chCls}`}>{c.source||'—'}</span></td>
+                  <td class="py-2.5 px-2 text-gray-500 text-xs">{c.medium||'—'}</td>
+                  <td class="py-2.5 px-2 tabular-nums font-semibold text-white">{c.views.toLocaleString('fr-FR')}</td>
+                  <td class="py-2.5 px-2 tabular-nums text-xs" style="color:#f59e0b">{c.leads > 0 ? c.leads : <span class="text-gray-700">—</span>}</td>
+                  <td class="py-2.5 px-2 tabular-nums text-xs" style="color:#a78bfa">{c.revenue > 0 ? c.revenue.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : <span class="text-gray-700">—</span>}</td>
+                  <td class="py-2.5 px-2 tabular-nums text-gray-400 text-xs">{cpa}</td>
+                  <td class="py-2.5 px-2 text-gray-400 text-xs capitalize">{c.topDevice}</td>
+                  <td class="py-2.5 px-2 text-gray-400 text-xs">{c.topCountry !== '—' ? `${countryFlag(c.topCountry)} ${c.topCountry}` : '—'}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     )}
   </div>
