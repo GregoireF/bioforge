@@ -362,6 +362,35 @@ const heatmapBlocks = blocks.map((b, i) => {
   return { id: b.id, title: b.title || 'Untitled', type: b.type, clicks, intensity, position: i + 1, active: b.active };
 });
 
+
+// ── v7: NEW METRICS ──────────────────────────────────────────────────────────
+// Peak hour / best day — approximate from daily labels (day of week frequency)
+const dayFreq: Record<string, number> = {};
+(rpcData?.daily_views ?? []).forEach(r => {
+  const dow = new Date(r.date + 'T12:00:00Z').toLocaleDateString('fr-FR', { weekday: 'long' });
+  dayFreq[dow] = (dayFreq[dow] ?? 0) + r.views;
+});
+const bestDay = Object.entries(dayFreq).sort((a, b) => b[1] - a[1])[0]?.[0] ?? '—';
+
+// Scroll depth proxy: clean_views / total_views (clean = stayed > Xs)
+const scrollDepth = summary.totalViews > 0
+  ? Math.round((summary.cleanViews / summary.totalViews) * 100) : 0;
+
+// Bounce rate proxy: 100 - scrollDepth (rough estimate)
+const bounceRate = Math.max(0, 100 - scrollDepth);
+
+// AOV & LTV
+const aov = sales > 0 ? revenue / sales : 0;
+const uniqueBuyers = sales; // proxy: 1 sale = 1 buyer
+const ltv = uniqueBuyers > 0 ? revenue / uniqueBuyers : 0;
+
+// Bloc activation rate
+const activeBlocks  = blocks.filter(b => b.active).length;
+const activationRate = blocks.length > 0 ? Math.round((activeBlocks / blocks.length) * 100) : 0;
+
+// Best delta bloc (highest click intensity)
+const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
+
 const exportedChart    = { labels: chartLabels, views: chartViews, clicks: chartClicks, rates: chartRates };
 const exportedDevices  = deviceData;
 const exportedDays     = days;
@@ -473,6 +502,41 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
   .alert-warning { background:rgba(248,113,113,.06); border-color:rgba(248,113,113,.2); }
   .alert-success { background:rgba(0,255,157,.05);   border-color:rgba(0,255,157,.2); }
   .alert-info    { background:rgba(56,189,248,.05);  border-color:rgba(56,189,248,.2); }
+
+  /* ── v7: Skeleton loaders ── */
+  @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+  .skeleton {
+    background: linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(255,255,255,.08) 50%, rgba(255,255,255,.04) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 8px;
+  }
+  /* ── v7: Tab slide indicator ── */
+  .tabs-wrapper { position:relative; }
+  .tab-indicator { position:absolute; bottom:0; height:2px; background:#00ff9d; border-radius:9999px; transition:left .25s cubic-bezier(.22,1,.36,1),width .25s cubic-bezier(.22,1,.36,1); }
+  /* ── v7: KPI ring (CSS only) ── */
+  .kpi-ring { position:absolute; top:8px; right:8px; width:32px; height:32px; }
+  .kpi-ring-svg { transform:rotate(-90deg); }
+  .kpi-ring-track { fill:none; stroke:rgba(255,255,255,.06); stroke-width:2.5; }
+  .kpi-ring-fill  { fill:none; stroke-width:2.5; stroke-linecap:round; transition:stroke-dashoffset .8s cubic-bezier(.16,1,.3,1); }
+  /* ── v7: Pulse delta ── */
+  @keyframes deltaPulse { 0%{opacity:1} 50%{opacity:.4} 100%{opacity:1} }
+  .delta-pulse { animation: deltaPulse 2s ease-in-out 3; }
+  /* ── v7: Noise texture ── */
+  .card-noise::after {
+    content:''; position:absolute; inset:0; pointer-events:none; border-radius:inherit;
+    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity:.4; mix-blend-mode:overlay;
+  }
+  /* ── v7: Chart metric toggle ── */
+  .metric-btn { transition:all .15s; }
+  .metric-btn.active { background:rgba(0,255,157,.12); color:#00ff9d; border-color:rgba(0,255,157,.3); }
+  /* ── v7: Filter chip ── */
+  .filter-chip { transition:all .15s; cursor:pointer; }
+  .filter-chip.active { background:rgba(0,255,157,.1); color:#00ff9d; border-color:rgba(0,255,157,.25); }
+  /* ── v7: Sort btn ── */
+  .sort-btn.active { color:#00ff9d; }
+
   /* @media print */
   @media print {
     @page { margin:16mm; size:A4; }
@@ -523,7 +587,7 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
   {rpcError && <div class="mb-4 p-4 rounded-xl border border-red-400/30 bg-red-400/8 text-red-400 text-sm">{rpcError}</div>}
 
   <!-- SECTION TABS (like Appearance) -->
-  <div class="flex items-center gap-1.5 flex-wrap mb-6">
+  <div class="flex items-center gap-1.5 flex-wrap mb-6 tabs-wrapper" style="position:relative">
     {[
       { id:'overview', label:'📊 Overview'             },
       { id:'traffic',  label:'📈 Trafic & Audience'    },
@@ -535,6 +599,7 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
         {s.label}
       </button>
     ))}
+    <div id="tab-indicator" style="position:absolute;bottom:0;height:2px;background:#00ff9d;border-radius:9999px;transition:left .25s cubic-bezier(.22,1,.36,1),width .25s cubic-bezier(.22,1,.36,1);pointer-events:none"></div>
   </div>
 
   <!-- ══ OVERVIEW ══ -->
@@ -628,6 +693,24 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
             {deltaRevenue.neutral ? <span class="delta-neu">—</span> : deltaRevenue.pos ? <span class="delta-pos">↑ {deltaRevenue.val}%</span> : <span class="delta-neg">↓ {deltaRevenue.val}%</span>}
           </div>
         </div>
+      </div>
+
+      <!-- v7: Peak metrics strip -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Meilleur jour',     value: bestDay,                              icon: '📅', color: '#00ff9d' },
+          { label: 'Scroll depth',      value: `${scrollDepth}%`,                   icon: '📜', color: '#38bdf8' },
+          { label: 'Taux de rebond',    value: `${bounceRate}%`,                     icon: '↩', color: '#f59e0b' },
+          { label: 'Blocs actifs',      value: `${activeBlocks} / ${blocks.length}`, icon: '⚡', color: '#a78bfa' },
+        ].map(m => (
+          <div class="flex items-center gap-3 p-3.5 glass rounded-xl border border-white/8">
+            <span class="text-xl leading-none shrink-0">{m.icon}</span>
+            <div class="min-w-0">
+              <p class="text-sm font-bold text-white truncate tabular-nums" style={`color:${m.color}`}>{m.value}</p>
+              <p class="text-xs text-gray-600 truncate">{m.label}</p>
+            </div>
+          </div>
+        ))}
       </div>
 
       <!-- Smart Alerts -->
@@ -757,11 +840,13 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
       <!-- Chart trafic + Appareils -->
       <div class="bento bento-main">
         <div class="p-5 glass rounded-2xl border border-white/8">
-          <div class="flex items-center justify-between mb-5">
-            <div><h3 class="text-sm font-semibold text-white">Trafic</h3><p class="text-xs text-gray-500 mt-0.5">Vues & clics · {days}j</p></div>
-            <div class="flex items-center gap-4">
-              <span class="flex items-center gap-1.5 text-xs text-gray-400"><span class="w-3 h-0.5 bg-neon-green rounded-full inline-block"></span>Vues</span>
-              <span class="flex items-center gap-1.5 text-xs text-gray-400"><span class="w-3 h-0.5 bg-neon-purple rounded-full inline-block"></span>Clics</span>
+          <div class="flex items-center justify-between mb-4">
+            <div><h3 class="text-sm font-semibold text-white">Trafic</h3><p class="text-xs text-gray-500 mt-0.5">· {days}j</p></div>
+            <div class="flex items-center gap-1" id="metric-toggle">
+              <button class="metric-btn active text-xs px-2.5 py-1 rounded-lg border border-white/10 text-gray-400" data-metric="both">Tout</button>
+              <button class="metric-btn text-xs px-2.5 py-1 rounded-lg border border-white/10 text-gray-400" data-metric="views">Vues</button>
+              <button class="metric-btn text-xs px-2.5 py-1 rounded-lg border border-white/10 text-gray-400" data-metric="clicks">Clics</button>
+              <button class="metric-btn text-xs px-2.5 py-1 rounded-lg border border-white/10 text-gray-400" data-metric="ctr">CTR</button>
             </div>
           </div>
           {chartLabels.length === 0 ? (
@@ -805,6 +890,19 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
               <canvas id="rate-chart" style="max-height:80px;width:100%"></canvas>
             </div>
           )}
+          <!-- v7: Scroll depth + bounce -->
+          <div class="p-4 glass rounded-xl border border-white/8">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs text-gray-500">Scroll depth</span>
+              <span class="text-sm font-bold tabular-nums" style="color:#38bdf8">{scrollDepth}%</span>
+            </div>
+            <div class="bar-track" style="height:4px"><div class="bar-fill" style={`width:${scrollDepth}%;background:#38bdf8;opacity:.8`}></div></div>
+            <div class="flex items-center justify-between mt-3 mb-2">
+              <span class="text-xs text-gray-500">Rebond estimé</span>
+              <span class="text-sm font-bold tabular-nums" style={`color:${bounceRate > 60 ? '#f87171' : bounceRate > 40 ? '#f59e0b' : '#00ff9d'}`}>{bounceRate}%</span>
+            </div>
+            <div class="bar-track" style="height:4px"><div class="bar-fill" style={`width:${bounceRate}%;background:${bounceRate > 60 ? '#f87171' : bounceRate > 40 ? '#f59e0b' : '#00ff9d'};opacity:.8`}></div></div>
+          </div>
         </div>
       </div>
 
@@ -924,6 +1022,21 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
   <div class="sec-panel" id="panel-revenue">
     <div class="space-y-5">
 
+      <!-- v7: Revenue KPIs strip -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: 'Revenue total',  value: revenue > 0 ? revenue.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : '—',      color:'#a78bfa' },
+          { label: 'Panier moyen',   value: aov > 0    ? aov.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : '—',           color:'#38bdf8' },
+          { label: 'LTV estimé',     value: ltv > 0    ? ltv.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : '—',           color:'#00ff9d' },
+          { label: 'Taux conv.',     value: `${convRate.toFixed(1)}%`,                                                                                          color:'#f59e0b' },
+        ].map(m => (
+          <div class="p-3.5 glass rounded-xl border border-white/8">
+            <p class="text-xs text-gray-600 mb-1">{m.label}</p>
+            <p class="text-lg font-bold tabular-nums" style={`color:${m.color}`}>{m.value}</p>
+          </div>
+        ))}
+      </div>
+
       <!-- Attribution par canal -->
       <div class="p-5 glass rounded-2xl border border-white/8">
         <div class="flex items-center justify-between mb-5">
@@ -1001,6 +1114,15 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
           </div>
           {isPro && utmData.length > 0 && <span class="text-xs text-gray-600">{utmData.length} événements</span>}
         </div>
+        {isPro && utmCamps.length > 0 && (
+          <div class="flex items-center gap-1.5 flex-wrap mb-4" id="utm-filter">
+            <span class="text-xs text-gray-600 mr-1">Source :</span>
+            <button class="filter-chip active text-xs px-2.5 py-1 rounded-full border border-white/10 text-gray-400" data-utm-filter="all">Tous</button>
+            {[...new Set(utmCamps.map(c => c.source))].slice(0,6).map(s => (
+              <button class="filter-chip text-xs px-2.5 py-1 rounded-full border border-white/10 text-gray-400" data-utm-filter={s}>{s}</button>
+            ))}
+          </div>
+        )}
         {!isPro ? (
           <div style="position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(8px);background:rgba(0,0,0,.72);border-radius:inherit">
             <div class="text-center px-8 py-6">
@@ -1021,12 +1143,12 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
               <thead>
                 <tr>{['Campaign','Source','Medium','Vues','Leads','Revenue','CPA','Device','Pays'].map(h => <th class="text-left pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5 whitespace-nowrap">{h}</th>)}</tr>
               </thead>
-              <tbody>
+              <tbody id="utm-table">
                 {utmCamps.map(c => {
                   const cpa   = c.sales > 0 ? `${(c.revenue/c.sales).toFixed(0)}€` : '—';
                   const chCls = c.medium?.toLowerCase().includes('cpc') ? 'ch-google' : 'ch-organic';
                   return (
-                    <tr class="border-b border-white/4 last:border-0 hover:bg-white/2 transition-colors">
+                    <tr class="border-b border-white/4 last:border-0 hover:bg-white/2 transition-colors" data-source={c.source||''}>
                       <td class="py-2.5 px-2 text-white text-xs font-medium max-w-[110px] truncate">{c.campaign}</td>
                       <td class="py-2.5 px-2"><span class={`text-xs font-semibold px-2 py-0.5 rounded-full ${chCls}`}>{c.source||'—'}</span></td>
                       <td class="py-2.5 px-2 text-gray-500 text-xs">{c.medium||'—'}</td>
@@ -1056,6 +1178,11 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
       <div class="p-5 glass rounded-2xl border border-white/8">
         <div class="flex items-center justify-between mb-5">
           <div><h3 class="text-sm font-semibold text-white">Heatmap des clics</h3><p class="text-xs text-gray-500 mt-0.5">Intensité par position · {blocks.length} blocs</p></div>
+          <div class="flex items-center gap-1" id="heatmap-sort">
+            <button class="sort-btn active text-xs px-2 py-1 rounded-lg border border-white/8 text-gray-500 hover:text-gray-300 transition-all" data-sort="clicks">Clics</button>
+            <button class="sort-btn text-xs px-2 py-1 rounded-lg border border-white/8 text-gray-500 hover:text-gray-300 transition-all" data-sort="position">Position</button>
+            <button class="sort-btn text-xs px-2 py-1 rounded-lg border border-white/8 text-gray-500 hover:text-gray-300 transition-all" data-sort="ctr">CTR</button>
+          </div>
         </div>
         {heatmapBlocks.length === 0 ? (
           <div class="text-center py-8">
@@ -1064,14 +1191,14 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
           </div>
         ) : (
           <div>
-            <div class="grid grid-cols-1 gap-1.5 mb-4">
+            <div class="grid grid-cols-1 gap-1.5 mb-4" id="heatmap-rows">
               {heatmapBlocks.map((block,i) => {
                 const ctr   = summary.totalViews > 0 ? ((block.clicks/summary.totalViews)*100).toFixed(1) : '0.0';
                 const alpha = block.intensity > 0 ? Math.max(0.06, block.intensity*0.85) : 0.03;
                 const bdr   = block.intensity > 0.5 ? `rgba(0,255,157,${Math.min(0.55,block.intensity)})` : 'rgba(255,255,255,.06)';
                 const heat  = block.intensity >= 0.8 ? '🔥' : block.intensity >= 0.5 ? '↑' : '';
                 return (
-                  <div class="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all" style={`background:rgba(0,255,157,${alpha});border:.5px solid ${bdr}`}>
+                  <div class="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all" style={`background:rgba(0,255,157,${alpha});border:.5px solid ${bdr}`} data-pos={block.position} data-clicks={block.clicks} data-ctr={summary.totalViews > 0 ? ((block.clicks/summary.totalViews)*100).toFixed(2) : '0'}>
                     <div class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 border"
                       style={block.intensity>0.5?'background:rgba(0,255,157,.15);border-color:rgba(0,255,157,.3);color:#00ff9d':'background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:#6b7280'}>
                       {block.position}
@@ -1094,14 +1221,20 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
                 );
               })}
             </div>
-            <div class="flex items-center gap-3 pt-3 border-t border-white/6">
-              <span class="text-xs text-gray-700">Intensité :</span>
-              {[.1,.3,.6,.85,1].map(v => (
-                <div class="flex items-center gap-1">
-                  <div class="w-4 h-4 rounded" style={`background:rgba(0,255,157,${Math.max(.06,v*.85)})`}></div>
-                  <span class="text-xs text-gray-700">{Math.round(v*100)}%</span>
-                </div>
-              ))}
+            <div class="flex items-center justify-between pt-3 border-t border-white/6">
+              <div class="flex items-center gap-3">
+                <span class="text-xs text-gray-700">Intensité :</span>
+                {[.1,.3,.6,.85,1].map(v => (
+                  <div class="flex items-center gap-1">
+                    <div class="w-4 h-4 rounded" style={`background:rgba(0,255,157,${Math.max(.06,v*.85)})`}></div>
+                    <span class="text-xs text-gray-700">{Math.round(v*100)}%</span>
+                  </div>
+                ))}
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-700">Activation :</span>
+                <span class="text-xs font-semibold" style={`color:${activationRate >= 80 ? '#00ff9d' : activationRate >= 50 ? '#f59e0b' : '#f87171'}`}>{activationRate}%</span>
+              </div>
             </div>
           </div>
         )}
@@ -1289,7 +1422,13 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
       const isPro            = el.dataset.isPro === 'true';
       const retentionData    = JSON.parse(el.dataset.retention ?? '[]');
 
-      // ── Chart.js ────────────────────────────────────────────────────────────
+      // ── Skeleton → show while Chart.js loads ─────────────────────────────
+      ['traffic-chart','rate-chart','roas-chart','retention-chart'].forEach(id => {
+        const c = document.getElementById(id);
+        if (c) { c.style.display = 'none'; const sk = document.createElement('div'); sk.className = 'skeleton'; sk.style.cssText = `height:${id==='rate-chart'?'80px':id==='roas-chart'||id==='retention-chart'?'100px':'240px'};width:100%;margin-bottom:0`; c.parentNode.insertBefore(sk, c); c._skeleton = sk; }
+      });
+
+      // ── Chart.js (lazy) ──────────────────────────────────────────────────
       await new Promise((resolve, reject) => {
         if (typeof Chart !== 'undefined') { resolve(null); return; }
         const s = document.createElement('script');
@@ -1298,36 +1437,46 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
         document.head.appendChild(s);
       });
 
+      // Remove skeletons & show canvas
+      document.querySelectorAll('canvas[id]').forEach(c => {
+        if (c._skeleton) { c._skeleton.remove(); c.style.display = ''; }
+      });
+
       Chart.defaults.font.family = 'DM Sans, system-ui, sans-serif';
       const GRID   = 'rgba(255,255,255,0.03)';
       const GREEN  = '#00ff9d';
       const PURPLE = '#bf00ff';
 
-      // Traffic chart
+      // ── Traffic chart (with metric toggle) ──────────────────────────────
+      let trafficChart = null;
       const trafficCtx = document.getElementById('traffic-chart');
-      if (trafficCtx && exportedChart.labels?.length > 0) {
-        new Chart(trafficCtx, {
-          type: 'line',
-          data: {
-            labels: exportedChart.labels,
-            datasets: [
-              { label:'Vues',  data:exportedChart.views,  borderColor:GREEN,  backgroundColor:(ctx)=>{ const g=ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height); g.addColorStop(0,GREEN+'22'); g.addColorStop(1,GREEN+'00'); return g; }, borderWidth:2,tension:0.4,fill:true,pointRadius:0,pointHoverRadius:4,pointHoverBackgroundColor:GREEN,pointHoverBorderColor:'#0a0a0a',pointHoverBorderWidth:2 },
-              { label:'Clics', data:exportedChart.clicks, borderColor:PURPLE, backgroundColor:(ctx)=>{ const g=ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height); g.addColorStop(0,PURPLE+'22'); g.addColorStop(1,PURPLE+'00'); return g; }, borderWidth:2,tension:0.4,fill:true,pointRadius:0,pointHoverRadius:4,pointHoverBackgroundColor:PURPLE,pointHoverBorderColor:'#0a0a0a',pointHoverBorderWidth:2 },
-            ],
-          },
-          options: {
-            responsive:true,maintainAspectRatio:false,
-            interaction:{mode:'index',intersect:false},
-            plugins:{ legend:{display:false}, tooltip:{backgroundColor:'#111115',titleColor:'#fff',bodyColor:'#9ca3af',borderColor:'rgba(255,255,255,0.08)',borderWidth:1,padding:12,displayColors:true,boxWidth:8,boxHeight:8,boxPadding:4,usePointStyle:true} },
-            scales:{
-              y:{beginAtZero:true,ticks:{color:'#4b5563',font:{size:10},maxTicksLimit:5},grid:{color:GRID},border:{display:false}},
-              x:{ticks:{color:'#4b5563',font:{size:10},maxTicksLimit:exportedDays===7?7:exportedDays===30?10:12,maxRotation:0},grid:{display:false},border:{display:false}},
-            },
-          },
+      function buildTrafficChart(mode) {
+        if (trafficChart) trafficChart.destroy();
+        if (!trafficCtx || !exportedChart.labels?.length) return;
+        const isCTR    = mode === 'ctr';
+        const isViews  = mode === 'views' || mode === 'both';
+        const isClicks = mode === 'clicks' || mode === 'both';
+        const datasets = [];
+        if (isViews && !isCTR)  datasets.push({ label:'Vues',  data:exportedChart.views,  borderColor:GREEN,  backgroundColor:(ctx)=>{ const g=ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height); g.addColorStop(0,GREEN+'22'); g.addColorStop(1,GREEN+'00'); return g; }, borderWidth:2,tension:0.4,fill:true,pointRadius:0,pointHoverRadius:4,pointHoverBackgroundColor:GREEN,pointHoverBorderColor:'#0a0a0a',pointHoverBorderWidth:2 });
+        if (isClicks && !isCTR) datasets.push({ label:'Clics', data:exportedChart.clicks, borderColor:PURPLE, backgroundColor:(ctx)=>{ const g=ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height); g.addColorStop(0,PURPLE+'22'); g.addColorStop(1,PURPLE+'00'); return g; }, borderWidth:2,tension:0.4,fill:true,pointRadius:0,pointHoverRadius:4,pointHoverBackgroundColor:PURPLE,pointHoverBorderColor:'#0a0a0a',pointHoverBorderWidth:2 });
+        if (isCTR) datasets.push({ label:'CTR%', data:exportedChart.rates, borderColor:'#f59e0b', backgroundColor:(ctx)=>{ const g=ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height); g.addColorStop(0,'#f59e0b22'); g.addColorStop(1,'#f59e0b00'); return g; }, borderWidth:2,tension:0.4,fill:true,pointRadius:0,pointHoverRadius:4,pointHoverBackgroundColor:'#f59e0b',pointHoverBorderColor:'#0a0a0a',pointHoverBorderWidth:2 });
+        trafficChart = new Chart(trafficCtx, {
+          type:'line', data:{ labels:exportedChart.labels, datasets },
+          options:{ responsive:true,maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{ legend:{display:false}, tooltip:{backgroundColor:'#111115',titleColor:'#fff',bodyColor:'#9ca3af',borderColor:'rgba(255,255,255,0.08)',borderWidth:1,padding:12,displayColors:true,boxWidth:8,boxHeight:8,boxPadding:4,usePointStyle:true} }, scales:{ y:{beginAtZero:true,ticks:{color:'#4b5563',font:{size:10},maxTicksLimit:5},grid:{color:GRID},border:{display:false}}, x:{ticks:{color:'#4b5563',font:{size:10},maxTicksLimit:exportedDays===7?7:exportedDays===30?10:12,maxRotation:0},grid:{display:false},border:{display:false}} } },
         });
       }
+      buildTrafficChart('both');
 
-      // CTR mini bar
+      // Metric toggle handler
+      document.getElementById('metric-toggle')?.querySelectorAll('.metric-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.metric-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          buildTrafficChart(btn.dataset.metric);
+        });
+      });
+
+      // ── CTR mini bar ──────────────────────────────────────────────────────
       const rateCtx = document.getElementById('rate-chart');
       if (rateCtx && exportedChart.labels?.length > 0) {
         new Chart(rateCtx, {
@@ -1337,31 +1486,20 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
         });
       }
 
-      // Retention stacked bar
+      // ── Retention stacked bar ────────────────────────────────────────────
       const retCtx = document.getElementById('retention-chart');
       if (retCtx && retentionData.length > 0) {
         new Chart(retCtx, {
           type:'bar',
-          data:{
-            labels:retentionData.map(d=>d.date),
-            datasets:[
-              {label:'Nouveaux',  data:retentionData.map(d=>d.new),       backgroundColor:GREEN+'40',  borderColor:GREEN+'80',  borderWidth:1,borderRadius:2,stack:'s'},
-              {label:'Récurrents',data:retentionData.map(d=>d.returning), backgroundColor:'#38bdf440', borderColor:'#38bdf480', borderWidth:1,borderRadius:2,stack:'s'},
-            ],
-          },
-          options:{
-            responsive:true,maintainAspectRatio:false,
-            interaction:{mode:'index',intersect:false},
-            plugins:{ legend:{display:true,position:'top',labels:{color:'#6b7280',font:{size:10},boxWidth:8,boxHeight:8,usePointStyle:true}}, tooltip:{backgroundColor:'#111115',titleColor:'#fff',bodyColor:'#9ca3af',borderColor:'rgba(255,255,255,0.08)',borderWidth:1} },
-            scales:{
-              y:{beginAtZero:true,stacked:true,ticks:{color:'#4b5563',font:{size:10},maxTicksLimit:4},grid:{color:GRID},border:{display:false}},
-              x:{stacked:true,ticks:{color:'#4b5563',font:{size:10},maxTicksLimit:exportedDays===7?7:10,maxRotation:0},grid:{display:false},border:{display:false}},
-            },
-          },
+          data:{ labels:retentionData.map(d=>d.date), datasets:[
+            {label:'Nouveaux',   data:retentionData.map(d=>d.new),       backgroundColor:GREEN+'40',  borderColor:GREEN+'80',  borderWidth:1,borderRadius:2,stack:'s'},
+            {label:'Récurrents', data:retentionData.map(d=>d.returning), backgroundColor:'#38bdf440', borderColor:'#38bdf480', borderWidth:1,borderRadius:2,stack:'s'},
+          ]},
+          options:{ responsive:true,maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{legend:{display:true,position:'top',labels:{color:'#6b7280',font:{size:10},boxWidth:8,boxHeight:8,usePointStyle:true}},tooltip:{backgroundColor:'#111115',titleColor:'#fff',bodyColor:'#9ca3af',borderColor:'rgba(255,255,255,0.08)',borderWidth:1}}, scales:{ y:{beginAtZero:true,stacked:true,ticks:{color:'#4b5563',font:{size:10},maxTicksLimit:4},grid:{color:GRID},border:{display:false}}, x:{stacked:true,ticks:{color:'#4b5563',font:{size:10},maxTicksLimit:exportedDays===7?7:10,maxRotation:0},grid:{display:false},border:{display:false}} } },
         });
       }
 
-      // ROAS chart
+      // ── ROAS chart ────────────────────────────────────────────────────────
       const roasCtx = document.getElementById('roas-chart');
       if (roasCtx && isPro && exportedChannels?.length > 0) {
         const chR = exportedChannels.filter(c => c.revenue > 0);
@@ -1375,24 +1513,22 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
         }
       }
 
-      // ── Exports ──────────────────────────────────────────────────────────────
+      // ── Exports ───────────────────────────────────────────────────────────
       document.getElementById('export-csv-btn')?.addEventListener('click', () => {
-        if (!exportedChart?.labels?.length) { alert('Aucune donnée à exporter'); return; }
+        if (!exportedChart?.labels?.length) { alert('Aucune donnée'); return; }
         const rows = [['Date','Vues','Clics','CTR%']];
-        exportedChart.labels.forEach((l, i) => rows.push([l, exportedChart.views[i], exportedChart.clicks[i], exportedChart.rates[i]]));
-        const csv  = rows.map(r => r.join(',')).join('\n');
-        const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+        exportedChart.labels.forEach((l,i) => rows.push([l,exportedChart.views[i],exportedChart.clicks[i],exportedChart.rates[i]]));
+        const blob = new Blob([rows.map(r=>r.join(',')).join('\n')],{type:'text/csv;charset=utf-8;'});
         const url  = URL.createObjectURL(blob);
         Object.assign(document.createElement('a'),{href:url,download:`analytics-${exportedDays}j.csv`}).click();
         URL.revokeObjectURL(url);
       });
-      document.getElementById('export-pdf-btn')?.addEventListener('click', () => { window.print(); });
+      document.getElementById('export-pdf-btn')?.addEventListener('click', () => window.print());
 
-      // ── Goals ─────────────────────────────────────────────────────────────────
+      // ── Goals ─────────────────────────────────────────────────────────────
       const GOALS_KEY = 'bf_analytics_goals_v1';
       function loadGoals() { try { return JSON.parse(localStorage.getItem(GOALS_KEY) ?? '{}'); } catch { return {}; } }
       function saveGoals(g) { localStorage.setItem(GOALS_KEY, JSON.stringify(g)); }
-
       function renderGoals() {
         const goals  = loadGoals();
         const actual = { views:Number(el.dataset.goalsViews??0), clicks:Number(el.dataset.goalsClicks??0), leads:Number(el.dataset.goalsLeads??0), revenue:Number(el.dataset.goalsRevenue??0) };
@@ -1405,13 +1541,10 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
         }
         list.innerHTML = items.map(item => {
           const g = Number(goals[item.key]??0); if (!g) return '';
-          const a = actual[item.key]??0;
-          const pct = Math.min(100, g>0?Math.round((a/g)*100):0);
-          const done = pct>=100;
+          const a = actual[item.key]??0, pct = Math.min(100,g>0?Math.round((a/g)*100):0), done = pct>=100;
           return `<div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;color:rgba(255,255,255,.4)">${item.label}</span><div style="display:flex;align-items:center;gap:6px">${done?'<span style="font-size:10px;font-weight:700;color:#00ff9d">✓ Atteint</span>':''}<span style="font-size:11px;font-weight:700;color:${done?'#00ff9d':item.color}">${pct}%</span></div></div><div style="background:rgba(255,255,255,.04);border-radius:9999px;height:5px;overflow:hidden"><div style="height:100%;border-radius:9999px;width:${pct}%;background:${done?'#00ff9d':item.color};opacity:${done?1:.7};transition:width .8s cubic-bezier(.16,1,.3,1)"></div></div><div style="font-size:10px;color:rgba(255,255,255,.2);margin-top:3px">${a.toLocaleString('fr-FR')} / ${g.toLocaleString('fr-FR')}</div></div>`;
         }).join('');
       }
-
       document.getElementById('edit-goals-btn')?.addEventListener('click', () => {
         const ed = document.getElementById('goals-editor');
         if (!ed) return;
@@ -1428,28 +1561,35 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
       });
       renderGoals();
 
-      // ── Section tabs (like Appearance) ───────────────────────────────────────
+      // ── Section tabs (like Appearance) + sessionStorage ──────────────────
       function activateTab(id) {
         document.querySelectorAll('.sec-tab').forEach(t => t.classList.toggle('active', t.dataset.section===id));
         document.querySelectorAll('.sec-panel').forEach(p => p.classList.toggle('active', p.id===`panel-${id}`));
-        // Lazy-init charts when tab becomes visible
-        if (id === 'traffic') initTrafficCharts();
-        if (id === 'revenue') initRoasChart();
+        try { sessionStorage.setItem('bf_analytics_tab', id); } catch {}
+        // Animated tab indicator
+        const activeBtn = document.querySelector(`.sec-tab[data-section="${id}"]`);
+        const indicator = document.getElementById('tab-indicator');
+        if (activeBtn && indicator) {
+          indicator.style.left  = activeBtn.offsetLeft + 'px';
+          indicator.style.width = activeBtn.offsetWidth + 'px';
+        }
       }
-
       document.querySelectorAll('.sec-tab').forEach(btn => {
         btn.addEventListener('click', () => {
-          const id = btn.dataset.section;
-          activateTab(id);
-          history.replaceState(null, '', `?days=${exportedDays}&tab=${id}`);
+          activateTab(btn.dataset.section);
+          history.replaceState(null,'',`?days=${exportedDays}&tab=${btn.dataset.section}`);
         });
       });
-
-      // Restore tab from URL
+      // Restore: URL > sessionStorage > default
       const urlTab = new URLSearchParams(location.search).get('tab');
-      if (urlTab && document.getElementById(`panel-${urlTab}`)) activateTab(urlTab);
+      let storedTab = null;
+      try { storedTab = sessionStorage.getItem('bf_analytics_tab'); } catch {}
+      const initTab = (urlTab && document.getElementById(`panel-${urlTab}`)) ? urlTab
+                    : (storedTab && document.getElementById(`panel-${storedTab}`)) ? storedTab
+                    : 'overview';
+      activateTab(initTab);
 
-      // ── Inner tabs (Geo / Sources) ───────────────────────────────────────────
+      // ── Inner tabs (Geo / Sources) ───────────────────────────────────────
       document.querySelectorAll('.insight-tab-inner').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.dataset.innerTab;
@@ -1458,13 +1598,46 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
         });
       });
 
-      // ── D3 Choropleth Map ────────────────────────────────────────────────────
+      // ── UTM source filter ────────────────────────────────────────────────
+      document.getElementById('utm-filter')?.querySelectorAll('.filter-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('#utm-filter .filter-chip').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const filter = btn.dataset.utmFilter;
+          document.querySelectorAll('#utm-table tbody tr').forEach(tr => {
+            tr.style.display = (filter==='all' || tr.dataset.source===filter) ? '' : 'none';
+          });
+        });
+      });
+
+      // ── Heatmap sort ──────────────────────────────────────────────────────
+      document.getElementById('heatmap-sort')?.querySelectorAll('.sort-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('#heatmap-sort .sort-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const sortKey = btn.dataset.sort;
+          const container = document.getElementById('heatmap-rows');
+          if (!container) return;
+          const rows = [...container.children];
+          rows.sort((a, b) => {
+            if (sortKey === 'position') return Number(a.dataset.pos||0) - Number(b.dataset.pos||0);
+            if (sortKey === 'ctr')      return Number(b.dataset.ctr||0) - Number(a.dataset.ctr||0);
+            return Number(b.dataset.clicks||0) - Number(a.dataset.clicks||0);
+          });
+          rows.forEach(r => container.appendChild(r));
+        });
+      });
+
+      // ── D3 Choropleth Map (IntersectionObserver lazy init) ───────────────
       const countriesData = JSON.parse(el.dataset.countries ?? '[]');
       const mapSvgEl   = document.getElementById('world-map');
       const mapLoader  = document.getElementById('world-map-loader');
       const mapTooltip = document.getElementById('map-tooltip');
 
-      if (mapSvgEl) {
+      async function initMap() {
+        if (!mapSvgEl || mapSvgEl._mapInited) return;
+        mapSvgEl._mapInited = true;
+
         await Promise.all([
           new Promise((res,rej)=>{ if(window.d3){res(null);return;} const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s); }),
           new Promise((res,rej)=>{ if(window.topojson){res(null);return;} const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/topojson@3.0.2/dist/topojson.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s); }),
@@ -1511,8 +1684,8 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
             d3.select(this.parentNode).selectAll('.country').filter(fd=>fd===d).attr('fill',fd=>{const v=viewsMap.get(+fd.id);return v?colorScale(v):'#101f16';});
           });
         const zoom=d3.zoom().scaleExtent([0.9,12]).translateExtent([[-W*.5,-H*.5],[W*1.5,H*1.5]])
-          .filter(event=>{if(event.type==='dblclick')return false;return true;})
-          .on('zoom',(event)=>{g.attr('transform',event.transform);const k=event.transform.k;g.selectAll('.country').attr('stroke-width',Math.max(0.2,0.4/k));mapSvgEl.style.cursor=event.sourceEvent?.buttons?'grabbing':'grab';});
+          .filter(ev=>{if(ev.type==='dblclick')return false;return true;})
+          .on('zoom',(ev)=>{g.attr('transform',ev.transform);g.selectAll('.country').attr('stroke-width',Math.max(0.2,0.4/ev.transform.k));mapSvgEl.style.cursor=ev.sourceEvent?.buttons?'grabbing':'grab';});
         svg.call(zoom);
         document.getElementById('map-zoom-in')?.addEventListener('click',()=>svg.transition().duration(300).call(zoom.scaleBy,1.6));
         document.getElementById('map-zoom-out')?.addEventListener('click',()=>svg.transition().duration(300).call(zoom.scaleBy,0.625));
@@ -1536,8 +1709,16 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
         if(mapLoader)mapLoader.style.display='none';
         const ro=new ResizeObserver(()=>{const nW=mapSvgEl.clientWidth;if(!nW)return;projection.scale(nW/6.1).translate([nW/2,H/2+15]);svg.attr('width',nW);g.selectAll('path').attr('d',pathGen);});
         ro.observe(mapSvgEl);
-      } else if(mapLoader) {
-        mapLoader.innerHTML='<p style="color:#374151;font-size:12px;padding:24px">Carte non disponible</p>';
+      }
+
+      // Lazy-init map via IntersectionObserver
+      if (mapSvgEl) {
+        const obs = new IntersectionObserver(entries => {
+          if (entries[0].isIntersecting) { initMap(); obs.disconnect(); }
+        }, { threshold: 0.1 });
+        obs.observe(mapSvgEl);
+      } else if (mapLoader) {
+        mapLoader.innerHTML = '<p style="color:#374151;font-size:12px;padding:24px">Carte non disponible</p>';
       }
 
     })();
