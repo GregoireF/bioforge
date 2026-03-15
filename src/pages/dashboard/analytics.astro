@@ -551,11 +551,12 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
   .insight-panel.active { display:block; }
 
   /* ── KPI cards ── */
-  .kpi-card { position:relative; overflow:hidden; transition:transform .2s cubic-bezier(.22,1,.36,1),box-shadow .2s; }
-  .kpi-card::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at 0% 0%,var(--glow) 0%,transparent 65%); opacity:.1; pointer-events:none; }
-  .kpi-card:hover { transform:translateY(-2px); box-shadow:0 8px 28px rgba(0,0,0,.35); }
-  /* Noise texture on cards */
-  .kpi-card::after { content:''; position:absolute; inset:0; border-radius:inherit; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E"); opacity:.35; mix-blend-mode:overlay; pointer-events:none; }
+  .kpi-card { position:relative; overflow:hidden; transition:transform .22s cubic-bezier(.22,1,.36,1),box-shadow .22s,border-color .22s; }
+  .kpi-card::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at 10% 10%,var(--glow) 0%,transparent 60%); opacity:.08; pointer-events:none; transition:opacity .3s; }
+  .kpi-card:hover { transform:translateY(-3px); box-shadow:0 12px 40px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.06); }
+  .kpi-card:hover::before { opacity:.16; }
+  /* Top shine line */
+  .kpi-card::after { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent); pointer-events:none; }
 
   /* ── Stripe-style revenue hero ── */
   .revenue-hero { background:linear-gradient(135deg,rgba(167,139,250,.08) 0%,rgba(56,189,248,.04) 100%); border:1px solid rgba(167,139,250,.15); }
@@ -623,6 +624,40 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
   .d-3{animation-delay:180ms} .d-4{animation-delay:240ms} .d-5{animation-delay:300ms}
   .stagger-1{animation-delay:.04s} .stagger-2{animation-delay:.08s} .stagger-3{animation-delay:.12s}
 
+  /* ── Delta badges enhanced ── */
+  .delta-pos { color:#00ff9d; font-size:11px; font-weight:700; display:inline-flex;align-items:center;gap:2px; }
+  .delta-neg { color:#f87171; font-size:11px; font-weight:700; display:inline-flex;align-items:center;gap:2px; }
+  .delta-neu { color:rgba(255,255,255,.18); font-size:11px; }
+
+  /* ── Revenue hero enhanced ── */
+  .revenue-hero { background:linear-gradient(135deg,rgba(167,139,250,.1) 0%,rgba(56,189,248,.05) 50%,rgba(0,255,157,.03) 100%); border:1px solid rgba(167,139,250,.18); position:relative; overflow:hidden; }
+  .revenue-hero::before { content:''; position:absolute; top:-50%; right:-20%; width:400px; height:400px; background:radial-gradient(circle,rgba(167,139,250,.08) 0%,transparent 70%); pointer-events:none; }
+  .revenue-hero-value { font-size:clamp(2.2rem,5vw,3.8rem); font-weight:900; letter-spacing:-.04em; line-height:1; font-variant-numeric:tabular-nums; }
+
+  /* ── Heatmap canvas ── */
+  #heatmap-canvas { border-radius:10px; cursor:crosshair; display:block; }
+  .heatmap-cell-tooltip { backdrop-filter:blur(12px); }
+
+  /* ── AB comparison bars ── */
+  .ab-bar-fill { transition:width .8s cubic-bezier(.16,1,.3,1); }
+
+  /* ── Score ring ── */
+  .score-ring { transform:rotate(-90deg); }
+
+  /* ── Section label ── */
+  .section-label { font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.22); }
+
+  /* ── Pill badge ── */
+  .pill { display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:10px;font-weight:600; }
+
+  /* ── Glass card shimmer on hover ── */
+  @keyframes cardShimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(200%)} }
+  .glass:hover .shimmer-line { animation:cardShimmer .6s ease forwards; }
+  .shimmer-line { position:absolute;top:0;left:0;width:50%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.04),transparent);pointer-events:none;transform:translateX(-100%); }
+
+  /* ── Funnel step ── */
+  .funnel-step { transition:transform .15s; }
+  .funnel-step:hover { transform:scale(1.02); }
   /* ── @media print ── */
   @media print {
     @page { margin:16mm; size:A4; }
@@ -695,18 +730,35 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
 
         <!-- Hero: Vues (spans 4 cols on lg) -->
         <div class="col-span-12 sm:col-span-6 lg:col-span-4 kpi-card p-5 glass rounded-2xl border border-white/8 cursor-default" style="--glow:#00ff9d">
-          <div class="flex items-start justify-between mb-3">
-            <div class="w-9 h-9 rounded-xl bg-neon-green/10 border border-neon-green/20 flex items-center justify-center">
-              <svg class="w-4 h-4 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+          <div class="shimmer-line"></div>
+          <div class="flex items-start justify-between mb-4">
+            <div>
+              <p class="section-label mb-2">Vues totales</p>
+              <div class="kpi-value text-5xl font-black text-white tabular-nums tracking-tight leading-none">{summary.totalViews.toLocaleString('fr-FR')}</div>
             </div>
-            <div set:html={viewSparkline} class="opacity-70"></div>
+            <div set:html={viewSparkline} class="opacity-75 mt-1 shrink-0"></div>
           </div>
-          <p class="text-xs text-gray-500 font-medium uppercase tracking-widest mb-1">Vues totales</p>
-          <div class="kpi-value text-4xl font-black text-white tabular-nums tracking-tight leading-none">{summary.totalViews.toLocaleString('fr-FR')}</div>
-          <div class="flex items-center justify-between mt-2.5">
-            <p class="text-xs text-gray-600">{summary.avgPerDay}/j · {summary.cleanViews.toLocaleString('fr-FR')} nettes</p>
-            {deltaViews.neutral ? <span class="delta-neu">—</span> : deltaViews.pos ? <span class="delta-pos">↑ {deltaViews.val}%</span> : <span class="delta-neg">↓ {deltaViews.val}%</span>}
+          <div class="flex items-center gap-3 mb-3">
+            {deltaViews.neutral
+              ? <span class="delta-neu pill" style="background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.08)">— vs préc.</span>
+              : deltaViews.pos
+                ? <span class="delta-pos pill" style="background:rgba(0,255,157,.08);border:.5px solid rgba(0,255,157,.2)">↑ {deltaViews.val}%</span>
+                : <span class="delta-neg pill" style="background:rgba(248,113,113,.08);border:.5px solid rgba(248,113,113,.2)">↓ {deltaViews.val}%</span>
+            }
+            <span class="text-xs text-gray-600">{summary.avgPerDay}/j moy.</span>
           </div>
+          <!-- Mini progress: clean vs total -->
+          {summary.totalViews > 0 && (
+            <div>
+              <div class="flex justify-between text-xs mb-1">
+                <span class="text-gray-700">Vues nettes</span>
+                <span class="text-gray-500 tabular-nums">{Math.round((summary.cleanViews/summary.totalViews)*100)}%</span>
+              </div>
+              <div class="bar-track" style="height:2px">
+                <div class="bar-fill" style={`width:${Math.round((summary.cleanViews/summary.totalViews)*100)}%;background:#00ff9d;opacity:.6`}></div>
+              </div>
+            </div>
+          )}
         </div>
 
         <!-- Right grid: 5 KPIs in 2+3 rows -->
@@ -764,13 +816,21 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
 
           <!-- Score card -->
           <div class="kpi-card p-4 glass rounded-2xl border border-white/8 cursor-default" style={`--glow:${perfColor}`}>
-            <div class="flex items-center justify-between mb-2">
-              <p class="text-xs text-gray-500 font-medium">Score IA</p>
-              <span class="text-xs font-black px-2 py-0.5 rounded-lg" style={`background:${perfColor}18;color:${perfColor}`}>{perfGrade}</span>
-            </div>
-            <div class="kpi-value text-2xl font-bold tabular-nums" style={`color:${perfColor}`}>{perfScore}<span class="text-sm text-gray-600">/100</span></div>
-            <div class="bar-track mt-2" style="height:3px">
-              <div class="bar-fill" style={`width:${perfScore}%;background:${perfColor}`}></div>
+            <div class="shimmer-line"></div>
+            <p class="section-label mb-2">Score IA</p>
+            <div class="flex items-center gap-3">
+              <!-- SVG Ring -->
+              <svg width="44" height="44" viewBox="0 0 44 44" class="score-ring shrink-0">
+                <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="3"/>
+                <circle cx="22" cy="22" r="18" fill="none" stroke={perfColor} stroke-width="3"
+                  stroke-linecap="round" stroke-dasharray={`${(perfScore/100)*113.1} 113.1`}
+                  style={`filter:drop-shadow(0 0 4px ${perfColor}60)`}/>
+                <text x="22" y="27" text-anchor="middle" fill={perfColor} font-size="11" font-weight="800" font-family="DM Sans,sans-serif">{perfGrade}</text>
+              </svg>
+              <div>
+                <div class="kpi-value text-2xl font-bold tabular-nums" style={`color:${perfColor}`}>{perfScore}<span class="text-xs text-gray-600 ml-0.5">/100</span></div>
+                <p class="text-xs text-gray-600 mt-0.5">{topRecos[0]?.slice(0,40)}…</p>
+              </div>
             </div>
           </div>
 
@@ -902,24 +962,37 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
 
       </div>
 
-      <!-- Funnel (compact) -->
+      <!-- Funnel (visual) -->
       <div class="p-5 glass rounded-2xl border border-white/8">
-        <h3 class="text-sm font-semibold text-white mb-4">Funnel <span class="text-gray-600 font-normal text-xs ml-1">· {days}j</span></h3>
-        <div class="grid grid-cols-4 gap-2">
+        <h3 class="text-sm font-semibold text-white mb-5">Funnel <span class="text-gray-600 font-normal text-xs ml-1">· {days}j</span></h3>
+        <div class="flex items-stretch gap-0">
           {funnelSteps.map((step, i) => {
             const prev     = i > 0 ? funnelSteps[i-1].value : step.value;
             const dropPct  = prev > 0 && i > 0 ? (1-step.value/prev)*100 : 0;
-            const widthPct = funnelSteps[0].value > 0 ? (step.value/funnelSteps[0].value)*100 : 0;
+            const widthPct = funnelSteps[0].value > 0 ? (step.value/funnelSteps[0].value)*100 : 100;
+            const isLast   = i === funnelSteps.length - 1;
             return (
-              <div class="flex flex-col gap-2">
-                <div class="text-center p-3 rounded-xl border" style={`background:${step.color}08;border-color:${step.color}20`}>
-                  <div class="text-lg font-black tabular-nums" style={`color:${step.color}`}>{step.value.toLocaleString('fr-FR')}</div>
-                  <div class="text-xs text-gray-500 mt-0.5">{step.label}</div>
-                  {i > 0 && dropPct > 0 && <div class="text-xs mt-1 font-semibold" style="color:rgba(248,113,113,.7)">↓{dropPct.toFixed(0)}%</div>}
+              <div class="flex items-center flex-1 min-w-0">
+                <!-- Step block -->
+                <div class="funnel-step flex-1 min-w-0 p-3.5 rounded-xl border cursor-default"
+                  style={`background:${step.color}0a;border-color:${step.color}25;box-shadow:inset 0 1px 0 ${step.color}15`}>
+                  <div class="section-label mb-1.5">{step.label}</div>
+                  <div class="text-xl font-black tabular-nums leading-none" style={`color:${step.color}`}>{step.value.toLocaleString('fr-FR')}</div>
+                  {i > 0 && dropPct > 0 && (
+                    <div class="mt-1.5 flex items-center gap-1">
+                      <div class="h-1 rounded-full flex-1" style="background:rgba(248,113,113,.12)">
+                        <div class="h-full rounded-full" style={`width:${dropPct}%;background:rgba(248,113,113,.5)`}></div>
+                      </div>
+                      <span class="text-xs shrink-0" style="color:rgba(248,113,113,.7)">↓{dropPct.toFixed(0)}%</span>
+                    </div>
+                  )}
                 </div>
-                <div class="bar-track" style="height:4px">
-                  <div class="bar-fill" style={`width:${widthPct}%;background:${step.color};opacity:.7;animation-delay:${i*80}ms`}></div>
-                </div>
+                <!-- Arrow connector -->
+                {!isLast && (
+                  <div class="flex items-center justify-center w-6 shrink-0" style="color:rgba(255,255,255,.12)">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8.293 1.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L12.586 9H1a1 1 0 110-2h11.586L8.293 2.707a1 1 0 010-1.414z"/></svg>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -1085,16 +1158,15 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
 
       <!-- Carte + Sources (inner tabs) -->
       <div class="p-5 glass rounded-2xl border border-white/8">
-        <div class="flex items-center gap-1 mb-5 border-b border-white/8 pb-3 overflow-x-auto scrollbar-none">
-          {[
-            {id:'geo',     label:'Géographie', icon:'M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064'},
-            {id:'sources', label:'Sources',    icon:'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.1-1.1m-.757-4.9a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1'},
-          ].map((tab, i) => (
-            <button class={`insight-tab-inner flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${i===0?'active text-white bg-white/8':'text-gray-500 hover:text-gray-300'}`} data-inner-tab={tab.id}>
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={tab.icon}/></svg>
-              {tab.label}
-            </button>
-          ))}
+        <div class="flex items-center gap-1 mb-5 border-b border-white/8 pb-3 overflow-x-auto scrollbar-none" id="inner-tabs-geo-sources">
+          <button class="insight-tab-inner active flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-white bg-white/8" data-inner-tab="geo">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064"/></svg>
+            Géographie
+          </button>
+          <button class="insight-tab-inner flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap text-gray-500 hover:text-gray-300" data-inner-tab="sources">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.1-1.1m-.757-4.9a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+            Sources
+          </button>
         </div>
         <div class="insight-panel active" id="inner-panel-geo">
           {topCountries.length === 0 ? (
@@ -1173,62 +1245,73 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
 
       <!-- Hero revenue (Stripe-style) -->
       <div class="revenue-hero p-6 rounded-2xl">
-        <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <!-- Top row: revenue + delta -->
+        <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
           <div>
-            <p class="text-xs font-semibold uppercase tracking-widest mb-2" style="color:rgba(167,139,250,.6)">Revenue total · {days}j</p>
+            <div class="flex items-center gap-2 mb-3">
+              <span class="section-label">Revenue total</span>
+              <span class="section-label opacity-50">· {days}j</span>
+            </div>
             <div class="revenue-hero-value text-white tabular-nums">
-              {revenue > 0 ? revenue.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : <span class="text-gray-600">—</span>}
+              {revenue > 0 ? revenue.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : <span style="color:rgba(255,255,255,.2)">—</span>}
             </div>
-            {revenue > 0 && (
-              <div class="flex items-center gap-2 mt-2">
-                {deltaRevenue.neutral ? <span class="text-sm text-gray-600">— vs préc.</span> : deltaRevenue.pos ? <span class="text-sm font-semibold" style="color:#00ff9d">↑ {deltaRevenue.val}% vs période préc.</span> : <span class="text-sm font-semibold" style="color:#f87171">↓ {deltaRevenue.val}% vs période préc.</span>}
-              </div>
-            )}
-          </div>
-          <div class="flex gap-6 shrink-0">
-            <div class="text-right">
-              <p class="text-xs text-gray-600 mb-1">Ventes</p>
-              <p class="text-2xl font-bold text-white tabular-nums">{sales}</p>
-            </div>
-            <div class="text-right">
-              <p class="text-xs text-gray-600 mb-1">Panier moy.</p>
-              <p class="text-2xl font-bold tabular-nums" style="color:#38bdf8">{aov > 0 ? aov.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : '—'}</p>
-            </div>
-            <div class="text-right">
-              <p class="text-xs text-gray-600 mb-1">LTV</p>
-              <p class="text-2xl font-bold tabular-nums" style="color:#00ff9d">{ltv > 0 ? ltv.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : '—'}</p>
-            </div>
-            <div class="text-right">
-              <p class="text-xs text-gray-600 mb-1">Conv.</p>
-              <p class="text-2xl font-bold tabular-nums" style="color:#f59e0b">{convRate.toFixed(1)}%</p>
+            <div class="flex items-center gap-3 mt-3">
+              {deltaRevenue.neutral
+                ? <span class="text-xs text-gray-600 pill" style="background:rgba(255,255,255,.04);border:.5px solid rgba(255,255,255,.08)">— vs période préc.</span>
+                : deltaRevenue.pos
+                  ? <span class="delta-pos pill text-xs" style="background:rgba(0,255,157,.08);border:.5px solid rgba(0,255,157,.2)">↑ {deltaRevenue.val}% vs période préc.</span>
+                  : <span class="delta-neg pill text-xs" style="background:rgba(248,113,113,.08);border:.5px solid rgba(248,113,113,.2)">↓ {deltaRevenue.val}% vs période préc.</span>
+              }
             </div>
           </div>
+          {revenue > 0 && (
+            <div set:html={revenueSparkline} class="opacity-60 shrink-0 mt-1 sm:mt-0"></div>
+          )}
+        </div>
+        <!-- Bottom row: 4 sub-metrics -->
+        <div class="grid grid-cols-4 gap-px rounded-xl overflow-hidden" style="background:rgba(255,255,255,.05)">
+          {[
+            { label:'Ventes',    value:String(sales),                                                                                            color:'#fff' },
+            { label:'AOV',       value:aov > 0 ? aov.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : '—',    color:'#38bdf8' },
+            { label:'LTV',       value:ltv > 0 ? ltv.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : '—',    color:'#00ff9d' },
+            { label:'Conv.',     value:`${convRate.toFixed(1)}%`,                                                                                 color:'#f59e0b' },
+          ].map(m => (
+            <div class="flex flex-col p-3" style="background:rgba(0,0,0,.25)">
+              <span class="section-label mb-2">{m.label}</span>
+              <span class="text-xl font-bold tabular-nums leading-none" style={`color:${m.color}`}>{m.value}</span>
+            </div>
+          ))}
         </div>
       </div>
 
       <!-- Funnel revenue (visual) -->
       <div class="p-5 glass rounded-2xl border border-white/8">
-        <h3 class="text-sm font-semibold text-white mb-4">Funnel</h3>
-        <div class="space-y-2">
+        <h3 class="text-sm font-semibold text-white mb-5">Funnel de conversion</h3>
+        <div class="flex items-stretch gap-0">
           {funnelSteps.map((step, i) => {
             const prev     = i > 0 ? funnelSteps[i-1].value : step.value;
             const dropPct  = prev > 0 && i > 0 ? (1-step.value/prev)*100 : 0;
-            const widthPct = funnelSteps[0].value > 0 ? (step.value/funnelSteps[0].value)*100 : 100;
+            const isLast   = i === funnelSteps.length - 1;
             return (
-              <div class="flex items-center gap-3">
-                <div class="w-6 h-6 rounded-lg shrink-0 flex items-center justify-center text-xs font-bold" style={`background:${step.color}18;color:${step.color};border:.5px solid ${step.color}30`}>{i+1}</div>
-                <div class="flex-1">
-                  <div class="flex items-center justify-between mb-1">
-                    <span class="text-xs font-semibold text-white">{step.label}</span>
-                    <div class="flex items-center gap-2">
-                      {i > 0 && dropPct > 0 && <span class="text-xs" style="color:rgba(248,113,113,.6)">↓{dropPct.toFixed(0)}%</span>}
-                      <span class="text-sm font-bold tabular-nums" style={`color:${step.color}`}>{step.value.toLocaleString('fr-FR')}</span>
+              <div class="flex items-center flex-1 min-w-0">
+                <div class="funnel-step flex-1 min-w-0 p-3.5 rounded-xl border"
+                  style={`background:${step.color}0a;border-color:${step.color}25;box-shadow:inset 0 1px 0 ${step.color}15`}>
+                  <div class="section-label mb-1.5">{step.label}</div>
+                  <div class="text-xl font-black tabular-nums leading-none" style={`color:${step.color}`}>{step.value.toLocaleString('fr-FR')}</div>
+                  {i > 0 && dropPct > 0 && (
+                    <div class="mt-1.5 flex items-center gap-1">
+                      <div class="h-1 rounded-full flex-1" style="background:rgba(248,113,113,.1)">
+                        <div class="h-full rounded-full" style={`width:${dropPct}%;background:rgba(248,113,113,.45)`}></div>
+                      </div>
+                      <span class="text-xs shrink-0" style="color:rgba(248,113,113,.65)">↓{dropPct.toFixed(0)}%</span>
                     </div>
-                  </div>
-                  <div style={`background:rgba(255,255,255,.04);border-radius:9999px;height:8px;overflow:hidden`}>
-                    <div style={`height:100%;border-radius:9999px;width:${widthPct}%;background:${step.color};opacity:.65;animation:barGrow .8s cubic-bezier(.16,1,.3,1) both;animation-delay:${i*100}ms`}></div>
-                  </div>
+                  )}
                 </div>
+                {!isLast && (
+                  <div class="w-6 shrink-0 flex items-center justify-center" style="color:rgba(255,255,255,.1)">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8.293 1.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L12.586 9H1a1 1 0 110-2h11.586L8.293 2.707a1 1 0 010-1.414z"/></svg>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -1422,46 +1505,84 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
         {abBlocks.length < 2 ? (
           <p class="text-sm text-gray-700 text-center py-6">Pas assez de données (min 2 blocs avec des clics)</p>
         ) : (
-          <div>
-            <!-- Visual bar comparison -->
-            <div class="mb-4 space-y-2">
-              {abBlocks.slice(0,4).map((block, i) => {
+          <div class="space-y-4">
+            <!-- Card comparison: 2 cols for top 2 -->
+            <div class="grid sm:grid-cols-2 gap-3">
+              {abBlocks.slice(0,2).map((block, i) => {
                 const ctr     = summary.totalViews > 0 ? (block.clicks/summary.totalViews)*100 : 0;
                 const maxC    = abBlocks[0]?.clicks ?? 1;
                 const relPct  = maxC > 0 ? (block.clicks/maxC)*100 : 0;
-                const COLS    = ['#00ff9d','#38bdf8','#f59e0b','#a78bfa'];
-                const color   = COLS[i] ?? '#9ca3af';
+                const COLS    = ['#00ff9d','#38bdf8'];
+                const color   = COLS[i];
                 const isWin   = i === 0;
                 return (
-                  <div class="flex items-center gap-3">
-                    <div class="w-28 shrink-0 flex items-center gap-2 min-w-0">
-                      {isWin && <span class="text-xs shrink-0">🏆</span>}
-                      <span class="text-xs text-gray-400 truncate">{block.title}</span>
-                    </div>
-                    <div class="flex-1 relative h-7 rounded-lg overflow-hidden" style="background:rgba(255,255,255,.04)">
-                      <div class="absolute inset-y-0 left-0 rounded-lg flex items-center px-2"
-                        style={`width:${relPct}%;background:${color}25;border-right:2px solid ${color}60;transition:width .7s cubic-bezier(.16,1,.3,1);animation:barGrow .8s cubic-bezier(.16,1,.3,1) both;animation-delay:${i*100}ms`}>
+                  <div class="p-4 rounded-xl border relative overflow-hidden"
+                    style={`background:${color}06;border-color:${color}${isWin?'30':'18'}`}>
+                    {isWin && (
+                      <div class="absolute top-3 right-3 text-xs font-bold px-2 py-0.5 rounded-full" style="background:rgba(0,255,157,.12);color:#00ff9d;border:.5px solid rgba(0,255,157,.25)">
+                        🏆 Best
                       </div>
-                      <div class="absolute inset-0 flex items-center justify-between px-3">
-                        <span class="text-xs font-semibold text-white">{block.clicks.toLocaleString('fr-FR')} clics</span>
-                        <span class="text-xs font-semibold" style={`color:${color}`}>{ctr.toFixed(1)}%</span>
+                    )}
+                    <div class="section-label mb-2">{block.type} · pos #{block.position}</div>
+                    <div class="text-xs text-white font-semibold mb-3 pr-16 leading-relaxed">{block.title}</div>
+                    <!-- Stats row -->
+                    <div class="grid grid-cols-2 gap-2 mb-3">
+                      <div>
+                        <div class="text-xl font-black tabular-nums" style={`color:${color}`}>{block.clicks.toLocaleString('fr-FR')}</div>
+                        <div class="text-xs text-gray-600">clics</div>
+                      </div>
+                      <div>
+                        <div class="text-xl font-black tabular-nums" style={`color:${color}`}>{ctr.toFixed(1)}%</div>
+                        <div class="text-xs text-gray-600">CTR</div>
                       </div>
                     </div>
-                    <span class="text-xs text-gray-600 w-8 text-right shrink-0">#{block.position}</span>
+                    <!-- Relative performance bar -->
+                    <div>
+                      <div class="flex justify-between text-xs mb-1">
+                        <span class="text-gray-700">Performance relative</span>
+                        <span class="font-semibold" style={`color:${color}`}>{relPct.toFixed(0)}%</span>
+                      </div>
+                      <div style="background:rgba(255,255,255,.06);border-radius:6px;height:6px;overflow:hidden">
+                        <div style={`height:100%;border-radius:6px;width:${relPct}%;background:${color};opacity:.7;animation:barGrow .8s cubic-bezier(.16,1,.3,1) both;animation-delay:${i*150}ms`}></div>
+                      </div>
+                    </div>
                   </div>
                 );
               })}
             </div>
-            <!-- Insight below -->
-            {abBlocks.length >= 2 && (() => {
+            <!-- Remaining blocs (compact) -->
+            {abBlocks.slice(2,4).length > 0 && (
+              <div class="space-y-1.5">
+                {abBlocks.slice(2,4).map((block, i) => {
+                  const ctr    = summary.totalViews > 0 ? (block.clicks/summary.totalViews)*100 : 0;
+                  const maxC   = abBlocks[0]?.clicks ?? 1;
+                  const relPct = maxC > 0 ? (block.clicks/maxC)*100 : 0;
+                  const COLS   = ['#f59e0b','#a78bfa'];
+                  const color  = COLS[i];
+                  return (
+                    <div class="flex items-center gap-3 px-3 py-2.5 rounded-xl" style={`background:${color}06;border:.5px solid ${color}18`}>
+                      <span class="text-xs text-gray-500 shrink-0">#{block.position}</span>
+                      <span class="text-xs text-white flex-1 truncate">{block.title}</span>
+                      <span class="text-xs font-bold tabular-nums shrink-0" style={`color:${color}`}>{block.clicks.toLocaleString('fr-FR')}</span>
+                      <span class="text-xs text-gray-600 tabular-nums shrink-0 w-10 text-right">{ctr.toFixed(1)}%</span>
+                      <div class="w-16 hidden sm:block" style="background:rgba(255,255,255,.05);border-radius:4px;height:4px;overflow:hidden">
+                        <div style={`height:100%;border-radius:4px;width:${relPct}%;background:${color};opacity:.6`}></div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <!-- Auto insight -->
+            {(() => {
               const top    = abBlocks[0];
               const second = abBlocks[1];
-              const ratio  = second.clicks > 0 ? (top.clicks / second.clicks).toFixed(1) : '∞';
+              const ratio  = second.clicks > 0 ? (top.clicks/second.clicks).toFixed(1) : '∞';
               return (
-                <div class="px-4 py-3 rounded-xl" style="background:rgba(0,255,157,.04);border:.5px solid rgba(0,255,157,.12)">
-                  <p class="text-xs text-gray-400">
-                    <span class="text-neon-green font-semibold">"{top.title}"</span> performe {ratio}× mieux que <span class="text-white">"{second.title}"</span> —
-                    {Number(ratio) >= 2 ? " fort signal, dupliquer ce format en priorité." : " avantage modéré, A/B test recommandé."}
+                <div class="px-4 py-3 rounded-xl" style="background:rgba(0,255,157,.04);border:.5px solid rgba(0,255,157,.1)">
+                  <p class="text-xs text-gray-500 leading-relaxed">
+                    <span style="color:#00ff9d;font-weight:600">"{top.title}"</span> performe <span style="color:#fff;font-weight:600">{ratio}×</span> mieux que <span style="color:#fff">{second.title}</span>
+                    {Number(ratio) >= 2 ? ' — fort signal. Duplique ce format.' : ' — avantage modéré. Teste une variante de CTA.'}
                   </p>
                 </div>
               );
@@ -1706,12 +1827,40 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
             id:'avgLine',
             afterDraw(chart) {
               if(isCTR||!isViews)return;
-              const{ctx:c,chartArea:{left,right},scales:{y}}=chart;
+              const{ctx:c,chartArea:{left,right,top},scales:{y,x}}=chart;
+
+              // Average line
               const yPos=y.getPixelForValue(viewsAvg);
-              c.save();c.setLineDash([4,5]);c.strokeStyle=GREEN+'40';c.lineWidth=1;
+              c.save();
+              c.setLineDash([5,4]);c.strokeStyle=GREEN+'35';c.lineWidth=1;
               c.beginPath();c.moveTo(left,yPos);c.lineTo(right,yPos);c.stroke();
-              c.setLineDash([]);c.fillStyle=GREEN+'80';c.font='9px DM Sans,sans-serif';
-              c.fillText(`moy. ${Math.round(viewsAvg).toLocaleString('fr-FR')}`,right-78,yPos-4);
+              c.setLineDash([]);
+              // Avg label pill
+              const label=`ø ${Math.round(viewsAvg).toLocaleString('fr-FR')}`;
+              const lw=c.measureText(label).width+12;
+              c.fillStyle='rgba(0,255,157,0.12)';
+              c.beginPath();c.roundRect(right-lw-4,yPos-9,lw,16,4);c.fill();
+              c.fillStyle=GREEN+'90';c.font='600 9px "DM Sans",sans-serif';
+              c.textAlign='center';
+              c.fillText(label,right-lw/2-4,yPos+3);
+
+              // Peak marker (if not CTR mode)
+              if (!isViews) { c.restore(); return; }
+              const peakIdx = exportedChart.views.indexOf(Math.max(...exportedChart.views));
+              if (peakIdx >= 0 && chart.data.datasets[0]) {
+                const pt = chart.data.datasets[0].data[peakIdx];
+                if (pt !== undefined) {
+                  const px = x.getPixelForValue(peakIdx);
+                  const py = y.getPixelForValue(pt);
+                  // Peak dot glow
+                  c.beginPath();c.arc(px,py,8,0,Math.PI*2);
+                  c.fillStyle='rgba(0,255,157,0.1)';c.fill();
+                  // Peak label
+                  c.fillStyle=GREEN;c.font='700 9px "DM Sans",sans-serif';c.textAlign='center';
+                  c.fillText('PEAK',px,py-14);
+                }
+              }
+              c.textAlign='left';
               c.restore();
             },
           }],
@@ -1832,69 +1981,88 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
         }
       }
 
-      // ── HEATMAP CANVAS ────────────────────────────────────────────────────
-      const heatCanvas = document.getElementById('heatmap-canvas');
+      // ── HEATMAP CANVAS (premium rendering) ──────────────────────────────────
+      const heatCanvas  = document.getElementById('heatmap-canvas');
       const heatTooltip = document.getElementById('heatmap-tooltip');
       if (heatCanvas && heatmapData.length > 0) {
-        const COLS = heatmapData.length;
-        const ROWS = 1;
-        const W    = heatCanvas.parentElement.clientWidth || 600;
-        const cellW = Math.floor(W / COLS);
-        const cellH = 56;
-        heatCanvas.width  = W;
-        heatCanvas.height = cellH;
+        const dpr    = window.devicePixelRatio || 1;
+        const W      = heatCanvas.parentElement.clientWidth || 600;
+        const cellW  = Math.floor(W / heatmapData.length);
+        const cellH  = 72;
+        const PAD    = 3;
+        const RADIUS = 8;
+        heatCanvas.width  = W * dpr;
+        heatCanvas.height = cellH * dpr;
+        heatCanvas.style.width  = W + 'px';
         heatCanvas.style.height = cellH + 'px';
         const c2 = heatCanvas.getContext('2d');
-        const sorted = [...heatmapData].sort((a,b)=>b.intensity-a.intensity);
+        c2.scale(dpr, dpr);
 
-        heatmapData.forEach((block, i) => {
-          const x     = i * cellW;
-          const alpha = Math.max(0.05, block.intensity * 0.85);
-          // Cell background
-          c2.fillStyle = `rgba(0,255,157,${alpha})`;
-          c2.beginPath();
-          c2.roundRect(x+2, 2, cellW-4, cellH-4, 6);
-          c2.fill();
-          // Rank indicator at top
-          if (block.intensity > 0.5) {
-            c2.fillStyle = `rgba(0,255,157,${Math.min(0.9, block.intensity)})`;
-            c2.fillRect(x+2, 2, 3, cellH-4);
-          }
-          // Position number
-          c2.fillStyle = block.intensity > 0.5 ? '#00ff9d' : 'rgba(255,255,255,0.3)';
-          c2.font = 'bold 10px DM Sans,sans-serif';
-          c2.textAlign = 'center';
-          c2.fillText(`#${block.position}`, x + cellW/2, 18);
-          // Click count
-          c2.fillStyle = block.intensity > 0 ? '#fff' : 'rgba(255,255,255,0.2)';
-          c2.font = 'bold 11px DM Sans,sans-serif';
-          c2.fillText(block.clicks > 999 ? `${(block.clicks/1000).toFixed(1)}k` : String(block.clicks), x + cellW/2, 36);
-          // Fire emoji for top
-          if (block.intensity >= 0.8) {
-            c2.font = '11px sans-serif';
-            c2.fillText('🔥', x + cellW/2, 52);
-          }
-        });
+        const renderHeatmap = (renderW) => {
+          const cW = Math.floor(renderW / heatmapData.length);
+          c2.clearRect(0, 0, renderW, cellH);
+          heatmapData.forEach((block, i) => {
+            const x     = i * cW;
+            const alpha = Math.max(0.04, block.intensity * 0.75);
+            const isHot = block.intensity >= 0.8, isWarm = block.intensity >= 0.4;
+            // Background gradient
+            const bg = c2.createLinearGradient(x, 0, x, cellH);
+            bg.addColorStop(0,   `rgba(0,255,157,${alpha*1.4})`);
+            bg.addColorStop(0.5, `rgba(0,255,157,${alpha})`);
+            bg.addColorStop(1,   `rgba(0,255,157,${alpha*0.5})`);
+            c2.beginPath(); c2.roundRect(x+PAD, PAD, cW-PAD*2, cellH-PAD*2, RADIUS);
+            c2.fillStyle = bg; c2.fill();
+            // Glow border
+            if (block.intensity > 0.5) {
+              c2.beginPath(); c2.roundRect(x+PAD, PAD, cW-PAD*2, cellH-PAD*2, RADIUS);
+              c2.strokeStyle = `rgba(0,255,157,${Math.min(.7,block.intensity*.8)})`; c2.lineWidth=1; c2.stroke();
+            }
+            // Left accent
+            if (isWarm) {
+              c2.fillStyle = `rgba(0,255,157,${Math.min(1,block.intensity)})`;
+              c2.beginPath(); c2.roundRect(x+PAD, PAD, 3, cellH-PAD*2, [RADIUS,0,0,RADIUS]); c2.fill();
+            }
+            // Position
+            c2.fillStyle = block.intensity > 0.5 ? 'rgba(0,255,157,.9)' : 'rgba(255,255,255,.22)';
+            c2.font = '600 9px "DM Sans",sans-serif'; c2.textAlign='center';
+            c2.fillText(`#${block.position}`, x+cW/2, 16);
+            // Clicks
+            const cs = block.clicks>9999?`${(block.clicks/1000).toFixed(0)}k`:block.clicks>999?`${(block.clicks/1000).toFixed(1)}k`:String(block.clicks);
+            c2.fillStyle = block.intensity>0?'#fff':'rgba(255,255,255,.12)';
+            c2.font = '800 14px "DM Sans",sans-serif';
+            c2.fillText(cs, x+cW/2, 38);
+            // Indicator
+            c2.font = '12px sans-serif';
+            c2.fillText(isHot?'🔥':isWarm?'↑':'·', x+cW/2, 58);
+          });
+        };
+        renderHeatmap(W);
 
-        // Tooltip on hover
+        // Tooltip
         heatCanvas.addEventListener('mousemove', e => {
           const rect = heatCanvas.getBoundingClientRect();
-          const mx   = (e.clientX - rect.left) * (heatCanvas.width / rect.width);
-          const idx  = Math.floor(mx / cellW);
-          if (idx < 0 || idx >= heatmapData.length || !heatTooltip) return;
+          const cW2  = Math.floor(rect.width / heatmapData.length);
+          const idx  = Math.min(heatmapData.length-1, Math.max(0, Math.floor((e.clientX-rect.left)/cW2)));
+          if (!heatTooltip) return;
           const block = heatmapData[idx];
-          const ctr   = (block.clicks > 0 && exportedChart.views?.length > 0)
-            ? ((block.clicks / exportedChart.views.reduce((a,b)=>a+b,0)) * 100 * exportedChart.views.length).toFixed(1)
-            : '0.0';
-          heatTooltip.innerHTML = `<span style="color:#00ff9d;font-weight:700">#${block.position} ${block.title}</span> <span style="color:#484f58">·</span> <span style="color:#e6edf3">${block.clicks.toLocaleString('fr-FR')} clics</span> <span style="color:#484f58">·</span> <span style="color:#f59e0b">${(block.intensity*100).toFixed(0)}% intensité</span>`;
-          let tx = e.clientX - rect.left + 12;
-          let ty = e.clientY - rect.top - 40;
-          if (tx + 280 > rect.width) tx -= 280;
-          heatTooltip.style.left = tx+'px'; heatTooltip.style.top = ty+'px';
+          const tv = exportedChart.views?.reduce((a,b)=>a+b,0)??0;
+          const ctr = tv>0?((block.clicks/tv)*100*exportedChart.views.length).toFixed(1):'0.0';
+          heatTooltip.innerHTML=`<span style="color:#00ff9d;font-weight:700">#${block.position} ${block.title}</span><span style="color:#484f58;margin:0 5px">·</span><span style="color:#e6edf3">${block.clicks.toLocaleString('fr-FR')} clics</span><span style="color:#484f58;margin:0 5px">·</span><span style="color:#f59e0b">${(block.intensity*100).toFixed(0)}%</span>`;
+          let tx=e.clientX-rect.left+14, ty=e.clientY-rect.top-44;
+          if(tx+300>rect.width)tx-=310; if(ty<0)ty=e.clientY-rect.top+16;
+          heatTooltip.style.left=tx+'px'; heatTooltip.style.top=ty+'px';
           heatTooltip.classList.remove('hidden');
         });
-        heatCanvas.addEventListener('mouseleave', () => heatTooltip?.classList.add('hidden'));
+        heatCanvas.addEventListener('mouseleave',()=>heatTooltip?.classList.add('hidden'));
+
+        // Responsive
+        new ResizeObserver(()=>{
+          const nW=heatCanvas.parentElement.clientWidth; if(!nW)return;
+          heatCanvas.width=nW*dpr; heatCanvas.style.width=nW+'px';
+          c2.scale(dpr,dpr); renderHeatmap(nW);
+        }).observe(heatCanvas.parentElement);
       }
+
 
       // ── AI REPORT ─────────────────────────────────────────────────────────
       const aiBtn     = document.getElementById('ai-report-btn');
@@ -2029,11 +2197,20 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
       });
 
       // ── INNER TABS ────────────────────────────────────────────────────────
-      document.querySelectorAll('.insight-tab-inner').forEach(btn=>{
+      document.getElementById('inner-tabs-geo-sources')?.querySelectorAll('.insight-tab-inner').forEach(btn=>{
         btn.addEventListener('click',()=>{
           const id=btn.dataset.innerTab;
-          document.querySelectorAll('.insight-tab-inner').forEach(b=>b.classList.toggle('active',b===btn));
-          document.querySelectorAll('.insight-panel').forEach(p=>p.classList.toggle('active',p.id===`inner-panel-${id}`));
+          // Scope: only toggle tabs and panels within this section
+          const section=btn.closest('.sec-panel')??document;
+          btn.closest('[id^="inner-tabs"]')?.querySelectorAll('.insight-tab-inner').forEach(b=>{
+            b.classList.toggle('active',b===btn);
+            b.classList.toggle('text-white',b===btn);
+            b.classList.toggle('bg-white\/8',b===btn);
+            b.classList.toggle('text-gray-500',b!==btn);
+          });
+          section.querySelectorAll('.insight-panel').forEach(p=>{
+            p.classList.toggle('active',p.id===`inner-panel-${id}`);
+          });
         });
       });
 
