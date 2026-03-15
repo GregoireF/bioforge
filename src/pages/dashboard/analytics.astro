@@ -510,52 +510,70 @@ const activationRate = blocks.length > 0 ? Math.round((activeBlocks / blocks.len
 // Best delta bloc (highest click intensity)
 const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
 
+
 ---
+
 
 <DashboardLayout title="Analytics">
 
-<meta name="sb-url" content={import.meta.env.PUBLIC_SUPABASE_URL} slot="head" />
-<meta name="sb-key" content={import.meta.env.PUBLIC_SUPABASE_ANON_KEY} slot="head" />
-
 <style>
-  @keyframes countUp   { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  /* ── Animations ── */
+  @keyframes countUp   { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
   @keyframes barGrow   { from{width:0!important} }
-  @keyframes fadeSlide { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
-  @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
-  .kpi-value  { animation:countUp 0.5s ease both; }
-  .bar-fill   { animation:barGrow 0.8s cubic-bezier(0.16,1,0.3,1) both; }
-  .fade-slide { animation:fadeSlide 0.4s ease both; }
-  .live-dot   { animation:livePulse 1.6s ease-in-out infinite; }
-  .bento { display:grid; gap:1rem; }
-  @media (min-width:768px) { .bento-main{grid-template-columns:2fr 1fr;} }
-  .kpi-card { position:relative; overflow:hidden; }
-  .kpi-card::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at 0% 0%,var(--glow) 0%,transparent 65%); opacity:.12; pointer-events:none; }
-  /* Tabs (same as Appearance) */
-  .sec-tab { transition:all 0.2s; }
-  .sec-tab.active { color:white; background:rgba(0,255,157,0.1); border-color:rgba(0,255,157,0.3); }
+  @keyframes fadeSlide { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  @keyframes shimmer   { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+  @keyframes slideInLeft { from{opacity:0;transform:translateX(-10px)} to{opacity:1;transform:none} }
+  @keyframes liveSlide   { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:none} }
+  @keyframes blink       { 0%,100%{opacity:1} 50%{opacity:0} }
+  @keyframes spin        { to{transform:rotate(360deg)} }
+  @keyframes ringPulse   { 0%{box-shadow:0 0 0 0 rgba(0,255,157,.5)} 70%{box-shadow:0 0 0 8px rgba(0,255,157,0)} 100%{box-shadow:0 0 0 0 rgba(0,255,157,0)} }
+
+  .kpi-value   { animation:countUp   .5s cubic-bezier(.22,1,.36,1) both; }
+  .bar-fill    { animation:barGrow   .8s cubic-bezier(.16,1,.3,1) both; }
+  .fade-slide  { animation:fadeSlide .4s cubic-bezier(.22,1,.36,1) both; }
+  .live-dot    { animation:livePulse 1.6s ease-in-out infinite; }
+  .live-entry  { animation:liveSlide  .3s cubic-bezier(.22,1,.36,1) both; }
+  .ai-cursor::after { content:'▋'; animation:blink .8s step-end infinite; margin-left:2px; font-size:.8em; }
+  .skeleton { background:linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.08) 50%,rgba(255,255,255,.04) 75%); background-size:200% 100%; animation:shimmer 1.5s infinite; border-radius:8px; }
+  .map-spinner { width:24px; height:24px; border:2px solid rgba(0,255,157,.15); border-top-color:#00ff9d; border-radius:50%; animation:spin .7s linear infinite; }
+
+  /* ── Tabs ── */
+  .sec-tab  { transition:all .2s; }
+  .sec-tab.active { color:#fff; background:rgba(0,255,157,.1); border-color:rgba(0,255,157,.3); }
   .sec-panel { display:none; }
-  .sec-panel.active { display:block; animation:fadeInUp 0.22s ease both; }
-  @keyframes fadeInUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
-  /* Insight tabs inside panels */
-  .insight-tab-inner { transition:all 0.15s; }
-  .insight-tab-inner.active { color:#fff; background:rgba(255,255,255,0.08); }
+  .sec-panel.active { display:block; animation:fadeSlide .22s cubic-bezier(.22,1,.36,1) both; }
+
+  /* ── Inner tabs ── */
+  .insight-tab-inner { transition:all .15s; }
+  .insight-tab-inner.active { color:#fff; background:rgba(255,255,255,.08); }
   .insight-panel { display:none; }
   .insight-panel.active { display:block; }
-  .rank-1 { background:linear-gradient(135deg,#ffd70022,#ffd70011); border-color:#ffd70040; color:#ffd700; }
-  .rank-2 { background:rgba(192,192,192,.1); border-color:rgba(192,192,192,.2); color:#c0c0c0; }
-  .rank-3 { background:rgba(205,127,50,.1); border-color:rgba(205,127,50,.2); color:#cd7f32; }
+
+  /* ── KPI cards ── */
+  .kpi-card { position:relative; overflow:hidden; transition:transform .2s cubic-bezier(.22,1,.36,1),box-shadow .2s; }
+  .kpi-card::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at 0% 0%,var(--glow) 0%,transparent 65%); opacity:.1; pointer-events:none; }
+  .kpi-card:hover { transform:translateY(-2px); box-shadow:0 8px 28px rgba(0,0,0,.35); }
+  /* Noise texture on cards */
+  .kpi-card::after { content:''; position:absolute; inset:0; border-radius:inherit; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E"); opacity:.35; mix-blend-mode:overlay; pointer-events:none; }
+
+  /* ── Stripe-style revenue hero ── */
+  .revenue-hero { background:linear-gradient(135deg,rgba(167,139,250,.08) 0%,rgba(56,189,248,.04) 100%); border:1px solid rgba(167,139,250,.15); }
+  .revenue-hero-value { font-size:clamp(2rem,5vw,3.5rem); font-weight:800; letter-spacing:-.03em; line-height:1; }
+
+  /* ── Progress bars ── */
   .bar-track { background:rgba(255,255,255,.04); border-radius:9999px; overflow:hidden; height:3px; }
   .bar-fill  { height:100%; border-radius:9999px; }
+
+  /* ── Source badge ── */
   .source-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:9999px; font-size:10px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; }
-  @keyframes spin { to{transform:rotate(360deg)} }
-  .map-spinner { width:24px; height:24px; border:2px solid rgba(0,255,157,.15); border-top-color:#00ff9d; border-radius:50%; animation:spin .7s linear infinite; }
+
+  /* ── Map ── */
   #world-map .country { transition:fill .2s,stroke .2s; cursor:default; }
   #world-map .country:hover { stroke:#00ff9d!important; stroke-width:1px!important; filter:brightness(1.4); }
   #world-map .country.highlighted { stroke:#00ff9d; stroke-width:1px; filter:brightness(1.6) drop-shadow(0 0 4px #00ff9d80); }
-  .scrollbar-none { scrollbar-width:none; }
-  .scrollbar-none::-webkit-scrollbar { display:none; }
-  .d-0{animation-delay:0ms} .d-1{animation-delay:60ms} .d-2{animation-delay:120ms}
-  .d-3{animation-delay:180ms} .d-4{animation-delay:240ms} .d-5{animation-delay:300ms}
+
+  /* ── Channel badges ── */
   .ch-google  { background:rgba(66,133,244,.12);  color:#60a5fa; border:.5px solid rgba(66,133,244,.2); }
   .ch-meta    { background:rgba(24,119,242,.12);   color:#818cf8; border:.5px solid rgba(99,102,241,.2); }
   .ch-tiktok  { background:rgba(0,0,0,.3);         color:#f0abfc; border:.5px solid rgba(240,171,252,.2); }
@@ -564,77 +582,56 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
   .ch-infl    { background:rgba(251,113,133,.1);   color:#fb7185; border:.5px solid rgba(251,113,133,.2); }
   .ch-direct  { background:rgba(255,255,255,.06);  color:#9ca3af; border:.5px solid rgba(255,255,255,.1); }
   .ch-other   { background:rgba(255,255,255,.04);  color:#6b7280; border:.5px solid rgba(255,255,255,.08); }
+
+  /* ── Plan badges ── */
   .badge-creator { display:inline-flex;align-items:center;gap:2px;padding:1px 5px;border-radius:5px;font-size:9px;font-weight:700;background:rgba(0,255,157,.12);color:#00ff9d;border:1px solid rgba(0,255,157,.3); }
   .badge-pro     { display:inline-flex;align-items:center;gap:2px;padding:1px 5px;border-radius:5px;font-size:9px;font-weight:700;background:rgba(168,85,247,.15);color:#c084fc;border:1px solid rgba(168,85,247,.35); }
+
+  /* ── Delta badges ── */
   .delta-pos { color:#00ff9d; font-size:11px; font-weight:700; }
   .delta-neg { color:#f87171; font-size:11px; font-weight:700; }
-  .delta-neu { color:rgba(255,255,255,.25); font-size:11px; }
-  /* Alert styles */
+  .delta-neu { color:rgba(255,255,255,.2); font-size:11px; }
+
+  /* ── Alert styles ── */
   .alert-warning { background:rgba(248,113,113,.06); border-color:rgba(248,113,113,.2); }
   .alert-success { background:rgba(0,255,157,.05);   border-color:rgba(0,255,157,.2); }
   .alert-info    { background:rgba(56,189,248,.05);  border-color:rgba(56,189,248,.2); }
 
-  /* ── v7: Skeleton loaders ── */
-  @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
-  .skeleton {
-    background: linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(255,255,255,.08) 50%, rgba(255,255,255,.04) 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-    border-radius: 8px;
-  }
-  /* ── v7: Tab slide indicator ── */
-  .tabs-wrapper { position:relative; }
-  .tab-indicator { position:absolute; bottom:0; height:2px; background:#00ff9d; border-radius:9999px; transition:left .25s cubic-bezier(.22,1,.36,1),width .25s cubic-bezier(.22,1,.36,1); }
-  /* ── v7: KPI ring (CSS only) ── */
-  .kpi-ring { position:absolute; top:8px; right:8px; width:32px; height:32px; }
-  .kpi-ring-svg { transform:rotate(-90deg); }
-  .kpi-ring-track { fill:none; stroke:rgba(255,255,255,.06); stroke-width:2.5; }
-  .kpi-ring-fill  { fill:none; stroke-width:2.5; stroke-linecap:round; transition:stroke-dashoffset .8s cubic-bezier(.16,1,.3,1); }
-  /* ── v7: Pulse delta ── */
-  @keyframes deltaPulse { 0%{opacity:1} 50%{opacity:.4} 100%{opacity:1} }
-  .delta-pulse { animation: deltaPulse 2s ease-in-out 3; }
-  /* ── v7: Noise texture ── */
-  .card-noise::after {
-    content:''; position:absolute; inset:0; pointer-events:none; border-radius:inherit;
-    background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
-    opacity:.4; mix-blend-mode:overlay;
-  }
-  /* ── v7: Chart metric toggle ── */
+  /* ── Interactive controls ── */
   .metric-btn { transition:all .15s; }
   .metric-btn.active { background:rgba(0,255,157,.12); color:#00ff9d; border-color:rgba(0,255,157,.3); }
-  /* ── v7: Filter chip ── */
   .filter-chip { transition:all .15s; cursor:pointer; }
   .filter-chip.active { background:rgba(0,255,157,.1); color:#00ff9d; border-color:rgba(0,255,157,.25); }
-  /* ── v7: Sort btn ── */
-  .sort-btn.active { color:#00ff9d; }
-
-  /* ── v8: Micro-interactions ── */
-  @keyframes slideInLeft { from{opacity:0;transform:translateX(-10px)} to{opacity:1;transform:translateX(0)} }
-  @keyframes springBar   { 0%{transform:scaleX(0)} 70%{transform:scaleX(1.04)} 100%{transform:scaleX(1)} }
-  @keyframes typewriter  { from{width:0} to{width:100%} }
-  @keyframes blink       { 0%,100%{opacity:1} 50%{opacity:0} }
-  @keyframes liveSlide   { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
-  .kpi-card { transition:transform .2s cubic-bezier(.22,1,.36,1),box-shadow .2s; }
-  .kpi-card:hover { transform:translateY(-2px); box-shadow:0 8px 32px rgba(0,0,0,.4); }
-  .live-entry  { animation:liveSlide .3s cubic-bezier(.22,1,.36,1) both; }
-  .ai-cursor::after { content:'▋'; animation:blink .8s step-end infinite; margin-left:2px; font-size:.8em; }
+  .sort-btn.active { color:#00ff9d; border-color:rgba(0,255,157,.3); background:rgba(0,255,157,.06); }
   .compare-btn.active { background:rgba(56,189,248,.12); color:#38bdf8; border-color:rgba(56,189,248,.3); }
-  .cohort-bar-fill { height:100%; border-radius:4px; background:linear-gradient(90deg,rgba(0,255,157,.6),rgba(0,255,157,.2)); transition:width .7s cubic-bezier(.16,1,.3,1); }
-  .section-label { font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.25); }
-  .stagger-1{animation-delay:.04s} .stagger-2{animation-delay:.08s} .stagger-3{animation-delay:.12s}
-  .stagger-4{animation-delay:.16s} .stagger-5{animation-delay:.20s} .stagger-6{animation-delay:.24s}
-  /* chart glow cursor */
+
+  /* ── Canvas heatmap ── */
+  #heatmap-canvas { border-radius:12px; cursor:crosshair; }
+
+  /* ── Cohort bars ── */
+  .cohort-bar-fill { height:100%; border-radius:4px; transition:width .7s cubic-bezier(.16,1,.3,1); }
+
+  /* ── Chart glow cursor ── */
   .chart-glow { position:absolute; width:180px; height:180px; border-radius:50%; background:radial-gradient(circle,rgba(0,255,157,.05) 0%,transparent 70%); pointer-events:none; transform:translate(-50%,-50%); opacity:0; transition:opacity .15s; }
-  /* @media print */
+
+  /* ── Scrollbar ── */
+  .scrollbar-none { scrollbar-width:none; }
+  .scrollbar-none::-webkit-scrollbar { display:none; }
+
+  /* ── Stagger ── */
+  .d-0{animation-delay:0ms} .d-1{animation-delay:60ms} .d-2{animation-delay:120ms}
+  .d-3{animation-delay:180ms} .d-4{animation-delay:240ms} .d-5{animation-delay:300ms}
+  .stagger-1{animation-delay:.04s} .stagger-2{animation-delay:.08s} .stagger-3{animation-delay:.12s}
+
+  /* ── @media print ── */
   @media print {
     @page { margin:16mm; size:A4; }
     .no-print,.sec-tab,[id^="map-zoom"],#map-reset { display:none!important; }
     .glass { background:#f8f8f8!important; border:1px solid #e0e0e0!important; box-shadow:none!important; }
-    .kpi-card::before { display:none; }
+    .kpi-card::before,.kpi-card::after { display:none; }
     .bar-fill,.fade-slide,.sec-panel { animation:none!important; opacity:1!important; transform:none!important; }
     .sec-panel { display:block!important; }
     .insight-panel { display:block!important; }
-    .pro-overlay { display:none!important; }
   }
 </style>
 
@@ -655,12 +652,12 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
           </div>
         )}
       </div>
-      <p class="text-sm text-gray-500">Données sur <span class="text-gray-300 font-medium">{days} jours</span>{summary.botViews > 0 && <span class="ml-2 text-xs text-yellow-500/70">· {summary.botViews} bots exclus</span>}</p>
+      <p class="text-sm text-gray-500">Données sur <span class="text-gray-300 font-medium">{days}j</span>{summary.botViews > 0 && <span class="ml-2 text-xs text-yellow-500/70">· {summary.botViews} bots exclus</span>}</p>
     </div>
     <div class="flex items-center gap-2 self-start flex-wrap">
       <div class="flex items-center gap-0.5 p-1 rounded-xl border border-white/8 bg-white/3">
         {([7, 30, 90] as const).map(d => (
-          <a href={`?days=${d}`} class={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${days === d ? 'bg-neon-green text-black' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}>{d}j</a>
+          <a href={`?days=${d}`} class={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${days===d?'bg-neon-green text-black':'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}>{d}j</a>
         ))}
       </div>
       <button id="export-csv-btn" class="no-print flex items-center gap-1.5 px-3 py-2 glass border border-white/10 rounded-xl text-xs text-gray-400 hover:text-white hover:border-white/20 transition-all">
@@ -674,127 +671,124 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
 
   {rpcError && <div class="mb-4 p-4 rounded-xl border border-red-400/30 bg-red-400/8 text-red-400 text-sm">{rpcError}</div>}
 
-  <!-- SECTION TABS (like Appearance) -->
-  <div class="flex items-center gap-1.5 flex-wrap mb-6 tabs-wrapper" style="position:relative">
+  <!-- SECTION TABS -->
+  <div class="flex items-center gap-1.5 flex-wrap mb-6" style="position:relative">
     {[
       { id:'overview', label:'📊 Overview'             },
       { id:'traffic',  label:'📈 Trafic & Audience'    },
       { id:'revenue',  label:'💰 Revenus & Conversion' },
       { id:'content',  label:'🔗 Contenu'              },
     ].map((s, i) => (
-      <button class={`sec-tab px-3 py-2 rounded-xl text-xs font-semibold border border-white/8 text-gray-500 hover:text-gray-300 hover:border-white/15 ${i === 0 ? 'active' : ''}`}
-        data-section={s.id}>
+      <button class={`sec-tab px-4 py-2 rounded-xl text-xs font-semibold border border-white/8 text-gray-500 hover:text-gray-300 hover:border-white/15 ${i===0?'active':''}`} data-section={s.id}>
         {s.label}
       </button>
     ))}
-    <div id="tab-indicator" style="position:absolute;bottom:0;height:2px;background:#00ff9d;border-radius:9999px;transition:left .25s cubic-bezier(.22,1,.36,1),width .25s cubic-bezier(.22,1,.36,1);pointer-events:none"></div>
+    <div id="tab-indicator" style="position:absolute;bottom:-4px;height:2px;background:#00ff9d;border-radius:9999px;transition:left .25s cubic-bezier(.22,1,.36,1),width .25s cubic-bezier(.22,1,.36,1);pointer-events:none"></div>
   </div>
 
   <!-- ══ OVERVIEW ══ -->
   <div class="sec-panel active" id="panel-overview">
     <div class="space-y-5">
 
-      <!-- KPI row -->
-      <div class="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-6">
-        <div class="kpi-card fade-slide d-0 p-5 glass rounded-2xl border border-white/8 cursor-default" style="--glow:#00ff9d">
-          <div class="flex items-start justify-between mb-4">
-            <div class="w-8 h-8 rounded-lg bg-neon-green/10 border border-neon-green/20 flex items-center justify-center">
-              <svg class="w-3.5 h-3.5 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+      <!-- KPI row: 3-col layout — hero metric + 5 supporting -->
+      <div class="grid grid-cols-12 gap-3">
+
+        <!-- Hero: Vues (spans 4 cols on lg) -->
+        <div class="col-span-12 sm:col-span-6 lg:col-span-4 kpi-card p-5 glass rounded-2xl border border-white/8 cursor-default" style="--glow:#00ff9d">
+          <div class="flex items-start justify-between mb-3">
+            <div class="w-9 h-9 rounded-xl bg-neon-green/10 border border-neon-green/20 flex items-center justify-center">
+              <svg class="w-4 h-4 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
             </div>
-            <div set:html={viewSparkline} class="opacity-60 mt-1"></div>
+            <div set:html={viewSparkline} class="opacity-70"></div>
           </div>
-          <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">{summary.totalViews.toLocaleString('fr-FR')}</div>
-          <p class="text-xs text-gray-500 mt-1.5 font-medium">Vues totales</p>
-          <div class="flex items-center justify-between mt-1">
-            <p class="text-xs text-gray-600">{summary.avgPerDay}/j moy.</p>
+          <p class="text-xs text-gray-500 font-medium uppercase tracking-widest mb-1">Vues totales</p>
+          <div class="kpi-value text-4xl font-black text-white tabular-nums tracking-tight leading-none">{summary.totalViews.toLocaleString('fr-FR')}</div>
+          <div class="flex items-center justify-between mt-2.5">
+            <p class="text-xs text-gray-600">{summary.avgPerDay}/j · {summary.cleanViews.toLocaleString('fr-FR')} nettes</p>
             {deltaViews.neutral ? <span class="delta-neu">—</span> : deltaViews.pos ? <span class="delta-pos">↑ {deltaViews.val}%</span> : <span class="delta-neg">↓ {deltaViews.val}%</span>}
           </div>
         </div>
-        <div class="kpi-card fade-slide d-1 p-5 glass rounded-2xl border border-white/8" style="--glow:#00aaff">
-          <div class="flex items-start justify-between mb-4">
-            <div class="w-8 h-8 rounded-lg bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center">
-              <svg class="w-3.5 h-3.5 text-neon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+
+        <!-- Right grid: 5 KPIs in 2+3 rows -->
+        <div class="col-span-12 sm:col-span-6 lg:col-span-8 grid grid-cols-2 sm:grid-cols-3 gap-3">
+
+          <div class="kpi-card p-4 glass rounded-2xl border border-white/8 cursor-default" style="--glow:#00aaff">
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-xs text-gray-500 font-medium">Uniques</p>
+              {summary.totalViews > 0 && <span class="text-xs font-mono text-neon-blue/70">{Math.round((summary.uniqueVisitors/summary.totalViews)*100)}%</span>}
             </div>
-            {summary.totalViews > 0 && <span class="text-xs text-neon-blue/70 bg-neon-blue/8 px-2 py-0.5 rounded-full border border-neon-blue/15 font-mono mt-1">{Math.round((summary.uniqueVisitors/summary.totalViews)*100)}%</span>}
-          </div>
-          <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">{summary.uniqueVisitors.toLocaleString('fr-FR')}</div>
-          <p class="text-xs text-gray-500 mt-1.5 font-medium">Visiteurs uniques</p>
-          <div class="flex items-center justify-between mt-1">
-            <p class="text-xs text-gray-600">{summary.cleanViews.toLocaleString('fr-FR')} nettes</p>
-            {deltaUniques.neutral ? <span class="delta-neu">—</span> : deltaUniques.pos ? <span class="delta-pos">↑ {deltaUniques.val}%</span> : <span class="delta-neg">↓ {deltaUniques.val}%</span>}
-          </div>
-        </div>
-        <div class="kpi-card fade-slide d-2 p-5 glass rounded-2xl border border-white/8" style="--glow:#bf00ff">
-          <div class="flex items-start justify-between mb-4">
-            <div class="w-8 h-8 rounded-lg bg-neon-purple/10 border border-neon-purple/20 flex items-center justify-center">
-              <svg class="w-3.5 h-3.5 text-neon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/></svg>
+            <div class="kpi-value text-2xl font-bold text-white tabular-nums">{summary.uniqueVisitors.toLocaleString('fr-FR')}</div>
+            <div class="flex items-center justify-between mt-1.5">
+              <span class="text-xs text-gray-700">{returningRate}% récurrents</span>
+              {deltaUniques.neutral ? <span class="delta-neu text-xs">—</span> : deltaUniques.pos ? <span class="delta-pos text-xs">↑{deltaUniques.val}%</span> : <span class="delta-neg text-xs">↓{deltaUniques.val}%</span>}
             </div>
-            <div set:html={clickSparkline} class="opacity-60 mt-1"></div>
           </div>
-          <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">{summary.totalClicks.toLocaleString('fr-FR')}</div>
-          <p class="text-xs text-gray-500 mt-1.5 font-medium">Clics sur liens</p>
-          <div class="flex items-center justify-between mt-1">
-            <p class="text-xs text-gray-600">CTR {summary.clickRate.toFixed(1)}%</p>
-            {deltaClicks.neutral ? <span class="delta-neu">—</span> : deltaClicks.pos ? <span class="delta-pos">↑ {deltaClicks.val}%</span> : <span class="delta-neg">↓ {deltaClicks.val}%</span>}
-          </div>
-        </div>
-        <div class="kpi-card fade-slide d-3 p-5 glass rounded-2xl border border-white/8" style="--glow:#ff6b6b">
-          <div class="flex items-start justify-between mb-4">
-            <div class="w-8 h-8 rounded-lg bg-neon-pink/10 border border-neon-pink/20 flex items-center justify-center">
-              <svg class="w-3.5 h-3.5 text-neon-pink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+
+          <div class="kpi-card p-4 glass rounded-2xl border border-white/8" style="--glow:#bf00ff">
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-xs text-gray-500 font-medium">Clics</p>
+              <span class={`text-xs font-mono ${summary.clickRate>=8?'text-neon-green':summary.clickRate>=4?'text-amber-400':'text-gray-500'}`}>{summary.clickRate.toFixed(1)}%</span>
             </div>
-            <span class={`text-xs px-2 py-0.5 rounded-full border font-mono mt-1 ${summary.clickRate >= 10 ? 'text-neon-green/70 bg-neon-green/8 border-neon-green/15' : summary.clickRate >= 5 ? 'text-yellow-400/70 bg-yellow-400/8 border-yellow-400/15' : 'text-gray-500 bg-white/5 border-white/10'}`}>
-              {summary.clickRate >= 10 ? '🔥 Top' : summary.clickRate >= 5 ? '↗ Bien' : '· Faible'}
-            </span>
-          </div>
-          <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">{summary.clickRate.toFixed(1)}<span class="text-lg text-gray-400">%</span></div>
-          <p class="text-xs text-gray-500 mt-1.5 font-medium">Taux de clic</p>
-          <p class="text-xs text-gray-600 mt-1">clics / vues</p>
-        </div>
-        <div class="kpi-card fade-slide d-4 p-5 glass rounded-2xl border border-white/8 cursor-default" style="--glow:#f59e0b">
-          <div class="flex items-start justify-between mb-4">
-            <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2)">
-              <svg class="w-3.5 h-3.5" style="color:#f59e0b" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"/></svg>
+            <div class="kpi-value text-2xl font-bold text-white tabular-nums">{summary.totalClicks.toLocaleString('fr-FR')}</div>
+            <div class="flex items-center justify-between mt-1.5">
+              <span class="text-xs text-gray-700">{blocks.filter(b=>b.active).length} blocs actifs</span>
+              {deltaClicks.neutral ? <span class="delta-neu text-xs">—</span> : deltaClicks.pos ? <span class="delta-pos text-xs">↑{deltaClicks.val}%</span> : <span class="delta-neg text-xs">↓{deltaClicks.val}%</span>}
             </div>
-            <span class="text-xs px-2 py-0.5 rounded-full border font-mono mt-1" style="color:rgba(245,158,11,.7);background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.15)">{leadRate.toFixed(1)}%</span>
           </div>
-          <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">{leads.toLocaleString('fr-FR')}</div>
-          <p class="text-xs text-gray-500 mt-1.5 font-medium">Leads</p>
-          <div class="flex items-center justify-between mt-1">
-            <p class="text-xs text-gray-600">{sales} ventes · {convRate.toFixed(1)}%</p>
-            {deltaLeads.neutral ? <span class="delta-neu">—</span> : deltaLeads.pos ? <span class="delta-pos">↑ {deltaLeads.val}%</span> : <span class="delta-neg">↓ {deltaLeads.val}%</span>}
-          </div>
-        </div>
-        <div class="kpi-card fade-slide d-5 p-5 glass rounded-2xl border border-white/8 cursor-default" style="--glow:#a78bfa">
-          <div class="flex items-start justify-between mb-4">
-            <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2)">
-              <svg class="w-3.5 h-3.5" style="color:#a78bfa" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+
+          <div class="kpi-card p-4 glass rounded-2xl border border-white/8 cursor-default" style="--glow:#f59e0b">
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-xs text-gray-500 font-medium">Leads</p>
+              <span class="text-xs font-mono" style="color:rgba(245,158,11,.7)">{leadRate.toFixed(1)}%</span>
             </div>
-            <div set:html={revenueSparkline} class="opacity-60 mt-1"></div>
+            <div class="kpi-value text-2xl font-bold text-white tabular-nums">{leads.toLocaleString('fr-FR')}</div>
+            <div class="flex items-center justify-between mt-1.5">
+              <span class="text-xs text-gray-700">{convRate.toFixed(1)}% conv.</span>
+              {deltaLeads.neutral ? <span class="delta-neu text-xs">—</span> : deltaLeads.pos ? <span class="delta-pos text-xs">↑{deltaLeads.val}%</span> : <span class="delta-neg text-xs">↓{deltaLeads.val}%</span>}
+            </div>
           </div>
-          <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">
-            {revenue > 0 ? revenue.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : '—'}
+
+          <div class="kpi-card p-4 glass rounded-2xl border border-white/8 cursor-default" style="--glow:#a78bfa">
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-xs text-gray-500 font-medium">Revenue</p>
+              <div set:html={revenueSparkline} class="opacity-60"></div>
+            </div>
+            <div class="kpi-value text-2xl font-bold text-white tabular-nums">
+              {revenue > 0 ? revenue.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : '—'}
+            </div>
+            <div class="flex items-center justify-between mt-1.5">
+              <span class="text-xs text-gray-700">{sales > 0 ? `CPA ${(revenue/sales).toFixed(0)}€` : 'aucune vente'}</span>
+              {deltaRevenue.neutral ? <span class="delta-neu text-xs">—</span> : deltaRevenue.pos ? <span class="delta-pos text-xs">↑{deltaRevenue.val}%</span> : <span class="delta-neg text-xs">↓{deltaRevenue.val}%</span>}
+            </div>
           </div>
-          <p class="text-xs text-gray-500 mt-1.5 font-medium">Revenue</p>
-          <div class="flex items-center justify-between mt-1">
-            <p class="text-xs text-gray-600">{sales > 0 ? `CPA ${(revenue/sales).toFixed(0)}€` : 'Aucune vente'}</p>
-            {deltaRevenue.neutral ? <span class="delta-neu">—</span> : deltaRevenue.pos ? <span class="delta-pos">↑ {deltaRevenue.val}%</span> : <span class="delta-neg">↓ {deltaRevenue.val}%</span>}
+
+          <!-- Score card -->
+          <div class="kpi-card p-4 glass rounded-2xl border border-white/8 cursor-default" style={`--glow:${perfColor}`}>
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-xs text-gray-500 font-medium">Score IA</p>
+              <span class="text-xs font-black px-2 py-0.5 rounded-lg" style={`background:${perfColor}18;color:${perfColor}`}>{perfGrade}</span>
+            </div>
+            <div class="kpi-value text-2xl font-bold tabular-nums" style={`color:${perfColor}`}>{perfScore}<span class="text-sm text-gray-600">/100</span></div>
+            <div class="bar-track mt-2" style="height:3px">
+              <div class="bar-fill" style={`width:${perfScore}%;background:${perfColor}`}></div>
+            </div>
           </div>
+
         </div>
       </div>
 
-      <!-- v7: Peak metrics strip -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <!-- Secondary strip: 4 quick stats -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {[
-          { label: 'Meilleur jour',     value: bestDay,                              icon: '📅', color: '#00ff9d' },
-          { label: 'Scroll depth',      value: `${scrollDepth}%`,                   icon: '📜', color: '#38bdf8' },
-          { label: 'Taux de rebond',    value: `${bounceRate}%`,                     icon: '↩', color: '#f59e0b' },
-          { label: 'Blocs actifs',      value: `${activeBlocks} / ${blocks.length}`, icon: '⚡', color: '#a78bfa' },
+          { label:'Meilleur jour', value:bestDay,           icon:'📅', color:'#00ff9d' },
+          { label:'Scroll depth',  value:`${scrollDepth}%`, icon:'📜', color:'#38bdf8' },
+          { label:'Rebond',        value:`${bounceRate}%`,  icon:'↩',  color:bounceRate>60?'#f87171':bounceRate>40?'#f59e0b':'#00ff9d' },
+          { label:'Blocs actifs',  value:`${activationRate}%`, icon:'⚡', color:'#a78bfa' },
         ].map(m => (
-          <div class="flex items-center gap-3 p-3.5 glass rounded-xl border border-white/8">
-            <span class="text-xl leading-none shrink-0">{m.icon}</span>
+          <div class="flex items-center gap-3 px-4 py-3 glass rounded-xl border border-white/6 hover:border-white/12 transition-colors">
+            <span class="text-lg leading-none shrink-0">{m.icon}</span>
             <div class="min-w-0">
-              <p class="text-sm font-bold text-white truncate tabular-nums" style={`color:${m.color}`}>{m.value}</p>
+              <p class="text-sm font-bold truncate tabular-nums" style={`color:${m.color}`}>{m.value}</p>
               <p class="text-xs text-gray-600 truncate">{m.label}</p>
             </div>
           </div>
@@ -804,14 +798,14 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
       <!-- Smart Alerts -->
       <div class="p-5 glass rounded-2xl border border-white/8">
         <h3 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-          Alertes intelligentes
-          {alertCount > 0 && <span class="text-xs font-bold px-2 py-0.5 rounded-full" style="background:rgba(248,113,113,.12);color:#f87171;border:0.5px solid rgba(248,113,113,.25)">{alertCount} active{alertCount > 1 ? 's' : ''}</span>}
+          Alertes
+          {alertCount > 0 && <span class="text-xs font-bold px-2 py-0.5 rounded-full" style="background:rgba(248,113,113,.12);color:#f87171;border:.5px solid rgba(248,113,113,.25)">{alertCount}</span>}
         </h3>
         <div class="space-y-2">
           {alerts.map(a => (
-            <div class={`flex gap-3 p-3.5 rounded-xl border ${a.type === 'warning' ? 'alert-warning' : a.type === 'success' ? 'alert-success' : 'alert-info'}`}>
+            <div class={`flex gap-3 p-3.5 rounded-xl border ${a.type==='warning'?'alert-warning':a.type==='success'?'alert-success':'alert-info'}`}>
               <span class="text-lg shrink-0 leading-none mt-0.5">{a.icon}</span>
-              <div class="min-w-0">
+              <div>
                 <p class="text-sm font-semibold text-white mb-0.5">{a.title}</p>
                 <p class="text-xs text-gray-400 leading-relaxed">{a.body}</p>
               </div>
@@ -820,131 +814,118 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
         </div>
       </div>
 
+      <!-- AI Report + Score + Predictions row -->
+      <div class="grid lg:grid-cols-3 gap-4">
 
-      <!-- v8: AI REPORT -->
-      <div class="p-5 glass rounded-2xl border border-white/8">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <h3 class="text-sm font-semibold text-white flex items-center gap-2">
-              Rapport IA
-              <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(168,85,247,.12);color:#c084fc;border:.5px solid rgba(168,85,247,.3)">Claude</span>
-            </h3>
-            <p class="text-xs text-gray-500 mt-0.5">Résumé de la période · généré par IA</p>
+        <!-- AI Report -->
+        <div class="lg:col-span-1 p-5 glass rounded-2xl border border-white/8 flex flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-semibold text-white flex items-center gap-2">Rapport IA <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(168,85,247,.12);color:#c084fc;border:.5px solid rgba(168,85,247,.3)">Claude</span></h3>
+              <p class="text-xs text-gray-500 mt-0.5">Résumé · généré à la demande</p>
+            </div>
+            <button id="ai-report-btn" class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all" style="background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.3);color:#c084fc">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              Générer
+            </button>
           </div>
-          <button id="ai-report-btn"
-            class="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all"
-            style="background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.3);color:#c084fc;hover:opacity:80%">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-            </svg>
-            Générer le rapport
-          </button>
+          <div id="ai-report-panel" class="hidden">
+            <div class="h-px bg-white/6 mb-3"></div>
+            <div id="ai-report-content" class="space-y-2 text-xs text-gray-400 leading-relaxed"></div>
+            <p class="text-xs text-gray-700 mt-3">Claude Sonnet · données locales uniquement</p>
+          </div>
         </div>
-        <div id="ai-report-panel" class="hidden">
-          <div class="h-px bg-white/6 mb-4"></div>
-          <div id="ai-report-content" class="space-y-3 text-sm text-gray-300 leading-relaxed"></div>
-          <p class="text-xs text-gray-700 mt-4">Généré par Claude Sonnet · basé sur tes métriques uniquement</p>
+
+        <!-- Score IA -->
+        <div class="p-5 glass rounded-2xl border border-white/8 flex flex-col gap-3">
+          <div class="flex items-center justify-between">
+            <div><h3 class="text-sm font-semibold text-white">Score performance</h3><p class="text-xs text-gray-500 mt-0.5">{days}j</p></div>
+            <div class="flex flex-col items-center w-12 h-12 rounded-xl border-2 justify-center" style={`border-color:${perfColor}40;background:${perfColor}0d`}>
+              <span class="text-lg font-black leading-none" style={`color:${perfColor}`}>{perfGrade}</span>
+            </div>
+          </div>
+          <div>
+            <div class="flex justify-between text-xs mb-1.5"><span class="text-gray-500">Global</span><span class="font-bold" style={`color:${perfColor}`}>{perfScore}/100</span></div>
+            <div class="bar-track" style="height:5px"><div class="bar-fill" style={`width:${perfScore}%;background:${perfColor};animation-delay:.2s`}></div></div>
+          </div>
+          <div class="grid grid-cols-2 gap-1.5">
+            {[{l:'CTR',v:scoreCTR},{l:'Croissance',v:scoreGrowth},{l:'Conversion',v:scoreConversion},{l:'Revenue',v:scoreRevenue}].map(s => (
+              <div class="px-2.5 py-2 rounded-lg" style="background:rgba(255,255,255,.03)">
+                <div class="flex justify-between text-xs mb-1"><span class="text-gray-600">{s.l}</span><span class="text-white font-semibold">{s.v}/25</span></div>
+                <div class="bar-track" style="height:2px"><div class="bar-fill" style={`width:${(s.v/25)*100}%;background:${perfColor};opacity:.7`}></div></div>
+              </div>
+            ))}
+          </div>
+          <div class="space-y-1.5 pt-2 border-t border-white/6">
+            {topRecos.map(r => <div class="flex gap-2 text-xs text-gray-500 leading-relaxed"><span class="shrink-0" style={`color:${perfColor}`}>→</span><span>{r}</span></div>)}
+          </div>
         </div>
+
+        <!-- Prédictions + Objectifs -->
+        <div class="flex flex-col gap-4">
+          <!-- Prédictions -->
+          <div class="p-4 glass rounded-xl border border-white/8 flex-1">
+            <h3 class="text-xs font-semibold text-white mb-3 uppercase tracking-widest" style="color:rgba(255,255,255,.5)">Prédictions 30j</h3>
+            {proj30Views === 0 ? (
+              <p class="text-xs text-gray-700 py-2">Pas assez de données</p>
+            ) : (
+              <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                  <div set:html={predSparkViews} class="opacity-80"></div>
+                  <div class="text-right"><p class="text-sm font-bold tabular-nums" style="color:#00ff9d">{proj30Views.toLocaleString('fr-FR')}</p><p class="text-xs text-gray-600">vues</p></div>
+                </div>
+                <div class="flex items-center justify-between">
+                  <div set:html={predSparkClicks} class="opacity-80"></div>
+                  <div class="text-right"><p class="text-sm font-bold tabular-nums" style="color:#38bdf8">{proj30Clicks.toLocaleString('fr-FR')}</p><p class="text-xs text-gray-600">clics</p></div>
+                </div>
+              </div>
+            )}
+          </div>
+          <!-- Objectifs -->
+          <div class="p-4 glass rounded-xl border border-white/8">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-xs font-semibold uppercase tracking-widest" style="color:rgba(255,255,255,.5)">Objectifs</h3>
+              <button id="edit-goals-btn" class="text-xs text-gray-600 hover:text-white transition-colors">Modifier</button>
+            </div>
+            <div id="goals-list" class="space-y-2"><div class="text-xs text-gray-700 text-center py-2">Chargement…</div></div>
+            <div id="goals-editor" class="hidden space-y-2 pt-3 border-t border-white/6 mt-3">
+              {[{id:'goal-views',l:'Vues',ph:'5000'},{id:'goal-clicks',l:'Clics',ph:'500'},{id:'goal-leads',l:'Leads',ph:'50'},{id:'goal-revenue',l:'Revenue €',ph:'1000'}].map(g => (
+                <div class="flex items-center gap-2">
+                  <label class="text-xs text-gray-600 w-20 shrink-0">{g.l}</label>
+                  <input type="number" id={g.id} placeholder={g.ph} min="0" class="flex-1 px-2.5 py-1.5 glass border border-white/10 rounded-lg text-white text-xs focus:border-neon-green/40 focus:outline-none" />
+                </div>
+              ))}
+              <button id="save-goals-btn" class="w-full py-1.5 rounded-lg text-xs font-bold mt-1" style="background:rgba(0,255,157,.1);border:1px solid rgba(0,255,157,.25);color:#00ff9d">Sauvegarder</button>
+            </div>
+          </div>
+        </div>
+
       </div>
 
-      <!-- Funnel -->
+      <!-- Funnel (compact) -->
       <div class="p-5 glass rounded-2xl border border-white/8">
-        <h3 class="text-sm font-semibold text-white mb-5">Funnel de conversion <span class="text-gray-600 font-normal text-xs ml-1">· {days}j</span></h3>
-        <div class="space-y-3">
+        <h3 class="text-sm font-semibold text-white mb-4">Funnel <span class="text-gray-600 font-normal text-xs ml-1">· {days}j</span></h3>
+        <div class="grid grid-cols-4 gap-2">
           {funnelSteps.map((step, i) => {
             const prev     = i > 0 ? funnelSteps[i-1].value : step.value;
-            const dropPct  = prev > 0 && i > 0 ? (1 - step.value/prev)*100 : 0;
+            const dropPct  = prev > 0 && i > 0 ? (1-step.value/prev)*100 : 0;
             const widthPct = funnelSteps[0].value > 0 ? (step.value/funnelSteps[0].value)*100 : 0;
             return (
-              <div>
-                <div class="flex items-center justify-between mb-1.5">
-                  <div class="flex items-center gap-2.5">
-                    <div class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shrink-0" style={`background:${step.color}18;border:.5px solid ${step.color}35;color:${step.color}`}>{i+1}</div>
-                    <span class="text-sm font-semibold text-white">{step.label}</span>
-                    {i > 0 && dropPct > 0 && <span class="text-xs px-2 py-0.5 rounded-full" style="color:rgba(248,113,113,.7);background:rgba(248,113,113,.08);border:.5px solid rgba(248,113,113,.15)">↓ {dropPct.toFixed(0)}% drop</span>}
-                  </div>
-                  <span class="text-sm font-bold tabular-nums" style={`color:${step.color}`}>{step.value.toLocaleString('fr-FR')}</span>
+              <div class="flex flex-col gap-2">
+                <div class="text-center p-3 rounded-xl border" style={`background:${step.color}08;border-color:${step.color}20`}>
+                  <div class="text-lg font-black tabular-nums" style={`color:${step.color}`}>{step.value.toLocaleString('fr-FR')}</div>
+                  <div class="text-xs text-gray-500 mt-0.5">{step.label}</div>
+                  {i > 0 && dropPct > 0 && <div class="text-xs mt-1 font-semibold" style="color:rgba(248,113,113,.7)">↓{dropPct.toFixed(0)}%</div>}
                 </div>
-                <div class="bar-track" style="height:6px"><div class="bar-fill" style={`width:${widthPct}%;background:${step.color};opacity:.75;animation-delay:${i*100}ms`}></div></div>
+                <div class="bar-track" style="height:4px">
+                  <div class="bar-fill" style={`width:${widthPct}%;background:${step.color};opacity:.7;animation-delay:${i*80}ms`}></div>
+                </div>
               </div>
             );
           })}
         </div>
       </div>
 
-      <!-- Score IA + Prédictions + Objectifs -->
-      <div class="grid lg:grid-cols-3 gap-4">
-        <!-- Score -->
-        <div class="p-5 glass rounded-2xl border border-white/8 flex flex-col gap-4">
-          <div class="flex items-center justify-between">
-            <div><h3 class="text-sm font-semibold text-white">Score de performance</h3><p class="text-xs text-gray-500 mt-0.5">Analyse · {days}j</p></div>
-            <div class="flex flex-col items-center justify-center w-14 h-14 rounded-2xl border-2" style={`border-color:${perfColor}40;background:${perfColor}10`}>
-              <span class="text-xl font-black" style={`color:${perfColor}`}>{perfGrade}</span>
-              <span class="text-xs font-bold" style={`color:${perfColor};opacity:.7`}>{perfScore}</span>
-            </div>
-          </div>
-          <div>
-            <div class="flex justify-between mb-1.5 text-xs"><span class="text-gray-500">Score global</span><span class="font-bold" style={`color:${perfColor}`}>{perfScore}/100</span></div>
-            <div class="bar-track" style="height:6px"><div class="bar-fill" style={`width:${perfScore}%;background:${perfColor};animation-delay:200ms`}></div></div>
-          </div>
-          <div class="grid grid-cols-2 gap-2">
-            {[{label:'CTR',val:scoreCTR},{label:'Croissance',val:scoreGrowth},{label:'Conversion',val:scoreConversion},{label:'Revenue',val:scoreRevenue}].map(s => (
-              <div class="p-2 rounded-xl" style="background:rgba(255,255,255,.04)">
-                <div class="flex justify-between text-xs mb-1"><span class="text-gray-500">{s.label}</span><span class="text-white font-semibold">{s.val}/25</span></div>
-                <div class="bar-track" style="height:3px"><div class="bar-fill" style={`width:${(s.val/25)*100}%;background:${perfColor};opacity:.7`}></div></div>
-              </div>
-            ))}
-          </div>
-          <div class="space-y-2 pt-2 border-t border-white/6">
-            <p class="text-xs text-gray-600 uppercase tracking-widest font-medium">Recommandations</p>
-            {topRecos.map(r => <div class="flex gap-2 text-xs text-gray-400 leading-relaxed"><span class="shrink-0 mt-0.5" style={`color:${perfColor}`}>→</span><span>{r}</span></div>)}
-          </div>
-        </div>
-        <!-- Prédictions -->
-        <div class="p-5 glass rounded-2xl border border-white/8 flex flex-col gap-4">
-          <div><h3 class="text-sm font-semibold text-white">Prédictions 30 jours</h3><p class="text-xs text-gray-500 mt-0.5">Tendance actuelle</p></div>
-          {proj30Views === 0 && proj30Clicks === 0 ? (
-            <div class="flex-1 flex items-center justify-center text-gray-700 text-sm text-center py-8">Pas assez de données<br/>(min 3 jours)</div>
-          ) : (
-            <div class="space-y-5">
-              <div>
-                <div class="flex items-center justify-between mb-2"><span class="text-xs text-gray-500">Vues / 30j</span><span class="text-sm font-bold tabular-nums" style="color:#00ff9d">{proj30Views.toLocaleString('fr-FR')}</span></div>
-                <div set:html={predSparkViews}></div>
-              </div>
-              <div>
-                <div class="flex items-center justify-between mb-2"><span class="text-xs text-gray-500">Clics / 30j</span><span class="text-sm font-bold tabular-nums" style="color:#38bdf8">{proj30Clicks.toLocaleString('fr-FR')}</span></div>
-                <div set:html={predSparkClicks}></div>
-              </div>
-              {proj30Revenue > 0 && (
-                <div class="p-3 rounded-xl border" style="background:rgba(167,139,250,.06);border-color:rgba(167,139,250,.15)">
-                  <div class="flex items-center justify-between">
-                    <span class="text-xs text-gray-500">Revenue projeté / 30j</span>
-                    <span class="text-sm font-bold" style="color:#a78bfa">{proj30Revenue.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0})}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        <!-- Objectifs -->
-        <div class="p-5 glass rounded-2xl border border-white/8 flex flex-col gap-3">
-          <div class="flex items-center justify-between">
-            <div><h3 class="text-sm font-semibold text-white">Objectifs</h3><p class="text-xs text-gray-500 mt-0.5">Cibles pour la période</p></div>
-            <button id="edit-goals-btn" class="no-print text-xs text-gray-500 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-white/8">Modifier</button>
-          </div>
-          <div id="goals-list" class="space-y-3 flex-1"><div class="flex items-center justify-center h-20 text-gray-700 text-xs text-center">Chargement…</div></div>
-          <div id="goals-editor" class="hidden space-y-3 pt-3 border-t border-white/6">
-            <p class="text-xs text-gray-600 uppercase tracking-widest font-medium">Définir tes objectifs</p>
-            {[{id:'goal-views',label:'Vues',ph:'ex: 5000'},{id:'goal-clicks',label:'Clics',ph:'ex: 500'},{id:'goal-leads',label:'Leads',ph:'ex: 50'},{id:'goal-revenue',label:'Revenue €',ph:'ex: 1000'}].map(g => (
-              <div class="flex items-center gap-2">
-                <label class="text-xs text-gray-500 w-24 shrink-0">{g.label}</label>
-                <input type="number" id={g.id} placeholder={g.ph} min="0" class="flex-1 px-3 py-1.5 glass border border-white/10 rounded-lg text-white text-xs focus:border-neon-green/40 focus:outline-none" />
-              </div>
-            ))}
-            <button id="save-goals-btn" class="w-full py-2 rounded-xl text-xs font-bold" style="background:rgba(0,255,157,.1);border:1px solid rgba(0,255,157,.25);color:#00ff9d">Sauvegarder</button>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -952,164 +933,159 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
   <div class="sec-panel" id="panel-traffic">
     <div class="space-y-5">
 
-      <!-- Chart trafic + Appareils -->
-      <div class="bento bento-main">
-        <div class="p-5 glass rounded-2xl border border-white/8">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-3">
-              <div><h3 class="text-sm font-semibold text-white">Trafic</h3><p class="text-xs text-gray-500 mt-0.5">· {days}j</p></div>
-              <button id="compare-btn" class="compare-btn text-xs px-2.5 py-1 rounded-lg border border-white/10 text-gray-500 hover:text-gray-300 transition-all">⊕ Comparer</button>
-            </div>
-            <div class="flex items-center gap-1" id="metric-toggle">
-              <button class="metric-btn active text-xs px-2.5 py-1 rounded-lg border border-white/10 text-gray-400" data-metric="both">Tout</button>
-              <button class="metric-btn text-xs px-2.5 py-1 rounded-lg border border-white/10 text-gray-400" data-metric="views">Vues</button>
-              <button class="metric-btn text-xs px-2.5 py-1 rounded-lg border border-white/10 text-gray-400" data-metric="clicks">Clics</button>
-              <button class="metric-btn text-xs px-2.5 py-1 rounded-lg border border-white/10 text-gray-400" data-metric="ctr">CTR</button>
-            </div>
-          </div>
-          {chartLabels.length === 0 ? (
-            <div class="flex flex-col items-center justify-center h-52 text-gray-600">
-              <p class="text-sm">Aucune donnée sur cette période</p>
-            </div>
-          ) : <canvas id="traffic-chart" style="max-height:240px;width:100%"></canvas>}
-        </div>
-        <div class="flex flex-col gap-4">
-          <div class="p-5 glass rounded-2xl border border-white/8 flex-1">
-            <h3 class="text-sm font-semibold text-white mb-4">Appareils</h3>
-            {deviceTotal === 0 ? <p class="text-sm text-gray-600 text-center py-6">Aucune donnée</p> : (
-              <div class="space-y-3">
-                {[
-                  {key:'mobile', label:'Mobile', color:'#00ff9d', icon:'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z'},
-                  {key:'desktop',label:'Desktop',color:'#bf00ff', icon:'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'},
-                  {key:'tablet', label:'Tablet', color:'#00aaff', icon:'M12 18h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z'},
-                ].map(dev => {
-                  const val = deviceData[dev.key as keyof typeof deviceData];
-                  const pct = deviceTotal > 0 ? Math.round((val/deviceTotal)*100) : 0;
-                  if (val === 0) return null;
-                  return (
-                    <div>
-                      <div class="flex items-center justify-between mb-1.5">
-                        <span class="flex items-center gap-2 text-xs text-gray-400">
-                          <svg class="w-3 h-3" fill="none" stroke="currentColor" style={`color:${dev.color}`} viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={dev.icon}/></svg>
-                          {dev.label}
-                        </span>
-                        <span class="text-xs font-semibold text-white tabular-nums">{pct}%</span>
-                      </div>
-                      <div class="bar-track"><div class="bar-fill" style={`width:${pct}%;background:${dev.color};animation-delay:${pct*3}ms`}></div></div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-          {chartLabels.length > 0 && (
-            <div class="p-5 glass rounded-2xl border border-white/8">
-              <h3 class="text-sm font-semibold text-white mb-1">CTR / jour</h3>
-              <canvas id="rate-chart" style="max-height:80px;width:100%"></canvas>
-            </div>
-          )}
-    
-      <!-- v8: LIVE FEED -->
+      <!-- Chart principal + metric toggle + compare -->
       <div class="p-5 glass rounded-2xl border border-white/8">
         <div class="flex items-center justify-between mb-4">
-          <div>
-            <h3 class="text-sm font-semibold text-white flex items-center gap-2">
-              Live feed
-              <span class="live-dot live-ring w-2 h-2 rounded-full bg-neon-green inline-block" style="box-shadow:0 0 0 0 rgba(0,255,157,.4)"></span>
-            </h3>
-            <p class="text-xs text-gray-500 mt-0.5">Visiteurs en temps réel via Realtime</p>
-          </div>
-          <span id="live-count" class="text-xs font-semibold text-neon-green tabular-nums"></span>
-        </div>
-        <div id="live-feed-list" class="space-y-1.5 max-h-48 overflow-y-auto scrollbar-none">
-          <p class="text-xs text-gray-700 text-center py-4">Connexion en cours…</p>
-        </div>
-      </div>
-
-      <!-- v7: Scroll depth + bounce -->
-          <div class="p-4 glass rounded-xl border border-white/8">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-xs text-gray-500">Scroll depth</span>
-              <span class="text-sm font-bold tabular-nums" style="color:#38bdf8">{scrollDepth}%</span>
+          <div class="flex items-center gap-3">
+            <div>
+              <h3 class="text-sm font-semibold text-white">Trafic</h3>
+              <p class="text-xs text-gray-500 mt-0.5">· {days}j</p>
             </div>
-            <div class="bar-track" style="height:4px"><div class="bar-fill" style={`width:${scrollDepth}%;background:#38bdf8;opacity:.8`}></div></div>
-            <div class="flex items-center justify-between mt-3 mb-2">
-              <span class="text-xs text-gray-500">Rebond estimé</span>
-              <span class="text-sm font-bold tabular-nums" style={`color:${bounceRate > 60 ? '#f87171' : bounceRate > 40 ? '#f59e0b' : '#00ff9d'}`}>{bounceRate}%</span>
-            </div>
-            <div class="bar-track" style="height:4px"><div class="bar-fill" style={`width:${bounceRate}%;background:${bounceRate > 60 ? '#f87171' : bounceRate > 40 ? '#f59e0b' : '#00ff9d'};opacity:.8`}></div></div>
+            <button id="compare-btn" class="compare-btn text-xs px-2.5 py-1 rounded-lg border border-white/10 text-gray-500 hover:text-gray-300 transition-all">⊕ Comparer</button>
+          </div>
+          <div class="flex items-center gap-1" id="metric-toggle">
+            <button class="metric-btn active text-xs px-2.5 py-1 rounded-lg border border-white/10 text-gray-400" data-metric="both">Tout</button>
+            <button class="metric-btn text-xs px-2.5 py-1 rounded-lg border border-white/10 text-gray-400" data-metric="views">Vues</button>
+            <button class="metric-btn text-xs px-2.5 py-1 rounded-lg border border-white/10 text-gray-400" data-metric="clicks">Clics</button>
+            <button class="metric-btn text-xs px-2.5 py-1 rounded-lg border border-white/10 text-gray-400" data-metric="ctr">CTR</button>
           </div>
         </div>
-      </div>
-
-      <!-- Retention -->
-      <div class="p-5 glass rounded-2xl border border-white/8">
-        <div class="flex items-center justify-between mb-5">
-          <div><h3 class="text-sm font-semibold text-white">Retention des visiteurs</h3><p class="text-xs text-gray-500 mt-0.5">Nouveaux vs récurrents · {days}j</p></div>
-        </div>
-        <div class="grid sm:grid-cols-3 gap-4 mb-5">
-          <div class="p-4 rounded-xl" style="background:rgba(0,255,157,.06);border:.5px solid rgba(0,255,157,.15)">
-            <p class="text-xs text-gray-500 mb-1">Visiteurs uniques</p>
-            <p class="text-2xl font-bold text-neon-green tabular-nums">{summary.uniqueVisitors.toLocaleString('fr-FR')}</p>
-            <p class="text-xs text-gray-600 mt-1">{retentionRate}% du trafic total</p>
-          </div>
-          <div class="p-4 rounded-xl" style="background:rgba(56,189,248,.06);border:.5px solid rgba(56,189,248,.15)">
-            <p class="text-xs text-gray-500 mb-1">Visites récurrentes</p>
-            <p class="text-2xl font-bold tabular-nums" style="color:#38bdf8">{returningVisitors.toLocaleString('fr-FR')}</p>
-            <p class="text-xs text-gray-600 mt-1">{returningRate}% du trafic total</p>
-          </div>
-          <div class="p-4 rounded-xl" style="background:rgba(167,139,250,.06);border:.5px solid rgba(167,139,250,.15)">
-            <p class="text-xs text-gray-500 mb-1">Taux de retour</p>
-            <p class="text-2xl font-bold tabular-nums" style="color:#a78bfa">{returningRate}%</p>
-            <p class="text-xs text-gray-600 mt-1">{prevRetentionRate > 0 ? `${prevRetentionRate}% période préc.` : 'Pas de comparaison'}</p>
-          </div>
-        </div>
-        <!-- Stacked bar new vs returning per day -->
-        <canvas id="retention-chart" style="max-height:120px;width:100%"></canvas>
-      </div>
-
-
-      <!-- v8: COHORT ANALYSIS -->
-      <div class="p-5 glass rounded-2xl border border-white/8">
-        <div class="flex items-center justify-between mb-5">
-          <div>
-            <h3 class="text-sm font-semibold text-white">Cohort Analysis</h3>
-            <p class="text-xs text-gray-500 mt-0.5">Rétention semaine par semaine</p>
-          </div>
-        </div>
-        {cohortWeeks.length < 2 ? (
-          <p class="text-sm text-gray-700 text-center py-6">Pas assez de données (min 14 jours)</p>
+        {chartLabels.length === 0 ? (
+          <div class="flex flex-col items-center justify-center h-52 text-gray-700"><p class="text-sm">Aucune donnée</p></div>
         ) : (
-          <div class="space-y-3">
-            {cohortWeeks.map((cw, i) => {
-              const isBase = i === 0;
-              const color  = cw.retention >= 80 ? '#00ff9d' : cw.retention >= 50 ? '#f59e0b' : '#f87171';
-              return (
-                <div class="flex items-center gap-3">
-                  <span class="text-xs text-gray-500 font-mono w-20 shrink-0">{cw.week}</span>
-                  <div class="flex-1 bg-white/4 rounded-lg overflow-hidden" style="height:20px">
-                    <div class="cohort-bar-fill h-full" style={`width:${cw.retention}%;background:linear-gradient(90deg,${color}55,${color}22)`}></div>
-                  </div>
-                  <span class="text-xs font-bold tabular-nums w-10 text-right" style={`color:${color}`}>{cw.retention}%</span>
-                  <span class="text-xs text-gray-700 tabular-nums w-16 text-right">{cw.views.toLocaleString('fr-FR')}</span>
-                  {isBase && <span class="text-xs text-gray-700 shrink-0">base</span>}
-                  {!isBase && <span class="text-xs shrink-0 w-8 text-right" style={`color:${color}`}>{cw.retention >= 100 ? '↑' : cw.retention >= 70 ? '→' : '↓'}</span>}
-                </div>
-              );
-            })}
-            <div class="flex items-center gap-3 pt-3 border-t border-white/6 text-xs text-gray-700">
-              <span class="w-20 shrink-0">Légende :</span>
-              <span style="color:#00ff9d">≥80% excellent</span>
-              <span style="color:#f59e0b">50–79% correct</span>
-              <span style="color:#f87171">&lt;50% faible</span>
-            </div>
+          <div style="position:relative">
+            <canvas id="traffic-chart" style="max-height:260px;width:100%"></canvas>
           </div>
         )}
       </div>
 
-      <!-- Carte + Sources (tabs internes) -->
+      <!-- Devices + CTR + Scroll/Bounce -->
+      <div class="grid sm:grid-cols-3 gap-4">
+        <!-- Devices -->
+        <div class="p-5 glass rounded-2xl border border-white/8">
+          <h3 class="text-xs font-semibold text-white mb-4 uppercase tracking-widest" style="color:rgba(255,255,255,.4)">Appareils</h3>
+          {deviceTotal === 0 ? <p class="text-sm text-gray-600 text-center py-6">Aucune donnée</p> : (
+            <div class="space-y-3">
+              {[
+                {key:'mobile', label:'Mobile', color:'#00ff9d', icon:'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z'},
+                {key:'desktop',label:'Desktop',color:'#bf00ff', icon:'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'},
+                {key:'tablet', label:'Tablet', color:'#38bdf8', icon:'M12 18h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z'},
+              ].map(dev => {
+                const val = deviceData[dev.key as keyof typeof deviceData];
+                const pct = deviceTotal > 0 ? Math.round((val/deviceTotal)*100) : 0;
+                if (val === 0) return null;
+                return (
+                  <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                      <span class="flex items-center gap-2 text-xs text-gray-400">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" style={`color:${dev.color}`} viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={dev.icon}/></svg>
+                        {dev.label}
+                      </span>
+                      <span class="text-xs font-semibold text-white tabular-nums">{pct}%</span>
+                    </div>
+                    <div class="bar-track"><div class="bar-fill" style={`width:${pct}%;background:${dev.color};animation-delay:${pct*3}ms`}></div></div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <!-- CTR / jour -->
+        <div class="p-5 glass rounded-2xl border border-white/8">
+          <h3 class="text-xs font-semibold text-white mb-4 uppercase tracking-widest" style="color:rgba(255,255,255,.4)">CTR / jour</h3>
+          <canvas id="rate-chart" style="max-height:120px;width:100%"></canvas>
+          <div class="flex items-center justify-between mt-3 text-xs">
+            <span class="text-gray-700">CTR moyen</span>
+            <span class="font-semibold" style={`color:${summary.clickRate>=8?'#00ff9d':summary.clickRate>=4?'#f59e0b':'#f87171'}`}>{summary.clickRate.toFixed(1)}%</span>
+          </div>
+        </div>
+        <!-- Scroll depth + Bounce + Live feed -->
+        <div class="flex flex-col gap-3">
+          <div class="p-4 glass rounded-xl border border-white/8 flex-1">
+            <h3 class="text-xs font-semibold mb-3 uppercase tracking-widest" style="color:rgba(255,255,255,.4)">Engagement</h3>
+            <div class="space-y-3">
+              <div>
+                <div class="flex justify-between text-xs mb-1"><span class="text-gray-500">Scroll depth</span><span class="font-semibold" style="color:#38bdf8">{scrollDepth}%</span></div>
+                <div class="bar-track" style="height:4px"><div class="bar-fill" style={`width:${scrollDepth}%;background:#38bdf8;opacity:.8`}></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between text-xs mb-1"><span class="text-gray-500">Rebond estimé</span><span class="font-semibold" style={`color:${bounceRate>60?'#f87171':bounceRate>40?'#f59e0b':'#00ff9d'}`}>{bounceRate}%</span></div>
+                <div class="bar-track" style="height:4px"><div class="bar-fill" style={`width:${bounceRate}%;background:${bounceRate>60?'#f87171':bounceRate>40?'#f59e0b':'#00ff9d'};opacity:.8`}></div></div>
+              </div>
+              <div>
+                <div class="flex justify-between text-xs mb-1"><span class="text-gray-500">Récurrents</span><span class="font-semibold" style="color:#a78bfa">{returningRate}%</span></div>
+                <div class="bar-track" style="height:4px"><div class="bar-fill" style={`width:${returningRate}%;background:#a78bfa;opacity:.8`}></div></div>
+              </div>
+            </div>
+          </div>
+          <!-- Live feed compact -->
+          <div class="p-4 glass rounded-xl border border-white/8">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <span class="live-dot w-1.5 h-1.5 rounded-full bg-neon-green shrink-0"></span>
+                <h3 class="text-xs font-semibold text-white">Live</h3>
+              </div>
+              <span id="live-count" class="text-xs font-semibold text-neon-green tabular-nums"></span>
+            </div>
+            <div id="live-feed-list" class="space-y-1 max-h-32 overflow-y-auto scrollbar-none">
+              <p class="text-xs text-gray-700 text-center py-2">Connexion…</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Retention stacked -->
       <div class="p-5 glass rounded-2xl border border-white/8">
-        <div class="flex items-center gap-1 mb-6 border-b border-white/8 pb-3 overflow-x-auto scrollbar-none">
+        <div class="flex items-center justify-between mb-4">
+          <div><h3 class="text-sm font-semibold text-white">Retention</h3><p class="text-xs text-gray-500 mt-0.5">Nouveaux vs récurrents · {days}j</p></div>
+        </div>
+        <div class="grid sm:grid-cols-3 gap-3 mb-4">
+          <div class="p-3.5 rounded-xl" style="background:rgba(0,255,157,.06);border:.5px solid rgba(0,255,157,.15)">
+            <p class="text-xs text-gray-500 mb-1">Visiteurs uniques</p>
+            <p class="text-2xl font-bold tabular-nums" style="color:#00ff9d">{summary.uniqueVisitors.toLocaleString('fr-FR')}</p>
+            <p class="text-xs text-gray-600 mt-0.5">{retentionRate}% du total</p>
+          </div>
+          <div class="p-3.5 rounded-xl" style="background:rgba(56,189,248,.06);border:.5px solid rgba(56,189,248,.15)">
+            <p class="text-xs text-gray-500 mb-1">Visites récurrentes</p>
+            <p class="text-2xl font-bold tabular-nums" style="color:#38bdf8">{returningVisitors.toLocaleString('fr-FR')}</p>
+            <p class="text-xs text-gray-600 mt-0.5">{returningRate}% du total</p>
+          </div>
+          <div class="p-3.5 rounded-xl" style="background:rgba(167,139,250,.06);border:.5px solid rgba(167,139,250,.15)">
+            <p class="text-xs text-gray-500 mb-1">Taux de retour</p>
+            <p class="text-2xl font-bold tabular-nums" style="color:#a78bfa">{returningRate}%</p>
+            <p class="text-xs text-gray-600 mt-0.5">{prevRetentionRate > 0 ? `${prevRetentionRate}% préc.` : '—'}</p>
+          </div>
+        </div>
+        <canvas id="retention-chart" style="max-height:120px;width:100%"></canvas>
+      </div>
+
+      <!-- Cohort Analysis -->
+      <div class="p-5 glass rounded-2xl border border-white/8">
+        <h3 class="text-sm font-semibold text-white mb-4">Cohort Analysis <span class="text-gray-600 font-normal text-xs ml-1">· rétention semaine/semaine</span></h3>
+        {cohortWeeks.length < 2 ? (
+          <p class="text-sm text-gray-700 text-center py-4">Pas assez de données (min 14 jours)</p>
+        ) : (
+          <div class="space-y-3">
+            {cohortWeeks.map((cw, i) => {
+              const color = cw.retention >= 80 ? '#00ff9d' : cw.retention >= 50 ? '#f59e0b' : '#f87171';
+              return (
+                <div class="flex items-center gap-3">
+                  <span class="text-xs text-gray-500 font-mono w-20 shrink-0">{cw.week}</span>
+                  <div class="flex-1 bg-white/4 rounded-lg overflow-hidden" style="height:20px">
+                    <div class="cohort-bar-fill" style={`width:${cw.retention}%;background:linear-gradient(90deg,${color}55,${color}22)`}></div>
+                  </div>
+                  <span class="text-xs font-bold tabular-nums w-10 text-right" style={`color:${color}`}>{cw.retention}%</span>
+                  <span class="text-xs text-gray-700 tabular-nums w-16 text-right">{cw.views.toLocaleString('fr-FR')}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <!-- Carte + Sources (inner tabs) -->
+      <div class="p-5 glass rounded-2xl border border-white/8">
+        <div class="flex items-center gap-1 mb-5 border-b border-white/8 pb-3 overflow-x-auto scrollbar-none">
           {[
             {id:'geo',     label:'Géographie', icon:'M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064'},
             {id:'sources', label:'Sources',    icon:'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.1-1.1m-.757-4.9a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1'},
@@ -1120,16 +1096,15 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
             </button>
           ))}
         </div>
-        <!-- Geo panel -->
         <div class="insight-panel active" id="inner-panel-geo">
           {topCountries.length === 0 ? (
             <p class="text-sm text-gray-600 text-center py-8">Aucune donnée géographique</p>
           ) : (
             <div>
-              <div class="relative rounded-xl overflow-hidden mb-5" style="background:#07100d;">
+              <div class="relative rounded-xl overflow-hidden mb-4" style="background:#07100d;">
                 <div id="world-map-loader" class="absolute inset-0 flex items-center justify-center z-10"><div class="map-spinner"></div></div>
-                <svg id="world-map" style="width:100%;height:320px;display:block;opacity:0;transition:opacity 0.5s;cursor:grab;"></svg>
-                <div id="map-tooltip" class="pointer-events-none absolute hidden z-20 bg-black/95 border border-neon-green/25 text-white text-xs px-3 py-2 rounded-lg backdrop-blur-sm shadow-xl whitespace-nowrap"></div>
+                <svg id="world-map" style="width:100%;height:300px;display:block;opacity:0;transition:opacity .5s;cursor:grab;"></svg>
+                <div id="map-tooltip" class="pointer-events-none absolute hidden z-20 bg-black/95 border border-neon-green/25 text-white text-xs px-3 py-2 rounded-lg backdrop-blur-sm whitespace-nowrap"></div>
                 <div class="absolute bottom-3 right-3 z-20 flex flex-col gap-1">
                   <button id="map-zoom-in"  class="w-7 h-7 rounded-lg glass border border-white/10 text-gray-400 hover:text-neon-green transition-all flex items-center justify-center text-base leading-none">+</button>
                   <button id="map-zoom-out" class="w-7 h-7 rounded-lg glass border border-white/10 text-gray-400 hover:text-neon-green transition-all flex items-center justify-center text-base leading-none">−</button>
@@ -1139,11 +1114,11 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
                 </div>
               </div>
               <div class="grid sm:grid-cols-2 gap-2">
-                {topCountries.slice(0,8).map((ctry,i) => {
+                {topCountries.slice(0,8).map((ctry, i) => {
                   const pct = Math.round((ctry.views/maxCountryViews)*100);
                   return (
                     <div class="country-row flex items-center gap-2.5 px-3 py-2 rounded-xl border border-white/5 hover:border-neon-green/20 hover:bg-neon-green/3 transition-all cursor-default group" data-iso={ctry.country}>
-                      <span class="text-base leading-none shrink-0 w-6 text-center">{countryFlag(ctry.country ?? '')}</span>
+                      <span class="text-base leading-none shrink-0 w-6 text-center">{countryFlag(ctry.country??'')}</span>
                       <div class="flex-1 min-w-0">
                         <div class="flex items-center justify-between gap-2 mb-1">
                           <span class="text-xs text-gray-300 font-medium group-hover:text-neon-green transition-colors truncate">{ctry.country||'??'}</span>
@@ -1159,16 +1134,15 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
             </div>
           )}
         </div>
-        <!-- Sources panel -->
         <div class="insight-panel" id="inner-panel-sources">
           {aggregatedReferrers.length === 0 ? (
             <p class="text-sm text-gray-600 text-center py-8">Aucune source identifiée</p>
           ) : (
             <div class="space-y-3">
-              {aggregatedReferrers.map((r,i) => {
+              {aggregatedReferrers.map((r, i) => {
                 const pct   = Math.round((r.views/maxReferrerViews)*100);
-                const color = CAT_COLORS[r.category] ?? '#9ca3af';
-                const label = CAT_LABELS[r.category] ?? r.category;
+                const color = CAT_COLORS[r.category]??'#9ca3af';
+                const label = CAT_LABELS[r.category]??r.category;
                 return (
                   <div class="flex items-center gap-3">
                     <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold text-gray-600 border border-white/8 bg-white/3">{i+1}</div>
@@ -1197,29 +1171,78 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
   <div class="sec-panel" id="panel-revenue">
     <div class="space-y-5">
 
-      <!-- v7: Revenue KPIs strip -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: 'Revenue total',  value: revenue > 0 ? revenue.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : '—',      color:'#a78bfa' },
-          { label: 'Panier moyen',   value: aov > 0    ? aov.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : '—',           color:'#38bdf8' },
-          { label: 'LTV estimé',     value: ltv > 0    ? ltv.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : '—',           color:'#00ff9d' },
-          { label: 'Taux conv.',     value: `${convRate.toFixed(1)}%`,                                                                                          color:'#f59e0b' },
-        ].map(m => (
-          <div class="p-3.5 glass rounded-xl border border-white/8">
-            <p class="text-xs text-gray-600 mb-1">{m.label}</p>
-            <p class="text-lg font-bold tabular-nums" style={`color:${m.color}`}>{m.value}</p>
+      <!-- Hero revenue (Stripe-style) -->
+      <div class="revenue-hero p-6 rounded-2xl">
+        <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-widest mb-2" style="color:rgba(167,139,250,.6)">Revenue total · {days}j</p>
+            <div class="revenue-hero-value text-white tabular-nums">
+              {revenue > 0 ? revenue.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : <span class="text-gray-600">—</span>}
+            </div>
+            {revenue > 0 && (
+              <div class="flex items-center gap-2 mt-2">
+                {deltaRevenue.neutral ? <span class="text-sm text-gray-600">— vs préc.</span> : deltaRevenue.pos ? <span class="text-sm font-semibold" style="color:#00ff9d">↑ {deltaRevenue.val}% vs période préc.</span> : <span class="text-sm font-semibold" style="color:#f87171">↓ {deltaRevenue.val}% vs période préc.</span>}
+              </div>
+            )}
           </div>
-        ))}
+          <div class="flex gap-6 shrink-0">
+            <div class="text-right">
+              <p class="text-xs text-gray-600 mb-1">Ventes</p>
+              <p class="text-2xl font-bold text-white tabular-nums">{sales}</p>
+            </div>
+            <div class="text-right">
+              <p class="text-xs text-gray-600 mb-1">Panier moy.</p>
+              <p class="text-2xl font-bold tabular-nums" style="color:#38bdf8">{aov > 0 ? aov.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : '—'}</p>
+            </div>
+            <div class="text-right">
+              <p class="text-xs text-gray-600 mb-1">LTV</p>
+              <p class="text-2xl font-bold tabular-nums" style="color:#00ff9d">{ltv > 0 ? ltv.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : '—'}</p>
+            </div>
+            <div class="text-right">
+              <p class="text-xs text-gray-600 mb-1">Conv.</p>
+              <p class="text-2xl font-bold tabular-nums" style="color:#f59e0b">{convRate.toFixed(1)}%</p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- Attribution par canal -->
+      <!-- Funnel revenue (visual) -->
+      <div class="p-5 glass rounded-2xl border border-white/8">
+        <h3 class="text-sm font-semibold text-white mb-4">Funnel</h3>
+        <div class="space-y-2">
+          {funnelSteps.map((step, i) => {
+            const prev     = i > 0 ? funnelSteps[i-1].value : step.value;
+            const dropPct  = prev > 0 && i > 0 ? (1-step.value/prev)*100 : 0;
+            const widthPct = funnelSteps[0].value > 0 ? (step.value/funnelSteps[0].value)*100 : 100;
+            return (
+              <div class="flex items-center gap-3">
+                <div class="w-6 h-6 rounded-lg shrink-0 flex items-center justify-center text-xs font-bold" style={`background:${step.color}18;color:${step.color};border:.5px solid ${step.color}30`}>{i+1}</div>
+                <div class="flex-1">
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-semibold text-white">{step.label}</span>
+                    <div class="flex items-center gap-2">
+                      {i > 0 && dropPct > 0 && <span class="text-xs" style="color:rgba(248,113,113,.6)">↓{dropPct.toFixed(0)}%</span>}
+                      <span class="text-sm font-bold tabular-nums" style={`color:${step.color}`}>{step.value.toLocaleString('fr-FR')}</span>
+                    </div>
+                  </div>
+                  <div style={`background:rgba(255,255,255,.04);border-radius:9999px;height:8px;overflow:hidden`}>
+                    <div style={`height:100%;border-radius:9999px;width:${widthPct}%;background:${step.color};opacity:.65;animation:barGrow .8s cubic-bezier(.16,1,.3,1) both;animation-delay:${i*100}ms`}></div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <!-- Attribution + ROAS -->
       <div class="p-5 glass rounded-2xl border border-white/8">
         <div class="flex items-center justify-between mb-5">
-          <div><h3 class="text-sm font-semibold text-white">Attribution par canal</h3><p class="text-xs text-gray-500 mt-0.5">Organic · Paid · Email · Influenceurs</p></div>
-          {!isPro && <span class="badge-pro">⚡ Pro pour UTM réel</span>}
+          <div><h3 class="text-sm font-semibold text-white">Attribution par canal</h3><p class="text-xs text-gray-500 mt-0.5">Sources de trafic et revenus</p></div>
+          {!isPro && <span class="badge-pro">⚡ Pro</span>}
         </div>
         {channels.length === 0 ? (
-          <p class="text-sm text-gray-700 text-center py-6">Ajoute des paramètres UTM à tes liens pour tracker les sources</p>
+          <p class="text-sm text-gray-700 text-center py-6">Ajoute des UTM à tes liens pour tracker les sources</p>
         ) : (
           <div class="space-y-1">
             <div class="grid grid-cols-12 gap-2 px-3 pb-2 border-b border-white/6">
@@ -1229,7 +1252,7 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
               <span class="col-span-2 text-xs text-gray-600 font-medium uppercase tracking-wider text-right">Revenue</span>
               <span class="col-span-3 text-xs text-gray-600 font-medium uppercase tracking-wider text-right">Part</span>
             </div>
-            {channels.map((ch,i) => {
+            {channels.map((ch, i) => {
               const sharePct = totalChViews > 0 ? Math.round((ch.views/totalChViews)*100) : 0;
               const chClass  = ch.name.includes('Google')?'ch-google':ch.name.includes('Meta')?'ch-meta':ch.name.includes('TikTok')?'ch-tiktok':(ch.name.includes('Organic')||ch.name==='SEO')?'ch-organic':ch.name==='Email'?'ch-email':ch.name==='Influenceurs'?'ch-infl':ch.name==='Direct'?'ch-direct':'ch-other';
               return (
@@ -1250,94 +1273,67 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
         {isPro && channels.some(c => c.revenue > 0) && (
           <div class="mt-4 pt-4 border-t border-white/6">
             <p class="text-xs text-gray-600 uppercase tracking-widest font-medium mb-3">Revenue par canal</p>
-            <canvas id="roas-chart" style="max-height:100px;width:100%"></canvas>
+            <canvas id="roas-chart" style="max-height:120px;width:100%"></canvas>
           </div>
         )}
       </div>
 
-      <!-- Funnel revenue -->
-      <div class="p-5 glass rounded-2xl border border-white/8">
-        <h3 class="text-sm font-semibold text-white mb-5">Funnel revenus <span class="text-gray-600 font-normal text-xs ml-1">· {days}j</span></h3>
-        <div class="space-y-3">
-          {funnelSteps.map((step,i) => {
-            const prev     = i > 0 ? funnelSteps[i-1].value : step.value;
-            const dropPct  = prev > 0 && i > 0 ? (1-step.value/prev)*100 : 0;
-            const widthPct = funnelSteps[0].value > 0 ? (step.value/funnelSteps[0].value)*100 : 0;
-            return (
-              <div>
-                <div class="flex items-center justify-between mb-1.5">
-                  <div class="flex items-center gap-2.5">
-                    <div class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shrink-0" style={`background:${step.color}18;border:.5px solid ${step.color}35;color:${step.color}`}>{i+1}</div>
-                    <span class="text-sm font-semibold text-white">{step.label}</span>
-                    {i > 0 && dropPct > 0 && <span class="text-xs px-2 py-0.5 rounded-full" style="color:rgba(248,113,113,.7);background:rgba(248,113,113,.08);border:.5px solid rgba(248,113,113,.15)">↓ {dropPct.toFixed(0)}% drop</span>}
-                  </div>
-                  <span class="text-sm font-bold tabular-nums" style={`color:${step.color}`}>{step.value.toLocaleString('fr-FR')}</span>
-                </div>
-                <div class="bar-track" style="height:6px"><div class="bar-fill" style={`width:${widthPct}%;background:${step.color};opacity:.75;animation-delay:${i*100}ms`}></div></div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <!-- UTM Campaigns (Pro gate) -->
+      <!-- UTM Campaigns -->
       <div class="p-5 glass rounded-2xl border border-white/8" style="position:relative;overflow:hidden">
         <div class="flex items-center justify-between mb-4">
           <div>
             <h3 class="text-sm font-semibold text-white flex items-center gap-2">Campagnes UTM <span class="badge-pro">⚡ Pro</span></h3>
-            <p class="text-xs text-gray-500 mt-0.5">source · medium · campaign · device · pays · CPA</p>
+            <p class="text-xs text-gray-500 mt-0.5">source · medium · campaign · CPA</p>
           </div>
           {isPro && utmData.length > 0 && <span class="text-xs text-gray-600">{utmData.length} événements</span>}
         </div>
-        {isPro && utmCamps.length > 0 && (
-          <div class="flex items-center gap-1.5 flex-wrap mb-4" id="utm-filter">
-            <span class="text-xs text-gray-600 mr-1">Source :</span>
-            <button class="filter-chip active text-xs px-2.5 py-1 rounded-full border border-white/10 text-gray-400" data-utm-filter="all">Tous</button>
-            {[...new Set(utmCamps.map(c => c.source))].slice(0,6).map(s => (
-              <button class="filter-chip text-xs px-2.5 py-1 rounded-full border border-white/10 text-gray-400" data-utm-filter={s}>{s}</button>
-            ))}
-          </div>
-        )}
         {!isPro ? (
           <div style="position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(8px);background:rgba(0,0,0,.72);border-radius:inherit">
             <div class="text-center px-8 py-6">
-              <div class="text-3xl mb-3">⚡</div>
               <p class="text-sm font-bold text-white mb-1">Tracking UTM avancé</p>
-              <p class="text-xs text-gray-500 mb-5 max-w-xs mx-auto">Suis chaque campagne Google, Meta, TikTok avec source / medium / device / pays et calcule ROAS et CPA automatiquement.</p>
-              <a href="/dashboard/billing" style="display:inline-flex;padding:10px 20px;border-radius:12px;background:rgba(168,85,247,.2);border:1px solid rgba(168,85,247,.4);color:#c084fc;font-size:14px;font-weight:700;text-decoration:none">Passer Pro →</a>
+              <p class="text-xs text-gray-500 mb-4 max-w-xs mx-auto">Source / medium / device / pays — ROAS et CPA calculés auto.</p>
+              <a href="/dashboard/billing" style="display:inline-flex;padding:8px 18px;border-radius:10px;background:rgba(168,85,247,.2);border:1px solid rgba(168,85,247,.4);color:#c084fc;font-size:13px;font-weight:700;text-decoration:none">Passer Pro →</a>
             </div>
           </div>
         ) : utmData.length === 0 ? (
-          <div class="text-center py-8 text-gray-700">
-            <p class="text-sm">Aucun événement UTM sur cette période</p>
-            <p class="text-xs mt-1">Ajoute <code class="text-neon-green">?utm_source=google&utm_medium=cpc&utm_campaign=nom</code></p>
-          </div>
+          <p class="text-sm text-gray-700 text-center py-6">Aucun événement UTM · ajoute <code class="text-neon-green">?utm_source=...</code></p>
         ) : (
-          <div class="overflow-x-auto -mx-1 scrollbar-none">
-            <table class="w-full text-sm min-w-[680px]">
-              <thead>
-                <tr>{['Campaign','Source','Medium','Vues','Leads','Revenue','CPA','Device','Pays'].map(h => <th class="text-left pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5 whitespace-nowrap">{h}</th>)}</tr>
-              </thead>
-              <tbody id="utm-table">
-                {utmCamps.map(c => {
-                  const cpa   = c.sales > 0 ? `${(c.revenue/c.sales).toFixed(0)}€` : '—';
-                  const chCls = c.medium?.toLowerCase().includes('cpc') ? 'ch-google' : 'ch-organic';
-                  return (
-                    <tr class="border-b border-white/4 last:border-0 hover:bg-white/2 transition-colors" data-source={c.source||''}>
-                      <td class="py-2.5 px-2 text-white text-xs font-medium max-w-[110px] truncate">{c.campaign}</td>
-                      <td class="py-2.5 px-2"><span class={`text-xs font-semibold px-2 py-0.5 rounded-full ${chCls}`}>{c.source||'—'}</span></td>
-                      <td class="py-2.5 px-2 text-gray-500 text-xs">{c.medium||'—'}</td>
-                      <td class="py-2.5 px-2 tabular-nums font-semibold text-white">{c.views.toLocaleString('fr-FR')}</td>
-                      <td class="py-2.5 px-2 tabular-nums text-xs" style="color:#f59e0b">{c.leads>0?c.leads:<span class="text-gray-700">—</span>}</td>
-                      <td class="py-2.5 px-2 tabular-nums text-xs" style="color:#a78bfa">{c.revenue>0?c.revenue.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}):<span class="text-gray-700">—</span>}</td>
-                      <td class="py-2.5 px-2 tabular-nums text-gray-400 text-xs">{cpa}</td>
-                      <td class="py-2.5 px-2 text-gray-400 text-xs capitalize">{c.topDevice}</td>
-                      <td class="py-2.5 px-2 text-gray-400 text-xs">{c.topCountry!=='—'?`${countryFlag(c.topCountry)} ${c.topCountry}`:'—'}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div>
+            {isPro && utmCamps.length > 0 && (
+              <div class="flex items-center gap-1.5 flex-wrap mb-4" id="utm-filter">
+                <span class="text-xs text-gray-600 mr-1">Source :</span>
+                <button class="filter-chip active text-xs px-2.5 py-1 rounded-full border border-white/10 text-gray-400" data-utm-filter="all">Tous</button>
+                {[...new Set(utmCamps.map(c => c.source))].slice(0,6).map(s => (
+                  <button class="filter-chip text-xs px-2.5 py-1 rounded-full border border-white/10 text-gray-400" data-utm-filter={s}>{s}</button>
+                ))}
+              </div>
+            )}
+            <div class="overflow-x-auto -mx-1 scrollbar-none">
+              <table class="w-full text-sm min-w-[680px]">
+                <thead>
+                  <tr>{['Campaign','Source','Medium','Vues','Leads','Revenue','CPA','Device','Pays'].map(h => <th class="text-left pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5 whitespace-nowrap">{h}</th>)}</tr>
+                </thead>
+                <tbody id="utm-table">
+                  {utmCamps.map(c => {
+                    const cpa   = c.sales > 0 ? `${(c.revenue/c.sales).toFixed(0)}€` : '—';
+                    const chCls = c.medium?.toLowerCase().includes('cpc') ? 'ch-google' : 'ch-organic';
+                    return (
+                      <tr class="border-b border-white/4 last:border-0 hover:bg-white/2 transition-colors" data-source={c.source||''}>
+                        <td class="py-2.5 px-2 text-white text-xs font-medium max-w-[110px] truncate">{c.campaign}</td>
+                        <td class="py-2.5 px-2"><span class={`text-xs font-semibold px-2 py-0.5 rounded-full ${chCls}`}>{c.source||'—'}</span></td>
+                        <td class="py-2.5 px-2 text-gray-500 text-xs">{c.medium||'—'}</td>
+                        <td class="py-2.5 px-2 tabular-nums font-semibold text-white">{c.views.toLocaleString('fr-FR')}</td>
+                        <td class="py-2.5 px-2 tabular-nums text-xs" style="color:#f59e0b">{c.leads>0?c.leads:<span class="text-gray-700">—</span>}</td>
+                        <td class="py-2.5 px-2 tabular-nums text-xs" style="color:#a78bfa">{c.revenue>0?c.revenue.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}):<span class="text-gray-700">—</span>}</td>
+                        <td class="py-2.5 px-2 tabular-nums text-gray-400 text-xs">{cpa}</td>
+                        <td class="py-2.5 px-2 text-gray-400 text-xs capitalize">{c.topDevice}</td>
+                        <td class="py-2.5 px-2 text-gray-400 text-xs">{c.topCountry!=='—'?`${countryFlag(c.topCountry)} ${c.topCountry}`:'—'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
@@ -1349,10 +1345,10 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
   <div class="sec-panel" id="panel-content">
     <div class="space-y-5">
 
-      <!-- Heatmap Blocs -->
+      <!-- Heatmap canvas -->
       <div class="p-5 glass rounded-2xl border border-white/8">
-        <div class="flex items-center justify-between mb-5">
-          <div><h3 class="text-sm font-semibold text-white">Heatmap des clics</h3><p class="text-xs text-gray-500 mt-0.5">Intensité par position · {blocks.length} blocs</p></div>
+        <div class="flex items-center justify-between mb-4">
+          <div><h3 class="text-sm font-semibold text-white">Heatmap des clics</h3><p class="text-xs text-gray-500 mt-0.5">Intensité canvas · {blocks.length} blocs</p></div>
           <div class="flex items-center gap-1" id="heatmap-sort">
             <button class="sort-btn active text-xs px-2 py-1 rounded-lg border border-white/8 text-gray-500 hover:text-gray-300 transition-all" data-sort="clicks">Clics</button>
             <button class="sort-btn text-xs px-2 py-1 rounded-lg border border-white/8 text-gray-500 hover:text-gray-300 transition-all" data-sort="position">Position</button>
@@ -1366,21 +1362,29 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
           </div>
         ) : (
           <div>
-            <div class="grid grid-cols-1 gap-1.5 mb-4" id="heatmap-rows">
-              {heatmapBlocks.map((block,i) => {
-                const ctr   = summary.totalViews > 0 ? ((block.clicks/summary.totalViews)*100).toFixed(1) : '0.0';
-                const alpha = block.intensity > 0 ? Math.max(0.06, block.intensity*0.85) : 0.03;
-                const bdr   = block.intensity > 0.5 ? `rgba(0,255,157,${Math.min(0.55,block.intensity)})` : 'rgba(255,255,255,.06)';
-                const heat  = block.intensity >= 0.8 ? '🔥' : block.intensity >= 0.5 ? '↑' : '';
+            <!-- Canvas heatmap visualization -->
+            <div class="relative mb-4 rounded-xl overflow-hidden" style="background:rgba(0,0,0,.3)">
+              <canvas id="heatmap-canvas" style="width:100%;display:block"></canvas>
+              <div id="heatmap-tooltip" class="pointer-events-none absolute hidden z-20 bg-black/95 border border-neon-green/25 text-white text-xs px-3 py-2 rounded-lg backdrop-blur-sm whitespace-nowrap"></div>
+            </div>
+            <!-- List rows (sortable) -->
+            <div id="heatmap-rows" class="space-y-1.5">
+              {heatmapBlocks.map((block, i) => {
+                const ctr   = summary.totalViews > 0 ? ((block.clicks/summary.totalViews)*100) : 0;
+                const alpha = block.intensity > 0 ? Math.max(.05, block.intensity*.8) : .03;
+                const bdr   = block.intensity > 0.5 ? `rgba(0,255,157,${Math.min(.5,block.intensity)})` : 'rgba(255,255,255,.06)';
+                const heat  = block.intensity >= .8 ? '🔥' : block.intensity >= .5 ? '↑' : '';
                 return (
-                  <div class="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all" style={`background:rgba(0,255,157,${alpha});border:.5px solid ${bdr}`} data-pos={block.position} data-clicks={block.clicks} data-ctr={summary.totalViews > 0 ? ((block.clicks/summary.totalViews)*100).toFixed(2) : '0'}>
+                  <div class="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all"
+                    style={`background:rgba(0,255,157,${alpha});border:.5px solid ${bdr}`}
+                    data-pos={block.position} data-clicks={block.clicks} data-ctr={ctr.toFixed(2)}>
                     <div class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 border"
-                      style={block.intensity>0.5?'background:rgba(0,255,157,.15);border-color:rgba(0,255,157,.3);color:#00ff9d':'background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:#6b7280'}>
+                      style={block.intensity>.5?'background:rgba(0,255,157,.15);border-color:rgba(0,255,157,.3);color:#00ff9d':'background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:#6b7280'}>
                       {block.position}
                     </div>
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center gap-2 mb-1.5">
-                        <span class="text-xs px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-gray-400">{block.type}</span>
+                        <span class="text-xs px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-gray-400 shrink-0">{block.type}</span>
                         <span class="text-sm font-medium truncate" style={`color:${block.intensity>0?'#fff':'rgba(255,255,255,.4)'}`}>{block.title}</span>
                         {heat && <span class="text-xs shrink-0">{heat}</span>}
                       </div>
@@ -1390,181 +1394,159 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
                     </div>
                     <div class="text-right shrink-0 pl-1">
                       <div class="text-sm font-bold tabular-nums" style={`color:${block.intensity>.5?'#00ff9d':block.intensity>0?'#fff':'rgba(255,255,255,.3)'}`}>{block.clicks.toLocaleString('fr-FR')}</div>
-                      <div class="text-xs text-gray-600">{ctr}%</div>
+                      <div class="text-xs text-gray-600">{ctr.toFixed(1)}%</div>
                     </div>
                   </div>
                 );
               })}
             </div>
-            <div class="flex items-center justify-between pt-3 border-t border-white/6">
-              <div class="flex items-center gap-3">
-                <span class="text-xs text-gray-700">Intensité :</span>
-                {[.1,.3,.6,.85,1].map(v => (
+            <!-- Legend + activation -->
+            <div class="flex items-center justify-between pt-3 mt-3 border-t border-white/6">
+              <div class="flex items-center gap-2">
+                {[.1,.35,.65,.9].map(v => (
                   <div class="flex items-center gap-1">
-                    <div class="w-4 h-4 rounded" style={`background:rgba(0,255,157,${Math.max(.06,v*.85)})`}></div>
+                    <div class="w-3 h-3 rounded" style={`background:rgba(0,255,157,${Math.max(.05,v*.8)})`}></div>
                     <span class="text-xs text-gray-700">{Math.round(v*100)}%</span>
                   </div>
                 ))}
               </div>
-              <div class="flex items-center gap-2">
-                <span class="text-xs text-gray-700">Activation :</span>
-                <span class="text-xs font-semibold" style={`color:${activationRate >= 80 ? '#00ff9d' : activationRate >= 50 ? '#f59e0b' : '#f87171'}`}>{activationRate}%</span>
-              </div>
+              <span class="text-xs text-gray-600">Activation <span class="font-semibold" style={`color:${activationRate>=80?'#00ff9d':activationRate>=50?'#f59e0b':'#f87171'}`}>{activationRate}%</span></span>
             </div>
           </div>
         )}
       </div>
 
-      <!-- A/B Test blocs -->
+      <!-- A/B Comparison (2 cols, side by side) -->
       <div class="p-5 glass rounded-2xl border border-white/8">
-        <div class="flex items-center justify-between mb-5">
-          <div><h3 class="text-sm font-semibold text-white">Comparaison de blocs</h3><p class="text-xs text-gray-500 mt-0.5">Top {abBlocks.length} blocs côte-à-côte</p></div>
-        </div>
+        <h3 class="text-sm font-semibold text-white mb-4">Comparaison de blocs <span class="text-gray-600 font-normal text-xs ml-1">· top {abBlocks.length} par clics</span></h3>
         {abBlocks.length < 2 ? (
-          <p class="text-sm text-gray-700 text-center py-6">Pas assez de clics pour comparer (min 2 blocs avec des clics)</p>
+          <p class="text-sm text-gray-700 text-center py-6">Pas assez de données (min 2 blocs avec des clics)</p>
         ) : (
-          <div class="grid sm:grid-cols-2 gap-3">
-            {abBlocks.slice(0,4).map((block,i) => {
-              const ctr       = summary.totalViews > 0 ? ((block.clicks/summary.totalViews)*100) : 0;
-              const maxClicks = abBlocks[0]?.clicks ?? 1;
-              const relScore  = maxClicks > 0 ? (block.clicks/maxClicks)*100 : 0;
-              const isWinner  = i === 0;
+          <div>
+            <!-- Visual bar comparison -->
+            <div class="mb-4 space-y-2">
+              {abBlocks.slice(0,4).map((block, i) => {
+                const ctr     = summary.totalViews > 0 ? (block.clicks/summary.totalViews)*100 : 0;
+                const maxC    = abBlocks[0]?.clicks ?? 1;
+                const relPct  = maxC > 0 ? (block.clicks/maxC)*100 : 0;
+                const COLS    = ['#00ff9d','#38bdf8','#f59e0b','#a78bfa'];
+                const color   = COLS[i] ?? '#9ca3af';
+                const isWin   = i === 0;
+                return (
+                  <div class="flex items-center gap-3">
+                    <div class="w-28 shrink-0 flex items-center gap-2 min-w-0">
+                      {isWin && <span class="text-xs shrink-0">🏆</span>}
+                      <span class="text-xs text-gray-400 truncate">{block.title}</span>
+                    </div>
+                    <div class="flex-1 relative h-7 rounded-lg overflow-hidden" style="background:rgba(255,255,255,.04)">
+                      <div class="absolute inset-y-0 left-0 rounded-lg flex items-center px-2"
+                        style={`width:${relPct}%;background:${color}25;border-right:2px solid ${color}60;transition:width .7s cubic-bezier(.16,1,.3,1);animation:barGrow .8s cubic-bezier(.16,1,.3,1) both;animation-delay:${i*100}ms`}>
+                      </div>
+                      <div class="absolute inset-0 flex items-center justify-between px-3">
+                        <span class="text-xs font-semibold text-white">{block.clicks.toLocaleString('fr-FR')} clics</span>
+                        <span class="text-xs font-semibold" style={`color:${color}`}>{ctr.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                    <span class="text-xs text-gray-600 w-8 text-right shrink-0">#{block.position}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <!-- Insight below -->
+            {abBlocks.length >= 2 && (() => {
+              const top    = abBlocks[0];
+              const second = abBlocks[1];
+              const ratio  = second.clicks > 0 ? (top.clicks / second.clicks).toFixed(1) : '∞';
               return (
-                <div class={`p-4 rounded-xl border transition-all ${isWinner ? 'border-neon-green/25 bg-neon-green/4' : 'border-white/8 bg-white/2'}`}>
-                  <div class="flex items-start justify-between mb-3">
-                    <div class="flex items-center gap-2 min-w-0">
-                      <span class="text-xs px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-gray-400 shrink-0">{block.type}</span>
-                      <span class="text-xs font-medium text-white truncate">{block.title}</span>
-                    </div>
-                    {isWinner && <span class="text-xs font-bold shrink-0 ml-2" style="color:#00ff9d">🏆 Best</span>}
-                  </div>
-                  <div class="grid grid-cols-3 gap-2 mb-3">
-                    <div class="text-center">
-                      <p class="text-lg font-bold tabular-nums" style={`color:${isWinner?'#00ff9d':'#fff'}`}>{block.clicks.toLocaleString('fr-FR')}</p>
-                      <p class="text-xs text-gray-600">clics</p>
-                    </div>
-                    <div class="text-center">
-                      <p class="text-lg font-bold tabular-nums text-white">{ctr.toFixed(1)}%</p>
-                      <p class="text-xs text-gray-600">CTR</p>
-                    </div>
-                    <div class="text-center">
-                      <p class="text-lg font-bold tabular-nums text-white">#{block.position}</p>
-                      <p class="text-xs text-gray-600">position</p>
-                    </div>
-                  </div>
-                  <div class="bar-track" style="height:4px">
-                    <div class="bar-fill" style={`width:${relScore}%;background:${isWinner?'#00ff9d':'rgba(255,255,255,.25)'};animation-delay:${i*80}ms`}></div>
-                  </div>
-                  <p class="text-xs text-gray-700 mt-1.5">{relScore.toFixed(0)}% du meilleur bloc</p>
+                <div class="px-4 py-3 rounded-xl" style="background:rgba(0,255,157,.04);border:.5px solid rgba(0,255,157,.12)">
+                  <p class="text-xs text-gray-400">
+                    <span class="text-neon-green font-semibold">"{top.title}"</span> performe {ratio}× mieux que <span class="text-white">"{second.title}"</span> —
+                    {Number(ratio) >= 2 ? " fort signal, dupliquer ce format en priorité." : " avantage modéré, A/B test recommandé."}
+                  </p>
                 </div>
               );
-            })}
+            })()}
           </div>
         )}
       </div>
 
-      <!-- Short URL Tracker (Creator+) -->
+      <!-- Short URL Tracker -->
       {isCreator && (
         <div class="p-5 glass rounded-2xl border border-white/8">
-          <div class="flex items-center justify-between mb-5">
-            <div>
-              <h3 class="text-sm font-semibold text-white flex items-center gap-2">Short URL Tracker <span class="badge-creator">👑 Creator</span></h3>
-              <p class="text-xs text-gray-500 mt-0.5">Performance de chaque lien court · {shortUrls.length} lien{shortUrls.length!==1?'s':''}</p>
-            </div>
+          <div class="flex items-center justify-between mb-4">
+            <div><h3 class="text-sm font-semibold text-white flex items-center gap-2">Short URLs <span class="badge-creator">👑 Creator</span></h3><p class="text-xs text-gray-500 mt-0.5">{shortUrls.length} lien{shortUrls.length!==1?'s':''}</p></div>
             <a href="/dashboard/links" class="text-xs text-neon-green/70 hover:text-neon-green transition-colors">Gérer →</a>
           </div>
           {shortUrls.length === 0 ? (
-            <div class="text-center py-8 text-gray-700">
+            <div class="text-center py-6 text-gray-700">
               <p class="text-sm">Aucun lien court créé</p>
-              <a href="/dashboard/links" class="text-xs text-neon-green hover:underline mt-1 inline-block">Créer un lien →</a>
+              <a href="/dashboard/links" class="text-xs text-neon-green hover:underline mt-1 inline-block">Créer →</a>
             </div>
           ) : (
-            <div class="overflow-x-auto -mx-1 scrollbar-none">
-              <table class="w-full text-sm min-w-[520px]">
-                <thead>
-                  <tr>
-                    <th class="text-left pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5">Lien</th>
-                    <th class="text-left pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5 hidden sm:table-cell">Destination</th>
-                    <th class="text-right pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5">Clics</th>
-                    <th class="text-right pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5 hidden md:table-cell">Créé</th>
-                    <th class="pb-3 px-2 border-b border-white/5 w-28 hidden lg:table-cell"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {shortUrls.map((link,i) => {
-                    const maxC   = shortUrls[0]?.click_count ?? 1;
-                    const barPct = maxC > 0 ? Math.round((link.click_count/maxC)*100) : 0;
-                    return (
-                      <tr class="border-b border-white/4 last:border-0 hover:bg-white/2 transition-colors">
-                        <td class="py-3 px-2">
-                          <div class="flex items-center gap-2">
-                            {i===0 && <span class="text-yellow-400 text-xs shrink-0">★</span>}
-                            <span class="font-mono text-neon-green text-xs font-semibold">/{link.slug}</span>
-                            {link.title && <span class="text-gray-500 text-xs truncate max-w-[90px] hidden sm:inline">{link.title}</span>}
-                          </div>
-                        </td>
-                        <td class="py-3 px-2 hidden sm:table-cell"><span class="text-gray-500 text-xs">{link.target_url?.replace(/^https?:\/\/(www\.)?/,'').slice(0,36)}</span></td>
-                        <td class="py-3 px-2 text-right"><span class={`font-semibold tabular-nums ${link.click_count>0?'text-neon-green':'text-gray-700'}`}>{(link.click_count??0).toLocaleString('fr-FR')}</span></td>
-                        <td class="py-3 px-2 text-right text-gray-600 text-xs hidden md:table-cell">{new Date(link.created_at).toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})}</td>
-                        <td class="py-3 px-2 hidden lg:table-cell"><div class="bar-track" style="height:4px"><div class="bar-fill" style={`width:${barPct}%;background:#00ff9d60;animation-delay:${i*40}ms`}></div></div></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div class="space-y-2">
+              {shortUrls.map((link, i) => {
+                const maxC   = shortUrls[0]?.click_count ?? 1;
+                const barPct = maxC > 0 ? Math.round((link.click_count/maxC)*100) : 0;
+                return (
+                  <div class="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-white/6 hover:border-white/12 transition-colors">
+                    {i === 0 && <span class="text-yellow-400 text-xs shrink-0">★</span>}
+                    <span class="font-mono text-neon-green text-xs font-semibold shrink-0">/{link.slug}</span>
+                    <span class="text-gray-600 text-xs truncate flex-1 hidden sm:block">{link.target_url?.replace(/^https?:\/\/(www\.)?/,'').slice(0,40)}</span>
+                    <div class="w-24 hidden lg:block">
+                      <div class="bar-track" style="height:4px"><div class="bar-fill" style={`width:${barPct}%;background:#00ff9d60;animation-delay:${i*40}ms`}></div></div>
+                    </div>
+                    <span class={`text-sm font-bold tabular-nums shrink-0 ${link.click_count>0?'text-neon-green':'text-gray-700'}`}>{(link.click_count??0).toLocaleString('fr-FR')}</span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
       )}
 
-      <!-- Tous les blocs -->
+      <!-- All blocks table -->
       <div class="p-5 glass rounded-2xl border border-white/8">
-        <div class="flex items-center justify-between mb-5">
-          <div><h3 class="text-sm font-semibold text-white">Tous les blocs</h3><p class="text-xs text-gray-500 mt-0.5">Performance complète · {blocks.length} bloc{blocks.length!==1?'s':''}</p></div>
+        <div class="flex items-center justify-between mb-4">
+          <div><h3 class="text-sm font-semibold text-white">Tous les blocs</h3><p class="text-xs text-gray-500 mt-0.5">{blocks.length} bloc{blocks.length!==1?'s':''}</p></div>
           <a href="/dashboard/blocks" class="text-xs text-neon-green/70 hover:text-neon-green transition-colors">Gérer →</a>
         </div>
-        {blocks.length === 0 ? (
-          <div class="text-center py-10 text-gray-600 text-sm"><a href="/dashboard/blocks" class="text-neon-green hover:underline">Ajouter des blocs</a></div>
-        ) : (
-          <div class="overflow-x-auto -mx-1 scrollbar-none">
-            <table class="w-full text-sm min-w-[500px]">
-              <thead>
-                <tr>
-                  <th class="text-left pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5">Bloc</th>
-                  <th class="text-right pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5">Clics</th>
-                  <th class="text-right pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5">CTR</th>
-                  <th class="text-center pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5">Statut</th>
-                </tr>
-              </thead>
-              <tbody>
-                {blocks.map((block,i) => {
-                  const found       = topBlocks.find(tb => tb.block_id === block.id);
-                  const blockClicks = found?.clicks ?? 0;
-                  const ctr         = summary.totalViews > 0 ? ((blockClicks/summary.totalViews)*100).toFixed(1) : '0.0';
-                  return (
-                    <tr class="border-b border-white/4 last:border-0 hover:bg-white/2 transition-colors">
-                      <td class="py-3 px-2">
-                        <div class="flex items-center gap-2.5">
-                          <span class="text-xs px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-gray-400">{block.type}</span>
-                          <span class="text-white font-medium truncate max-w-[200px]">{block.title||'Untitled'}</span>
-                          {i===0 && topBlocks.length>0 && !!found && <span class="text-xs text-yellow-400/70">★</span>}
-                        </div>
-                      </td>
-                      <td class="py-3 px-2 text-right"><span class={`font-semibold tabular-nums ${blockClicks>0?'text-neon-green':'text-gray-700'}`}>{blockClicks.toLocaleString('fr-FR')}</span></td>
-                      <td class="py-3 px-2 text-right text-gray-500 tabular-nums">{ctr}%</td>
-                      <td class="py-3 px-2 text-center">
-                        <span class={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${block.active?'text-neon-green bg-neon-green/10':'text-gray-600 bg-white/5'}`}>
-                          <span class={`w-1.5 h-1.5 rounded-full ${block.active?'bg-neon-green':'bg-gray-600'}`}></span>
-                          {block.active?'Actif':'Inactif'}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <div class="overflow-x-auto -mx-1 scrollbar-none">
+          <table class="w-full text-sm min-w-[440px]">
+            <thead>
+              <tr>
+                <th class="text-left pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5">Bloc</th>
+                <th class="text-right pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5">Clics</th>
+                <th class="text-right pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5">CTR</th>
+                <th class="text-center pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5">Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              {blocks.map((block, i) => {
+                const found       = topBlocks.find(tb => tb.block_id === block.id);
+                const blockClicks = found?.clicks ?? 0;
+                const ctr         = summary.totalViews > 0 ? ((blockClicks/summary.totalViews)*100).toFixed(1) : '0.0';
+                return (
+                  <tr class="border-b border-white/4 last:border-0 hover:bg-white/2 transition-colors">
+                    <td class="py-2.5 px-2">
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs px-1.5 py-0.5 rounded border border-white/10 bg-white/5 text-gray-400">{block.type}</span>
+                        <span class="text-white text-xs font-medium truncate max-w-[160px]">{block.title||'Untitled'}</span>
+                      </div>
+                    </td>
+                    <td class="py-2.5 px-2 text-right"><span class={`font-semibold tabular-nums text-xs ${blockClicks>0?'text-neon-green':'text-gray-700'}`}>{blockClicks.toLocaleString('fr-FR')}</span></td>
+                    <td class="py-2.5 px-2 text-right text-gray-500 tabular-nums text-xs">{ctr}%</td>
+                    <td class="py-2.5 px-2 text-center">
+                      <span class={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${block.active?'text-neon-green bg-neon-green/10':'text-gray-600 bg-white/5'}`}>
+                        <span class={`w-1.5 h-1.5 rounded-full ${block.active?'bg-neon-green':'bg-gray-600'}`}></span>
+                        {block.active?'Actif':'Inactif'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
     </div>
@@ -1586,7 +1568,10 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
       data-retention={JSON.stringify(retentionData)}
       data-cohorts={JSON.stringify(cohortWeeks)}
       data-compare={JSON.stringify(comparePrev)}
-      data-profile-id={profileId}>
+      data-profile-id={profileId}
+      data-sb-url={import.meta.env.PUBLIC_SUPABASE_URL}
+      data-sb-key={import.meta.env.PUBLIC_SUPABASE_ANON_KEY}
+      data-heatmap={JSON.stringify(heatmapBlocks)}>
     </div>
   </div>
 
@@ -1601,20 +1586,21 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
       const retentionData    = JSON.parse(el.dataset.retention ?? '[]');
       const cohortData       = JSON.parse(el.dataset.cohorts  ?? '[]');
       const comparePrev      = JSON.parse(el.dataset.compare  ?? '[]');
+      const heatmapData      = JSON.parse(el.dataset.heatmap  ?? '[]');
 
-      // ── Skeleton loaders ─────────────────────────────────────────────────
+      // ── Skeleton loaders ──────────────────────────────────────────────────
       ['traffic-chart','rate-chart','roas-chart','retention-chart'].forEach(id => {
         const c = document.getElementById(id);
         if (!c) return;
         c.style.display = 'none';
         const sk = document.createElement('div');
         sk.className = 'skeleton';
-        sk.style.cssText = `height:${id==='rate-chart'?'80px':id==='roas-chart'||id==='retention-chart'?'110px':'248px'};width:100%;border-radius:12px`;
+        sk.style.cssText = `height:${id==='rate-chart'?'120px':id==='roas-chart'?'120px':id==='retention-chart'?'120px':'260px'};width:100%;border-radius:12px`;
         c.parentNode.insertBefore(sk, c);
         c._skeleton = sk;
       });
 
-      // ── Chart.js ────────────────────────────────────────────────────────
+      // ── Chart.js ──────────────────────────────────────────────────────────
       await new Promise((resolve, reject) => {
         if (typeof Chart !== 'undefined') { resolve(null); return; }
         const s = document.createElement('script');
@@ -1633,17 +1619,16 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
       const BLUE   = '#38bdf8';
       const AMBER  = '#f59e0b';
 
-      function makeGrad(ctx, color, alphaTop = 0.22) {
+      function makeGrad(ctx, color, alphaTop = 0.2) {
         const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height);
         g.addColorStop(0,   color + Math.round(alphaTop * 255).toString(16).padStart(2,'0'));
-        g.addColorStop(0.6, color + Math.round(alphaTop * 0.3 * 255).toString(16).padStart(2,'0'));
+        g.addColorStop(0.6, color + Math.round(alphaTop * 0.25 * 255).toString(16).padStart(2,'0'));
         g.addColorStop(1,   '00000000');
         return g;
       }
-
       const TOOLTIP_BASE = {
         backgroundColor:'#0d1117', titleColor:'#e6edf3', bodyColor:'#8b949e',
-        borderColor:'rgba(0,255,157,0.18)', borderWidth:1, padding:14, cornerRadius:10,
+        borderColor:'rgba(0,255,157,0.15)', borderWidth:1, padding:14, cornerRadius:10,
         displayColors:true, boxWidth:8, boxHeight:8, boxPadding:5, usePointStyle:true,
         titleFont:{size:11,weight:'600'}, bodyFont:{size:11},
       };
@@ -1651,7 +1636,7 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
       const SCALE_X = { grid:{display:false}, border:{display:false}, ticks:{color:'#484f58',font:{size:10},maxRotation:0} };
       const SCALE_X_HIDE = { display:false, grid:{display:false}, border:{display:false} };
 
-      // ── TRAFFIC CHART (with compare overlay) ─────────────────────────────
+      // ── TRAFFIC CHART ─────────────────────────────────────────────────────
       let trafficChart = null;
       let compareMode  = false;
       const trafficCtx = document.getElementById('traffic-chart');
@@ -1659,24 +1644,21 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
       function buildTrafficChart(mode) {
         if (trafficChart) trafficChart.destroy();
         if (!trafficCtx || !exportedChart.labels?.length) return;
-
         const isCTR    = mode === 'ctr';
         const isViews  = mode === 'views'  || mode === 'both';
         const isClicks = mode === 'clicks' || mode === 'both';
-
-        const viewsAvg    = exportedChart.views.reduce((a,b)=>a+b,0)  / Math.max(exportedChart.views.length,1);
+        const viewsAvg    = exportedChart.views.reduce((a,b)=>a+b,0) / Math.max(exportedChart.views.length,1);
         const peakViewIdx = exportedChart.views.indexOf(Math.max(...exportedChart.views));
-
         const datasets = [];
         if (isViews && !isCTR) {
           datasets.push({ label:'Vues', data:exportedChart.views, borderColor:GREEN,
-            backgroundColor:ctx=>makeGrad(ctx,GREEN,0.18), borderWidth:2, tension:0.42, fill:true,
+            backgroundColor:ctx=>makeGrad(ctx,GREEN,0.2), borderWidth:2, tension:0.42, fill:true,
             pointRadius:exportedChart.views.map((_,i)=>i===peakViewIdx?5:0),
             pointHoverRadius:5, pointBackgroundColor:GREEN, pointBorderColor:'#0d1117', pointBorderWidth:2,
             pointHoverBackgroundColor:GREEN, pointHoverBorderColor:'#0d1117', pointHoverBorderWidth:2,
           });
           if (compareMode && comparePrev.length > 0) {
-            datasets.push({ label:'Vues (période préc.)', data:comparePrev, borderColor:GREEN+'66',
+            datasets.push({ label:'Vues (période préc.)', data:comparePrev, borderColor:GREEN+'55',
               backgroundColor:'transparent', borderWidth:1.5, tension:0.42, fill:false,
               borderDash:[5,4], pointRadius:0, pointHoverRadius:4,
               pointHoverBackgroundColor:GREEN+'88', pointHoverBorderColor:'#0d1117', pointHoverBorderWidth:1,
@@ -1693,47 +1675,43 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
           pointRadius:0, pointHoverRadius:5,
           pointHoverBackgroundColor:AMBER, pointHoverBorderColor:'#0d1117', pointHoverBorderWidth:2,
         });
-
         trafficChart = new Chart(trafficCtx, {
-          type:'line',
-          data:{ labels:exportedChart.labels, datasets },
+          type:'line', data:{ labels:exportedChart.labels, datasets },
           options:{
             responsive:true, maintainAspectRatio:false,
-            interaction:{ mode:'index', intersect:false },
+            interaction:{mode:'index',intersect:false},
             plugins:{
               legend:{ display:compareMode, position:'top', labels:{color:'#484f58',font:{size:10},boxWidth:8,usePointStyle:true} },
               tooltip:{
                 ...TOOLTIP_BASE,
                 callbacks:{
-                  title: items => items[0].label,
-                  label: item => ` ${item.dataset.label}: ${item.parsed.y.toLocaleString('fr-FR')}${isCTR?'%':''}`,
-                  afterBody: items => {
-                    const i = items[0]?.dataIndex;
-                    const v = exportedChart.views[i] ?? 0;
-                    const tot = exportedChart.views.reduce((a,b)=>a+b,0);
-                    if (!tot || isCTR) return '';
-                    return [``, `  Part du trafic : ${Math.round((v/tot)*100)}%`];
+                  title:items=>items[0].label,
+                  label:item=>` ${item.dataset.label}: ${item.parsed.y.toLocaleString('fr-FR')}${isCTR?'%':''}`,
+                  afterBody:items=>{
+                    const i=items[0]?.dataIndex;
+                    const v=exportedChart.views[i]??0;
+                    const tot=exportedChart.views.reduce((a,b)=>a+b,0);
+                    if(!tot||isCTR)return'';
+                    return[``,`  Part du trafic : ${Math.round((v/tot)*100)}%`];
                   },
                 },
               },
             },
             scales:{
-              y:{ ...SCALE_Y, ticks:{...SCALE_Y.ticks, callback:v=>v>=1000?`${(v/1000).toFixed(1)}k`:v} },
-              x:{ ...SCALE_X, ticks:{...SCALE_X.ticks, maxTicksLimit:exportedDays===7?7:exportedDays===30?10:12} },
+              y:{...SCALE_Y,ticks:{...SCALE_Y.ticks,callback:v=>v>=1000?`${(v/1000).toFixed(1)}k`:v}},
+              x:{...SCALE_X,ticks:{...SCALE_X.ticks,maxTicksLimit:exportedDays===7?7:exportedDays===30?10:12}},
             },
           },
           plugins:[{
             id:'avgLine',
             afterDraw(chart) {
-              if (isCTR || !isViews) return;
-              const {ctx:c,chartArea:{left,right},scales:{y}} = chart;
-              const yPos = y.getPixelForValue(viewsAvg);
-              c.save();
-              c.setLineDash([4,5]); c.strokeStyle = GREEN+'45'; c.lineWidth=1;
-              c.beginPath(); c.moveTo(left,yPos); c.lineTo(right,yPos); c.stroke();
-              c.setLineDash([]);
-              c.fillStyle = GREEN+'90'; c.font='9px DM Sans,sans-serif';
-              c.fillText(`moy. ${Math.round(viewsAvg).toLocaleString('fr-FR')}`, right-76, yPos-4);
+              if(isCTR||!isViews)return;
+              const{ctx:c,chartArea:{left,right},scales:{y}}=chart;
+              const yPos=y.getPixelForValue(viewsAvg);
+              c.save();c.setLineDash([4,5]);c.strokeStyle=GREEN+'40';c.lineWidth=1;
+              c.beginPath();c.moveTo(left,yPos);c.lineTo(right,yPos);c.stroke();
+              c.setLineDash([]);c.fillStyle=GREEN+'80';c.font='9px DM Sans,sans-serif';
+              c.fillText(`moy. ${Math.round(viewsAvg).toLocaleString('fr-FR')}`,right-78,yPos-4);
               c.restore();
             },
           }],
@@ -1741,115 +1719,112 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
       }
       buildTrafficChart('both');
 
-      // Glow cursor on chart
-      const chartWrapper = trafficCtx?.parentElement;
-      if (chartWrapper) {
-        chartWrapper.style.position = 'relative';
-        const glow = document.createElement('div');
-        glow.className = 'chart-glow';
-        chartWrapper.appendChild(glow);
+      // Glow cursor
+      if (trafficCtx) {
+        const wrap = trafficCtx.parentElement;
+        if (wrap && getComputedStyle(wrap).position !== 'relative') wrap.style.position = 'relative';
+        const glow = document.createElement('div'); glow.className = 'chart-glow';
+        wrap?.appendChild(glow);
         trafficCtx.addEventListener('mousemove', e => {
           const r = trafficCtx.getBoundingClientRect();
-          glow.style.left = (e.clientX - r.left) + 'px';
-          glow.style.top  = (e.clientY - r.top)  + 'px';
-          glow.style.opacity = '1';
+          glow.style.left = (e.clientX-r.left)+'px'; glow.style.top = (e.clientY-r.top)+'px'; glow.style.opacity='1';
         });
-        trafficCtx.addEventListener('mouseleave', () => { glow.style.opacity = '0'; });
+        trafficCtx.addEventListener('mouseleave', () => { glow.style.opacity='0'; });
       }
 
       // Metric toggle
-      document.getElementById('metric-toggle')?.querySelectorAll('.metric-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
+      document.getElementById('metric-toggle')?.querySelectorAll('.metric-btn').forEach(btn=>{
+        btn.addEventListener('click',()=>{
           document.querySelectorAll('.metric-btn').forEach(b=>b.classList.remove('active'));
-          btn.classList.add('active');
-          buildTrafficChart(btn.dataset.metric);
+          btn.classList.add('active'); buildTrafficChart(btn.dataset.metric);
         });
       });
-
       // Compare toggle
-      document.getElementById('compare-btn')?.addEventListener('click', function() {
-        compareMode = !compareMode;
-        this.classList.toggle('active', compareMode);
-        this.textContent = compareMode ? '✕ Comparer' : '⊕ Comparer';
-        buildTrafficChart(document.querySelector('.metric-btn.active')?.dataset.metric ?? 'both');
+      document.getElementById('compare-btn')?.addEventListener('click',function(){
+        compareMode=!compareMode;
+        this.classList.toggle('active',compareMode);
+        this.textContent=compareMode?'✕ Comparer':'⊕ Comparer';
+        buildTrafficChart(document.querySelector('.metric-btn.active')?.dataset.metric??'both');
       });
 
-      // ── CTR bar ──────────────────────────────────────────────────────────
+      // ── CTR BAR ───────────────────────────────────────────────────────────
       const rateCtx = document.getElementById('rate-chart');
       if (rateCtx && exportedChart.labels?.length > 0) {
-        const rates  = exportedChart.rates;
-        const avgCTR = rates.reduce((a,b)=>a+b,0) / Math.max(rates.length,1);
-        new Chart(rateCtx, {
+        const rates=exportedChart.rates;
+        const avgCTR=rates.reduce((a,b)=>a+b,0)/Math.max(rates.length,1);
+        new Chart(rateCtx,{
           type:'bar',
-          data:{ labels:exportedChart.labels, datasets:[{
+          data:{labels:exportedChart.labels,datasets:[{
             data:rates,
             backgroundColor:rates.map(r=>r>=8?GREEN+'55':r>=3?AMBER+'55':'#f87171'+'55'),
             borderColor:rates.map(r=>r>=8?GREEN+'cc':r>=3?AMBER+'cc':'#f87171cc'),
-            borderWidth:1, borderRadius:4,
+            borderWidth:1,borderRadius:4,
           }]},
-          options:{ responsive:true, maintainAspectRatio:false,
-            plugins:{ legend:{display:false}, tooltip:{...TOOLTIP_BASE,callbacks:{label:ctx=>` CTR: ${ctx.parsed.y.toFixed(1)}%`}} },
-            scales:{ y:{...SCALE_Y,ticks:{...SCALE_Y.ticks,callback:v=>`${v}%`}}, x:SCALE_X_HIDE },
+          options:{responsive:true,maintainAspectRatio:false,
+            plugins:{legend:{display:false},tooltip:{...TOOLTIP_BASE,callbacks:{label:ctx=>` CTR: ${ctx.parsed.y.toFixed(1)}%`}}},
+            scales:{y:{...SCALE_Y,ticks:{...SCALE_Y.ticks,callback:v=>`${v}%`}},x:SCALE_X_HIDE},
           },
-          plugins:[{ id:'ctrAvgLine', afterDraw(chart) {
-            if (!avgCTR) return;
-            const {ctx:c,chartArea:{left,right},scales:{y}} = chart;
-            c.save(); c.setLineDash([3,4]); c.strokeStyle='rgba(255,255,255,0.2)'; c.lineWidth=1;
-            c.beginPath(); c.moveTo(left,y.getPixelForValue(avgCTR)); c.lineTo(right,y.getPixelForValue(avgCTR)); c.stroke();
-            c.setLineDash([]); c.restore();
+          plugins:[{id:'ctrAvgLine',afterDraw(chart){
+            if(!avgCTR)return;
+            const{ctx:c,chartArea:{left,right},scales:{y}}=chart;
+            c.save();c.setLineDash([3,4]);c.strokeStyle='rgba(255,255,255,0.15)';c.lineWidth=1;
+            c.beginPath();c.moveTo(left,y.getPixelForValue(avgCTR));c.lineTo(right,y.getPixelForValue(avgCTR));c.stroke();
+            c.setLineDash([]);c.restore();
           }}],
         });
       }
 
-      // ── Retention stacked bar ────────────────────────────────────────────
+      // ── RETENTION CHART ───────────────────────────────────────────────────
       const retCtx = document.getElementById('retention-chart');
       if (retCtx && retentionData.length > 0) {
-        new Chart(retCtx, {
+        new Chart(retCtx,{
           type:'bar',
-          data:{ labels:retentionData.map(d=>d.date), datasets:[
-            { label:'Nouveaux',   data:retentionData.map(d=>d.new),
+          data:{labels:retentionData.map(d=>d.date),datasets:[
+            {label:'Nouveaux',data:retentionData.map(d=>d.new),
               backgroundColor:ctx=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height);g.addColorStop(0,GREEN+'66');g.addColorStop(1,GREEN+'22');return g;},
-              borderColor:GREEN+'aa', borderWidth:1, borderRadius:{topLeft:4,topRight:4,bottomLeft:0,bottomRight:0}, borderSkipped:'bottom', stack:'s' },
-            { label:'Récurrents', data:retentionData.map(d=>d.returning),
+              borderColor:GREEN+'aa',borderWidth:1,borderRadius:{topLeft:4,topRight:4,bottomLeft:0,bottomRight:0},borderSkipped:'bottom',stack:'s'},
+            {label:'Récurrents',data:retentionData.map(d=>d.returning),
               backgroundColor:ctx=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height);g.addColorStop(0,BLUE+'55');g.addColorStop(1,BLUE+'22');return g;},
-              borderColor:BLUE+'88', borderWidth:1, borderRadius:{topLeft:0,topRight:0,bottomLeft:4,bottomRight:4}, borderSkipped:'top', stack:'s' },
+              borderColor:BLUE+'88',borderWidth:1,borderRadius:{topLeft:0,topRight:0,bottomLeft:4,bottomRight:4},borderSkipped:'top',stack:'s'},
           ]},
-          options:{ responsive:true, maintainAspectRatio:false,
+          options:{responsive:true,maintainAspectRatio:false,
             interaction:{mode:'index',intersect:false},
-            plugins:{ legend:{display:true,position:'top',labels:{color:'#6b7280',font:{size:10},boxWidth:8,usePointStyle:true}},
+            plugins:{
+              legend:{display:true,position:'top',labels:{color:'#6b7280',font:{size:10},boxWidth:8,usePointStyle:true}},
               tooltip:{...TOOLTIP_BASE,callbacks:{
                 label:item=>` ${item.dataset.label}: ${item.parsed.y.toLocaleString('fr-FR')}`,
-                afterBody:items=>{ const t=items.reduce((s,it)=>s+it.parsed.y,0); if(!t) return ''; return ['', ...items.map(it=>`  ${it.dataset.label}: ${Math.round((it.parsed.y/t)*100)}%`)]; },
+                afterBody:items=>{const t=items.reduce((s,it)=>s+it.parsed.y,0);if(!t)return'';return['', ...items.map(it=>`  ${it.dataset.label}: ${Math.round((it.parsed.y/t)*100)}%`)];},
               }},
             },
-            scales:{ y:{...SCALE_Y,stacked:true}, x:{...SCALE_X,stacked:true,ticks:{...SCALE_X.ticks,maxTicksLimit:exportedDays===7?7:10}} },
+            scales:{y:{...SCALE_Y,stacked:true},x:{...SCALE_X,stacked:true,ticks:{...SCALE_X.ticks,maxTicksLimit:exportedDays===7?7:10}}},
           },
         });
       }
 
-      // ── ROAS horizontal bar ──────────────────────────────────────────────
+      // ── ROAS CHART (horizontal) ───────────────────────────────────────────
       const roasCtx = document.getElementById('roas-chart');
       if (roasCtx && isPro && exportedChannels?.length > 0) {
-        const chR = exportedChannels.filter(c=>c.revenue>0).sort((a,b)=>b.revenue-a.revenue);
+        const chR=exportedChannels.filter(c=>c.revenue>0).sort((a,b)=>b.revenue-a.revenue);
         if (chR.length > 0) {
-          const PAL = ['#a78bfa',BLUE,GREEN,AMBER,'#fb7185','#34d399'];
-          new Chart(roasCtx, {
-            type:'bar', data:{ labels:chR.map(c=>c.name), datasets:[{
-              label:'Revenue', data:chR.map(c=>c.revenue),
+          const PAL=['#a78bfa',BLUE,GREEN,AMBER,'#fb7185','#34d399'];
+          new Chart(roasCtx,{
+            type:'bar',
+            data:{labels:chR.map(c=>c.name),datasets:[{
+              label:'Revenue',data:chR.map(c=>c.revenue),
               backgroundColor:chR.map((_,i)=>PAL[i%PAL.length]+'55'),
               borderColor:chR.map((_,i)=>PAL[i%PAL.length]+'cc'),
-              borderWidth:1.5, borderRadius:6, borderSkipped:false,
+              borderWidth:1.5,borderRadius:6,borderSkipped:false,
             }]},
-            options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
-              plugins:{ legend:{display:false}, tooltip:{...TOOLTIP_BASE,callbacks:{label:ctx=>` ${Number(ctx.parsed.x).toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0})}`}} },
-              scales:{ x:{...SCALE_Y,ticks:{...SCALE_Y.ticks,callback:v=>v>=1000?`${Math.round(v/1000)}k€`:`${v}€`}}, y:{grid:{display:false},border:{display:false},ticks:{color:'#8b949e',font:{size:10},padding:4}} },
+            options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+              plugins:{legend:{display:false},tooltip:{...TOOLTIP_BASE,callbacks:{label:ctx=>` ${Number(ctx.parsed.x).toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0})}`}}},
+              scales:{x:{...SCALE_Y,ticks:{...SCALE_Y.ticks,callback:v=>v>=1000?`${Math.round(v/1000)}k€`:`${v}€`}},y:{grid:{display:false},border:{display:false},ticks:{color:'#8b949e',font:{size:10},padding:4}}},
             },
-            plugins:[{ id:'roasLabels', afterDatasetsDraw(chart) {
-              const {ctx:c,data,scales:{x,y}} = chart;
-              data.datasets[0].data.forEach((val,i) => {
-                if (!val) return;
-                c.save(); c.fillStyle='#8b949e'; c.font='9px DM Sans,sans-serif'; c.textAlign='left';
-                c.fillText(Number(val).toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}), x.getPixelForValue(val)+6, y.getPixelForValue(i)+3.5);
+            plugins:[{id:'roasLabels',afterDatasetsDraw(chart){
+              const{ctx:c,data,scales:{x,y}}=chart;
+              data.datasets[0].data.forEach((val,i)=>{
+                if(!val)return;
+                c.save();c.fillStyle='#8b949e';c.font='9px DM Sans,sans-serif';c.textAlign='left';
+                c.fillText(Number(val).toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}),x.getPixelForValue(val)+6,y.getPixelForValue(i)+3.5);
                 c.restore();
               });
             }}],
@@ -1857,7 +1832,71 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
         }
       }
 
-      // ── AI REPORT (Claude API) ────────────────────────────────────────────
+      // ── HEATMAP CANVAS ────────────────────────────────────────────────────
+      const heatCanvas = document.getElementById('heatmap-canvas');
+      const heatTooltip = document.getElementById('heatmap-tooltip');
+      if (heatCanvas && heatmapData.length > 0) {
+        const COLS = heatmapData.length;
+        const ROWS = 1;
+        const W    = heatCanvas.parentElement.clientWidth || 600;
+        const cellW = Math.floor(W / COLS);
+        const cellH = 56;
+        heatCanvas.width  = W;
+        heatCanvas.height = cellH;
+        heatCanvas.style.height = cellH + 'px';
+        const c2 = heatCanvas.getContext('2d');
+        const sorted = [...heatmapData].sort((a,b)=>b.intensity-a.intensity);
+
+        heatmapData.forEach((block, i) => {
+          const x     = i * cellW;
+          const alpha = Math.max(0.05, block.intensity * 0.85);
+          // Cell background
+          c2.fillStyle = `rgba(0,255,157,${alpha})`;
+          c2.beginPath();
+          c2.roundRect(x+2, 2, cellW-4, cellH-4, 6);
+          c2.fill();
+          // Rank indicator at top
+          if (block.intensity > 0.5) {
+            c2.fillStyle = `rgba(0,255,157,${Math.min(0.9, block.intensity)})`;
+            c2.fillRect(x+2, 2, 3, cellH-4);
+          }
+          // Position number
+          c2.fillStyle = block.intensity > 0.5 ? '#00ff9d' : 'rgba(255,255,255,0.3)';
+          c2.font = 'bold 10px DM Sans,sans-serif';
+          c2.textAlign = 'center';
+          c2.fillText(`#${block.position}`, x + cellW/2, 18);
+          // Click count
+          c2.fillStyle = block.intensity > 0 ? '#fff' : 'rgba(255,255,255,0.2)';
+          c2.font = 'bold 11px DM Sans,sans-serif';
+          c2.fillText(block.clicks > 999 ? `${(block.clicks/1000).toFixed(1)}k` : String(block.clicks), x + cellW/2, 36);
+          // Fire emoji for top
+          if (block.intensity >= 0.8) {
+            c2.font = '11px sans-serif';
+            c2.fillText('🔥', x + cellW/2, 52);
+          }
+        });
+
+        // Tooltip on hover
+        heatCanvas.addEventListener('mousemove', e => {
+          const rect = heatCanvas.getBoundingClientRect();
+          const mx   = (e.clientX - rect.left) * (heatCanvas.width / rect.width);
+          const idx  = Math.floor(mx / cellW);
+          if (idx < 0 || idx >= heatmapData.length || !heatTooltip) return;
+          const block = heatmapData[idx];
+          const ctr   = (block.clicks > 0 && exportedChart.views?.length > 0)
+            ? ((block.clicks / exportedChart.views.reduce((a,b)=>a+b,0)) * 100 * exportedChart.views.length).toFixed(1)
+            : '0.0';
+          heatTooltip.innerHTML = `<span style="color:#00ff9d;font-weight:700">#${block.position} ${block.title}</span> <span style="color:#484f58">·</span> <span style="color:#e6edf3">${block.clicks.toLocaleString('fr-FR')} clics</span> <span style="color:#484f58">·</span> <span style="color:#f59e0b">${(block.intensity*100).toFixed(0)}% intensité</span>`;
+          let tx = e.clientX - rect.left + 12;
+          let ty = e.clientY - rect.top - 40;
+          if (tx + 280 > rect.width) tx -= 280;
+          heatTooltip.style.left = tx+'px'; heatTooltip.style.top = ty+'px';
+          heatTooltip.classList.remove('hidden');
+        });
+        heatCanvas.addEventListener('mouseleave', () => heatTooltip?.classList.add('hidden'));
+      }
+
+      // ── AI REPORT ─────────────────────────────────────────────────────────
       const aiBtn     = document.getElementById('ai-report-btn');
       const aiPanel   = document.getElementById('ai-report-panel');
       const aiContent = document.getElementById('ai-report-content');
@@ -1865,207 +1904,96 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
       aiBtn?.addEventListener('click', async () => {
         if (aiBtn.dataset.loading === 'true') return;
         aiBtn.dataset.loading = 'true';
-        aiBtn.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" style="opacity:.25"/><path fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" style="opacity:.75"/></svg> Génération…';
+        aiBtn.innerHTML = '<svg class="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" opacity=".2"/><path fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z"/></svg>';
         aiPanel.classList.remove('hidden');
-        aiContent.innerHTML = '<div class="flex items-center gap-2 text-gray-600 text-xs"><span class="skeleton w-5 h-5 rounded-full shrink-0"></span>Analyse de tes données en cours…</div>';
+        aiContent.innerHTML = '<div class="text-gray-600 text-xs flex items-center gap-2"><span class="skeleton w-4 h-4 rounded-full shrink-0"></span>Analyse…</div>';
 
-        const metrics = {
-          period: `${exportedDays} jours`,
-          views:  (JSON.parse(el.dataset.goalsViews ?? '0')).toLocaleString('fr-FR'),
-          clicks: (JSON.parse(el.dataset.goalsClicks ?? '0')).toLocaleString('fr-FR'),
-          leads:  (JSON.parse(el.dataset.goalsLeads ?? '0')).toLocaleString('fr-FR'),
-          revenue:(JSON.parse(el.dataset.goalsRevenue ?? '0')).toLocaleString('fr-FR', {style:'currency',currency:'EUR',maximumFractionDigits:0}),
-          ctr:    exportedChart.rates?.length ? (exportedChart.rates.reduce((a,b)=>a+b,0)/exportedChart.rates.length).toFixed(1)+'%' : '—',
-          channels: exportedChannels.slice(0,3).map(c=>`${c.name} (${c.views} vues)`).join(', ') || 'non disponible',
-          trend: (() => {
-            const v = exportedChart.views ?? [];
-            if (v.length < 4) return 'insuffisant';
-            const first = v.slice(0,3).reduce((a,b)=>a+b,0)/3;
-            const last  = v.slice(-3).reduce((a,b)=>a+b,0)/3;
-            return last > first*1.1 ? 'croissance' : last < first*0.9 ? 'déclin' : 'stable';
-          })(),
-        };
+        const actualViews   = Number(el.dataset.goalsViews   ?? 0);
+        const actualClicks  = Number(el.dataset.goalsClicks  ?? 0);
+        const actualRevenue = Number(el.dataset.goalsRevenue ?? 0);
+        const rates = exportedChart.rates ?? [];
+        const avgCTR = rates.length ? (rates.reduce((a,b)=>a+b,0)/rates.length).toFixed(1) : '—';
+        const trend = (() => {
+          const v=exportedChart.views??[];
+          if(v.length<4)return'insuffisant';
+          const first=v.slice(0,3).reduce((a,b)=>a+b,0)/3;
+          const last =v.slice(-3).reduce((a,b)=>a+b,0)/3;
+          return last>first*1.1?'croissance':last<first*0.9?'déclin':'stable';
+        })();
+        const chans = exportedChannels.slice(0,3).map(c=>`${c.name} (${c.views} vues)`).join(', ')||'non disponible';
 
         try {
           const resp = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              model: 'claude-sonnet-4-20250514',
-              max_tokens: 1000,
-              messages: [{
-                role: 'user',
-                content: `Tu es un analyste marketing expert. Voici les métriques BioForge d'un créateur sur les ${metrics.period} :
-
-Vues : ${metrics.views}
-Clics : ${metrics.clicks}
-CTR : ${metrics.ctr}
-Leads : ${metrics.leads}
-Revenue : ${metrics.revenue}
-Tendance trafic : ${metrics.trend}
-Canaux principaux : ${metrics.channels}
-
-Rédige un rapport analytique concis en 3 sections :
-1. **Ce qui s'est passé** (2-3 phrases, synthèse factuelle)
-2. **Pourquoi** (1-2 hypothèses basées sur les chiffres)
-3. **3 actions prioritaires** (bullet points, très concrets)
-
-Réponds directement en français, sans introduction. Format markdown simple.`,
-              }],
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({
+              model:'claude-sonnet-4-20250514', max_tokens:1000,
+              messages:[{role:'user',content:`Tu es un analyste marketing expert. Métriques BioForge sur ${exportedDays} jours :\n\nVues : ${actualViews.toLocaleString('fr-FR')}\nClics : ${actualClicks.toLocaleString('fr-FR')}\nCTR moyen : ${avgCTR}%\nRevenue : ${actualRevenue.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0})}\nTendance : ${trend}\nCanaux : ${chans}\n\nRédige un rapport en 3 sections :\n1. **Ce qui s'est passé** (2-3 phrases factuelles)\n2. **Pourquoi** (1-2 hypothèses)\n3. **3 actions prioritaires** (bullet points concrets)\n\nDirectement en français, sans introduction. Markdown simple.`}],
             }),
           });
-
           if (!resp.ok) throw new Error(`API ${resp.status}`);
           const data = await resp.json();
-          const text = data.content?.map(b => b.text ?? '').join('') ?? '';
+          const text = data.content?.map(b=>b.text??'').join('')??'';
 
-          // Render with typewriter effect
           aiContent.innerHTML = '';
-          const sections = text.split('\n').filter(l => l.trim());
+          const sections = text.split('\n').filter(l=>l.trim());
           let i = 0;
           function renderNext() {
             if (i >= sections.length) {
               aiBtn.dataset.loading = 'false';
-              aiBtn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Régénérer';
+              aiBtn.innerHTML = '↺ Régénérer';
               return;
             }
             const line = sections[i++];
             const div  = document.createElement('div');
             div.className = 'slide-in-up stagger-1';
-
             if (line.startsWith('**') && line.endsWith('**')) {
-              div.innerHTML = `<p class="text-xs font-bold text-white uppercase tracking-widest mt-3 mb-1" style="color:rgba(0,255,157,.8)">${line.slice(2,-2)}</p>`;
+              div.innerHTML = `<p style="font-size:10px;font-weight:700;color:rgba(0,255,157,.8);text-transform:uppercase;letter-spacing:.08em;margin:10px 0 4px">${line.slice(2,-2)}</p>`;
             } else if (line.startsWith('- ') || line.startsWith('• ')) {
-              div.innerHTML = `<div class="flex gap-2 text-gray-400 text-xs leading-relaxed"><span style="color:rgba(0,255,157,.6);margin-top:1px">→</span><span>${line.slice(2)}</span></div>`;
+              div.innerHTML = `<div style="display:flex;gap:8px;font-size:11px;color:#6e7681;line-height:1.5"><span style="color:rgba(0,255,157,.5);margin-top:1px;flex-shrink:0">→</span><span>${line.slice(2)}</span></div>`;
             } else {
-              div.innerHTML = `<p class="text-xs text-gray-400 leading-relaxed">${line}</p>`;
+              div.innerHTML = `<p style="font-size:11px;color:#6e7681;line-height:1.5">${line}</p>`;
             }
             aiContent.appendChild(div);
-            setTimeout(renderNext, 80);
+            setTimeout(renderNext, 70);
           }
           renderNext();
-
-        } catch (err) {
-          aiContent.innerHTML = `<p class="text-xs text-red-400">Erreur : ${err.message}. Vérifie que l'API Anthropic est accessible.</p>`;
+        } catch(err) {
+          aiContent.innerHTML = `<p style="font-size:11px;color:#f87171">Erreur : ${err.message}</p>`;
           aiBtn.dataset.loading = 'false';
           aiBtn.innerHTML = '↺ Réessayer';
         }
       });
 
-      // ── LIVE FEED (Supabase Realtime) ─────────────────────────────────────
-      const liveList  = document.getElementById('live-feed-list');
-      const liveCount = document.getElementById('live-count');
-
-      async function initLiveFeed() {
-        const supaUrl = document.querySelector('meta[name="sb-url"]')?.content;
-        const supaKey = document.querySelector('meta[name="sb-key"]')?.content;
-        if (!supaUrl || !supaKey || !liveList) return;
-
-        // Load Supabase JS
-        await new Promise((res, rej) => {
-          if (window.supabase) { res(null); return; }
-          const s = document.createElement('script');
-          s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
-          s.onload = res; s.onerror = rej;
-          document.head.appendChild(s);
-        });
-
-        const client = window.supabase.createClient(supaUrl, supaKey);
-        const profileId = el.dataset.profileId;
-        if (!profileId) return;
-
-        let liveVisitors = [];
-
-        // Load recent visitors as seed
-        const { data: recent } = await client
-          .from('profile_views')
-          .select('id, country, device, created_at')
-          .eq('profile_id', profileId)
-          .order('created_at', { ascending: false })
-          .limit(8);
-
-        if (recent) {
-          liveVisitors = recent;
-          renderLive();
-        }
-
-        // Subscribe to new rows
-        client.channel('live-views')
-          .on('postgres_changes', {
-            event: 'INSERT', schema: 'public', table: 'profile_views',
-            filter: `profile_id=eq.${profileId}`,
-          }, payload => {
-            liveVisitors.unshift(payload.new);
-            if (liveVisitors.length > 12) liveVisitors.pop();
-            renderLive();
-          })
-          .subscribe();
-
-        function renderLive() {
-          if (!liveList) return;
-          if (liveVisitors.length === 0) {
-            liveList.innerHTML = '<p class="text-xs text-gray-700 text-center py-4">Aucun visiteur récent</p>';
-            return;
-          }
-          if (liveCount) liveCount.textContent = liveVisitors.filter(v => {
-            return new Date(v.created_at) > new Date(Date.now() - 5*60*1000);
-          }).length + ' actif(s)';
-
-          liveList.innerHTML = liveVisitors.map((v, i) => {
-            const ago  = Math.round((Date.now() - new Date(v.created_at).getTime()) / 60000);
-            const flag = v.country?.length === 2
-              ? String.fromCodePoint(...[...v.country.toUpperCase()].map(c => 0x1F1E0-65+c.charCodeAt(0)))
-              : '🌐';
-            const device = v.device === 'mobile' ? '📱' : v.device === 'tablet' ? '📊' : '🖥';
-            const isNew  = i === 0;
-            return `<div class="flex items-center gap-2.5 px-3 py-2 rounded-lg ${isNew ? 'live-entry' : ''} hover:bg-white/3 transition-colors">
-              <span class="text-base leading-none">${flag}</span>
-              <span class="text-sm leading-none">${device}</span>
-              <div class="flex-1 min-w-0">
-                <span class="text-xs text-gray-400">${v.country || 'Inconnu'}</span>
-              </div>
-              <span class="text-xs text-gray-700 tabular-nums shrink-0">${ago < 1 ? 'à l\'instant' : ago+'min'}</span>
-              ${isNew ? '<span class="w-1.5 h-1.5 rounded-full bg-neon-green shrink-0"></span>' : ''}
-            </div>`;
-          }).join('');
-        }
-      }
-
-      // Init live feed when traffic tab is visible
-      document.querySelector('[data-section="traffic"]')?.addEventListener('click', () => {
-        setTimeout(initLiveFeed, 100);
-      }, { once: true });
-
-      // ── Exports ───────────────────────────────────────────────────────────
-      document.getElementById('export-csv-btn')?.addEventListener('click', () => {
-        if (!exportedChart?.labels?.length) { alert('Aucune donnée'); return; }
-        const rows = [['Date','Vues','Clics','CTR%']];
-        exportedChart.labels.forEach((l,i) => rows.push([l,exportedChart.views[i],exportedChart.clicks[i],exportedChart.rates[i]]));
-        const blob = new Blob([rows.map(r=>r.join(',')).join('\n')],{type:'text/csv;charset=utf-8;'});
-        const url  = URL.createObjectURL(blob);
+      // ── EXPORTS ───────────────────────────────────────────────────────────
+      document.getElementById('export-csv-btn')?.addEventListener('click',()=>{
+        if(!exportedChart?.labels?.length){alert('Aucune donnée');return;}
+        const rows=[['Date','Vues','Clics','CTR%']];
+        exportedChart.labels.forEach((l,i)=>rows.push([l,exportedChart.views[i],exportedChart.clicks[i],exportedChart.rates[i]]));
+        const blob=new Blob([rows.map(r=>r.join(',')).join('\n')],{type:'text/csv;charset=utf-8;'});
+        const url=URL.createObjectURL(blob);
         Object.assign(document.createElement('a'),{href:url,download:`analytics-${exportedDays}j.csv`}).click();
         URL.revokeObjectURL(url);
       });
-      document.getElementById('export-pdf-btn')?.addEventListener('click', ()=>window.print());
+      document.getElementById('export-pdf-btn')?.addEventListener('click',()=>window.print());
 
-      // ── Goals ─────────────────────────────────────────────────────────────
-      const GOALS_KEY = 'bf_analytics_goals_v1';
-      function loadGoals() { try{return JSON.parse(localStorage.getItem(GOALS_KEY)??'{}');}catch{return{};} }
-      function saveGoals(g) { localStorage.setItem(GOALS_KEY, JSON.stringify(g)); }
-      function renderGoals() {
-        const goals  = loadGoals();
-        const actual = {views:Number(el.dataset.goalsViews??0),clicks:Number(el.dataset.goalsClicks??0),leads:Number(el.dataset.goalsLeads??0),revenue:Number(el.dataset.goalsRevenue??0)};
-        const items  = [{key:'views',label:'Vues',color:GREEN},{key:'clicks',label:'Clics',color:BLUE},{key:'leads',label:'Leads',color:AMBER},{key:'revenue',label:'Revenue',color:'#a78bfa'}];
-        const list   = document.getElementById('goals-list');
-        if (!list) return;
-        if (!Object.values(goals).some(v=>Number(v)>0)) {
-          list.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:80px;gap:8px;color:rgba(255,255,255,0.2);font-size:12px;text-align:center"><span style="font-size:20px;opacity:.3">🎯</span>Aucun objectif<br>Clique sur Modifier</div>';
+      // ── GOALS ─────────────────────────────────────────────────────────────
+      const GOALS_KEY='bf_analytics_goals_v1';
+      function loadGoals(){try{return JSON.parse(localStorage.getItem(GOALS_KEY)??'{}');}catch{return{};}}
+      function saveGoals(g){localStorage.setItem(GOALS_KEY,JSON.stringify(g));}
+      function renderGoals(){
+        const goals=loadGoals();
+        const actual={views:Number(el.dataset.goalsViews??0),clicks:Number(el.dataset.goalsClicks??0),leads:Number(el.dataset.goalsLeads??0),revenue:Number(el.dataset.goalsRevenue??0)};
+        const items=[{key:'views',label:'Vues',color:GREEN},{key:'clicks',label:'Clics',color:BLUE},{key:'leads',label:'Leads',color:AMBER},{key:'revenue',label:'Revenue',color:'#a78bfa'}];
+        const list=document.getElementById('goals-list');
+        if(!list)return;
+        if(!Object.values(goals).some(v=>Number(v)>0)){
+          list.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:60px;gap:6px;color:rgba(255,255,255,0.2);font-size:11px;text-align:center"><span style="font-size:16px;opacity:.3">🎯</span>Aucun objectif</div>';
           return;
         }
         list.innerHTML=items.map(item=>{
           const g=Number(goals[item.key]??0);if(!g)return'';
           const a=actual[item.key]??0,pct=Math.min(100,g>0?Math.round((a/g)*100):0),done=pct>=100;
-          return`<div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px"><span style="font-size:11px;color:#484f58">${item.label}</span><div style="display:flex;align-items:center;gap:6px">${done?'<span style="font-size:10px;font-weight:700;color:#00ff9d">✓</span>':''}<span style="font-size:12px;font-weight:700;color:${done?'#00ff9d':item.color};font-variant-numeric:tabular-nums">${pct}%</span></div></div><div style="background:rgba(255,255,255,.04);border-radius:9999px;height:4px;overflow:hidden"><div style="height:100%;border-radius:9999px;width:${pct}%;background:${done?'#00ff9d':item.color};transition:width .9s cubic-bezier(.16,1,.3,1)"></div></div><div style="font-size:10px;color:rgba(255,255,255,.18);margin-top:3px;font-variant-numeric:tabular-nums">${a.toLocaleString('fr-FR')} / ${g.toLocaleString('fr-FR')}</div></div>`;
+          return`<div style="margin-bottom:8px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;color:#484f58">${item.label}</span><span style="font-size:11px;font-weight:700;color:${done?'#00ff9d':item.color};font-variant-numeric:tabular-nums">${done?'✓ ':''} ${pct}%</span></div><div style="background:rgba(255,255,255,.04);border-radius:9999px;height:3px;overflow:hidden"><div style="height:100%;border-radius:9999px;width:${pct}%;background:${done?'#00ff9d':item.color};transition:width .9s cubic-bezier(.16,1,.3,1)"></div></div></div>`;
         }).join('');
       }
       document.getElementById('edit-goals-btn')?.addEventListener('click',()=>{
@@ -2079,8 +2007,8 @@ Réponds directement en français, sans introduction. Format markdown simple.`,
       });
       renderGoals();
 
-      // ── Section tabs ──────────────────────────────────────────────────────
-      function activateTab(id) {
+      // ── SECTION TABS ──────────────────────────────────────────────────────
+      function activateTab(id){
         document.querySelectorAll('.sec-tab').forEach(t=>t.classList.toggle('active',t.dataset.section===id));
         document.querySelectorAll('.sec-panel').forEach(p=>p.classList.toggle('active',p.id===`panel-${id}`));
         try{sessionStorage.setItem('bf_analytics_tab',id);}catch{}
@@ -2089,13 +2017,18 @@ Réponds directement en français, sans introduction. Format markdown simple.`,
         if(btn&&ind){ind.style.left=btn.offsetLeft+'px';ind.style.width=btn.offsetWidth+'px';}
       }
       document.querySelectorAll('.sec-tab').forEach(btn=>{
-        btn.addEventListener('click',()=>{activateTab(btn.dataset.section);history.replaceState(null,'',`?days=${exportedDays}&tab=${btn.dataset.section}`);});
+        btn.addEventListener('click',()=>{
+          activateTab(btn.dataset.section);
+          history.replaceState(null,'',`?days=${exportedDays}&tab=${btn.dataset.section}`);
+        });
       });
       const urlTab=new URLSearchParams(location.search).get('tab');
       let storedTab;try{storedTab=sessionStorage.getItem('bf_analytics_tab');}catch{}
-      activateTab((urlTab&&document.getElementById(`panel-${urlTab}`)?urlTab:(storedTab&&document.getElementById(`panel-${storedTab}`))?storedTab:'overview'));
+      requestAnimationFrame(()=>{
+        activateTab((urlTab&&document.getElementById(`panel-${urlTab}`))?urlTab:(storedTab&&document.getElementById(`panel-${storedTab}`))?storedTab:'overview');
+      });
 
-      // ── Inner tabs ────────────────────────────────────────────────────────
+      // ── INNER TABS ────────────────────────────────────────────────────────
       document.querySelectorAll('.insight-tab-inner').forEach(btn=>{
         btn.addEventListener('click',()=>{
           const id=btn.dataset.innerTab;
@@ -2104,17 +2037,19 @@ Réponds directement en français, sans introduction. Format markdown simple.`,
         });
       });
 
-      // ── UTM filter ────────────────────────────────────────────────────────
+      // ── UTM FILTER ────────────────────────────────────────────────────────
       document.getElementById('utm-filter')?.querySelectorAll('.filter-chip').forEach(btn=>{
         btn.addEventListener('click',()=>{
           document.querySelectorAll('#utm-filter .filter-chip').forEach(b=>b.classList.remove('active'));
           btn.classList.add('active');
           const filter=btn.dataset.utmFilter;
-          document.querySelectorAll('#utm-table tbody tr').forEach(tr=>{tr.style.display=(filter==='all'||tr.dataset.source===filter)?'':'none';});
+          document.querySelectorAll('#utm-table tbody tr').forEach(tr=>{
+            tr.style.display=(filter==='all'||tr.dataset.source===filter)?'':'none';
+          });
         });
       });
 
-      // ── Heatmap sort ──────────────────────────────────────────────────────
+      // ── HEATMAP SORT ──────────────────────────────────────────────────────
       document.getElementById('heatmap-sort')?.querySelectorAll('.sort-btn').forEach(btn=>{
         btn.addEventListener('click',()=>{
           document.querySelectorAll('#heatmap-sort .sort-btn').forEach(b=>b.classList.remove('active'));
@@ -2122,19 +2057,58 @@ Réponds directement en français, sans introduction. Format markdown simple.`,
           const k=btn.dataset.sort;
           const container=document.getElementById('heatmap-rows');
           if(!container)return;
-          [...container.children].sort((a,b)=>k==='position'?Number(a.dataset.pos||0)-Number(b.dataset.pos||0):k==='ctr'?Number(b.dataset.ctr||0)-Number(a.dataset.ctr||0):Number(b.dataset.clicks||0)-Number(a.dataset.clicks||0)).forEach(r=>container.appendChild(r));
+          [...container.children].sort((a,b)=>
+            k==='position'?Number(a.dataset.pos||0)-Number(b.dataset.pos||0):
+            k==='ctr'?Number(b.dataset.ctr||0)-Number(a.dataset.ctr||0):
+            Number(b.dataset.clicks||0)-Number(a.dataset.clicks||0)
+          ).forEach(r=>container.appendChild(r));
         });
       });
 
-      // ── D3 Map (IntersectionObserver lazy) ───────────────────────────────
+      // ── LIVE FEED ─────────────────────────────────────────────────────────
+      const liveList  = document.getElementById('live-feed-list');
+      const liveCount = document.getElementById('live-count');
+      async function initLiveFeed(){
+        const supaUrl=el.dataset.sbUrl;
+        const supaKey=el.dataset.sbKey;
+        if(!supaUrl||!supaKey||!liveList)return;
+        await new Promise((res,rej)=>{
+          if(window.supabase){res(null);return;}
+          const s=document.createElement('script');
+          s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
+          s.onload=res;s.onerror=rej;document.head.appendChild(s);
+        });
+        const client=window.supabase.createClient(supaUrl,supaKey);
+        const profileId=el.dataset.profileId;
+        if(!profileId)return;
+        let visitors=[];
+        const{data:recent}=await client.from('profile_views').select('id,country,device,created_at').eq('profile_id',profileId).order('created_at',{ascending:false}).limit(10);
+        if(recent)visitors=recent;
+        const renderLive=()=>{
+          if(!liveList)return;
+          if(!visitors.length){liveList.innerHTML='<p class="text-xs text-gray-700 text-center py-2">Aucun visiteur récent</p>';return;}
+          if(liveCount)liveCount.textContent=visitors.filter(v=>new Date(v.created_at)>new Date(Date.now()-5*60*1000)).length+' actif(s)';
+          liveList.innerHTML=visitors.map((v,i)=>{
+            const ago=Math.round((Date.now()-new Date(v.created_at).getTime())/60000);
+            const flag=v.country?.length===2?String.fromCodePoint(...[...v.country.toUpperCase()].map(c=>0x1F1E0-65+c.charCodeAt(0))):'🌐';
+            const dev=v.device==='mobile'?'📱':v.device==='tablet'?'📊':'🖥';
+            return`<div class="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/3 ${i===0?'live-entry':''}"><span class="text-sm">${flag}</span><span class="text-sm">${dev}</span><span class="text-xs text-gray-500 flex-1">${v.country||'?'}</span><span class="text-xs text-gray-700 tabular-nums">${ago<1?"à l'instant":ago+'min'}</span>${i===0?'<span class="w-1.5 h-1.5 rounded-full bg-neon-green shrink-0"></span>':''}</div>`;
+          }).join('');
+        };
+        renderLive();
+        client.channel('live-views').on('postgres_changes',{event:'INSERT',schema:'public',table:'profile_views',filter:`profile_id=eq.${profileId}`},payload=>{
+          visitors.unshift(payload.new);if(visitors.length>12)visitors.pop();renderLive();
+        }).subscribe();
+      }
+      document.querySelector('[data-section="traffic"]')?.addEventListener('click',()=>setTimeout(initLiveFeed,100),{once:true});
+
+      // ── D3 MAP (IntersectionObserver lazy) ───────────────────────────────
       const countriesData=JSON.parse(el.dataset.countries??'[]');
       const mapSvgEl=document.getElementById('world-map');
       const mapLoader=document.getElementById('world-map-loader');
-      const mapTooltip=document.getElementById('map-tooltip');
-
-      async function initMap() {
-        if(!mapSvgEl||mapSvgEl._mapInited)return;
-        mapSvgEl._mapInited=true;
+      const mapTooltip2=document.getElementById('map-tooltip');
+      async function initMap(){
+        if(!mapSvgEl||mapSvgEl._inited)return;mapSvgEl._inited=true;
         await Promise.all([
           new Promise((res,rej)=>{if(window.d3){res(null);return;}const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);}),
           new Promise((res,rej)=>{if(window.topojson){res(null);return;}const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/topojson@3.0.2/dist/topojson.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);}),
@@ -2143,41 +2117,41 @@ Réponds directement en français, sans introduction. Format markdown simple.`,
         const ISO2_NUM={AF:'4',AL:'8',DZ:'12',AO:'24',AR:'32',AU:'36',AT:'40',AZ:'31',BD:'50',BE:'56',BJ:'204',BO:'68',BR:'76',BG:'100',CA:'124',CL:'152',CN:'156',CO:'170',CD:'180',CR:'188',HR:'191',CZ:'203',DK:'208',EG:'818',ET:'231',FI:'246',FR:'250',DE:'276',GH:'288',GR:'300',HK:'344',HU:'348',IN:'356',ID:'360',IR:'364',IQ:'368',IE:'372',IL:'376',IT:'380',CI:'384',JP:'392',JO:'400',KZ:'398',KE:'404',KR:'410',KW:'414',LB:'422',LY:'434',MA:'504',MX:'484',MM:'104',NL:'528',NZ:'554',NG:'566',NO:'578',PK:'586',PE:'604',PH:'608',PL:'616',PT:'620',QA:'634',RO:'642',RU:'643',SA:'682',SN:'686',SG:'702',SK:'703',SI:'705',SO:'706',ZA:'710',ES:'724',SE:'752',CH:'756',SY:'760',TW:'158',TZ:'834',TH:'764',TN:'788',TR:'792',UA:'804',AE:'784',GB:'826',US:'840',UY:'858',VE:'862',VN:'704',YE:'887',ZW:'716',MG:'450',CM:'120',GN:'324',ML:'466',TD:'148',NE:'562',LK:'144',KH:'116',MN:'496',IS:'352',LV:'428',LT:'440',EE:'233',RS:'688',BA:'70',MK:'807',GE:'268',BY:'112',MD:'498',AM:'51',UZ:'860',TM:'795',KG:'417',TJ:'762',LU:'442',CY:'196',MT:'470',MZ:'508',ZM:'894',MW:'454',UG:'800',RW:'646',BI:'108',SS:'728',SD:'729',LR:'430',SL:'694',BF:'854',GW:'624',GM:'270',CV:'132',GQ:'226',GA:'266',CG:'178',CF:'140',ER:'232',DJ:'262',KM:'174',SC:'690',MU:'480',MR:'478',LI:'438',MC:'492',SM:'674',VA:'336',AD:'20',ME:'499',XK:'383'};
         const maxViews=countriesData.length>0?countriesData[0].views:1;
         const viewsMap=new Map(),iso2Map=new Map(),labelMap=new Map();
-        countriesData.forEach(row=>{const num=ISO2_NUM[row.country];if(!num)return;viewsMap.set(+num,row.views);iso2Map.set(+num,row.country);labelMap.set(+num,row.country);});
+        countriesData.forEach(r=>{const n=ISO2_NUM[r.country];if(!n)return;viewsMap.set(+n,r.views);iso2Map.set(+n,r.country);labelMap.set(+n,r.country);});
         const colorScale=maxViews>1?d3.scaleSequentialLog().domain([1,maxViews]).interpolator(d3.interpolate('#0f2a1a','#00ff9d')):()=>'#0f2a1a';
-        const W=mapSvgEl.clientWidth||720,H=320;
+        const W=mapSvgEl.clientWidth||720,H=300;
         const svg=d3.select(mapSvgEl).attr('width',W).attr('height',H);
-        const projection=d3.geoNaturalEarth1().scale(W/6.1).translate([W/2,H/2+15]);
-        const pathGen=d3.geoPath().projection(projection);
+        const proj=d3.geoNaturalEarth1().scale(W/6.1).translate([W/2,H/2+15]);
+        const path=d3.geoPath().projection(proj);
         const g=svg.append('g');
-        g.append('path').datum({type:'Sphere'}).attr('d',pathGen).attr('fill','#060d0a').attr('stroke','rgba(0,255,157,0.04)').attr('stroke-width',.8);
-        g.append('path').datum(d3.geoGraticule().step([20,20])()).attr('d',pathGen).attr('fill','none').attr('stroke','rgba(255,255,255,0.02)').attr('stroke-width',.4);
+        g.append('path').datum({type:'Sphere'}).attr('d',path).attr('fill','#060d0a').attr('stroke','rgba(0,255,157,.04)').attr('stroke-width',.8);
+        g.append('path').datum(d3.geoGraticule().step([20,20])()).attr('d',path).attr('fill','none').attr('stroke','rgba(255,255,255,.02)').attr('stroke-width',.4);
         const countries=topojson.feature(world,world.objects.countries);
-        g.selectAll('.country').data(countries.features).join('path').attr('class','country').attr('d',pathGen).attr('fill',d=>{const v=viewsMap.get(+d.id);return v?colorScale(v):'#101f16';}).attr('stroke','#0c1a12').attr('stroke-width',.4);
-        g.append('path').datum(topojson.mesh(world,world.objects.countries,(a,b)=>a!==b)).attr('d',pathGen).attr('fill','none').attr('stroke','rgba(0,255,157,0.07)').attr('stroke-width',.5);
+        g.selectAll('.country').data(countries.features).join('path').attr('class','country').attr('d',path).attr('fill',d=>{const v=viewsMap.get(+d.id);return v?colorScale(v):'#101f16';}).attr('stroke','#0c1a12').attr('stroke-width',.4);
+        g.append('path').datum(topojson.mesh(world,world.objects.countries,(a,b)=>a!==b)).attr('d',path).attr('fill','none').attr('stroke','rgba(0,255,157,.07)').attr('stroke-width',.5);
         const dotsG=g.append('g');
         countriesData.slice(0,6).forEach((row,idx)=>{
-          const num=ISO2_NUM[row.country];if(!num)return;
-          const feat=countries.features.find(f=>+f.id===+num);if(!feat)return;
-          const cen=pathGen.centroid(feat);if(!cen||isNaN(cen[0])||isNaN(cen[1]))return;
+          const n=ISO2_NUM[row.country];if(!n)return;
+          const feat=countries.features.find(f=>+f.id===+n);if(!feat)return;
+          const cen=path.centroid(feat);if(!cen||isNaN(cen[0])||isNaN(cen[1]))return;
           const intensity=row.views/maxViews,r=2.5+intensity*5.5;
           dotsG.append('circle').attr('cx',cen[0]).attr('cy',cen[1]).attr('r',r+6).attr('fill',`rgba(0,255,157,${.06+intensity*.08})`).attr('pointer-events','none');
-          dotsG.append('circle').attr('cx',cen[0]).attr('cy',cen[1]).attr('r',r).attr('fill',idx===0?'#00ff9d':`rgba(0,255,157,${.5+intensity*.4})`).attr('stroke',idx===0?'rgba(0,255,157,0.4)':'none').attr('stroke-width',1.5).attr('pointer-events','none');
+          dotsG.append('circle').attr('cx',cen[0]).attr('cy',cen[1]).attr('r',r).attr('fill',idx===0?'#00ff9d':`rgba(0,255,157,${.5+intensity*.4})`).attr('stroke',idx===0?'rgba(0,255,157,.4)':'none').attr('stroke-width',1.5).attr('pointer-events','none');
         });
-        g.selectAll('.country-hit').data(countries.features).join('path').attr('class','country-hit').attr('d',pathGen).attr('fill','transparent').attr('stroke','none')
+        g.selectAll('.country-hit').data(countries.features).join('path').attr('class','country-hit').attr('d',path).attr('fill','transparent').attr('stroke','none')
           .attr('cursor',d=>viewsMap.has(+d.id)?'pointer':'default')
-          .on('mousemove',function(event,d){
-            const views=viewsMap.get(+d.id);if(!views||!mapTooltip)return;
-            const iso2=iso2Map.get(+d.id)||'',name=labelMap.get(+d.id)||iso2,pct=((views/maxViews)*100).toFixed(0);
+          .on('mousemove',function(evt,d){
+            const v=viewsMap.get(+d.id);if(!v||!mapTooltip2)return;
+            const iso2=iso2Map.get(+d.id)||'',name=labelMap.get(+d.id)||iso2;
             const rect=mapSvgEl.getBoundingClientRect();
-            mapTooltip.innerHTML=`<span style="color:#00ff9d;font-weight:700">${iso2} — ${name}</span><span style="color:#484f58;margin:0 6px">·</span><span style="color:#e6edf3">${views.toLocaleString('fr-FR')} vues</span><span style="color:#484f58;margin-left:6px">${pct}%</span>`;
-            let tx=event.clientX-rect.left+14,ty=event.clientY-rect.top-38;
-            if(tx+240>W)tx-=260;if(ty<4)ty=event.clientY-rect.top+18;
-            mapTooltip.style.left=tx+'px';mapTooltip.style.top=ty+'px';mapTooltip.classList.remove('hidden');
-            d3.select(this.parentNode).selectAll('.country').filter(fd=>fd===d).attr('fill',v=>{const val=viewsMap.get(+v.id);return val?d3.color(colorScale(val)).brighter(.8).formatHex():'#1e3525';});
+            mapTooltip2.innerHTML=`<span style="color:#00ff9d;font-weight:700">${iso2} — ${name}</span><span style="color:#484f58;margin:0 6px">·</span><span style="color:#e6edf3">${v.toLocaleString('fr-FR')} vues</span>`;
+            let tx=evt.clientX-rect.left+12,ty=evt.clientY-rect.top-36;
+            if(tx+240>W)tx-=252;if(ty<4)ty=evt.clientY-rect.top+16;
+            mapTooltip2.style.left=tx+'px';mapTooltip2.style.top=ty+'px';mapTooltip2.classList.remove('hidden');
+            d3.select(this.parentNode).selectAll('.country').filter(fd=>fd===d).attr('fill',fv=>{const val=viewsMap.get(+fv.id);return val?d3.color(colorScale(val)).brighter(.8).formatHex():'#1e3525';});
           })
-          .on('mouseleave',function(event,d){
-            if(mapTooltip)mapTooltip.classList.add('hidden');
+          .on('mouseleave',function(evt,d){
+            if(mapTooltip2)mapTooltip2.classList.add('hidden');
             d3.select(this.parentNode).selectAll('.country').filter(fd=>fd===d).attr('fill',fd=>{const v=viewsMap.get(+fd.id);return v?colorScale(v):'#101f16';});
           });
         const zoom=d3.zoom().scaleExtent([.9,12]).translateExtent([[-W*.5,-H*.5],[W*1.5,H*1.5]])
@@ -2189,10 +2163,10 @@ Réponds directement en français, sans introduction. Format markdown simple.`,
         document.getElementById('map-reset')?.addEventListener('click',()=>svg.transition().duration(450).call(zoom.transform,d3.zoomIdentity));
         document.querySelectorAll('.country-row').forEach(row=>{
           row.addEventListener('mouseenter',()=>{
-            const num=ISO2_NUM[row.getAttribute('data-iso')];if(!num)return;
-            const feat=countries.features.find(f=>+f.id===+num);if(!feat)return;
-            g.selectAll('.country').classed('highlighted',fd=>+fd.id===+num);
-            const b=pathGen.bounds(feat),dx=b[1][0]-b[0][0],dy=b[1][1]-b[0][1];
+            const n=ISO2_NUM[row.getAttribute('data-iso')];if(!n)return;
+            const feat=countries.features.find(f=>+f.id===+n);if(!feat)return;
+            g.selectAll('.country').classed('highlighted',fd=>+fd.id===+n);
+            const b=path.bounds(feat),dx=b[1][0]-b[0][0],dy=b[1][1]-b[0][1];
             const cx=(b[0][0]+b[1][0])/2,cy=(b[0][1]+b[1][1])/2;
             const scale=Math.max(1.2,Math.min(8,.85/Math.max(dx/W,dy/H)));
             svg.transition().duration(550).ease(d3.easeCubicOut).call(zoom.transform,d3.zoomIdentity.translate(W/2-scale*cx,H/2-scale*cy).scale(scale));
@@ -2204,14 +2178,13 @@ Réponds directement en français, sans introduction. Format markdown simple.`,
         });
         mapSvgEl.style.opacity='1';
         if(mapLoader)mapLoader.style.display='none';
-        const ro=new ResizeObserver(()=>{const nW=mapSvgEl.clientWidth;if(!nW)return;projection.scale(nW/6.1).translate([nW/2,H/2+15]);svg.attr('width',nW);g.selectAll('path').attr('d',pathGen);});
+        const ro=new ResizeObserver(()=>{const nW=mapSvgEl.clientWidth;if(!nW)return;proj.scale(nW/6.1).translate([nW/2,H/2+15]);svg.attr('width',nW);g.selectAll('path').attr('d',path);});
         ro.observe(mapSvgEl);
       }
-
       if(mapSvgEl){
         const obs=new IntersectionObserver(entries=>{if(entries[0].isIntersecting){initMap();obs.disconnect();}},{threshold:.1});
         obs.observe(mapSvgEl);
-      } else if(mapLoader) {
+      }else if(mapLoader){
         mapLoader.innerHTML='<p style="color:#484f58;font-size:12px;padding:24px">Carte non disponible</p>';
       }
 
