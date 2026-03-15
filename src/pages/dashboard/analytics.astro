@@ -349,27 +349,6 @@ if (perfRecos.length < 3) perfRecos.push('Continue sur cette lancée — ta coh�
 const topRecos = perfRecos.slice(0, 3);
 
 // ── v5: PREDICTIONS (linear regression on daily views last 7d) ───────────────
-const last7Views  = chartViews.slice(-7);
-const last7Clicks = chartClicks.slice(-7);
-function linReg(data: number[]): { slope: number; intercept: number } {
-  const n = data.length;
-  if (n < 2) return { slope: 0, intercept: data[0] ?? 0 };
-  const sumX = data.reduce((s, _, i) => s + i, 0);
-  const sumY = data.reduce((s, v) => s + v, 0);
-  const sumXY = data.reduce((s, v, i) => s + i * v, 0);
-  const sumX2 = data.reduce((s, _, i) => s + i * i, 0);
-  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
-  const intercept = (sumY - slope * sumX) / n;
-  return { slope, intercept };
-}
-const regViews  = linReg(last7Views);
-const regClicks = linReg(last7Clicks);
-// Project 30 days ahead
-const proj30Views  = Math.max(0, Math.round((regViews.intercept  + regViews.slope  * (last7Views.length  + 22)) * 30));
-const proj30Clicks = Math.max(0, Math.round((regClicks.intercept + regClicks.slope * (last7Clicks.length + 22)) * 30));
-const proj30Revenue = revenue > 0 && days > 0 ? Math.round((revenue / days) * 30) : 0;
-// Sparkline for predictions (extended)
-function sparklinePred(data: number[], slope: number, intercept: number, color: string): string {
   const W = 200, H = 40;
   const extended = [...data];
   for (let i = data.length; i < data.length + 14; i++) {
