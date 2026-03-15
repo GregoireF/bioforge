@@ -1,221 +1,621 @@
 ---
 // src/components/features/NotificationCenter.astro
-// Notification bell + dropdown panel avec Supabase Realtime
-// Intégration : <NotificationCenter userId={profile.id} supabaseUrl={...} supabaseKey={...} />
+// Usage: <NotificationCenter userId={profile.id} supabaseUrl={...} supabaseKey={...} />
 
 interface Props {
   userId:      string;
   supabaseUrl: string;
-  supabaseKey: string; // anon key uniquement
+  supabaseKey: string;
 }
 
 const { userId, supabaseUrl, supabaseKey } = Astro.props;
 ---
 
-<!-- Bell button — s'insère dans la topbar -->
+<!-- ─────────────────────────────────────────────────
+     BELL BUTTON
+───────────────────────────────────────────────── -->
 <button
   id="notif-bell"
   aria-label="Notifications"
   aria-haspopup="true"
   aria-expanded="false"
-  class="relative flex items-center justify-center w-8 h-8 rounded-lg glass border border-white/10 hover:border-white/20 transition-all text-gray-400 hover:text-white"
+  class="nc-bell"
 >
-  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+  <svg width="15" height="15" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
     <path stroke-linecap="round" stroke-linejoin="round"
       d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
   </svg>
-  <!-- Badge compteur non-lus -->
-  <span
-    id="notif-badge"
-    style="display:none"
-    class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full
-      bg-neon-green text-black text-[9px] font-bold
-      flex items-center justify-center leading-none"
-  ></span>
+  <span id="notif-badge" class="nc-bell-badge" style="display:none"></span>
 </button>
 
-<!-- Panel dropdown -->
+<!-- ─────────────────────────────────────────────────
+     PANEL
+───────────────────────────────────────────────── -->
 <div
   id="notif-panel"
   role="dialog"
   aria-label="Centre de notifications"
-  style="
-    display:none; position:fixed; top:60px; right:16px; z-index:9980;
-    width:380px;
-    background:linear-gradient(160deg,#0e1317 0%,#090c0f 100%);
-    border:1px solid rgba(255,255,255,0.09);
-    border-top:1px solid rgba(255,255,255,0.14);
-    border-radius:20px; overflow:hidden;
-    box-shadow:0 32px 64px rgba(0,0,0,0.65),0 0 0 1px rgba(0,0,0,0.5);
-    opacity:0; transform:translateY(-10px) scale(0.97);
-    transition:opacity 0.25s ease,transform 0.25s cubic-bezier(0.22,1,0.36,1);
-  "
+  class="nc-panel"
+  style="display:none; opacity:0; transform:translateY(-10px) scale(0.97)"
 >
+  <!-- Top glow line -->
+  <div class="nc-panel-glow" aria-hidden="true"></div>
+
   <!-- Header -->
-  <div style="
-    display:flex; align-items:center; justify-content:space-between;
-    padding:16px 18px 12px;
-    border-bottom:1px solid rgba(255,255,255,0.06);
-  ">
-    <div style="display:flex;align-items:center;gap:10px">
-      <span style="font-family:'Cabinet Grotesk',system-ui;font-size:15px;font-weight:900;color:#fff;letter-spacing:-0.02em">
-        Notifications
-      </span>
-      <span id="notif-header-count" style="display:none;font-size:11px;font-weight:700;background:#00ff9d;color:#000;padding:2px 8px;border-radius:99px"></span>
+  <div class="nc-header">
+    <div class="nc-header-left">
+      <span class="nc-title">Notifications</span>
+      <span id="notif-header-count" class="nc-count" style="display:none"></span>
     </div>
-    <div style="display:flex;align-items:center;gap:8px">
-      <!-- Mark all read -->
-      <button id="notif-read-all"
-        style="font-size:11px;color:rgba(255,255,255,0.35);background:none;border:none;cursor:pointer;font-family:inherit;padding:4px 8px;border-radius:7px;transition:all 0.15s"
-        onmouseover="this.style.background='rgba(255,255,255,0.06)';this.style.color='#fff'"
-        onmouseout="this.style.background='none';this.style.color='rgba(255,255,255,0.35)'"
-      >
-        Tout lire
-      </button>
-      <!-- Close -->
-      <button id="notif-close"
-        style="width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgba(255,255,255,0.4);font-size:11px;transition:all 0.15s"
-        onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'"
-        aria-label="Fermer"
-      >✕</button>
+    <div class="nc-header-actions">
+      <button id="notif-read-all" class="nc-btn-read">Tout lire</button>
+      <button id="notif-close" class="nc-btn-close" aria-label="Fermer">✕</button>
     </div>
   </div>
 
   <!-- Filter tabs -->
-  <div style="display:flex;gap:2px;padding:8px 10px 4px">
-    <button class="notif-tab active" data-filter="all"
-      style="padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;font-family:inherit;background:rgba(255,255,255,0.08);color:#fff">
-      Toutes
-    </button>
-    <button class="notif-tab" data-filter="unread"
-      style="padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;font-family:inherit;background:transparent;color:rgba(255,255,255,0.4)">
-      Non lues
-    </button>
-    <button class="notif-tab" data-filter="roadmap"
-      style="padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;font-family:inherit;background:transparent;color:rgba(255,255,255,0.4)">
-      Roadmap
-    </button>
+  <div class="nc-tabs" id="notif-tabs">
+    <div class="nc-tab-slider" id="notif-tab-slider"></div>
+    <button class="nc-tab active" data-filter="all">Toutes</button>
+    <button class="nc-tab" data-filter="unread">Non lues</button>
+    <button class="nc-tab" data-filter="roadmap">Roadmap</button>
   </div>
 
   <!-- List -->
-  <div id="notif-list" style="max-height:400px;overflow-y:auto;padding:6px 8px 8px">
-    <!-- Loading state -->
-    <div id="notif-loading" style="padding:32px 0;text-align:center">
-      <div style="width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,0.08);border-top-color:#00ff9d;animation:nspin 0.8s linear infinite;margin:0 auto 12px"></div>
-      <p style="font-size:12px;color:rgba(255,255,255,0.3)">Chargement…</p>
+  <div id="notif-list" class="nc-list">
+    <!-- Loading -->
+    <div id="notif-loading" class="nc-loading">
+      <div class="nc-spinner"></div>
+      <p>Chargement…</p>
     </div>
-    <!-- Empty state (hidden by default) -->
-    <div id="notif-empty" style="display:none;padding:36px 16px;text-align:center">
-      <div style="font-size:32px;margin-bottom:10px;opacity:0.4">🔔</div>
-      <p style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.5);margin-bottom:4px">Aucune notification</p>
-      <p style="font-size:12px;color:rgba(255,255,255,0.25)">Tu seras notifié dès qu'il se passe quelque chose.</p>
+    <!-- Empty -->
+    <div id="notif-empty" class="nc-empty" style="display:none">
+      <div class="nc-empty-icon">🔔</div>
+      <p class="nc-empty-title">Aucune notification</p>
+      <p class="nc-empty-sub">Tu seras notifié dès qu'il se passe quelque chose.</p>
     </div>
   </div>
 
-  <!-- Footer — lien settings notifs -->
-  <div style="padding:10px 18px;border-top:1px solid rgba(255,255,255,0.06);display:flex;justify-content:center">
-    <a href="/dashboard/settings#notifications"
-      style="font-size:11px;color:rgba(255,255,255,0.25);text-decoration:none;transition:color 0.2s"
-      onmouseover="this.style.color='rgba(255,255,255,0.55)'" onmouseout="this.style.color='rgba(255,255,255,0.25)'"
-    >
-      Gérer les préférences de notification →
-    </a>
+  <!-- Footer -->
+  <div class="nc-footer">
+    <a href="/dashboard/settings#notifications" class="nc-footer-link">Gérer les préférences →</a>
+    <span id="notif-footer-count" class="nc-footer-count"></span>
   </div>
 </div>
 
-<!-- Realtime toast container -->
-<div id="notif-toast-wrap"
-  style="position:fixed;top:72px;right:20px;z-index:9990;display:flex;flex-direction:column;gap:8px;pointer-events:none">
-</div>
+<!-- ─────────────────────────────────────────────────
+     TOAST CONTAINER
+───────────────────────────────────────────────── -->
+<div id="notif-toast-wrap" class="nc-toast-wrap" aria-live="polite"></div>
 
+<!-- ─────────────────────────────────────────────────
+     STYLES
+───────────────────────────────────────────────── -->
 <style>
-  @keyframes nspin {
-    to { transform: rotate(360deg) }
+  /* ── BELL ───────────────────────────────────────── */
+  .nc-bell {
+    position: relative;
+    width: 36px; height: 36px;
+    border-radius: 11px;
+    background: rgba(255,255,255,0.04);
+    border: 0.5px solid rgba(255,255,255,0.09);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: rgba(255,255,255,0.45);
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
   }
-  @keyframes ntoast-in {
-    from { opacity:0; transform:translateX(20px) scale(0.95) }
-    to   { opacity:1; transform:none }
+  .nc-bell:hover {
+    background: rgba(255,255,255,0.07);
+    border-color: rgba(255,255,255,0.18);
+    color: #fff;
   }
-  @keyframes ntoast-out {
-    to { opacity:0; transform:translateX(20px) scale(0.95) }
+  .nc-bell[aria-expanded="true"] {
+    border-color: rgba(0,255,157,0.3);
+    color: #00ff9d;
   }
-  @keyframes nitem-in {
-    from { opacity:0; transform:translateY(-6px) }
-    to   { opacity:1; transform:none }
-  }
-  .notif-item {
-    display:flex; align-items:flex-start; gap:11px;
-    padding:11px 12px; border-radius:13px; cursor:pointer;
-    transition:background 0.15s; border:1px solid transparent;
-    animation:nitem-in 0.3s cubic-bezier(0.22,1,0.36,1) both;
-    position:relative;
-  }
-  .notif-item:hover { background:rgba(255,255,255,0.05) }
-  .notif-item.unread { background:rgba(0,255,157,0.04); border-color:rgba(0,255,157,0.1) }
-  .notif-item.unread:hover { background:rgba(0,255,157,0.07) }
-  .notif-dot {
-    position:absolute; top:14px; right:14px;
-    width:7px; height:7px; border-radius:50%;
-    background:#00ff9d;
-    box-shadow:0 0 0 2px rgba(0,255,157,0.15);
-  }
-  .notif-icon {
-    width:36px; height:36px; border-radius:11px; flex-shrink:0;
-    display:flex; align-items:center; justify-content:center;
-    font-size:17px; line-height:1;
-  }
-  .notif-title {
-    font-size:13px; font-weight:700; color:#fff;
-    letter-spacing:-0.01em; margin-bottom:3px; line-height:1.2;
-    font-family:'Cabinet Grotesk',system-ui,sans-serif;
-  }
-  .notif-body { font-size:12px; color:rgba(255,255,255,0.45); line-height:1.55 }
-  .notif-time { font-size:10px; color:rgba(255,255,255,0.25); margin-top:4px }
-  .notif-tab.active { background:rgba(255,255,255,0.08) !important; color:#fff !important }
 
-  /* Realtime toast */
-  .ntoast {
-    pointer-events:all;
-    display:flex; align-items:center; gap:10px;
-    padding:11px 15px; border-radius:14px;
-    background:linear-gradient(135deg,#0d1114,#090c0f);
-    border:1px solid rgba(255,255,255,0.1);
-    border-left:3px solid #00ff9d;
-    box-shadow:0 16px 40px rgba(0,0,0,0.55);
-    max-width:320px;
-    cursor:pointer;
-    animation:ntoast-in 0.35s cubic-bezier(0.22,1,0.36,1) both;
+  .nc-bell-badge {
+    position: absolute;
+    top: -4px; right: -4px;
+    min-width: 16px; height: 16px;
+    padding: 0 4px;
+    border-radius: 99px;
+    background: #00ff9d;
+    color: #000;
+    font-size: 9px;
+    font-weight: 800;
+    font-family: inherit;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 0 2.5px var(--nc-page-bg, #070a0d);
+    animation: nc-badge-pulse 2.5s ease-in-out infinite;
+    line-height: 1;
+    letter-spacing: 0;
   }
-  .ntoast.out { animation:ntoast-out 0.25s ease forwards }
-  .ntoast-icon { font-size:18px; flex-shrink:0 }
-  .ntoast-title { font-size:13px; font-weight:700; color:#fff; font-family:'Cabinet Grotesk',system-ui,sans-serif; letter-spacing:-0.01em }
-  .ntoast-body  { font-size:11px; color:rgba(255,255,255,0.45); margin-top:1px }
 
-  /* Scrollbar notif list */
-  #notif-list::-webkit-scrollbar { width:3px }
-  #notif-list::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:2px }
+  /* ── PANEL ──────────────────────────────────────── */
+  .nc-panel {
+    position: fixed;
+    top: 60px; right: 16px;
+    z-index: 9980;
+    width: 400px;
+    background: rgba(9,12,16,0.94);
+    backdrop-filter: blur(32px) saturate(180%);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
+    border-radius: 22px;
+    overflow: hidden;
+    box-shadow:
+      0 0 0 0.5px rgba(255,255,255,0.10),
+      0 0 0 1px rgba(0,0,0,0.85),
+      0 40px 80px rgba(0,0,0,0.72),
+      inset 0 1px 0 rgba(255,255,255,0.07);
+    transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.22,1,0.36,1);
+    /* Noise texture */
+    background-image:
+      url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E"),
+      linear-gradient(160deg, #0d1117 0%, #090c10 100%);
+  }
+
+  .nc-panel-glow {
+    position: absolute;
+    top: 0; left: 10%; right: 10%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0,255,157,0.45), transparent);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  /* ── HEADER ─────────────────────────────────────── */
+  .nc-header {
+    position: relative; z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 18px 14px;
+    border-bottom: 0.5px solid rgba(255,255,255,0.06);
+  }
+
+  .nc-header-left {
+    display: flex; align-items: center; gap: 10px;
+  }
+
+  .nc-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.03em;
+  }
+
+  .nc-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px; height: 20px;
+    padding: 0 6px;
+    border-radius: 99px;
+    background: #00ff9d;
+    color: #000;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0;
+    animation: nc-badge-pulse 2.5s ease-in-out infinite;
+  }
+
+  .nc-header-actions {
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .nc-btn-read {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.28);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    padding: 5px 10px;
+    border-radius: 8px;
+    transition: background 0.15s, color 0.15s;
+    letter-spacing: -0.01em;
+  }
+  .nc-btn-read:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.7); }
+
+  .nc-btn-close {
+    width: 28px; height: 28px;
+    border-radius: 9px;
+    background: rgba(255,255,255,0.04);
+    border: 0.5px solid rgba(255,255,255,0.08);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: rgba(255,255,255,0.3);
+    font-size: 10px;
+    font-family: inherit;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .nc-btn-close:hover {
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+    border-color: rgba(255,255,255,0.14);
+  }
+
+  /* ── TABS ───────────────────────────────────────── */
+  .nc-tabs {
+    position: relative; z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 10px 12px 6px;
+  }
+
+  .nc-tab-slider {
+    position: absolute;
+    background: rgba(255,255,255,0.08);
+    border-radius: 9px;
+    transition: left 0.25s cubic-bezier(0.22,1,0.36,1),
+                top 0.25s cubic-bezier(0.22,1,0.36,1),
+                width 0.25s cubic-bezier(0.22,1,0.36,1),
+                height 0.25s cubic-bezier(0.22,1,0.36,1);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .nc-tab {
+    position: relative; z-index: 1;
+    padding: 5px 13px;
+    border-radius: 9px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: rgba(255,255,255,0.32);
+    font-family: inherit;
+    transition: color 0.2s;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+  }
+  .nc-tab.active { color: #fff; }
+
+  /* ── LIST ───────────────────────────────────────── */
+  .nc-list {
+    position: relative; z-index: 2;
+    max-height: 420px;
+    overflow-y: auto;
+    padding: 5px 8px 8px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.07) transparent;
+  }
+  .nc-list::-webkit-scrollbar { width: 3px; }
+  .nc-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.07); border-radius: 2px; }
+
+  /* ── SECTION LABEL ──────────────────────────────── */
+  .nc-section {
+    padding: 8px 6px 3px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.18);
+    user-select: none;
+  }
+
+  /* ── DIVIDER ────────────────────────────────────── */
+  .nc-divider {
+    height: 0.5px;
+    background: rgba(255,255,255,0.05);
+    margin: 4px 6px;
+  }
+
+  /* ── ITEM ───────────────────────────────────────── */
+  .nc-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 11px 12px;
+    border-radius: 14px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    border: 0.5px solid transparent;
+    position: relative;
+    animation: nc-item-in 0.35s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  .nc-item:hover {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.06);
+  }
+  .nc-item.unread {
+    background: rgba(0,255,157,0.03);
+    border-color: rgba(0,255,157,0.09);
+  }
+  .nc-item.unread:hover {
+    background: rgba(0,255,157,0.055);
+    border-color: rgba(0,255,157,0.14);
+  }
+
+  /* ── ITEM ICON ──────────────────────────────────── */
+  .nc-item-icon {
+    width: 38px; height: 38px;
+    border-radius: 12px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  /* color variants */
+  .nc-icon-green  { background: rgba(0,255,157,0.09);   box-shadow: 0 0 0 0.5px rgba(0,255,157,0.18); }
+  .nc-icon-blue   { background: rgba(56,189,248,0.09);  box-shadow: 0 0 0 0.5px rgba(56,189,248,0.18); }
+  .nc-icon-orange { background: rgba(251,146,60,0.09);  box-shadow: 0 0 0 0.5px rgba(251,146,60,0.18); }
+  .nc-icon-purple { background: rgba(167,139,250,0.09); box-shadow: 0 0 0 0.5px rgba(167,139,250,0.18); }
+  .nc-icon-gray   { background: rgba(255,255,255,0.05); box-shadow: 0 0 0 0.5px rgba(255,255,255,0.09); }
+
+  /* ── ITEM CONTENT ───────────────────────────────── */
+  .nc-item-content { flex: 1; min-width: 0; }
+
+  .nc-item-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color 0.3s;
+  }
+  .nc-item-title.read { color: rgba(255,255,255,0.5); }
+
+  .nc-item-body {
+    font-size: 12px;
+    color: rgba(255,255,255,0.4);
+    line-height: 1.55;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .nc-item-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 5px;
+  }
+
+  .nc-item-time {
+    font-size: 10.5px;
+    color: rgba(255,255,255,0.2);
+    font-weight: 500;
+  }
+
+  .nc-item-tag {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    padding: 1px 7px;
+    border-radius: 5px;
+    line-height: 1.65;
+  }
+  .nc-tag-green  { background: rgba(0,255,157,0.1);    color: #00ff9d; }
+  .nc-tag-blue   { background: rgba(56,189,248,0.1);   color: #38bdf8; }
+  .nc-tag-orange { background: rgba(251,146,60,0.1);   color: #fb923c; }
+  .nc-tag-purple { background: rgba(167,139,250,0.12); color: #a78bfa; }
+
+  /* ── UNREAD DOT ─────────────────────────────────── */
+  .nc-unread-dot {
+    position: absolute;
+    top: 13px; right: 13px;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #00ff9d;
+    box-shadow: 0 0 0 2.5px rgba(0,255,157,0.12), 0 0 8px rgba(0,255,157,0.45);
+    transition: opacity 0.3s;
+    flex-shrink: 0;
+  }
+
+  /* ── LOADING / EMPTY ────────────────────────────── */
+  .nc-loading {
+    padding: 36px 0;
+    text-align: center;
+  }
+  .nc-spinner {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.07);
+    border-top-color: #00ff9d;
+    animation: nc-spin 0.75s linear infinite;
+    margin: 0 auto 12px;
+  }
+  .nc-loading p {
+    font-size: 12px;
+    color: rgba(255,255,255,0.25);
+  }
+
+  .nc-empty {
+    padding: 40px 16px;
+    text-align: center;
+  }
+  .nc-empty-icon { font-size: 28px; margin-bottom: 12px; opacity: 0.35; }
+  .nc-empty-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 4px;
+    letter-spacing: -0.02em;
+  }
+  .nc-empty-sub {
+    font-size: 12px;
+    color: rgba(255,255,255,0.2);
+    line-height: 1.5;
+  }
+
+  /* ── FOOTER ─────────────────────────────────────── */
+  .nc-footer {
+    position: relative; z-index: 2;
+    padding: 11px 18px;
+    border-top: 0.5px solid rgba(255,255,255,0.05);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .nc-footer-link {
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.2);
+    text-decoration: none;
+    letter-spacing: -0.01em;
+    transition: color 0.2s;
+  }
+  .nc-footer-link:hover { color: rgba(255,255,255,0.55); }
+  .nc-footer-count {
+    font-size: 10px;
+    color: rgba(255,255,255,0.14);
+    font-weight: 500;
+  }
+
+  /* ── TOAST WRAP ─────────────────────────────────── */
+  .nc-toast-wrap {
+    position: fixed;
+    top: 72px; right: 20px;
+    z-index: 9990;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+  }
+
+  /* ── TOAST ──────────────────────────────────────── */
+  .nc-toast {
+    pointer-events: all;
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+    padding: 13px 36px 13px 0;
+    border-radius: 16px;
+    background: rgba(9,12,16,0.96);
+    border: 0.5px solid rgba(255,255,255,0.09);
+    box-shadow:
+      0 0 0 0.5px rgba(0,0,0,0.85),
+      0 20px 50px rgba(0,0,0,0.6),
+      inset 0 1px 0 rgba(255,255,255,0.05);
+    max-width: 320px;
+    width: 320px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    animation: nc-toast-in 0.38s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  .nc-toast.out {
+    animation: nc-toast-out 0.25s ease forwards !important;
+  }
+
+  .nc-toast-accent {
+    width: 3px;
+    border-radius: 2px 0 0 2px;
+    align-self: stretch;
+    flex-shrink: 0;
+    margin: -13px 8px -13px 0;
+  }
+
+  .nc-toast-icon {
+    width: 34px; height: 34px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+
+  .nc-toast-body { flex: 1; min-width: 0; }
+  .nc-toast-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    margin-bottom: 2px;
+  }
+  .nc-toast-text {
+    font-size: 11.5px;
+    color: rgba(255,255,255,0.4);
+    line-height: 1.45;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .nc-toast-close {
+    position: absolute;
+    top: 9px; right: 10px;
+    width: 20px; height: 20px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.04);
+    border: none;
+    color: rgba(255,255,255,0.2);
+    cursor: pointer;
+    font-size: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: inherit;
+    transition: background 0.15s, color 0.15s;
+  }
+  .nc-toast-close:hover { background: rgba(255,255,255,0.09); color: #fff; }
+
+  .nc-toast-progress {
+    position: absolute;
+    bottom: 0; left: 0;
+    height: 2px;
+    border-radius: 0 2px 0 0;
+    animation: nc-progress 5s linear forwards;
+  }
+
+  /* ── KEYFRAMES ──────────────────────────────────── */
+  @keyframes nc-spin {
+    to { transform: rotate(360deg); }
+  }
+  @keyframes nc-badge-pulse {
+    0%, 100% { box-shadow: 0 0 0 2.5px var(--nc-page-bg, #070a0d), 0 0 0 0 rgba(0,255,157,0.4); }
+    50%       { box-shadow: 0 0 0 2.5px var(--nc-page-bg, #070a0d), 0 0 0 4px rgba(0,255,157,0); }
+  }
+  @keyframes nc-item-in {
+    from { opacity: 0; transform: translateY(-5px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes nc-toast-in {
+    from { opacity: 0; transform: translateX(20px) scale(0.96); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes nc-toast-out {
+    to { opacity: 0; transform: translateX(20px) scale(0.96); }
+  }
+  @keyframes nc-progress {
+    from { width: 100%; }
+    to   { width: 0%; }
+  }
 </style>
 
+<!-- ─────────────────────────────────────────────────
+     SCRIPT
+───────────────────────────────────────────────── -->
 <script define:vars={{ userId, supabaseUrl, supabaseKey }}>
 (function () {
-  /* ── CONFIG ─────────────────────────────────────────────────────────────── */
-  var ICON_MAP = {
-    welcome:         { bg:'rgba(0,255,157,0.1)',  border:'rgba(0,255,157,0.2)'  },
-    new_visit:       { bg:'rgba(56,189,248,0.1)', border:'rgba(56,189,248,0.2)' },
-    visit_milestone: { bg:'rgba(56,189,248,0.1)', border:'rgba(56,189,248,0.2)' },
-    click_milestone: { bg:'rgba(251,146,60,0.1)', border:'rgba(251,146,60,0.2)' },
-    roadmap_shipped: { bg:'rgba(0,255,157,0.1)',  border:'rgba(0,255,157,0.2)'  },
-    suggestion_ok:   { bg:'rgba(0,255,157,0.1)',  border:'rgba(0,255,157,0.2)'  },
-    suggestion_no:   { bg:'rgba(107,114,128,0.12)',border:'rgba(107,114,128,0.2)'},
-    upgrade_success: { bg:'rgba(167,139,250,0.1)', border:'rgba(167,139,250,0.2)'},
+  'use strict';
+
+  /* ── TYPE CONFIG ─────────────────────────────────── */
+  var TYPE_CONFIG = {
+    welcome:         { iconClass: 'nc-icon-green',  tagClass: 'nc-tag-green',  tagLabel: 'Bienvenue',  accentColor: '#00ff9d' },
+    new_visit:       { iconClass: 'nc-icon-blue',   tagClass: 'nc-tag-blue',   tagLabel: 'Visite',     accentColor: '#38bdf8' },
+    visit_milestone: { iconClass: 'nc-icon-blue',   tagClass: 'nc-tag-blue',   tagLabel: 'Analytics',  accentColor: '#38bdf8' },
+    click_milestone: { iconClass: 'nc-icon-orange', tagClass: 'nc-tag-orange', tagLabel: 'Clics',      accentColor: '#fb923c' },
+    roadmap_shipped: { iconClass: 'nc-icon-green',  tagClass: 'nc-tag-green',  tagLabel: 'Roadmap',    accentColor: '#00ff9d' },
+    suggestion_ok:   { iconClass: 'nc-icon-green',  tagClass: 'nc-tag-green',  tagLabel: 'Suggestion', accentColor: '#00ff9d' },
+    suggestion_no:   { iconClass: 'nc-icon-gray',   tagClass: null,            tagLabel: null,         accentColor: 'rgba(255,255,255,0.2)' },
+    upgrade_success: { iconClass: 'nc-icon-purple', tagClass: 'nc-tag-purple', tagLabel: 'Pro',        accentColor: '#a78bfa' },
   };
+  var DEFAULT_CONFIG = { iconClass: 'nc-icon-gray', tagClass: null, tagLabel: null, accentColor: 'rgba(255,255,255,0.18)' };
 
-  /* ── STATE ──────────────────────────────────────────────────────────────── */
-  var allNotifs  = [];
-  var filter     = 'all';
-  var panelOpen  = false;
+  /* ── STATE ───────────────────────────────────────── */
+  var allNotifs = [];
+  var filter    = 'all';
+  var panelOpen = false;
 
-  /* ── DOM refs ───────────────────────────────────────────────────────────── */
+  /* ── DOM ─────────────────────────────────────────── */
   var bell        = document.getElementById('notif-bell');
   var badge       = document.getElementById('notif-badge');
   var panel       = document.getElementById('notif-panel');
@@ -225,19 +625,39 @@ const { userId, supabaseUrl, supabaseKey } = Astro.props;
   var closeBtn    = document.getElementById('notif-close');
   var readAllBtn  = document.getElementById('notif-read-all');
   var headerCount = document.getElementById('notif-header-count');
+  var footerCount = document.getElementById('notif-footer-count');
+  var tabsEl      = document.getElementById('notif-tabs');
+  var slider      = document.getElementById('notif-tab-slider');
   var toastWrap   = document.getElementById('notif-toast-wrap');
 
   if (!bell || !panel) return;
 
-  /* ── HELPERS ─────────────────────────────────────────────────────────────── */
+  /* ── HELPERS ─────────────────────────────────────── */
+  function esc(s) {
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
   function timeAgo(iso) {
     var diff = (Date.now() - new Date(iso).getTime()) / 1000;
-    if (diff < 60)   return 'À l\'instant';
-    if (diff < 3600) return Math.floor(diff / 60) + ' min';
-    if (diff < 86400)return Math.floor(diff / 3600) + 'h';
+    if (diff < 60)    return 'À l\'instant';
+    if (diff < 3600)  return Math.floor(diff / 60) + ' min';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h';
     return Math.floor(diff / 86400) + 'j';
   }
 
+  function isSameDay(a, b) {
+    var da = new Date(a), db = new Date(b);
+    return da.toDateString() === db.toDateString();
+  }
+
+  function isThisWeek(iso) {
+    var diff = (Date.now() - new Date(iso).getTime()) / (1000 * 86400);
+    return diff <= 7;
+  }
+
+  /* ── BADGE ───────────────────────────────────────── */
   function updateBadge(count) {
     if (count > 0) {
       badge.textContent = count > 99 ? '99+' : String(count);
@@ -245,13 +665,35 @@ const { userId, supabaseUrl, supabaseKey } = Astro.props;
       headerCount.textContent = String(count);
       headerCount.style.display = 'inline-flex';
     } else {
-      badge.style.display = 'none';
+      badge.style.transition = 'transform 0.2s, opacity 0.2s';
+      badge.style.transform  = 'scale(0)';
+      badge.style.opacity    = '0';
+      setTimeout(function () { badge.style.display = 'none'; }, 220);
       headerCount.style.display = 'none';
+    }
+
+    // Footer count
+    if (footerCount) {
+      var total = allNotifs.length;
+      footerCount.textContent = total > 0 ? total + ' notification' + (total > 1 ? 's' : '') : '';
     }
   }
 
-  /* ── RENDER LIST ─────────────────────────────────────────────────────────── */
+  /* ── TAB SLIDER ──────────────────────────────────── */
+  function positionSlider(activeTab) {
+    if (!slider || !tabsEl || !activeTab) return;
+    var tr = activeTab.getBoundingClientRect();
+    var pr = tabsEl.getBoundingClientRect();
+    slider.style.left   = (tr.left - pr.left) + 'px';
+    slider.style.top    = (tr.top  - pr.top)  + 'px';
+    slider.style.width  = tr.width  + 'px';
+    slider.style.height = tr.height + 'px';
+  }
+
+  /* ── RENDER ──────────────────────────────────────── */
   function renderList() {
+    var now = new Date();
+
     var filtered = allNotifs.filter(function (n) {
       if (filter === 'unread')  return !n.is_read;
       if (filter === 'roadmap') return n.type === 'roadmap_shipped' || n.type === 'suggestion_ok' || n.type === 'suggestion_no';
@@ -262,51 +704,66 @@ const { userId, supabaseUrl, supabaseKey } = Astro.props;
 
     if (!filtered.length) {
       empty.style.display = 'block';
-      // clear previous items
-      var old = list.querySelectorAll('.notif-item');
-      old.forEach(function (el) { el.remove(); });
+      list.querySelectorAll('.nc-item, .nc-section, .nc-divider').forEach(function (el) { el.remove(); });
       return;
     }
     empty.style.display = 'none';
 
-    var existingIds = {};
-    list.querySelectorAll('.notif-item').forEach(function (el) {
-      existingIds[el.dataset.id] = true;
-    });
+    // Full re-render on filter change — simpler and reliable
+    list.querySelectorAll('.nc-item, .nc-section, .nc-divider').forEach(function (el) { el.remove(); });
 
-    // Remove stale items
-    list.querySelectorAll('.notif-item').forEach(function (el) {
-      if (!filtered.find(function (n) { return String(n.id) === el.dataset.id; })) {
-        el.remove();
-      }
-    });
+    var shownToday = false;
+    var shownWeek  = false;
+    var shownOlder = false;
 
     filtered.forEach(function (n, idx) {
-      if (existingIds[String(n.id)]) {
-        // Update read state
-        var el = list.querySelector('[data-id="' + n.id + '"]');
-        if (el) {
-          if (n.is_read) el.classList.remove('unread');
-          var dot = el.querySelector('.notif-dot');
-          if (dot) dot.style.display = n.is_read ? 'none' : 'block';
-          el.querySelector('.notif-time').textContent = timeAgo(n.created_at);
-        }
-        return;
+      var isToday = isSameDay(n.created_at, now);
+      var isWeek  = !isToday && isThisWeek(n.created_at);
+
+      // Section labels
+      if (isToday && !shownToday) {
+        shownToday = true;
+        var sec = document.createElement('div');
+        sec.className = 'nc-section';
+        sec.textContent = 'Aujourd\'hui';
+        list.insertBefore(sec, empty);
+      } else if (isWeek && !shownWeek) {
+        shownWeek = true;
+        var div = document.createElement('div');
+        div.className = 'nc-divider';
+        list.insertBefore(div, empty);
+        var sec2 = document.createElement('div');
+        sec2.className = 'nc-section';
+        sec2.textContent = 'Cette semaine';
+        list.insertBefore(sec2, empty);
+      } else if (!isToday && !isWeek && !shownOlder) {
+        shownOlder = true;
+        var div2 = document.createElement('div');
+        div2.className = 'nc-divider';
+        list.insertBefore(div2, empty);
+        var sec3 = document.createElement('div');
+        sec3.className = 'nc-section';
+        sec3.textContent = 'Plus ancien';
+        list.insertBefore(sec3, empty);
       }
-      var colors = ICON_MAP[n.type] || { bg:'rgba(255,255,255,0.06)', border:'rgba(255,255,255,0.1)' };
+
+      var cfg = TYPE_CONFIG[n.type] || DEFAULT_CONFIG;
       var item = document.createElement('div');
-      item.className = 'notif-item' + (n.is_read ? '' : ' unread');
-      item.dataset.id   = String(n.id);
-      item.style.animationDelay = (idx * 30) + 'ms';
+      item.className = 'nc-item' + (n.is_read ? '' : ' unread');
+      item.dataset.id = String(n.id);
+      item.style.animationDelay = Math.min(idx * 35, 200) + 'ms';
 
       item.innerHTML =
-        '<div class="notif-icon" style="background:' + colors.bg + ';border:1px solid ' + colors.border + '">' + (n.icon || '✦') + '</div>' +
-        '<div style="flex:1;min-width:0">' +
-          '<div class="notif-title">' + escHtml(n.title) + '</div>' +
-          (n.body ? '<div class="notif-body">' + escHtml(n.body) + '</div>' : '') +
-          '<div class="notif-time">' + timeAgo(n.created_at) + '</div>' +
+        '<div class="nc-item-icon ' + cfg.iconClass + '">' + esc(n.icon || '✦') + '</div>' +
+        '<div class="nc-item-content">' +
+          '<div class="nc-item-title' + (n.is_read ? ' read' : '') + '">' + esc(n.title) + '</div>' +
+          (n.body ? '<div class="nc-item-body">' + esc(n.body) + '</div>' : '') +
+          '<div class="nc-item-meta">' +
+            '<span class="nc-item-time">' + timeAgo(n.created_at) + '</span>' +
+            (cfg.tagLabel ? '<span class="nc-item-tag ' + cfg.tagClass + '">' + cfg.tagLabel + '</span>' : '') +
+          '</div>' +
         '</div>' +
-        (!n.is_read ? '<div class="notif-dot"></div>' : '');
+        (!n.is_read ? '<div class="nc-unread-dot"></div>' : '');
 
       item.addEventListener('click', function () {
         markRead(n.id);
@@ -314,26 +771,15 @@ const { userId, supabaseUrl, supabaseKey } = Astro.props;
         else closePanel();
       });
 
-      // Insert in correct position
-      var allItems = list.querySelectorAll('.notif-item');
-      var before = null;
-      for (var i = 0; i < allItems.length; i++) {
-        var other = filtered.find(function (x) { return String(x.id) === allItems[i].dataset.id; });
-        if (other && filtered.indexOf(other) > idx) { before = allItems[i]; break; }
-      }
-      if (before) list.insertBefore(item, before);
-      else list.insertBefore(item, empty);
+      list.insertBefore(item, empty);
     });
   }
 
-  function escHtml(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
-  /* ── FETCH ───────────────────────────────────────────────────────────────── */
+  /* ── FETCH ───────────────────────────────────────── */
   async function fetchNotifs() {
     try {
       var r = await fetch('/api/notifications');
+      if (!r.ok) return;
       var d = await r.json();
       if (d.success) {
         allNotifs = d.data.notifications || [];
@@ -343,14 +789,24 @@ const { userId, supabaseUrl, supabaseKey } = Astro.props;
     } catch (_) {}
   }
 
-  /* ── MARK READ ───────────────────────────────────────────────────────────── */
+  /* ── MARK READ ───────────────────────────────────── */
   async function markRead(id) {
     var n = allNotifs.find(function (x) { return x.id === id; });
-    if (n && n.is_read) return;
-    if (n) n.is_read = true;
-    var unread = allNotifs.filter(function (x) { return !x.is_read; }).length;
-    updateBadge(unread);
-    renderList();
+    if (!n || n.is_read) return;
+    n.is_read = true;
+
+    // Animate dot out
+    var el = list.querySelector('[data-id="' + id + '"]');
+    if (el) {
+      el.classList.remove('unread');
+      var dot = el.querySelector('.nc-unread-dot');
+      if (dot) { dot.style.opacity = '0'; setTimeout(function () { dot.remove(); }, 300); }
+      var title = el.querySelector('.nc-item-title');
+      if (title) title.classList.add('read');
+    }
+
+    updateBadge(allNotifs.filter(function (x) { return !x.is_read; }).length);
+
     try {
       await fetch('/api/notifications/read', {
         method: 'PATCH',
@@ -365,45 +821,67 @@ const { userId, supabaseUrl, supabaseKey } = Astro.props;
     updateBadge(0);
     renderList();
     try {
-      await fetch('/api/notifications/read', { method: 'PATCH', headers: { 'Content-Type': 'application/json' } });
+      await fetch('/api/notifications/read', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+      });
     } catch (_) {}
   }
 
-  /* ── REALTIME TOAST ──────────────────────────────────────────────────────── */
+  /* ── TOAST ───────────────────────────────────────── */
   function showToast(notif) {
+    var cfg   = TYPE_CONFIG[notif.type] || DEFAULT_CONFIG;
     var toast = document.createElement('div');
-    toast.className = 'ntoast';
-    toast.innerHTML =
-      '<div class="ntoast-icon">' + (notif.icon || '✦') + '</div>' +
-      '<div><div class="ntoast-title">' + escHtml(notif.title) + '</div>' +
-        (notif.body ? '<div class="ntoast-body">' + escHtml(notif.body.slice(0, 70)) + (notif.body.length > 70 ? '…' : '') + '</div>' : '') +
-      '</div>';
+    toast.className = 'nc-toast';
 
-    toast.addEventListener('click', function () {
+    toast.innerHTML =
+      '<div class="nc-toast-accent" style="background:' + cfg.accentColor + ';box-shadow:0 0 8px ' + cfg.accentColor + '55"></div>' +
+      '<div class="nc-toast-icon ' + cfg.iconClass + '" style="background:' + cfg.accentColor + '18;box-shadow:0 0 0 0.5px ' + cfg.accentColor + '30">' +
+        esc(notif.icon || '✦') +
+      '</div>' +
+      '<div class="nc-toast-body">' +
+        '<div class="nc-toast-title">' + esc(notif.title) + '</div>' +
+        (notif.body ? '<div class="nc-toast-text">' + esc(notif.body.slice(0, 72)) + (notif.body.length > 72 ? '…' : '') + '</div>' : '') +
+      '</div>' +
+      '<button class="nc-toast-close" aria-label="Fermer">✕</button>' +
+      '<div class="nc-toast-progress" style="background:' + cfg.accentColor + ';box-shadow:0 0 6px ' + cfg.accentColor + '80"></div>';
+
+    toast.addEventListener('click', function (e) {
+      if (e.target.classList.contains('nc-toast-close')) return;
       dismissToast(toast);
       markRead(notif.id);
       if (notif.href) window.location.href = notif.href;
     });
-    toastWrap.appendChild(toast);
 
-    // Auto-dismiss after 5s
+    toast.querySelector('.nc-toast-close').addEventListener('click', function () {
+      dismissToast(toast);
+    });
+
+    toastWrap.appendChild(toast);
     setTimeout(function () { dismissToast(toast); }, 5000);
   }
 
   function dismissToast(toast) {
+    if (!toast.parentNode) return;
     toast.classList.add('out');
-    setTimeout(function () { toast.remove(); }, 280);
+    setTimeout(function () { toast.remove(); }, 260);
   }
 
-  /* ── PANEL OPEN/CLOSE ────────────────────────────────────────────────────── */
+  /* ── PANEL ───────────────────────────────────────── */
   function openPanel() {
     panelOpen = true;
     panel.style.display = 'block';
     bell.setAttribute('aria-expanded', 'true');
     requestAnimationFrame(function () {
-      panel.style.opacity   = '1';
-      panel.style.transform = 'translateY(0) scale(1)';
+      requestAnimationFrame(function () {
+        panel.style.opacity   = '1';
+        panel.style.transform = 'translateY(0) scale(1)';
+      });
     });
+    // Position slider on visible tabs
+    setTimeout(function () {
+      positionSlider(tabsEl.querySelector('.nc-tab.active'));
+    }, 20);
     fetchNotifs();
   }
 
@@ -412,26 +890,23 @@ const { userId, supabaseUrl, supabaseKey } = Astro.props;
     bell.setAttribute('aria-expanded', 'false');
     panel.style.opacity   = '0';
     panel.style.transform = 'translateY(-10px) scale(0.97)';
-    setTimeout(function () { panel.style.display = 'none'; }, 260);
+    setTimeout(function () {
+      if (!panelOpen) panel.style.display = 'none';
+    }, 260);
   }
 
-  /* ── FILTER TABS ─────────────────────────────────────────────────────────── */
-  document.querySelectorAll('.notif-tab').forEach(function (btn) {
+  /* ── TABS ────────────────────────────────────────── */
+  tabsEl.querySelectorAll('.nc-tab').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      document.querySelectorAll('.notif-tab').forEach(function (b) {
-        b.classList.remove('active');
-        b.style.background = 'transparent';
-        b.style.color = 'rgba(255,255,255,0.4)';
-      });
+      tabsEl.querySelectorAll('.nc-tab').forEach(function (b) { b.classList.remove('active'); });
       btn.classList.add('active');
-      btn.style.background = 'rgba(255,255,255,0.08)';
-      btn.style.color = '#fff';
+      positionSlider(btn);
       filter = btn.dataset.filter;
       renderList();
     });
   });
 
-  /* ── LISTENERS ───────────────────────────────────────────────────────────── */
+  /* ── LISTENERS ───────────────────────────────────── */
   bell.addEventListener('click', function (e) {
     e.stopPropagation();
     panelOpen ? closePanel() : openPanel();
@@ -447,32 +922,22 @@ const { userId, supabaseUrl, supabaseKey } = Astro.props;
     if (e.key === 'Escape' && panelOpen) closePanel();
   });
 
-  /* ── SUPABASE REALTIME ───────────────────────────────────────────────────── */
+  /* ── SUPABASE REALTIME ───────────────────────────── */
   function initRealtime() {
-    if (typeof window === 'undefined') return;
-    // Import Supabase client dynamically
     var script = document.createElement('script');
     script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
     script.onload = function () {
       var client = window.supabase.createClient(supabaseUrl, supabaseKey);
-
       client
         .channel('notifications:' + userId)
         .on(
           'postgres_changes',
-          {
-            event:  'INSERT',
-            schema: 'public',
-            table:  'notifications',
-            filter: 'user_id=eq.' + userId,
-          },
+          { event: 'INSERT', schema: 'public', table: 'notifications', filter: 'user_id=eq.' + userId },
           function (payload) {
             var notif = payload.new;
-            // Prepend to list
             allNotifs.unshift(notif);
             var unread = allNotifs.filter(function (x) { return !x.is_read; }).length;
             updateBadge(unread);
-            // Show in-app toast si panel fermé
             if (!panelOpen) showToast(notif);
             else renderList();
           }
@@ -482,10 +947,10 @@ const { userId, supabaseUrl, supabaseKey } = Astro.props;
     document.head.appendChild(script);
   }
 
-  /* ── INIT ────────────────────────────────────────────────────────────────── */
-  // Fetch initial au load
+  /* ── INIT ────────────────────────────────────────── */
   fetchNotifs();
-  // Refresh badge count toutes les 60s (fallback si realtime down)
+
+  // Fallback refresh badge every 60s
   setInterval(function () {
     if (!panelOpen) {
       fetch('/api/notifications')
@@ -494,7 +959,7 @@ const { userId, supabaseUrl, supabaseKey } = Astro.props;
         .catch(function () {});
     }
   }, 60000);
-  // Démarrer Realtime
+
   initRealtime();
 })();
 </script>
