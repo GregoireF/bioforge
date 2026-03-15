@@ -407,6 +407,29 @@ const heatmapBlocks = blocks.map((b, i) => {
   return { id: b.id, title: b.title || 'Untitled', type: b.type, clicks, intensity, position: i + 1, active: b.active };
 });
 
+
+// ── v8: COHORT ANALYSIS ──────────────────────────────────────────────────────
+const cohortWeeks: { week: string; views: number; retention: number }[] = [];
+if (sortedDates.length >= 7) {
+  const weekSize = 7;
+  const numWeeks = Math.min(4, Math.floor(sortedDates.length / weekSize));
+  for (let w = 0; w < numWeeks; w++) {
+    const weekDates = sortedDates.slice(w * weekSize, (w + 1) * weekSize);
+    const weekViews = weekDates.reduce((s, d) => s + (viewsByDate.get(d) ?? 0), 0);
+    const baseViews = cohortWeeks[0]?.views ?? weekViews;
+    const retention = baseViews > 0 ? Math.round((weekViews / baseViews) * 100) : 100;
+    const weekLabel = `S${numWeeks - w} (${weekDates[0]?.slice(5) ?? ''})`;
+    cohortWeeks.unshift({ week: weekLabel, views: weekViews, retention });
+  }
+}
+// ── v8: COMPARE PREV PERIOD ───────────────────────────────────────────────────
+const comparePrev: number[] = (() => {
+  if (prevViews <= 0 || chartViews.length === 0) return chartViews.map(() => 0);
+  const avgPrev = prevViews  / chartViews.length;
+  const avgCurr = summary.totalViews / Math.max(chartViews.length, 1);
+  return chartViews.map(v => avgCurr > 0 ? Math.round((v / avgCurr) * avgPrev) : 0);
+})();
+
 const exportedChart    = { labels: chartLabels, views: chartViews, clicks: chartClicks, rates: chartRates };
 const exportedDevices  = deviceData;
 const exportedDays     = days;
@@ -490,6 +513,9 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
 ---
 
 <DashboardLayout title="Analytics">
+
+<meta name="sb-url" content={import.meta.env.PUBLIC_SUPABASE_URL} slot="head" />
+<meta name="sb-key" content={import.meta.env.PUBLIC_SUPABASE_ANON_KEY} slot="head" />
 
 <style>
   @keyframes countUp   { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
@@ -582,6 +608,23 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
   /* ── v7: Sort btn ── */
   .sort-btn.active { color:#00ff9d; }
 
+  /* ── v8: Micro-interactions ── */
+  @keyframes slideInLeft { from{opacity:0;transform:translateX(-10px)} to{opacity:1;transform:translateX(0)} }
+  @keyframes springBar   { 0%{transform:scaleX(0)} 70%{transform:scaleX(1.04)} 100%{transform:scaleX(1)} }
+  @keyframes typewriter  { from{width:0} to{width:100%} }
+  @keyframes blink       { 0%,100%{opacity:1} 50%{opacity:0} }
+  @keyframes liveSlide   { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+  .kpi-card { transition:transform .2s cubic-bezier(.22,1,.36,1),box-shadow .2s; }
+  .kpi-card:hover { transform:translateY(-2px); box-shadow:0 8px 32px rgba(0,0,0,.4); }
+  .live-entry  { animation:liveSlide .3s cubic-bezier(.22,1,.36,1) both; }
+  .ai-cursor::after { content:'▋'; animation:blink .8s step-end infinite; margin-left:2px; font-size:.8em; }
+  .compare-btn.active { background:rgba(56,189,248,.12); color:#38bdf8; border-color:rgba(56,189,248,.3); }
+  .cohort-bar-fill { height:100%; border-radius:4px; background:linear-gradient(90deg,rgba(0,255,157,.6),rgba(0,255,157,.2)); transition:width .7s cubic-bezier(.16,1,.3,1); }
+  .section-label { font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:rgba(255,255,255,.25); }
+  .stagger-1{animation-delay:.04s} .stagger-2{animation-delay:.08s} .stagger-3{animation-delay:.12s}
+  .stagger-4{animation-delay:.16s} .stagger-5{animation-delay:.20s} .stagger-6{animation-delay:.24s}
+  /* chart glow cursor */
+  .chart-glow { position:absolute; width:180px; height:180px; border-radius:50%; background:radial-gradient(circle,rgba(0,255,157,.05) 0%,transparent 70%); pointer-events:none; transform:translate(-50%,-50%); opacity:0; transition:opacity .15s; }
   /* @media print */
   @media print {
     @page { margin:16mm; size:A4; }
@@ -777,6 +820,33 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
         </div>
       </div>
 
+
+      <!-- v8: AI REPORT -->
+      <div class="p-5 glass rounded-2xl border border-white/8">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+              Rapport IA
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background:rgba(168,85,247,.12);color:#c084fc;border:.5px solid rgba(168,85,247,.3)">Claude</span>
+            </h3>
+            <p class="text-xs text-gray-500 mt-0.5">Résumé de la période · généré par IA</p>
+          </div>
+          <button id="ai-report-btn"
+            class="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all"
+            style="background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.3);color:#c084fc;hover:opacity:80%">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            Générer le rapport
+          </button>
+        </div>
+        <div id="ai-report-panel" class="hidden">
+          <div class="h-px bg-white/6 mb-4"></div>
+          <div id="ai-report-content" class="space-y-3 text-sm text-gray-300 leading-relaxed"></div>
+          <p class="text-xs text-gray-700 mt-4">Généré par Claude Sonnet · basé sur tes métriques uniquement</p>
+        </div>
+      </div>
+
       <!-- Funnel -->
       <div class="p-5 glass rounded-2xl border border-white/8">
         <h3 class="text-sm font-semibold text-white mb-5">Funnel de conversion <span class="text-gray-600 font-normal text-xs ml-1">· {days}j</span></h3>
@@ -886,7 +956,10 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
       <div class="bento bento-main">
         <div class="p-5 glass rounded-2xl border border-white/8">
           <div class="flex items-center justify-between mb-4">
-            <div><h3 class="text-sm font-semibold text-white">Trafic</h3><p class="text-xs text-gray-500 mt-0.5">· {days}j</p></div>
+            <div class="flex items-center gap-3">
+              <div><h3 class="text-sm font-semibold text-white">Trafic</h3><p class="text-xs text-gray-500 mt-0.5">· {days}j</p></div>
+              <button id="compare-btn" class="compare-btn text-xs px-2.5 py-1 rounded-lg border border-white/10 text-gray-500 hover:text-gray-300 transition-all">⊕ Comparer</button>
+            </div>
             <div class="flex items-center gap-1" id="metric-toggle">
               <button class="metric-btn active text-xs px-2.5 py-1 rounded-lg border border-white/10 text-gray-400" data-metric="both">Tout</button>
               <button class="metric-btn text-xs px-2.5 py-1 rounded-lg border border-white/10 text-gray-400" data-metric="views">Vues</button>
@@ -935,7 +1008,25 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
               <canvas id="rate-chart" style="max-height:80px;width:100%"></canvas>
             </div>
           )}
-          <!-- v7: Scroll depth + bounce -->
+    
+      <!-- v8: LIVE FEED -->
+      <div class="p-5 glass rounded-2xl border border-white/8">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+              Live feed
+              <span class="live-dot live-ring w-2 h-2 rounded-full bg-neon-green inline-block" style="box-shadow:0 0 0 0 rgba(0,255,157,.4)"></span>
+            </h3>
+            <p class="text-xs text-gray-500 mt-0.5">Visiteurs en temps réel via Realtime</p>
+          </div>
+          <span id="live-count" class="text-xs font-semibold text-neon-green tabular-nums"></span>
+        </div>
+        <div id="live-feed-list" class="space-y-1.5 max-h-48 overflow-y-auto scrollbar-none">
+          <p class="text-xs text-gray-700 text-center py-4">Connexion en cours…</p>
+        </div>
+      </div>
+
+      <!-- v7: Scroll depth + bounce -->
           <div class="p-4 glass rounded-xl border border-white/8">
             <div class="flex items-center justify-between mb-2">
               <span class="text-xs text-gray-500">Scroll depth</span>
@@ -975,6 +1066,45 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
         </div>
         <!-- Stacked bar new vs returning per day -->
         <canvas id="retention-chart" style="max-height:120px;width:100%"></canvas>
+      </div>
+
+
+      <!-- v8: COHORT ANALYSIS -->
+      <div class="p-5 glass rounded-2xl border border-white/8">
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <h3 class="text-sm font-semibold text-white">Cohort Analysis</h3>
+            <p class="text-xs text-gray-500 mt-0.5">Rétention semaine par semaine</p>
+          </div>
+        </div>
+        {cohortWeeks.length < 2 ? (
+          <p class="text-sm text-gray-700 text-center py-6">Pas assez de données (min 14 jours)</p>
+        ) : (
+          <div class="space-y-3">
+            {cohortWeeks.map((cw, i) => {
+              const isBase = i === 0;
+              const color  = cw.retention >= 80 ? '#00ff9d' : cw.retention >= 50 ? '#f59e0b' : '#f87171';
+              return (
+                <div class="flex items-center gap-3">
+                  <span class="text-xs text-gray-500 font-mono w-20 shrink-0">{cw.week}</span>
+                  <div class="flex-1 bg-white/4 rounded-lg overflow-hidden" style="height:20px">
+                    <div class="cohort-bar-fill h-full" style={`width:${cw.retention}%;background:linear-gradient(90deg,${color}55,${color}22)`}></div>
+                  </div>
+                  <span class="text-xs font-bold tabular-nums w-10 text-right" style={`color:${color}`}>{cw.retention}%</span>
+                  <span class="text-xs text-gray-700 tabular-nums w-16 text-right">{cw.views.toLocaleString('fr-FR')}</span>
+                  {isBase && <span class="text-xs text-gray-700 shrink-0">base</span>}
+                  {!isBase && <span class="text-xs shrink-0 w-8 text-right" style={`color:${color}`}>{cw.retention >= 100 ? '↑' : cw.retention >= 70 ? '→' : '↓'}</span>}
+                </div>
+              );
+            })}
+            <div class="flex items-center gap-3 pt-3 border-t border-white/6 text-xs text-gray-700">
+              <span class="w-20 shrink-0">Légende :</span>
+              <span style="color:#00ff9d">≥80% excellent</span>
+              <span style="color:#f59e0b">50–79% correct</span>
+              <span style="color:#f87171">&lt;50% faible</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <!-- Carte + Sources (tabs internes) -->
@@ -1453,7 +1583,10 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
       data-goals-clicks={String(summary.totalClicks)}
       data-goals-leads={String(leads)}
       data-goals-revenue={String(revenue)}
-      data-retention={JSON.stringify(retentionData)}>
+      data-retention={JSON.stringify(retentionData)}
+      data-cohorts={JSON.stringify(cohortWeeks)}
+      data-compare={JSON.stringify(comparePrev)}
+      data-profile-id={profileId}>
     </div>
   </div>
 
@@ -1466,21 +1599,22 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
       const exportedDays     = Number(el.dataset.days ?? 7);
       const isPro            = el.dataset.isPro === 'true';
       const retentionData    = JSON.parse(el.dataset.retention ?? '[]');
+      const cohortData       = JSON.parse(el.dataset.cohorts  ?? '[]');
+      const comparePrev      = JSON.parse(el.dataset.compare  ?? '[]');
 
-      // ── Skeleton loaders while Chart.js loads ────────────────────────────
+      // ── Skeleton loaders ─────────────────────────────────────────────────
       ['traffic-chart','rate-chart','roas-chart','retention-chart'].forEach(id => {
         const c = document.getElementById(id);
         if (!c) return;
         c.style.display = 'none';
         const sk = document.createElement('div');
-        const h  = id === 'rate-chart' ? '80px' : (id === 'roas-chart' || id === 'retention-chart') ? '110px' : '248px';
-        sk.className  = 'skeleton';
-        sk.style.cssText = `height:${h};width:100%;border-radius:12px`;
+        sk.className = 'skeleton';
+        sk.style.cssText = `height:${id==='rate-chart'?'80px':id==='roas-chart'||id==='retention-chart'?'110px':'248px'};width:100%;border-radius:12px`;
         c.parentNode.insertBefore(sk, c);
         c._skeleton = sk;
       });
 
-      // ── Chart.js ─────────────────────────────────────────────────────────
+      // ── Chart.js ────────────────────────────────────────────────────────
       await new Promise((resolve, reject) => {
         if (typeof Chart !== 'undefined') { resolve(null); return; }
         const s = document.createElement('script');
@@ -1488,155 +1622,118 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
         s.onload = resolve; s.onerror = reject;
         document.head.appendChild(s);
       });
-
-      // Remove skeletons
       document.querySelectorAll('canvas').forEach(c => {
         if (c._skeleton) { c._skeleton.remove(); c.style.display = ''; }
       });
 
       Chart.defaults.font.family = 'DM Sans, system-ui, sans-serif';
-
-      // ── Shared helpers ────────────────────────────────────────────────────
       const GRID_C = 'rgba(255,255,255,0.03)';
       const GREEN  = '#00ff9d';
       const PURPLE = '#bf00ff';
       const BLUE   = '#38bdf8';
       const AMBER  = '#f59e0b';
 
-      function makeGrad(ctx, color, alphaTop = 0.22, alphaBot = 0.00) {
+      function makeGrad(ctx, color, alphaTop = 0.22) {
         const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height);
         g.addColorStop(0,   color + Math.round(alphaTop * 255).toString(16).padStart(2,'0'));
-        g.addColorStop(0.6, color + Math.round((alphaTop * 0.3) * 255).toString(16).padStart(2,'0'));
-        g.addColorStop(1,   color + Math.round(alphaBot * 255).toString(16).padStart(2,'0'));
+        g.addColorStop(0.6, color + Math.round(alphaTop * 0.3 * 255).toString(16).padStart(2,'0'));
+        g.addColorStop(1,   '00000000');
         return g;
       }
 
       const TOOLTIP_BASE = {
-        backgroundColor: '#0d1117',
-        titleColor:      '#e6edf3',
-        bodyColor:       '#8b949e',
-        borderColor:     'rgba(0,255,157,0.18)',
-        borderWidth:     1,
-        padding:         14,
-        cornerRadius:    10,
-        displayColors:   true,
-        boxWidth:        8,
-        boxHeight:       8,
-        boxPadding:      5,
-        usePointStyle:   true,
-        titleFont:       { size: 11, weight: '600' },
-        bodyFont:        { size: 11 },
+        backgroundColor:'#0d1117', titleColor:'#e6edf3', bodyColor:'#8b949e',
+        borderColor:'rgba(0,255,157,0.18)', borderWidth:1, padding:14, cornerRadius:10,
+        displayColors:true, boxWidth:8, boxHeight:8, boxPadding:5, usePointStyle:true,
+        titleFont:{size:11,weight:'600'}, bodyFont:{size:11},
       };
+      const SCALE_Y = { beginAtZero:true, grid:{color:GRID_C,drawBorder:false}, border:{display:false}, ticks:{color:'#484f58',font:{size:10},maxTicksLimit:4,padding:6} };
+      const SCALE_X = { grid:{display:false}, border:{display:false}, ticks:{color:'#484f58',font:{size:10},maxRotation:0} };
+      const SCALE_X_HIDE = { display:false, grid:{display:false}, border:{display:false} };
 
-      const SCALE_Y = {
-        beginAtZero: true,
-        grid:        { color: GRID_C, drawBorder: false },
-        border:      { display: false },
-        ticks:       { color: '#484f58', font: { size: 10 }, maxTicksLimit: 4, padding: 6 },
-      };
-      const SCALE_X_HIDE = {
-        display: false, grid: { display: false }, border: { display: false },
-      };
-      const SCALE_X = {
-        grid:   { display: false },
-        border: { display: false },
-        ticks:  { color: '#484f58', font: { size: 10 }, maxRotation: 0 },
-      };
-
-      // ── TRAFFIC CHART (premium) ───────────────────────────────────────────
+      // ── TRAFFIC CHART (with compare overlay) ─────────────────────────────
       let trafficChart = null;
+      let compareMode  = false;
       const trafficCtx = document.getElementById('traffic-chart');
 
       function buildTrafficChart(mode) {
         if (trafficChart) trafficChart.destroy();
         if (!trafficCtx || !exportedChart.labels?.length) return;
 
-        const isCTR = mode === 'ctr', isViews = mode === 'views' || mode === 'both', isClicks = mode === 'clicks' || mode === 'both';
+        const isCTR    = mode === 'ctr';
+        const isViews  = mode === 'views'  || mode === 'both';
+        const isClicks = mode === 'clicks' || mode === 'both';
+
+        const viewsAvg    = exportedChart.views.reduce((a,b)=>a+b,0)  / Math.max(exportedChart.views.length,1);
+        const peakViewIdx = exportedChart.views.indexOf(Math.max(...exportedChart.views));
+
         const datasets = [];
-
-        // Compute annotations
-        const viewsAvg  = exportedChart.views.length  ? Math.round(exportedChart.views.reduce((a,b)=>a+b,0)  / exportedChart.views.length)  : 0;
-        const clicksAvg = exportedChart.clicks.length ? Math.round(exportedChart.clicks.reduce((a,b)=>a+b,0) / exportedChart.clicks.length) : 0;
-        const peakViewIdx  = exportedChart.views.indexOf(Math.max(...exportedChart.views));
-        const peakClickIdx = exportedChart.clicks.indexOf(Math.max(...exportedChart.clicks));
-
-        if (isViews && !isCTR) datasets.push({
-          label: 'Vues', data: exportedChart.views, borderColor: GREEN,
-          backgroundColor: ctx => makeGrad(ctx, GREEN, 0.18, 0),
-          borderWidth: 2, tension: 0.42, fill: true,
-          pointRadius: exportedChart.views.map((_, i) => i === peakViewIdx ? 5 : 0),
-          pointHoverRadius: 5, pointBackgroundColor: GREEN, pointBorderColor: '#0d1117', pointBorderWidth: 2,
-          pointHoverBackgroundColor: GREEN, pointHoverBorderColor: '#0d1117', pointHoverBorderWidth: 2,
-          shadowOffsetX: 0, shadowOffsetY: 3, shadowBlur: 12, shadowColor: GREEN + '50',
+        if (isViews && !isCTR) {
+          datasets.push({ label:'Vues', data:exportedChart.views, borderColor:GREEN,
+            backgroundColor:ctx=>makeGrad(ctx,GREEN,0.18), borderWidth:2, tension:0.42, fill:true,
+            pointRadius:exportedChart.views.map((_,i)=>i===peakViewIdx?5:0),
+            pointHoverRadius:5, pointBackgroundColor:GREEN, pointBorderColor:'#0d1117', pointBorderWidth:2,
+            pointHoverBackgroundColor:GREEN, pointHoverBorderColor:'#0d1117', pointHoverBorderWidth:2,
+          });
+          if (compareMode && comparePrev.length > 0) {
+            datasets.push({ label:'Vues (période préc.)', data:comparePrev, borderColor:GREEN+'66',
+              backgroundColor:'transparent', borderWidth:1.5, tension:0.42, fill:false,
+              borderDash:[5,4], pointRadius:0, pointHoverRadius:4,
+              pointHoverBackgroundColor:GREEN+'88', pointHoverBorderColor:'#0d1117', pointHoverBorderWidth:1,
+            });
+          }
+        }
+        if (isClicks && !isCTR) datasets.push({ label:'Clics', data:exportedChart.clicks, borderColor:PURPLE,
+          backgroundColor:ctx=>makeGrad(ctx,PURPLE,0.15), borderWidth:2, tension:0.42, fill:true,
+          pointRadius:0, pointHoverRadius:5,
+          pointHoverBackgroundColor:PURPLE, pointHoverBorderColor:'#0d1117', pointHoverBorderWidth:2,
         });
-        if (isClicks && !isCTR) datasets.push({
-          label: 'Clics', data: exportedChart.clicks, borderColor: PURPLE,
-          backgroundColor: ctx => makeGrad(ctx, PURPLE, 0.15, 0),
-          borderWidth: 2, tension: 0.42, fill: true,
-          pointRadius: exportedChart.clicks.map((_, i) => i === peakClickIdx ? 5 : 0),
-          pointHoverRadius: 5, pointBackgroundColor: PURPLE, pointBorderColor: '#0d1117', pointBorderWidth: 2,
-          pointHoverBackgroundColor: PURPLE, pointHoverBorderColor: '#0d1117', pointHoverBorderWidth: 2,
-        });
-        if (isCTR) datasets.push({
-          label: 'CTR %', data: exportedChart.rates, borderColor: AMBER,
-          backgroundColor: ctx => makeGrad(ctx, AMBER, 0.15, 0),
-          borderWidth: 2, tension: 0.42, fill: true,
-          pointRadius: 0, pointHoverRadius: 5,
-          pointHoverBackgroundColor: AMBER, pointHoverBorderColor: '#0d1117', pointHoverBorderWidth: 2,
+        if (isCTR) datasets.push({ label:'CTR %', data:exportedChart.rates, borderColor:AMBER,
+          backgroundColor:ctx=>makeGrad(ctx,AMBER,0.15), borderWidth:2, tension:0.42, fill:true,
+          pointRadius:0, pointHoverRadius:5,
+          pointHoverBackgroundColor:AMBER, pointHoverBorderColor:'#0d1117', pointHoverBorderWidth:2,
         });
 
         trafficChart = new Chart(trafficCtx, {
-          type: 'line',
-          data: { labels: exportedChart.labels, datasets },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
-            plugins: {
-              legend: { display: false },
-              tooltip: {
+          type:'line',
+          data:{ labels:exportedChart.labels, datasets },
+          options:{
+            responsive:true, maintainAspectRatio:false,
+            interaction:{ mode:'index', intersect:false },
+            plugins:{
+              legend:{ display:compareMode, position:'top', labels:{color:'#484f58',font:{size:10},boxWidth:8,usePointStyle:true} },
+              tooltip:{
                 ...TOOLTIP_BASE,
-                callbacks: {
+                callbacks:{
                   title: items => items[0].label,
-                  label: item => {
-                    const v = item.parsed.y;
-                    const suffix = item.dataset.label === 'CTR %' ? '%' : '';
-                    return ` ${item.dataset.label}: ${v.toLocaleString('fr-FR')}${suffix}`;
-                  },
+                  label: item => ` ${item.dataset.label}: ${item.parsed.y.toLocaleString('fr-FR')}${isCTR?'%':''}`,
                   afterBody: items => {
-                    if (items.length === 0) return '';
-                    const i     = items[0].dataIndex;
-                    const views = exportedChart.views[i] ?? 0;
-                    const total = exportedChart.views.reduce((a,b)=>a+b,0);
-                    if (total === 0) return '';
-                    return [``, `  Part du trafic : ${Math.round((views/total)*100)}%`];
+                    const i = items[0]?.dataIndex;
+                    const v = exportedChart.views[i] ?? 0;
+                    const tot = exportedChart.views.reduce((a,b)=>a+b,0);
+                    if (!tot || isCTR) return '';
+                    return [``, `  Part du trafic : ${Math.round((v/tot)*100)}%`];
                   },
                 },
               },
-              // Inline average annotation via custom plugin
-              annotation_avg: false,
             },
-            scales: {
-              y: { ...SCALE_Y, ticks: { ...SCALE_Y.ticks, callback: v => v >= 1000 ? `${(v/1000).toFixed(1)}k` : v } },
-              x: { ...SCALE_X, ticks: { ...SCALE_X.ticks, maxTicksLimit: exportedDays===7?7:exportedDays===30?10:12 } },
+            scales:{
+              y:{ ...SCALE_Y, ticks:{...SCALE_Y.ticks, callback:v=>v>=1000?`${(v/1000).toFixed(1)}k`:v} },
+              x:{ ...SCALE_X, ticks:{...SCALE_X.ticks, maxTicksLimit:exportedDays===7?7:exportedDays===30?10:12} },
             },
           },
-          plugins: [{
-            id: 'avgLine',
+          plugins:[{
+            id:'avgLine',
             afterDraw(chart) {
-              if (isCTR) return;
-              const { ctx: c, chartArea: { left, right, top, bottom }, scales: { y } } = chart;
-              const avg = isViews && !isCTR ? viewsAvg : clicksAvg;
-              if (!avg) return;
-              const yPos = y.getPixelForValue(avg);
+              if (isCTR || !isViews) return;
+              const {ctx:c,chartArea:{left,right},scales:{y}} = chart;
+              const yPos = y.getPixelForValue(viewsAvg);
               c.save();
-              c.setLineDash([4, 5]);
-              c.strokeStyle = isViews ? GREEN + '45' : PURPLE + '45';
-              c.lineWidth = 1;
-              c.beginPath(); c.moveTo(left, yPos); c.lineTo(right, yPos); c.stroke();
+              c.setLineDash([4,5]); c.strokeStyle = GREEN+'45'; c.lineWidth=1;
+              c.beginPath(); c.moveTo(left,yPos); c.lineTo(right,yPos); c.stroke();
               c.setLineDash([]);
-              c.fillStyle = isViews ? GREEN + '90' : PURPLE + '90';
-              c.font = '9px DM Sans, sans-serif';
-              c.fillText(`moy. ${avg.toLocaleString('fr-FR')}`, right - 70, yPos - 4);
+              c.fillStyle = GREEN+'90'; c.font='9px DM Sans,sans-serif';
+              c.fillText(`moy. ${Math.round(viewsAvg).toLocaleString('fr-FR')}`, right-76, yPos-4);
               c.restore();
             },
           }],
@@ -1644,183 +1741,300 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
       }
       buildTrafficChart('both');
 
+      // Glow cursor on chart
+      const chartWrapper = trafficCtx?.parentElement;
+      if (chartWrapper) {
+        chartWrapper.style.position = 'relative';
+        const glow = document.createElement('div');
+        glow.className = 'chart-glow';
+        chartWrapper.appendChild(glow);
+        trafficCtx.addEventListener('mousemove', e => {
+          const r = trafficCtx.getBoundingClientRect();
+          glow.style.left = (e.clientX - r.left) + 'px';
+          glow.style.top  = (e.clientY - r.top)  + 'px';
+          glow.style.opacity = '1';
+        });
+        trafficCtx.addEventListener('mouseleave', () => { glow.style.opacity = '0'; });
+      }
+
+      // Metric toggle
       document.getElementById('metric-toggle')?.querySelectorAll('.metric-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-          document.querySelectorAll('.metric-btn').forEach(b => b.classList.remove('active'));
+          document.querySelectorAll('.metric-btn').forEach(b=>b.classList.remove('active'));
           btn.classList.add('active');
           buildTrafficChart(btn.dataset.metric);
         });
       });
 
-      // ── CTR MINI-BAR (premium) ────────────────────────────────────────────
+      // Compare toggle
+      document.getElementById('compare-btn')?.addEventListener('click', function() {
+        compareMode = !compareMode;
+        this.classList.toggle('active', compareMode);
+        this.textContent = compareMode ? '✕ Comparer' : '⊕ Comparer';
+        buildTrafficChart(document.querySelector('.metric-btn.active')?.dataset.metric ?? 'both');
+      });
+
+      // ── CTR bar ──────────────────────────────────────────────────────────
       const rateCtx = document.getElementById('rate-chart');
       if (rateCtx && exportedChart.labels?.length > 0) {
         const rates  = exportedChart.rates;
-        const avgCTR = rates.length ? rates.reduce((a,b)=>a+b,0) / rates.length : 0;
-
+        const avgCTR = rates.reduce((a,b)=>a+b,0) / Math.max(rates.length,1);
         new Chart(rateCtx, {
-          type: 'bar',
-          data: {
-            labels: exportedChart.labels,
-            datasets: [{
-              data: rates,
-              backgroundColor: rates.map(r => r >= 8 ? GREEN + '55' : r >= 3 ? AMBER + '55' : '#f87171' + '55'),
-              borderColor:     rates.map(r => r >= 8 ? GREEN + 'cc' : r >= 3 ? AMBER + 'cc' : '#f87171cc'),
-              borderWidth: 1, borderRadius: 4,
-            }],
+          type:'bar',
+          data:{ labels:exportedChart.labels, datasets:[{
+            data:rates,
+            backgroundColor:rates.map(r=>r>=8?GREEN+'55':r>=3?AMBER+'55':'#f87171'+'55'),
+            borderColor:rates.map(r=>r>=8?GREEN+'cc':r>=3?AMBER+'cc':'#f87171cc'),
+            borderWidth:1, borderRadius:4,
+          }]},
+          options:{ responsive:true, maintainAspectRatio:false,
+            plugins:{ legend:{display:false}, tooltip:{...TOOLTIP_BASE,callbacks:{label:ctx=>` CTR: ${ctx.parsed.y.toFixed(1)}%`}} },
+            scales:{ y:{...SCALE_Y,ticks:{...SCALE_Y.ticks,callback:v=>`${v}%`}}, x:SCALE_X_HIDE },
           },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-              tooltip: { ...TOOLTIP_BASE, callbacks: { label: ctx => ` CTR: ${ctx.parsed.y.toFixed(1)}%` } },
-            },
-            scales: { y: { ...SCALE_Y, ticks: { ...SCALE_Y.ticks, callback: v => `${v}%` } }, x: SCALE_X_HIDE },
-          },
-          plugins: [{
-            id: 'ctrAvgLine',
-            afterDraw(chart) {
-              const { ctx: c, chartArea: { left, right }, scales: { y } } = chart;
-              if (!avgCTR) return;
-              const yPos = y.getPixelForValue(avgCTR);
-              c.save();
-              c.setLineDash([3, 4]);
-              c.strokeStyle = 'rgba(255,255,255,0.2)';
-              c.lineWidth = 1;
-              c.beginPath(); c.moveTo(left, yPos); c.lineTo(right, yPos); c.stroke();
-              c.setLineDash([]);
-              c.restore();
-            },
-          }],
+          plugins:[{ id:'ctrAvgLine', afterDraw(chart) {
+            if (!avgCTR) return;
+            const {ctx:c,chartArea:{left,right},scales:{y}} = chart;
+            c.save(); c.setLineDash([3,4]); c.strokeStyle='rgba(255,255,255,0.2)'; c.lineWidth=1;
+            c.beginPath(); c.moveTo(left,y.getPixelForValue(avgCTR)); c.lineTo(right,y.getPixelForValue(avgCTR)); c.stroke();
+            c.setLineDash([]); c.restore();
+          }}],
         });
       }
 
-      // ── RETENTION CHART (premium stacked) ────────────────────────────────
+      // ── Retention stacked bar ────────────────────────────────────────────
       const retCtx = document.getElementById('retention-chart');
       if (retCtx && retentionData.length > 0) {
         new Chart(retCtx, {
-          type: 'bar',
-          data: {
-            labels: retentionData.map(d => d.date),
-            datasets: [
-              {
-                label: 'Nouveaux',
-                data: retentionData.map(d => d.new),
-                backgroundColor: ctx => {
-                  const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height);
-                  g.addColorStop(0, GREEN + '66');
-                  g.addColorStop(1, GREEN + '22');
-                  return g;
-                },
-                borderColor: GREEN + 'aa',
-                borderWidth: 1,
-                borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 },
-                borderSkipped: 'bottom',
-                stack: 's',
-              },
-              {
-                label: 'Récurrents',
-                data: retentionData.map(d => d.returning),
-                backgroundColor: ctx => {
-                  const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height);
-                  g.addColorStop(0, BLUE + '55');
-                  g.addColorStop(1, BLUE + '22');
-                  return g;
-                },
-                borderColor: BLUE + '88',
-                borderWidth: 1,
-                borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 4, bottomRight: 4 },
-                borderSkipped: 'top',
-                stack: 's',
-              },
-            ],
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false },
-            plugins: {
-              legend: { display: true, position: 'top', labels: { color: '#6b7280', font: { size: 10 }, boxWidth: 8, usePointStyle: true } },
-              tooltip: {
-                ...TOOLTIP_BASE,
-                callbacks: {
-                  label: item => ` ${item.dataset.label}: ${item.parsed.y.toLocaleString('fr-FR')}`,
-                  afterBody: items => {
-                    const total = items.reduce((s, it) => s + it.parsed.y, 0);
-                    if (!total) return '';
-                    const lines = items.map(it => `  ${it.dataset.label}: ${Math.round((it.parsed.y/total)*100)}%`);
-                    return ['', ...lines];
-                  },
-                },
-              },
+          type:'bar',
+          data:{ labels:retentionData.map(d=>d.date), datasets:[
+            { label:'Nouveaux',   data:retentionData.map(d=>d.new),
+              backgroundColor:ctx=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height);g.addColorStop(0,GREEN+'66');g.addColorStop(1,GREEN+'22');return g;},
+              borderColor:GREEN+'aa', borderWidth:1, borderRadius:{topLeft:4,topRight:4,bottomLeft:0,bottomRight:0}, borderSkipped:'bottom', stack:'s' },
+            { label:'Récurrents', data:retentionData.map(d=>d.returning),
+              backgroundColor:ctx=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height);g.addColorStop(0,BLUE+'55');g.addColorStop(1,BLUE+'22');return g;},
+              borderColor:BLUE+'88', borderWidth:1, borderRadius:{topLeft:0,topRight:0,bottomLeft:4,bottomRight:4}, borderSkipped:'top', stack:'s' },
+          ]},
+          options:{ responsive:true, maintainAspectRatio:false,
+            interaction:{mode:'index',intersect:false},
+            plugins:{ legend:{display:true,position:'top',labels:{color:'#6b7280',font:{size:10},boxWidth:8,usePointStyle:true}},
+              tooltip:{...TOOLTIP_BASE,callbacks:{
+                label:item=>` ${item.dataset.label}: ${item.parsed.y.toLocaleString('fr-FR')}`,
+                afterBody:items=>{ const t=items.reduce((s,it)=>s+it.parsed.y,0); if(!t) return ''; return ['', ...items.map(it=>`  ${it.dataset.label}: ${Math.round((it.parsed.y/t)*100)}%`)]; },
+              }},
             },
-            scales: {
-              y: { ...SCALE_Y, stacked: true },
-              x: { ...SCALE_X, stacked: true, ticks: { ...SCALE_X.ticks, maxTicksLimit: exportedDays===7?7:10 } },
-            },
+            scales:{ y:{...SCALE_Y,stacked:true}, x:{...SCALE_X,stacked:true,ticks:{...SCALE_X.ticks,maxTicksLimit:exportedDays===7?7:10}} },
           },
         });
       }
 
-      // ── ROAS CHART (horizontal bar, premium) ──────────────────────────────
+      // ── ROAS horizontal bar ──────────────────────────────────────────────
       const roasCtx = document.getElementById('roas-chart');
       if (roasCtx && isPro && exportedChannels?.length > 0) {
-        const chR = exportedChannels.filter(c => c.revenue > 0).sort((a,b) => b.revenue - a.revenue);
+        const chR = exportedChannels.filter(c=>c.revenue>0).sort((a,b)=>b.revenue-a.revenue);
         if (chR.length > 0) {
-          const PALETTE = ['#a78bfa','#38bdf8',GREEN,AMBER,'#fb7185','#34d399'];
+          const PAL = ['#a78bfa',BLUE,GREEN,AMBER,'#fb7185','#34d399'];
           new Chart(roasCtx, {
-            type: 'bar',
-            data: {
-              labels: chR.map(c => c.name),
-              datasets: [{
-                label: 'Revenue',
-                data: chR.map(c => c.revenue),
-                backgroundColor: chR.map((_, i) => {
-                  const col = PALETTE[i % PALETTE.length];
-                  return col + '55';
-                }),
-                borderColor:  chR.map((_, i) => PALETTE[i % PALETTE.length] + 'cc'),
-                borderWidth:  1.5,
-                borderRadius: 6,
-                borderSkipped: false,
-              }],
+            type:'bar', data:{ labels:chR.map(c=>c.name), datasets:[{
+              label:'Revenue', data:chR.map(c=>c.revenue),
+              backgroundColor:chR.map((_,i)=>PAL[i%PAL.length]+'55'),
+              borderColor:chR.map((_,i)=>PAL[i%PAL.length]+'cc'),
+              borderWidth:1.5, borderRadius:6, borderSkipped:false,
+            }]},
+            options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+              plugins:{ legend:{display:false}, tooltip:{...TOOLTIP_BASE,callbacks:{label:ctx=>` ${Number(ctx.parsed.x).toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0})}`}} },
+              scales:{ x:{...SCALE_Y,ticks:{...SCALE_Y.ticks,callback:v=>v>=1000?`${Math.round(v/1000)}k€`:`${v}€`}}, y:{grid:{display:false},border:{display:false},ticks:{color:'#8b949e',font:{size:10},padding:4}} },
             },
-            options: {
-              indexAxis: 'y',
-              responsive: true, maintainAspectRatio: false,
-              plugins: {
-                legend: { display: false },
-                tooltip: {
-                  ...TOOLTIP_BASE,
-                  callbacks: {
-                    label: ctx => ` ${Number(ctx.parsed.x).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}`,
-                  },
-                },
-              },
-              scales: {
-                x: { ...SCALE_Y, ticks: { ...SCALE_Y.ticks, callback: v => v >= 1000 ? `${Math.round(v/1000)}k€` : `${v}€` } },
-                y: { grid: { display: false }, border: { display: false }, ticks: { color: '#8b949e', font: { size: 10 }, padding: 4 } },
-              },
-            },
-            plugins: [{
-              id: 'roasLabels',
-              afterDatasetsDraw(chart) {
-                const { ctx: c, data, scales: { x, y } } = chart;
-                data.datasets[0].data.forEach((val, i) => {
-                  if (!val) return;
-                  const xPos = x.getPixelForValue(val);
-                  const yPos = y.getPixelForValue(i);
-                  c.save();
-                  c.fillStyle = '#8b949e';
-                  c.font = '9px DM Sans, sans-serif';
-                  c.textAlign = 'left';
-                  c.fillText(Number(val).toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}), xPos + 6, yPos + 3.5);
-                  c.restore();
-                });
-              },
-            }],
+            plugins:[{ id:'roasLabels', afterDatasetsDraw(chart) {
+              const {ctx:c,data,scales:{x,y}} = chart;
+              data.datasets[0].data.forEach((val,i) => {
+                if (!val) return;
+                c.save(); c.fillStyle='#8b949e'; c.font='9px DM Sans,sans-serif'; c.textAlign='left';
+                c.fillText(Number(val).toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}), x.getPixelForValue(val)+6, y.getPixelForValue(i)+3.5);
+                c.restore();
+              });
+            }}],
           });
         }
       }
+
+      // ── AI REPORT (Claude API) ────────────────────────────────────────────
+      const aiBtn     = document.getElementById('ai-report-btn');
+      const aiPanel   = document.getElementById('ai-report-panel');
+      const aiContent = document.getElementById('ai-report-content');
+
+      aiBtn?.addEventListener('click', async () => {
+        if (aiBtn.dataset.loading === 'true') return;
+        aiBtn.dataset.loading = 'true';
+        aiBtn.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" style="opacity:.25"/><path fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" style="opacity:.75"/></svg> Génération…';
+        aiPanel.classList.remove('hidden');
+        aiContent.innerHTML = '<div class="flex items-center gap-2 text-gray-600 text-xs"><span class="skeleton w-5 h-5 rounded-full shrink-0"></span>Analyse de tes données en cours…</div>';
+
+        const metrics = {
+          period: `${exportedDays} jours`,
+          views:  (JSON.parse(el.dataset.goalsViews ?? '0')).toLocaleString('fr-FR'),
+          clicks: (JSON.parse(el.dataset.goalsClicks ?? '0')).toLocaleString('fr-FR'),
+          leads:  (JSON.parse(el.dataset.goalsLeads ?? '0')).toLocaleString('fr-FR'),
+          revenue:(JSON.parse(el.dataset.goalsRevenue ?? '0')).toLocaleString('fr-FR', {style:'currency',currency:'EUR',maximumFractionDigits:0}),
+          ctr:    exportedChart.rates?.length ? (exportedChart.rates.reduce((a,b)=>a+b,0)/exportedChart.rates.length).toFixed(1)+'%' : '—',
+          channels: exportedChannels.slice(0,3).map(c=>`${c.name} (${c.views} vues)`).join(', ') || 'non disponible',
+          trend: (() => {
+            const v = exportedChart.views ?? [];
+            if (v.length < 4) return 'insuffisant';
+            const first = v.slice(0,3).reduce((a,b)=>a+b,0)/3;
+            const last  = v.slice(-3).reduce((a,b)=>a+b,0)/3;
+            return last > first*1.1 ? 'croissance' : last < first*0.9 ? 'déclin' : 'stable';
+          })(),
+        };
+
+        try {
+          const resp = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: 1000,
+              messages: [{
+                role: 'user',
+                content: `Tu es un analyste marketing expert. Voici les métriques BioForge d'un créateur sur les ${metrics.period} :
+
+Vues : ${metrics.views}
+Clics : ${metrics.clicks}
+CTR : ${metrics.ctr}
+Leads : ${metrics.leads}
+Revenue : ${metrics.revenue}
+Tendance trafic : ${metrics.trend}
+Canaux principaux : ${metrics.channels}
+
+Rédige un rapport analytique concis en 3 sections :
+1. **Ce qui s'est passé** (2-3 phrases, synthèse factuelle)
+2. **Pourquoi** (1-2 hypothèses basées sur les chiffres)
+3. **3 actions prioritaires** (bullet points, très concrets)
+
+Réponds directement en français, sans introduction. Format markdown simple.`,
+              }],
+            }),
+          });
+
+          if (!resp.ok) throw new Error(`API ${resp.status}`);
+          const data = await resp.json();
+          const text = data.content?.map(b => b.text ?? '').join('') ?? '';
+
+          // Render with typewriter effect
+          aiContent.innerHTML = '';
+          const sections = text.split('\n').filter(l => l.trim());
+          let i = 0;
+          function renderNext() {
+            if (i >= sections.length) {
+              aiBtn.dataset.loading = 'false';
+              aiBtn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Régénérer';
+              return;
+            }
+            const line = sections[i++];
+            const div  = document.createElement('div');
+            div.className = 'slide-in-up stagger-1';
+
+            if (line.startsWith('**') && line.endsWith('**')) {
+              div.innerHTML = `<p class="text-xs font-bold text-white uppercase tracking-widest mt-3 mb-1" style="color:rgba(0,255,157,.8)">${line.slice(2,-2)}</p>`;
+            } else if (line.startsWith('- ') || line.startsWith('• ')) {
+              div.innerHTML = `<div class="flex gap-2 text-gray-400 text-xs leading-relaxed"><span style="color:rgba(0,255,157,.6);margin-top:1px">→</span><span>${line.slice(2)}</span></div>`;
+            } else {
+              div.innerHTML = `<p class="text-xs text-gray-400 leading-relaxed">${line}</p>`;
+            }
+            aiContent.appendChild(div);
+            setTimeout(renderNext, 80);
+          }
+          renderNext();
+
+        } catch (err) {
+          aiContent.innerHTML = `<p class="text-xs text-red-400">Erreur : ${err.message}. Vérifie que l'API Anthropic est accessible.</p>`;
+          aiBtn.dataset.loading = 'false';
+          aiBtn.innerHTML = '↺ Réessayer';
+        }
+      });
+
+      // ── LIVE FEED (Supabase Realtime) ─────────────────────────────────────
+      const liveList  = document.getElementById('live-feed-list');
+      const liveCount = document.getElementById('live-count');
+
+      async function initLiveFeed() {
+        const supaUrl = document.querySelector('meta[name="sb-url"]')?.content;
+        const supaKey = document.querySelector('meta[name="sb-key"]')?.content;
+        if (!supaUrl || !supaKey || !liveList) return;
+
+        // Load Supabase JS
+        await new Promise((res, rej) => {
+          if (window.supabase) { res(null); return; }
+          const s = document.createElement('script');
+          s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
+          s.onload = res; s.onerror = rej;
+          document.head.appendChild(s);
+        });
+
+        const client = window.supabase.createClient(supaUrl, supaKey);
+        const profileId = el.dataset.profileId;
+        if (!profileId) return;
+
+        let liveVisitors = [];
+
+        // Load recent visitors as seed
+        const { data: recent } = await client
+          .from('profile_views')
+          .select('id, country, device, created_at')
+          .eq('profile_id', profileId)
+          .order('created_at', { ascending: false })
+          .limit(8);
+
+        if (recent) {
+          liveVisitors = recent;
+          renderLive();
+        }
+
+        // Subscribe to new rows
+        client.channel('live-views')
+          .on('postgres_changes', {
+            event: 'INSERT', schema: 'public', table: 'profile_views',
+            filter: `profile_id=eq.${profileId}`,
+          }, payload => {
+            liveVisitors.unshift(payload.new);
+            if (liveVisitors.length > 12) liveVisitors.pop();
+            renderLive();
+          })
+          .subscribe();
+
+        function renderLive() {
+          if (!liveList) return;
+          if (liveVisitors.length === 0) {
+            liveList.innerHTML = '<p class="text-xs text-gray-700 text-center py-4">Aucun visiteur récent</p>';
+            return;
+          }
+          if (liveCount) liveCount.textContent = liveVisitors.filter(v => {
+            return new Date(v.created_at) > new Date(Date.now() - 5*60*1000);
+          }).length + ' actif(s)';
+
+          liveList.innerHTML = liveVisitors.map((v, i) => {
+            const ago  = Math.round((Date.now() - new Date(v.created_at).getTime()) / 60000);
+            const flag = v.country?.length === 2
+              ? String.fromCodePoint(...[...v.country.toUpperCase()].map(c => 0x1F1E0-65+c.charCodeAt(0)))
+              : '🌐';
+            const device = v.device === 'mobile' ? '📱' : v.device === 'tablet' ? '📊' : '🖥';
+            const isNew  = i === 0;
+            return `<div class="flex items-center gap-2.5 px-3 py-2 rounded-lg ${isNew ? 'live-entry' : ''} hover:bg-white/3 transition-colors">
+              <span class="text-base leading-none">${flag}</span>
+              <span class="text-sm leading-none">${device}</span>
+              <div class="flex-1 min-w-0">
+                <span class="text-xs text-gray-400">${v.country || 'Inconnu'}</span>
+              </div>
+              <span class="text-xs text-gray-700 tabular-nums shrink-0">${ago < 1 ? 'à l\'instant' : ago+'min'}</span>
+              ${isNew ? '<span class="w-1.5 h-1.5 rounded-full bg-neon-green shrink-0"></span>' : ''}
+            </div>`;
+          }).join('');
+        }
+      }
+
+      // Init live feed when traffic tab is visible
+      document.querySelector('[data-section="traffic"]')?.addEventListener('click', () => {
+        setTimeout(initLiveFeed, 100);
+      }, { once: true });
 
       // ── Exports ───────────────────────────────────────────────────────────
       document.getElementById('export-csv-btn')?.addEventListener('click', () => {
@@ -1832,109 +2046,101 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
         Object.assign(document.createElement('a'),{href:url,download:`analytics-${exportedDays}j.csv`}).click();
         URL.revokeObjectURL(url);
       });
-      document.getElementById('export-pdf-btn')?.addEventListener('click', () => window.print());
+      document.getElementById('export-pdf-btn')?.addEventListener('click', ()=>window.print());
 
       // ── Goals ─────────────────────────────────────────────────────────────
       const GOALS_KEY = 'bf_analytics_goals_v1';
-      function loadGoals() { try { return JSON.parse(localStorage.getItem(GOALS_KEY) ?? '{}'); } catch { return {}; } }
+      function loadGoals() { try{return JSON.parse(localStorage.getItem(GOALS_KEY)??'{}');}catch{return{};} }
       function saveGoals(g) { localStorage.setItem(GOALS_KEY, JSON.stringify(g)); }
       function renderGoals() {
         const goals  = loadGoals();
-        const actual = { views:Number(el.dataset.goalsViews??0), clicks:Number(el.dataset.goalsClicks??0), leads:Number(el.dataset.goalsLeads??0), revenue:Number(el.dataset.goalsRevenue??0) };
+        const actual = {views:Number(el.dataset.goalsViews??0),clicks:Number(el.dataset.goalsClicks??0),leads:Number(el.dataset.goalsLeads??0),revenue:Number(el.dataset.goalsRevenue??0)};
         const items  = [{key:'views',label:'Vues',color:GREEN},{key:'clicks',label:'Clics',color:BLUE},{key:'leads',label:'Leads',color:AMBER},{key:'revenue',label:'Revenue',color:'#a78bfa'}];
         const list   = document.getElementById('goals-list');
         if (!list) return;
-        if (!Object.values(goals).some(v => Number(v) > 0)) {
-          list.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:80px;gap:8px;color:rgba(255,255,255,0.2);font-size:12px;text-align:center"><span style="font-size:20px;opacity:.3">🎯</span>Aucun objectif<br>Clique sur Modifier</div>';
+        if (!Object.values(goals).some(v=>Number(v)>0)) {
+          list.innerHTML='<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:80px;gap:8px;color:rgba(255,255,255,0.2);font-size:12px;text-align:center"><span style="font-size:20px;opacity:.3">🎯</span>Aucun objectif<br>Clique sur Modifier</div>';
           return;
         }
-        list.innerHTML = items.map(item => {
-          const g = Number(goals[item.key]??0); if (!g) return '';
-          const a = actual[item.key]??0, pct = Math.min(100,g>0?Math.round((a/g)*100):0), done = pct>=100;
-          return `<div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px"><span style="font-size:11px;color:#484f58">${item.label}</span><div style="display:flex;align-items:center;gap:6px">${done?'<span style="font-size:10px;font-weight:700;color:#00ff9d;letter-spacing:.02em">✓ ATTEINT</span>':''}<span style="font-size:12px;font-weight:700;color:${done?'#00ff9d':item.color};font-variant-numeric:tabular-nums">${pct}%</span></div></div><div style="background:rgba(255,255,255,.04);border-radius:9999px;height:4px;overflow:hidden"><div style="height:100%;border-radius:9999px;width:${pct}%;background:${done?'#00ff9d':item.color};transition:width .9s cubic-bezier(.16,1,.3,1)"></div></div><div style="font-size:10px;color:rgba(255,255,255,.18);margin-top:3px;font-variant-numeric:tabular-nums">${a.toLocaleString('fr-FR')} / ${g.toLocaleString('fr-FR')}</div></div>`;
+        list.innerHTML=items.map(item=>{
+          const g=Number(goals[item.key]??0);if(!g)return'';
+          const a=actual[item.key]??0,pct=Math.min(100,g>0?Math.round((a/g)*100):0),done=pct>=100;
+          return`<div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px"><span style="font-size:11px;color:#484f58">${item.label}</span><div style="display:flex;align-items:center;gap:6px">${done?'<span style="font-size:10px;font-weight:700;color:#00ff9d">✓</span>':''}<span style="font-size:12px;font-weight:700;color:${done?'#00ff9d':item.color};font-variant-numeric:tabular-nums">${pct}%</span></div></div><div style="background:rgba(255,255,255,.04);border-radius:9999px;height:4px;overflow:hidden"><div style="height:100%;border-radius:9999px;width:${pct}%;background:${done?'#00ff9d':item.color};transition:width .9s cubic-bezier(.16,1,.3,1)"></div></div><div style="font-size:10px;color:rgba(255,255,255,.18);margin-top:3px;font-variant-numeric:tabular-nums">${a.toLocaleString('fr-FR')} / ${g.toLocaleString('fr-FR')}</div></div>`;
         }).join('');
       }
-      document.getElementById('edit-goals-btn')?.addEventListener('click', () => {
-        const ed = document.getElementById('goals-editor');
-        if (!ed) return;
-        ed.classList.toggle('hidden');
-        if (ed.classList.contains('hidden')) return;
-        const g = loadGoals();
-        ['views','clicks','leads','revenue'].forEach(k => { const inp = document.getElementById(`goal-${k}`); if (inp && g[k]) inp.value = g[k]; });
+      document.getElementById('edit-goals-btn')?.addEventListener('click',()=>{
+        const ed=document.getElementById('goals-editor');if(!ed)return;
+        ed.classList.toggle('hidden');if(ed.classList.contains('hidden'))return;
+        const g=loadGoals();['views','clicks','leads','revenue'].forEach(k=>{const inp=document.getElementById(`goal-${k}`);if(inp&&g[k])inp.value=g[k];});
       });
-      document.getElementById('save-goals-btn')?.addEventListener('click', () => {
-        const g = {};
-        ['views','clicks','leads','revenue'].forEach(k => { const val=parseInt(document.getElementById(`goal-${k}`)?.value??'0'); if(val>0)g[k]=val; });
-        saveGoals(g); document.getElementById('goals-editor')?.classList.add('hidden'); renderGoals();
+      document.getElementById('save-goals-btn')?.addEventListener('click',()=>{
+        const g={};['views','clicks','leads','revenue'].forEach(k=>{const val=parseInt(document.getElementById(`goal-${k}`)?.value??'0');if(val>0)g[k]=val;});
+        saveGoals(g);document.getElementById('goals-editor')?.classList.add('hidden');renderGoals();
       });
       renderGoals();
 
       // ── Section tabs ──────────────────────────────────────────────────────
       function activateTab(id) {
-        document.querySelectorAll('.sec-tab').forEach(t => t.classList.toggle('active', t.dataset.section===id));
-        document.querySelectorAll('.sec-panel').forEach(p => p.classList.toggle('active', p.id===`panel-${id}`));
-        try { sessionStorage.setItem('bf_analytics_tab', id); } catch {}
-        const btn = document.querySelector(`.sec-tab[data-section="${id}"]`);
-        const ind = document.getElementById('tab-indicator');
-        if (btn && ind) { ind.style.left = btn.offsetLeft+'px'; ind.style.width = btn.offsetWidth+'px'; }
+        document.querySelectorAll('.sec-tab').forEach(t=>t.classList.toggle('active',t.dataset.section===id));
+        document.querySelectorAll('.sec-panel').forEach(p=>p.classList.toggle('active',p.id===`panel-${id}`));
+        try{sessionStorage.setItem('bf_analytics_tab',id);}catch{}
+        const btn=document.querySelector(`.sec-tab[data-section="${id}"]`);
+        const ind=document.getElementById('tab-indicator');
+        if(btn&&ind){ind.style.left=btn.offsetLeft+'px';ind.style.width=btn.offsetWidth+'px';}
       }
-      document.querySelectorAll('.sec-tab').forEach(btn => {
-        btn.addEventListener('click', () => { activateTab(btn.dataset.section); history.replaceState(null,'',`?days=${exportedDays}&tab=${btn.dataset.section}`); });
+      document.querySelectorAll('.sec-tab').forEach(btn=>{
+        btn.addEventListener('click',()=>{activateTab(btn.dataset.section);history.replaceState(null,'',`?days=${exportedDays}&tab=${btn.dataset.section}`);});
       });
-      const urlTab = new URLSearchParams(location.search).get('tab');
-      let storedTab; try { storedTab = sessionStorage.getItem('bf_analytics_tab'); } catch {}
-      activateTab((urlTab && document.getElementById(`panel-${urlTab}`)) ? urlTab : (storedTab && document.getElementById(`panel-${storedTab}`)) ? storedTab : 'overview');
+      const urlTab=new URLSearchParams(location.search).get('tab');
+      let storedTab;try{storedTab=sessionStorage.getItem('bf_analytics_tab');}catch{}
+      activateTab((urlTab&&document.getElementById(`panel-${urlTab}`)?urlTab:(storedTab&&document.getElementById(`panel-${storedTab}`))?storedTab:'overview'));
 
       // ── Inner tabs ────────────────────────────────────────────────────────
-      document.querySelectorAll('.insight-tab-inner').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const id = btn.dataset.innerTab;
-          document.querySelectorAll('.insight-tab-inner').forEach(b => b.classList.toggle('active', b===btn));
-          document.querySelectorAll('.insight-panel').forEach(p => p.classList.toggle('active', p.id===`inner-panel-${id}`));
+      document.querySelectorAll('.insight-tab-inner').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+          const id=btn.dataset.innerTab;
+          document.querySelectorAll('.insight-tab-inner').forEach(b=>b.classList.toggle('active',b===btn));
+          document.querySelectorAll('.insight-panel').forEach(p=>p.classList.toggle('active',p.id===`inner-panel-${id}`));
         });
       });
 
       // ── UTM filter ────────────────────────────────────────────────────────
-      document.getElementById('utm-filter')?.querySelectorAll('.filter-chip').forEach(btn => {
-        btn.addEventListener('click', () => {
-          document.querySelectorAll('#utm-filter .filter-chip').forEach(b => b.classList.remove('active'));
+      document.getElementById('utm-filter')?.querySelectorAll('.filter-chip').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+          document.querySelectorAll('#utm-filter .filter-chip').forEach(b=>b.classList.remove('active'));
           btn.classList.add('active');
-          const filter = btn.dataset.utmFilter;
-          document.querySelectorAll('#utm-table tbody tr').forEach(tr => {
-            tr.style.display = (filter==='all' || tr.dataset.source===filter) ? '' : 'none';
-          });
+          const filter=btn.dataset.utmFilter;
+          document.querySelectorAll('#utm-table tbody tr').forEach(tr=>{tr.style.display=(filter==='all'||tr.dataset.source===filter)?'':'none';});
         });
       });
 
       // ── Heatmap sort ──────────────────────────────────────────────────────
-      document.getElementById('heatmap-sort')?.querySelectorAll('.sort-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          document.querySelectorAll('#heatmap-sort .sort-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('heatmap-sort')?.querySelectorAll('.sort-btn').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+          document.querySelectorAll('#heatmap-sort .sort-btn').forEach(b=>b.classList.remove('active'));
           btn.classList.add('active');
-          const k = btn.dataset.sort;
-          const container = document.getElementById('heatmap-rows');
-          if (!container) return;
-          const rows = [...container.children];
-          rows.sort((a,b) => k==='position' ? Number(a.dataset.pos||0)-Number(b.dataset.pos||0) : k==='ctr' ? Number(b.dataset.ctr||0)-Number(a.dataset.ctr||0) : Number(b.dataset.clicks||0)-Number(a.dataset.clicks||0));
-          rows.forEach(r => container.appendChild(r));
+          const k=btn.dataset.sort;
+          const container=document.getElementById('heatmap-rows');
+          if(!container)return;
+          [...container.children].sort((a,b)=>k==='position'?Number(a.dataset.pos||0)-Number(b.dataset.pos||0):k==='ctr'?Number(b.dataset.ctr||0)-Number(a.dataset.ctr||0):Number(b.dataset.clicks||0)-Number(a.dataset.clicks||0)).forEach(r=>container.appendChild(r));
         });
       });
 
-      // ── D3 Map (IntersectionObserver lazy) ────────────────────────────────
-      const countriesData = JSON.parse(el.dataset.countries ?? '[]');
-      const mapSvgEl   = document.getElementById('world-map');
-      const mapLoader  = document.getElementById('world-map-loader');
-      const mapTooltip = document.getElementById('map-tooltip');
+      // ── D3 Map (IntersectionObserver lazy) ───────────────────────────────
+      const countriesData=JSON.parse(el.dataset.countries??'[]');
+      const mapSvgEl=document.getElementById('world-map');
+      const mapLoader=document.getElementById('world-map-loader');
+      const mapTooltip=document.getElementById('map-tooltip');
 
       async function initMap() {
-        if (!mapSvgEl || mapSvgEl._mapInited) return;
-        mapSvgEl._mapInited = true;
+        if(!mapSvgEl||mapSvgEl._mapInited)return;
+        mapSvgEl._mapInited=true;
         await Promise.all([
-          new Promise((res,rej)=>{ if(window.d3){res(null);return;} const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s); }),
-          new Promise((res,rej)=>{ if(window.topojson){res(null);return;} const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/topojson@3.0.2/dist/topojson.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s); }),
+          new Promise((res,rej)=>{if(window.d3){res(null);return;}const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);}),
+          new Promise((res,rej)=>{if(window.topojson){res(null);return;}const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/topojson@3.0.2/dist/topojson.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s);}),
         ]);
-        const world = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json').then(r=>r.json());
-        const ISO2_NUM = {AF:'4',AL:'8',DZ:'12',AO:'24',AR:'32',AU:'36',AT:'40',AZ:'31',BD:'50',BE:'56',BJ:'204',BO:'68',BR:'76',BG:'100',CA:'124',CL:'152',CN:'156',CO:'170',CD:'180',CR:'188',HR:'191',CZ:'203',DK:'208',EG:'818',ET:'231',FI:'246',FR:'250',DE:'276',GH:'288',GR:'300',HK:'344',HU:'348',IN:'356',ID:'360',IR:'364',IQ:'368',IE:'372',IL:'376',IT:'380',CI:'384',JP:'392',JO:'400',KZ:'398',KE:'404',KR:'410',KW:'414',LB:'422',LY:'434',MA:'504',MX:'484',MM:'104',NL:'528',NZ:'554',NG:'566',NO:'578',PK:'586',PE:'604',PH:'608',PL:'616',PT:'620',QA:'634',RO:'642',RU:'643',SA:'682',SN:'686',SG:'702',SK:'703',SI:'705',SO:'706',ZA:'710',ES:'724',SE:'752',CH:'756',SY:'760',TW:'158',TZ:'834',TH:'764',TN:'788',TR:'792',UA:'804',AE:'784',GB:'826',US:'840',UY:'858',VE:'862',VN:'704',YE:'887',ZW:'716',MG:'450',CM:'120',GN:'324',ML:'466',TD:'148',NE:'562',LK:'144',KH:'116',MN:'496',IS:'352',LV:'428',LT:'440',EE:'233',RS:'688',BA:'70',MK:'807',GE:'268',BY:'112',MD:'498',AM:'51',UZ:'860',TM:'795',KG:'417',TJ:'762',LU:'442',CY:'196',MT:'470',MZ:'508',ZM:'894',MW:'454',UG:'800',RW:'646',BI:'108',SS:'728',SD:'729',LR:'430',SL:'694',BF:'854',GW:'624',GM:'270',CV:'132',GQ:'226',GA:'266',CG:'178',CF:'140',ER:'232',DJ:'262',KM:'174',SC:'690',MU:'480',MR:'478',LI:'438',MC:'492',SM:'674',VA:'336',AD:'20',ME:'499',XK:'383'};
+        const world=await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json').then(r=>r.json());
+        const ISO2_NUM={AF:'4',AL:'8',DZ:'12',AO:'24',AR:'32',AU:'36',AT:'40',AZ:'31',BD:'50',BE:'56',BJ:'204',BO:'68',BR:'76',BG:'100',CA:'124',CL:'152',CN:'156',CO:'170',CD:'180',CR:'188',HR:'191',CZ:'203',DK:'208',EG:'818',ET:'231',FI:'246',FR:'250',DE:'276',GH:'288',GR:'300',HK:'344',HU:'348',IN:'356',ID:'360',IR:'364',IQ:'368',IE:'372',IL:'376',IT:'380',CI:'384',JP:'392',JO:'400',KZ:'398',KE:'404',KR:'410',KW:'414',LB:'422',LY:'434',MA:'504',MX:'484',MM:'104',NL:'528',NZ:'554',NG:'566',NO:'578',PK:'586',PE:'604',PH:'608',PL:'616',PT:'620',QA:'634',RO:'642',RU:'643',SA:'682',SN:'686',SG:'702',SK:'703',SI:'705',SO:'706',ZA:'710',ES:'724',SE:'752',CH:'756',SY:'760',TW:'158',TZ:'834',TH:'764',TN:'788',TR:'792',UA:'804',AE:'784',GB:'826',US:'840',UY:'858',VE:'862',VN:'704',YE:'887',ZW:'716',MG:'450',CM:'120',GN:'324',ML:'466',TD:'148',NE:'562',LK:'144',KH:'116',MN:'496',IS:'352',LV:'428',LT:'440',EE:'233',RS:'688',BA:'70',MK:'807',GE:'268',BY:'112',MD:'498',AM:'51',UZ:'860',TM:'795',KG:'417',TJ:'762',LU:'442',CY:'196',MT:'470',MZ:'508',ZM:'894',MW:'454',UG:'800',RW:'646',BI:'108',SS:'728',SD:'729',LR:'430',SL:'694',BF:'854',GW:'624',GM:'270',CV:'132',GQ:'226',GA:'266',CG:'178',CF:'140',ER:'232',DJ:'262',KM:'174',SC:'690',MU:'480',MR:'478',LI:'438',MC:'492',SM:'674',VA:'336',AD:'20',ME:'499',XK:'383'};
         const maxViews=countriesData.length>0?countriesData[0].views:1;
         const viewsMap=new Map(),iso2Map=new Map(),labelMap=new Map();
         countriesData.forEach(row=>{const num=ISO2_NUM[row.country];if(!num)return;viewsMap.set(+num,row.views);iso2Map.set(+num,row.country);labelMap.set(+num,row.country);});
@@ -1944,11 +2150,11 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
         const projection=d3.geoNaturalEarth1().scale(W/6.1).translate([W/2,H/2+15]);
         const pathGen=d3.geoPath().projection(projection);
         const g=svg.append('g');
-        g.append('path').datum({type:'Sphere'}).attr('d',pathGen).attr('fill','#060d0a').attr('stroke','rgba(0,255,157,0.04)').attr('stroke-width',0.8);
-        g.append('path').datum(d3.geoGraticule().step([20,20])()).attr('d',pathGen).attr('fill','none').attr('stroke','rgba(255,255,255,0.02)').attr('stroke-width',0.4);
+        g.append('path').datum({type:'Sphere'}).attr('d',pathGen).attr('fill','#060d0a').attr('stroke','rgba(0,255,157,0.04)').attr('stroke-width',.8);
+        g.append('path').datum(d3.geoGraticule().step([20,20])()).attr('d',pathGen).attr('fill','none').attr('stroke','rgba(255,255,255,0.02)').attr('stroke-width',.4);
         const countries=topojson.feature(world,world.objects.countries);
-        g.selectAll('.country').data(countries.features).join('path').attr('class','country').attr('d',pathGen).attr('fill',d=>{const v=viewsMap.get(+d.id);return v?colorScale(v):'#101f16';}).attr('stroke','#0c1a12').attr('stroke-width',0.4);
-        g.append('path').datum(topojson.mesh(world,world.objects.countries,(a,b)=>a!==b)).attr('d',pathGen).attr('fill','none').attr('stroke','rgba(0,255,157,0.07)').attr('stroke-width',0.5);
+        g.selectAll('.country').data(countries.features).join('path').attr('class','country').attr('d',pathGen).attr('fill',d=>{const v=viewsMap.get(+d.id);return v?colorScale(v):'#101f16';}).attr('stroke','#0c1a12').attr('stroke-width',.4);
+        g.append('path').datum(topojson.mesh(world,world.objects.countries,(a,b)=>a!==b)).attr('d',pathGen).attr('fill','none').attr('stroke','rgba(0,255,157,0.07)').attr('stroke-width',.5);
         const dotsG=g.append('g');
         countriesData.slice(0,6).forEach((row,idx)=>{
           const num=ISO2_NUM[row.country];if(!num)return;
@@ -2002,11 +2208,11 @@ const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
         ro.observe(mapSvgEl);
       }
 
-      if (mapSvgEl) {
-        const obs = new IntersectionObserver(entries => { if(entries[0].isIntersecting){initMap();obs.disconnect();} }, {threshold:0.1});
+      if(mapSvgEl){
+        const obs=new IntersectionObserver(entries=>{if(entries[0].isIntersecting){initMap();obs.disconnect();}},{threshold:.1});
         obs.observe(mapSvgEl);
-      } else if (mapLoader) {
-        mapLoader.innerHTML = '<p style="color:#484f58;font-size:12px;padding:24px">Carte non disponible</p>';
+      } else if(mapLoader) {
+        mapLoader.innerHTML='<p style="color:#484f58;font-size:12px;padding:24px">Carte non disponible</p>';
       }
 
     })();
