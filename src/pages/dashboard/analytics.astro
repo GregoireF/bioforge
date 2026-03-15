@@ -1,7 +1,6 @@
 ---
-// src/pages/dashboard/analytics.astro — Analytics v3
-// Powered by get_profile_analytics RPC + daily_clicks query
-// Redesigned: bento grid · animated KPIs · sparklines · tabbed insights
+// src/pages/dashboard/analytics.astro — v4
+// Base v3 + Funnel · Attribution · UTM · Short URLs · Revenue KPIs · Live visitors
 
 import DashboardLayout from '@/layouts/DashboardLayout.astro';
 import Card from '@/components/ui/Card.astro';
@@ -12,13 +11,11 @@ import { getBlocks } from '@/lib/supabase/queries';
 import { createServerClient } from '@supabase/ssr';
 import { parse } from 'cookie';
 
-// ==================== PERIOD ====================
 const allowedDays = [7, 30, 90] as const;
 type Period = typeof allowedDays[number];
 const rawDays = Number(Astro.url.searchParams.get('days') ?? 7);
 const days: Period = (allowedDays.includes(rawDays as Period) ? rawDays : 7) as Period;
 
-// ==================== SUPABASE CLIENT ====================
 const cookies = parse(Astro.request.headers.get('cookie') ?? '');
 const supabase = createServerClient(
   import.meta.env.PUBLIC_SUPABASE_URL!,
@@ -26,27 +23,27 @@ const supabase = createServerClient(
   { cookies: { get: (k) => cookies[k], set: () => {}, remove: () => {} } }
 );
 
-// ==================== AUTH ====================
 const authResult = await withAuth({ cookies: Astro.cookies, request: Astro.request });
 if (!authResult.success || !authResult.data) {
   return Astro.redirect(authResult.redirect || '/signin?error=auth_failed');
 }
-const { profile } = authResult.data;
+const { profile, planLimits } = authResult.data;
 const profileId = profile?.id;
 if (!profileId) return Astro.redirect('/signin?error=no_profile');
 
-// ==================== DATA FETCH ====================
+// v4: plan detection
+const plan: string = (planLimits as any)?.plan ?? (profile as any)?.plan ?? 'Free';
+const isPro     = ['Pro', 'Enterprise'].includes(plan);
+const isCreator = ['Creator', 'Pro', 'Enterprise'].includes(plan);
+
 type AnalyticsRPC = {
-  total_views:     number;
-  clean_views:     number;
-  unique_visitors: number;
-  total_clicks:    number;
-  daily_views:     { date: string; views: number }[] | null;
-  devices:         Record<string, number> | null;
-  top_countries:   { country: string; views: number }[] | null;
-  top_referrers:   { referrer: string; views: number }[] | null;
-  top_blocks:      { block_id: string; title: string; type: string; clicks: number }[] | null;
-  bots:            Record<string, number> | null;
+  total_views: number; clean_views: number; unique_visitors: number; total_clicks: number;
+  daily_views: { date: string; views: number }[] | null;
+  devices: Record<string, number> | null;
+  top_countries: { country: string; views: number }[] | null;
+  top_referrers: { referrer: string; views: number }[] | null;
+  top_blocks: { block_id: string; title: string; type: string; clicks: number }[] | null;
+  bots: Record<string, number> | null;
 };
 
 let rpcData: AnalyticsRPC | null = null;
@@ -54,97 +51,158 @@ let rpcError: string | null = null;
 let dailyClicks: { date: string; clicks: number }[] = [];
 let blocks: any[] = [];
 
-const { data: rpcRaw, error: rpcErr } = await supabase.rpc('get_profile_analytics', {
-  p_profile_id: profileId,
-  p_days: days,
-});
-if (rpcErr) { rpcError = rpcErr.message; }
-else { rpcData = rpcRaw as AnalyticsRPC; }
+const { data: rpcRaw, error: rpcErr } = await supabase.rpc('get_profile_analytics', { p_profile_id: profileId, p_days: days });
+if (rpcErr) { rpcError = rpcErr.message; } else { rpcData = rpcRaw as AnalyticsRPC; }
 
 const since = new Date();
 since.setDate(since.getDate() - days);
-const { data: clickRows } = await supabase
-  .from('block_clicks').select('click_date')
-  .eq('profile_id', profileId)
-  .gte('click_date', since.toISOString().split('T')[0]);
 
+const { data: clickRows } = await supabase.from('block_clicks').select('click_date')
+  .eq('profile_id', profileId).gte('click_date', since.toISOString().split('T')[0]);
 if (clickRows) {
   const map = new Map<string, number>();
-  for (const row of clickRows) {
-    const d = row.click_date as string;
-    map.set(d, (map.get(d) ?? 0) + 1);
-  }
-  dailyClicks = Array.from(map.entries())
-    .map(([date, clicks]) => ({ date, clicks }))
-    .sort((a, b) => a.date.localeCompare(b.date));
+  for (const row of clickRows) { const d = row.click_date as string; map.set(d, (map.get(d) ?? 0) + 1); }
+  dailyClicks = Array.from(map.entries()).map(([date, clicks]) => ({ date, clicks })).sort((a, b) => a.date.localeCompare(b.date));
 }
 
-const { data: blockRows } = await supabase
-  .from('blocks').select('id, type, title, active')
+const { data: blockRows } = await supabase.from('blocks').select('id, type, title, active')
   .eq('profile_id', profileId).is('deleted_at', null).order('position');
 blocks = blockRows ?? [];
 
-// ==================== DERIVED METRICS ====================
+// v4: active visitors (last 5 min)
+const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+const { count: activeVisitors } = await supabase.from('profile_views')
+  .select('id', { count: 'exact', head: true }).eq('profile_id', profileId).gte('created_at', fiveMinAgo);
+
+// v4: conversion events
+const { data: convRows } = await supabase.from('conversion_events')
+  .select('type, value, source, created_at').eq('profile_id', profileId).gte('created_at', since.toISOString());
+const conversionRows = convRows ?? [];
+
+// v4: UTM events (Pro+)
+let utmData: any[] = [];
+if (isPro) {
+  const { data: utmRows } = await supabase.from('utm_events')
+    .select('source, medium, campaign, country, device, converted, revenue, created_at')
+    .eq('profile_id', profileId).gte('created_at', since.toISOString())
+    .order('created_at', { ascending: false }).limit(2000);
+  utmData = utmRows ?? [];
+}
+
+// v4: short URLs (Creator+)
+let shortUrls: any[] = [];
+if (isCreator) {
+  const { data: shortRows } = await supabase.from('short_urls')
+    .select('id, slug, target_url, title, click_count, created_at')
+    .eq('profile_id', profileId).order('click_count', { ascending: false }).limit(10);
+  shortUrls = shortRows ?? [];
+}
+
+// v3 derived (intact)
 const summary = {
   totalViews:     rpcData?.total_views     ?? 0,
   cleanViews:     rpcData?.clean_views     ?? 0,
   uniqueVisitors: rpcData?.unique_visitors ?? 0,
   totalClicks:    rpcData?.total_clicks    ?? 0,
-  clickRate:      rpcData && rpcData.total_views > 0
-    ? ((rpcData.total_clicks / rpcData.total_views) * 100) : 0,
-  botViews: Object.values(rpcData?.bots ?? {}).reduce((a, b) => a + b, 0),
-  avgPerDay: days > 0 ? Math.round((rpcData?.total_views ?? 0) / days) : 0,
+  clickRate:      rpcData && rpcData.total_views > 0 ? ((rpcData.total_clicks / rpcData.total_views) * 100) : 0,
+  botViews:       Object.values(rpcData?.bots ?? {}).reduce((a, b) => a + b, 0),
+  avgPerDay:      days > 0 ? Math.round((rpcData?.total_views ?? 0) / days) : 0,
 };
-
 const topBlocks    = rpcData?.top_blocks    ?? [];
 const topCountries = rpcData?.top_countries ?? [];
 const devices      = rpcData?.devices       ?? {};
 const topReferrers = rpcData?.top_referrers ?? [];
 
-// ── Chart data ──
+// v4 derived
+const leads    = conversionRows.filter(r => r.type === 'lead').length;
+const sales    = conversionRows.filter(r => r.type === 'sale').length;
+const revenue  = conversionRows.filter(r => r.type === 'sale').reduce((s, r) => s + (r.value ?? 0), 0);
+const leadRate = summary.totalClicks > 0 ? (leads / summary.totalClicks) * 100 : 0;
+const convRate = leads > 0 ? (sales / leads) * 100 : 0;
+
+const funnelSteps = [
+  { label: 'Vues',   value: summary.totalViews,  color: '#00ff9d' },
+  { label: 'Clics',  value: summary.totalClicks, color: '#38bdf8' },
+  { label: 'Leads',  value: leads,               color: '#f59e0b' },
+  { label: 'Ventes', value: sales,               color: '#a78bfa' },
+];
+
+type ChannelStat = { views: number; leads: number; sales: number; revenue: number };
+const channelMap = new Map<string, ChannelStat>();
+
+function classifyChannel(medium: string | null, source: string | null): string {
+  if (!medium && !source) return 'Direct';
+  const m = (medium ?? '').toLowerCase();
+  const s = (source ?? '').toLowerCase();
+  if (['cpc','paid','ppc','paidsocial'].includes(m)) {
+    if (s.includes('google'))  return 'Google Ads';
+    if (s.includes('facebook') || s.includes('meta') || s.includes('instagram')) return 'Meta Ads';
+    if (s.includes('tiktok'))  return 'TikTok Ads';
+    return 'Paid Ads';
+  }
+  if (m === 'email' || m === 'newsletter')  return 'Email';
+  if (m === 'influencer' || m === 'collab') return 'Influenceurs';
+  if (m === 'organic' || m === 'social')    return 'Organic Social';
+  if (s.includes('google'))                 return 'SEO';
+  return 'Autre';
+}
+
+if (utmData.length > 0) {
+  for (const row of utmData) {
+    const ch = classifyChannel(row.medium, row.source);
+    const e  = channelMap.get(ch) ?? { views: 0, leads: 0, sales: 0, revenue: 0 };
+    e.views++;
+    if (row.converted)   e.leads++;
+    if (row.revenue > 0) { e.sales++; e.revenue += row.revenue; }
+    channelMap.set(ch, e);
+  }
+} else {
+  const SH = ['twitter.com','x.com','instagram.com','tiktok.com','facebook.com','linkedin.com','youtube.com'];
+  const SE = ['google.','bing.com','duckduckgo.com','yahoo.com'];
+  for (const r of topReferrers) {
+    let ch = 'Direct';
+    try {
+      const rf   = r.referrer ?? '';
+      const host = new URL(rf.includes('://')?rf:`https://${rf}`).hostname.replace(/^www\./,'');
+      if (SH.some(s => host.includes(s))) ch = 'Organic Social';
+      else if (SE.some(s => host.includes(s))) ch = 'SEO';
+      else if (r.referrer) ch = 'Autre';
+    } catch { }
+    const e = channelMap.get(ch) ?? { views: 0, leads: 0, sales: 0, revenue: 0 };
+    e.views += r.views;
+    channelMap.set(ch, e);
+  }
+}
+
+const channels = Array.from(channelMap.entries()).map(([name, s]) => ({ name, ...s })).sort((a, b) => b.views - a.views);
+const totalChViews = channels.reduce((s, c) => s + c.views, 0);
+
+// v3 chart data (intact)
 const allDates = new Set<string>();
 (rpcData?.daily_views ?? []).forEach(r => allDates.add(r.date));
 dailyClicks.forEach(r => allDates.add(r.date));
 const sortedDates  = Array.from(allDates).sort();
 const viewsByDate  = new Map((rpcData?.daily_views ?? []).map(r => [r.date, r.views]));
 const clicksByDate = new Map(dailyClicks.map(r => [r.date, r.clicks]));
-const chartLabels  = sortedDates.map(d =>
-  new Date(d + 'T12:00:00Z').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
-);
-const chartViews  = sortedDates.map(d => viewsByDate.get(d)  ?? 0);
-const chartClicks = sortedDates.map(d => clicksByDate.get(d) ?? 0);
-const chartRates  = sortedDates.map((_, i) => {
-  const v = chartViews[i], c = chartClicks[i];
-  return v > 0 ? parseFloat(((c / v) * 100).toFixed(1)) : 0;
-});
+const chartLabels  = sortedDates.map(d => new Date(d + 'T12:00:00Z').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }));
+const chartViews   = sortedDates.map(d => viewsByDate.get(d)  ?? 0);
+const chartClicks  = sortedDates.map(d => clicksByDate.get(d) ?? 0);
+const chartRates   = sortedDates.map((_, i) => { const v = chartViews[i], c = chartClicks[i]; return v > 0 ? parseFloat(((c / v) * 100).toFixed(1)) : 0; });
 
-// Sparkline SVG helper — tiny 32×16 path from data array
 function sparkline(data: number[], color: string): string {
   if (!data.length) return '';
   const max = Math.max(...data, 1);
   const W = 80, H = 24;
-  const pts = data.map((v, i) => {
-    const x = (i / Math.max(data.length - 1, 1)) * W;
-    const y = H - (v / max) * H;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <polyline points="${pts}" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.8"/>
-  </svg>`;
+  const pts = data.map((v, i) => { const x = (i / Math.max(data.length - 1, 1)) * W; const y = H - (v / max) * H; return `${x.toFixed(1)},${y.toFixed(1)}`; }).join(' ');
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" fill="none" xmlns="http://www.w3.org/2000/svg"><polyline points="${pts}" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.8"/></svg>`;
 }
-const viewSparkline  = sparkline(chartViews,  '#00ff9d');
-const clickSparkline = sparkline(chartClicks, '#bf00ff');
+const viewSparkline    = sparkline(chartViews,  '#00ff9d');
+const clickSparkline   = sparkline(chartClicks, '#bf00ff');
+const revenueSparkline = sparkline(conversionRows.filter(r => r.type === 'sale').map(r => r.value ?? 0), '#a78bfa');
 
-// ── Device ──
-const deviceData = {
-  mobile:  devices['mobile']  ?? 0,
-  desktop: devices['desktop'] ?? 0,
-  tablet:  devices['tablet']  ?? 0,
-  unknown: devices['unknown'] ?? 0,
-};
+const deviceData = { mobile: devices['mobile'] ?? 0, desktop: devices['desktop'] ?? 0, tablet: devices['tablet'] ?? 0, unknown: devices['unknown'] ?? 0 };
 const deviceTotal = deviceData.mobile + deviceData.desktop + deviceData.tablet + deviceData.unknown;
 
-// ── Referrer ──
 const SOCIAL = ['twitter.com','x.com','instagram.com','tiktok.com','facebook.com','linkedin.com','youtube.com','pinterest.com','snapchat.com','reddit.com','discord.com','twitch.tv'];
 const SEARCH  = ['google.','bing.com','duckduckgo.com','yahoo.com','baidu.com','yandex.'];
 function classifyReferrer(ref: string | null): { label: string; category: 'direct'|'social'|'search'|'other' } {
@@ -156,421 +214,370 @@ function classifyReferrer(ref: string | null): { label: string; category: 'direc
     return { label: host, category: 'other' };
   } catch { return { label: ref.slice(0, 40), category: 'other' }; }
 }
-const parsedReferrers = topReferrers.map(r => ({ ...classifyReferrer(r.referrer), views: r.views }));
-const refAgg = new Map<string, { label: string; category: string; views: number }>();
-for (const r of parsedReferrers) {
-  const e = refAgg.get(r.label);
-  if (e) e.views += r.views; else refAgg.set(r.label, { ...r });
-}
+const parsedReferrers     = topReferrers.map(r => ({ ...classifyReferrer(r.referrer), views: r.views }));
+const refAgg              = new Map<string, { label: string; category: string; views: number }>();
+for (const r of parsedReferrers) { const e = refAgg.get(r.label); if (e) e.views += r.views; else refAgg.set(r.label, { ...r }); }
 const aggregatedReferrers = Array.from(refAgg.values()).sort((a, b) => b.views - a.views).slice(0, 6);
-const maxReferrerViews = aggregatedReferrers[0]?.views ?? 1;
-const maxCountryViews  = topCountries[0]?.views ?? 1;
+const maxReferrerViews    = aggregatedReferrers[0]?.views ?? 1;
+const maxCountryViews     = topCountries[0]?.views ?? 1;
 
 function countryFlag(code: string): string {
   if (!code || code.length !== 2) return '🌐';
   return String.fromCodePoint(...[...code.toUpperCase()].map(c => 0x1F1E0 - 65 + c.charCodeAt(0)));
 }
 
-// Static lookups — kept out of JSX to avoid TS-generic parse errors
-const CAT_COLORS: Record<string, string> = {
-  direct: '#00ff9d', social: '#bf00ff', search: '#00aaff', other: '#ff6b6b',
-};
-const CAT_LABELS: Record<string, string> = {
-  direct: 'Direct', social: 'Social', search: 'Recherche', other: 'Autre',
-};
+const CAT_COLORS: Record<string, string> = { direct: '#00ff9d', social: '#bf00ff', search: '#00aaff', other: '#ff6b6b' };
+const CAT_LABELS: Record<string, string> = { direct: 'Direct', social: 'Social', search: 'Recherche', other: 'Autre' };
 
-// Bridge
-const exportedChart   = { labels: chartLabels, views: chartViews, clicks: chartClicks, rates: chartRates };
-const exportedDevices = deviceData;
-const exportedDays    = days;
+const exportedChart    = { labels: chartLabels, views: chartViews, clicks: chartClicks, rates: chartRates };
+const exportedDevices  = deviceData;
+const exportedDays     = days;
+const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, revenue: c.revenue }));
 ---
 
 <DashboardLayout title="Analytics">
 
 <style>
-  /* ── Animations ── */
-  @keyframes countUp {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  @keyframes barGrow {
-    from { width: 0 !important; }
-  }
-  @keyframes fadeSlide {
-    from { opacity: 0; transform: translateY(12px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  .kpi-value  { animation: countUp  0.5s ease both; }
-  .bar-fill   { animation: barGrow  0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
-  .fade-slide { animation: fadeSlide 0.4s ease both; }
-
-  /* ── Bento grid ── */
-  .bento { display: grid; gap: 1rem; }
-  @media (min-width: 768px) {
-    .bento-main { grid-template-columns: 2fr 1fr; }
-    .bento-insights { grid-template-columns: 1fr 1fr; }
-  }
-
-  /* ── KPI card glow ── */
-  .kpi-card { position: relative; overflow: hidden; }
-  .kpi-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(ellipse at 0% 0%, var(--glow) 0%, transparent 65%);
-    opacity: 0.12;
-    pointer-events: none;
-  }
-
-  /* ── Tab system ── */
-  .insight-panel { display: none; }
-  .insight-panel.active { display: block; }
-
-  /* ── Rank badge ── */
-  .rank-1 { background: linear-gradient(135deg, #ffd70022, #ffd70011); border-color: #ffd70040; color: #ffd700; }
-  .rank-2 { background: rgba(192,192,192,0.1); border-color: rgba(192,192,192,0.2); color: #c0c0c0; }
-  .rank-3 { background: rgba(205,127,50,0.1);  border-color: rgba(205,127,50,0.2);  color: #cd7f32; }
-
-  /* ── Progress bar track ── */
-  .bar-track { background: rgba(255,255,255,0.04); border-radius: 9999px; overflow: hidden; height: 3px; }
-  .bar-fill  { height: 100%; border-radius: 9999px; }
-
-  /* ── Source badge ── */
-  .source-badge {
-    display: inline-flex; align-items: center; gap: 4px;
-    padding: 2px 8px; border-radius: 9999px;
-    font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
-  }
-
-
-  /* ── Choropleth map ── */
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .map-spinner {
-    width: 24px; height: 24px;
-    border: 2px solid rgba(0,255,157,0.15);
-    border-top-color: #00ff9d;
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-  #world-map .country {
-    transition: fill 0.2s, stroke 0.2s;
-    cursor: default;
-  }
-  #world-map .country:hover {
-    stroke: #00ff9d !important;
-    stroke-width: 1px !important;
-    filter: brightness(1.4);
-  }
-  #world-map .country.highlighted {
-    stroke: #00ff9d;
-    stroke-width: 1px;
-    filter: brightness(1.6) drop-shadow(0 0 4px #00ff9d80);
-  }
-
-  /* ── Scrollbar ── */
-  .scrollbar-none { scrollbar-width: none; }
-  .scrollbar-none::-webkit-scrollbar { display: none; }
-
-  /* ── Stagger delay helpers ── */
-  .d-0 { animation-delay: 0ms; }
-  .d-1 { animation-delay: 60ms; }
-  .d-2 { animation-delay: 120ms; }
-  .d-3 { animation-delay: 180ms; }
-  .d-4 { animation-delay: 240ms; }
-  .d-5 { animation-delay: 300ms; }
+  @keyframes countUp   { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes barGrow   { from{width:0!important} }
+  @keyframes fadeSlide { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+  .kpi-value  { animation:countUp 0.5s ease both; }
+  .bar-fill   { animation:barGrow 0.8s cubic-bezier(0.16,1,0.3,1) both; }
+  .fade-slide { animation:fadeSlide 0.4s ease both; }
+  .live-dot   { animation:livePulse 1.6s ease-in-out infinite; }
+  .bento { display:grid; gap:1rem; }
+  @media (min-width:768px) { .bento-main{grid-template-columns:2fr 1fr;} }
+  .kpi-card { position:relative; overflow:hidden; }
+  .kpi-card::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at 0% 0%,var(--glow) 0%,transparent 65%); opacity:.12; pointer-events:none; }
+  .insight-panel { display:none; }
+  .insight-panel.active { display:block; }
+  .rank-1 { background:linear-gradient(135deg,#ffd70022,#ffd70011); border-color:#ffd70040; color:#ffd700; }
+  .rank-2 { background:rgba(192,192,192,.1); border-color:rgba(192,192,192,.2); color:#c0c0c0; }
+  .rank-3 { background:rgba(205,127,50,.1); border-color:rgba(205,127,50,.2); color:#cd7f32; }
+  .bar-track { background:rgba(255,255,255,.04); border-radius:9999px; overflow:hidden; height:3px; }
+  .bar-fill  { height:100%; border-radius:9999px; }
+  .source-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:9999px; font-size:10px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .map-spinner { width:24px; height:24px; border:2px solid rgba(0,255,157,.15); border-top-color:#00ff9d; border-radius:50%; animation:spin .7s linear infinite; }
+  #world-map .country { transition:fill .2s,stroke .2s; cursor:default; }
+  #world-map .country:hover { stroke:#00ff9d!important; stroke-width:1px!important; filter:brightness(1.4); }
+  #world-map .country.highlighted { stroke:#00ff9d; stroke-width:1px; filter:brightness(1.6) drop-shadow(0 0 4px #00ff9d80); }
+  .scrollbar-none { scrollbar-width:none; }
+  .scrollbar-none::-webkit-scrollbar { display:none; }
+  .d-0{animation-delay:0ms} .d-1{animation-delay:60ms} .d-2{animation-delay:120ms}
+  .d-3{animation-delay:180ms} .d-4{animation-delay:240ms} .d-5{animation-delay:300ms}
+  /* v4: channel badges */
+  .ch-google  { background:rgba(66,133,244,.12);  color:#60a5fa; border:.5px solid rgba(66,133,244,.2); }
+  .ch-meta    { background:rgba(24,119,242,.12);   color:#818cf8; border:.5px solid rgba(99,102,241,.2); }
+  .ch-tiktok  { background:rgba(0,0,0,.3);         color:#f0abfc; border:.5px solid rgba(240,171,252,.2); }
+  .ch-organic { background:rgba(0,255,157,.08);    color:#00ff9d; border:.5px solid rgba(0,255,157,.2); }
+  .ch-email   { background:rgba(251,191,36,.1);    color:#fbbf24; border:.5px solid rgba(251,191,36,.2); }
+  .ch-infl    { background:rgba(251,113,133,.1);   color:#fb7185; border:.5px solid rgba(251,113,133,.2); }
+  .ch-direct  { background:rgba(255,255,255,.06);  color:#9ca3af; border:.5px solid rgba(255,255,255,.1); }
+  .ch-other   { background:rgba(255,255,255,.04);  color:#6b7280; border:.5px solid rgba(255,255,255,.08); }
+  /* v4: plan badges */
+  .badge-creator { display:inline-flex;align-items:center;gap:2px;padding:1px 5px;border-radius:5px;font-size:9px;font-weight:700;background:rgba(0,255,157,.12);color:#00ff9d;border:1px solid rgba(0,255,157,.3); }
+  .badge-pro     { display:inline-flex;align-items:center;gap:2px;padding:1px 5px;border-radius:5px;font-size:9px;font-weight:700;background:rgba(168,85,247,.15);color:#c084fc;border:1px solid rgba(168,85,247,.35); }
 </style>
 
-  <!-- ===== HEADER ===== -->
+  <!-- HEADER -->
   <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8 fade-slide">
     <div>
-      <h2 class="text-xl font-semibold text-white tracking-tight mb-1">Analytics</h2>
+      <div class="flex items-center gap-3 mb-1">
+        <h2 class="text-xl font-semibold text-white tracking-tight">Analytics</h2>
+        {(activeVisitors ?? 0) > 0 && (
+          <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-neon-green/25 bg-neon-green/8">
+            <span class="live-dot w-1.5 h-1.5 rounded-full bg-neon-green shrink-0"></span>
+            <span class="text-xs font-semibold text-neon-green">{activeVisitors} en ligne</span>
+          </div>
+        )}
+      </div>
       <p class="text-sm text-gray-500">
         Données sur <span class="text-gray-300 font-medium">{days} jours</span>
-        {summary.botViews > 0 && (
-          <span class="ml-2 text-xs text-yellow-500/70">· {summary.botViews} bots exclus</span>
-        )}
+        {summary.botViews > 0 && <span class="ml-2 text-xs text-yellow-500/70">· {summary.botViews} bots exclus</span>}
       </p>
     </div>
-
-    <!-- Period pills -->
-    <div class="flex items-center gap-1 p-1 rounded-xl border border-white/8 bg-white/3 w-fit self-start">
-      {([7, 30, 90] as const).map(d => (
-        <a href={`?days=${d}`}
-          class={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-            days === d
-              ? 'bg-neon-green text-black shadow-lg shadow-neon-green/20'
-              : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
-          }`}>
-          {d === 7 ? '7j' : d === 30 ? '30j' : '90j'}
-        </a>
-      ))}
+    <div class="flex items-center gap-2 self-start flex-wrap">
+      <div class="flex items-center gap-1 p-1 rounded-xl border border-white/8 bg-white/3 w-fit">
+        {([7, 30, 90] as const).map(d => (
+          <a href={`?days=${d}`} class={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${days === d ? 'bg-neon-green text-black shadow-lg shadow-neon-green/20' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'}`}>
+            {d === 7 ? '7j' : d === 30 ? '30j' : '90j'}
+          </a>
+        ))}
+      </div>
+      <button id="export-csv-btn" class="flex items-center gap-1.5 px-3 py-2 glass border border-white/10 rounded-xl text-xs text-gray-400 hover:text-white hover:border-white/20 transition-all">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        Export CSV
+      </button>
     </div>
   </div>
 
-  <!-- Error -->
-  {rpcError && (
-    <Alert variant="danger" title="Données indisponibles">
-      <p>{rpcError}</p>
-    </Alert>
-  )}
+  {rpcError && <Alert variant="danger" title="Données indisponibles"><p>{rpcError}</p></Alert>}
 
-  <!-- ===== KPI ROW ===== -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+  <!-- KPI ROW: v3 (4 cards) + v4 (Leads + Revenue) -->
+  <div class="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-6">
 
-    <!-- Views -->
-    <div class="kpi-card fade-slide d-0 p-5 glass rounded-2xl border border-white/8 cursor-default"
-      style="--glow: #00ff9d">
+    <div class="kpi-card fade-slide d-0 p-5 glass rounded-2xl border border-white/8 cursor-default" style="--glow:#00ff9d">
       <div class="flex items-start justify-between mb-4">
         <div class="w-8 h-8 rounded-lg bg-neon-green/10 border border-neon-green/20 flex items-center justify-center">
-          <svg class="w-3.5 h-3.5 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-          </svg>
+          <svg class="w-3.5 h-3.5 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
         </div>
         <div set:html={viewSparkline} class="opacity-60 mt-1"></div>
       </div>
-      <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">
-        {summary.totalViews.toLocaleString('fr-FR')}
-      </div>
+      <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">{summary.totalViews.toLocaleString('fr-FR')}</div>
       <p class="text-xs text-gray-500 mt-1.5 font-medium">Vues totales</p>
       <p class="text-xs text-gray-600 mt-0.5">{summary.avgPerDay.toLocaleString('fr-FR')}/j en moy.</p>
     </div>
 
-    <!-- Unique visitors -->
-    <div class="kpi-card fade-slide d-1 p-5 glass rounded-2xl border border-white/8"
-      style="--glow: #00aaff">
+    <div class="kpi-card fade-slide d-1 p-5 glass rounded-2xl border border-white/8" style="--glow:#00aaff">
       <div class="flex items-start justify-between mb-4">
         <div class="w-8 h-8 rounded-lg bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center">
-          <svg class="w-3.5 h-3.5 text-neon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
-          </svg>
+          <svg class="w-3.5 h-3.5 text-neon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
         </div>
-        <!-- Ratio badge -->
-        {summary.totalViews > 0 && (
-          <span class="text-xs text-neon-blue/70 bg-neon-blue/8 px-2 py-0.5 rounded-full border border-neon-blue/15 font-mono mt-1">
-            {Math.round((summary.uniqueVisitors / summary.totalViews) * 100)}%
-          </span>
-        )}
+        {summary.totalViews > 0 && <span class="text-xs text-neon-blue/70 bg-neon-blue/8 px-2 py-0.5 rounded-full border border-neon-blue/15 font-mono mt-1">{Math.round((summary.uniqueVisitors / summary.totalViews) * 100)}%</span>}
       </div>
-      <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">
-        {summary.uniqueVisitors.toLocaleString('fr-FR')}
-      </div>
+      <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">{summary.uniqueVisitors.toLocaleString('fr-FR')}</div>
       <p class="text-xs text-gray-500 mt-1.5 font-medium">Visiteurs uniques</p>
       <p class="text-xs text-gray-600 mt-0.5">{summary.cleanViews.toLocaleString('fr-FR')} vues nettes</p>
     </div>
 
-    <!-- Clicks -->
-    <div class="kpi-card fade-slide d-2 p-5 glass rounded-2xl border border-white/8"
-      style="--glow: #bf00ff">
+    <div class="kpi-card fade-slide d-2 p-5 glass rounded-2xl border border-white/8" style="--glow:#bf00ff">
       <div class="flex items-start justify-between mb-4">
         <div class="w-8 h-8 rounded-lg bg-neon-purple/10 border border-neon-purple/20 flex items-center justify-center">
-          <svg class="w-3.5 h-3.5 text-neon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/>
-          </svg>
+          <svg class="w-3.5 h-3.5 text-neon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/></svg>
         </div>
         <div set:html={clickSparkline} class="opacity-60 mt-1"></div>
       </div>
-      <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">
-        {summary.totalClicks.toLocaleString('fr-FR')}
-      </div>
+      <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">{summary.totalClicks.toLocaleString('fr-FR')}</div>
       <p class="text-xs text-gray-500 mt-1.5 font-medium">Clics sur liens</p>
       <p class="text-xs text-gray-600 mt-0.5">sur {blocks.filter((b) => b.active).length} blocs actifs</p>
     </div>
 
-    <!-- CTR -->
-    <div class="kpi-card fade-slide d-3 p-5 glass rounded-2xl border border-white/8"
-      style="--glow: #ff6b6b">
+    <div class="kpi-card fade-slide d-3 p-5 glass rounded-2xl border border-white/8" style="--glow:#ff6b6b">
       <div class="flex items-start justify-between mb-4">
         <div class="w-8 h-8 rounded-lg bg-neon-pink/10 border border-neon-pink/20 flex items-center justify-center">
-          <svg class="w-3.5 h-3.5 text-neon-pink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-          </svg>
+          <svg class="w-3.5 h-3.5 text-neon-pink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
         </div>
-        <!-- CTR quality pill -->
-        <span class={`text-xs px-2 py-0.5 rounded-full border font-mono mt-1 ${
-          summary.clickRate >= 10 ? 'text-neon-green/70 bg-neon-green/8 border-neon-green/15' :
-          summary.clickRate >= 5  ? 'text-yellow-400/70 bg-yellow-400/8 border-yellow-400/15' :
-          'text-gray-500 bg-white/5 border-white/10'
-        }`}>
+        <span class={`text-xs px-2 py-0.5 rounded-full border font-mono mt-1 ${summary.clickRate >= 10 ? 'text-neon-green/70 bg-neon-green/8 border-neon-green/15' : summary.clickRate >= 5 ? 'text-yellow-400/70 bg-yellow-400/8 border-yellow-400/15' : 'text-gray-500 bg-white/5 border-white/10'}`}>
           {summary.clickRate >= 10 ? '🔥 Top' : summary.clickRate >= 5 ? '↗ Bien' : '· Faible'}
         </span>
       </div>
-      <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">
-        {summary.clickRate.toFixed(1)}<span class="text-lg text-gray-400">%</span>
-      </div>
+      <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">{summary.clickRate.toFixed(1)}<span class="text-lg text-gray-400">%</span></div>
       <p class="text-xs text-gray-500 mt-1.5 font-medium">Taux de clic</p>
       <p class="text-xs text-gray-600 mt-0.5">clics / vues</p>
     </div>
 
+    <!-- v4: Leads -->
+    <div class="kpi-card fade-slide d-4 p-5 glass rounded-2xl border border-white/8 cursor-default" style="--glow:#f59e0b">
+      <div class="flex items-start justify-between mb-4">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2)">
+          <svg class="w-3.5 h-3.5" style="color:#f59e0b" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"/></svg>
+        </div>
+        <span class="text-xs px-2 py-0.5 rounded-full border font-mono mt-1" style="color:rgba(245,158,11,.7);background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.15)">{leadRate.toFixed(1)}%</span>
+      </div>
+      <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">{leads.toLocaleString('fr-FR')}</div>
+      <p class="text-xs text-gray-500 mt-1.5 font-medium">Leads</p>
+      <p class="text-xs text-gray-600 mt-0.5">{sales} vente{sales !== 1 ? 's' : ''} · {convRate.toFixed(1)}% conv.</p>
+    </div>
+
+    <!-- v4: Revenue -->
+    <div class="kpi-card fade-slide d-5 p-5 glass rounded-2xl border border-white/8 cursor-default" style="--glow:#a78bfa">
+      <div class="flex items-start justify-between mb-4">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.2)">
+          <svg class="w-3.5 h-3.5" style="color:#a78bfa" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div set:html={revenueSparkline} class="opacity-60 mt-1"></div>
+      </div>
+      <div class="kpi-value text-2xl lg:text-3xl font-bold text-white tabular-nums tracking-tight">
+        {revenue > 0 ? revenue.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }) : '—'}
+      </div>
+      <p class="text-xs text-gray-500 mt-1.5 font-medium">Revenue</p>
+      <p class="text-xs text-gray-600 mt-0.5">{sales > 0 ? `CPA ${(revenue / sales).toFixed(0)}€` : 'Aucune vente'}</p>
+    </div>
+
   </div>
 
-  <!-- ===== MAIN BENTO: CHART + DEVICE ===== -->
-  <div class="bento bento-main mb-6">
+  <!-- v4: FUNNEL -->
+  <div class="fade-slide d-1 p-5 glass rounded-2xl border border-white/8 mb-6">
+    <div class="flex items-center justify-between mb-5">
+      <div>
+        <h3 class="text-sm font-semibold text-white">Funnel de conversion</h3>
+        <p class="text-xs text-gray-500 mt-0.5">De la visite à la vente · {days}j</p>
+      </div>
+    </div>
+    <div class="space-y-3">
+      {funnelSteps.map((step, i) => {
+        const prev     = i > 0 ? funnelSteps[i - 1].value : step.value;
+        const dropPct  = prev > 0 && i > 0 ? (1 - step.value / prev) * 100 : 0;
+        const widthPct = funnelSteps[0].value > 0 ? (step.value / funnelSteps[0].value) * 100 : 0;
+        return (
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <div class="flex items-center gap-2.5">
+                <div class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold shrink-0" style={`background:${step.color}18;border:.5px solid ${step.color}35;color:${step.color}`}>{i + 1}</div>
+                <span class="text-sm font-semibold text-white">{step.label}</span>
+                {i > 0 && dropPct > 0 && (
+                  <span class="text-xs px-2 py-0.5 rounded-full" style="color:rgba(248,113,113,.7);background:rgba(248,113,113,.08);border:.5px solid rgba(248,113,113,.15)">↓ {dropPct.toFixed(0)}% drop</span>
+                )}
+              </div>
+              <span class="text-sm font-bold tabular-nums" style={`color:${step.color}`}>{step.value.toLocaleString('fr-FR')}</span>
+            </div>
+            <div class="bar-track" style="height:6px">
+              <div class="bar-fill" style={`width:${widthPct}%;background:${step.color};opacity:.75;animation-delay:${i*100}ms`}></div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
 
-    <!-- Traffic chart — large -->
+  <!-- CHART + DEVICES (v3 intact) -->
+  <div class="bento bento-main mb-6">
     <div class="fade-slide d-2 p-5 glass rounded-2xl border border-white/8">
       <div class="flex items-center justify-between mb-5">
-        <div>
-          <h3 class="text-sm font-semibold text-white">Trafic</h3>
-          <p class="text-xs text-gray-500 mt-0.5">Vues & clics · {days}j</p>
-        </div>
-        <!-- Legend -->
+        <div><h3 class="text-sm font-semibold text-white">Trafic</h3><p class="text-xs text-gray-500 mt-0.5">Vues & clics · {days}j</p></div>
         <div class="flex items-center gap-4">
-          <span class="flex items-center gap-1.5 text-xs text-gray-400">
-            <span class="w-3 h-0.5 bg-neon-green rounded-full inline-block"></span>Vues
-          </span>
-          <span class="flex items-center gap-1.5 text-xs text-gray-400">
-            <span class="w-3 h-0.5 bg-neon-purple rounded-full inline-block"></span>Clics
-          </span>
+          <span class="flex items-center gap-1.5 text-xs text-gray-400"><span class="w-3 h-0.5 bg-neon-green rounded-full inline-block"></span>Vues</span>
+          <span class="flex items-center gap-1.5 text-xs text-gray-400"><span class="w-3 h-0.5 bg-neon-purple rounded-full inline-block"></span>Clics</span>
         </div>
       </div>
       {chartLabels.length === 0 ? (
         <div class="flex flex-col items-center justify-center h-52 text-gray-600">
-          <svg class="w-10 h-10 mb-3 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4v16"/>
-          </svg>
+          <svg class="w-10 h-10 mb-3 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4v16"/></svg>
           <p class="text-sm">Aucune donnée sur cette période</p>
         </div>
-      ) : (
-        <canvas id="traffic-chart" style="max-height: 240px; width: 100%;"></canvas>
-      )}
+      ) : <canvas id="traffic-chart" style="max-height:240px;width:100%"></canvas>}
     </div>
-
-    <!-- Right column: device + CTR mini chart -->
     <div class="flex flex-col gap-4">
-
-      <!-- Device breakdown -->
       <div class="fade-slide d-3 p-5 glass rounded-2xl border border-white/8 flex-1">
         <h3 class="text-sm font-semibold text-white mb-4">Appareils</h3>
-        {deviceTotal === 0 ? (
-          <p class="text-sm text-gray-600 text-center py-6">Aucune donnée</p>
-        ) : (
+        {deviceTotal === 0 ? <p class="text-sm text-gray-600 text-center py-6">Aucune donnée</p> : (
           <div class="space-y-3">
             {[
-              { key: 'mobile',  label: 'Mobile',  color: '#00ff9d', icon: 'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z' },
-              { key: 'desktop', label: 'Desktop', color: '#bf00ff', icon: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
-              { key: 'tablet',  label: 'Tablet',  color: '#00aaff', icon: 'M12 18h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
+              { key:'mobile',  label:'Mobile',  color:'#00ff9d', icon:'M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z' },
+              { key:'desktop', label:'Desktop', color:'#bf00ff', icon:'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
+              { key:'tablet',  label:'Tablet',  color:'#00aaff', icon:'M12 18h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
             ].map(dev => {
-              const val  = deviceData[dev.key as keyof typeof deviceData];
-              const pct  = deviceTotal > 0 ? Math.round((val / deviceTotal) * 100) : 0;
+              const val = deviceData[dev.key as keyof typeof deviceData];
+              const pct = deviceTotal > 0 ? Math.round((val / deviceTotal) * 100) : 0;
               if (val === 0) return null;
               return (
                 <div>
                   <div class="flex items-center justify-between mb-1.5">
                     <span class="flex items-center gap-2 text-xs text-gray-400">
-                      <svg class="w-3 h-3" fill="none" stroke="currentColor" style={`color:${dev.color}`} viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={dev.icon}/>
-                      </svg>
+                      <svg class="w-3 h-3" fill="none" stroke="currentColor" style={`color:${dev.color}`} viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={dev.icon}/></svg>
                       {dev.label}
                     </span>
                     <span class="text-xs font-semibold text-white tabular-nums">{pct}%</span>
                   </div>
-                  <div class="bar-track">
-                    <div class="bar-fill" style={`width:${pct}%; background:${dev.color}; animation-delay:${300 + (pct * 3)}ms`}></div>
-                  </div>
+                  <div class="bar-track"><div class="bar-fill" style={`width:${pct}%;background:${dev.color};animation-delay:${300+(pct*3)}ms`}></div></div>
                 </div>
               );
             })}
           </div>
         )}
       </div>
-
-      <!-- CTR mini chart -->
       {chartLabels.length > 0 && (
         <div class="fade-slide d-4 p-5 glass rounded-2xl border border-white/8">
           <h3 class="text-sm font-semibold text-white mb-1">Taux de clic / jour</h3>
-          <canvas id="rate-chart" style="max-height: 80px; width: 100%;"></canvas>
+          <canvas id="rate-chart" style="max-height:80px;width:100%"></canvas>
         </div>
       )}
-
     </div>
   </div>
 
-  <!-- ===== INSIGHTS: TABBED (Geo · Sources · Blocks) ===== -->
-  <div class="fade-slide d-3 p-5 glass rounded-2xl border border-white/8 mb-6">
+  <!-- v4: ATTRIBUTION PAR CANAL -->
+  <div class="fade-slide d-2 p-5 glass rounded-2xl border border-white/8 mb-6">
+    <div class="flex items-center justify-between mb-5">
+      <div><h3 class="text-sm font-semibold text-white">Attribution par canal</h3><p class="text-xs text-gray-500 mt-0.5">Organic · Paid · Email · Influenceurs</p></div>
+      {!isPro && <span class="badge-pro">⚡ Pro pour UTM réel</span>}
+    </div>
+    {channels.length === 0 ? (
+      <p class="text-sm text-gray-700 text-center py-6">Ajoute des paramètres UTM à tes liens pour tracker les sources</p>
+    ) : (
+      <div class="space-y-1">
+        <div class="grid grid-cols-12 gap-2 px-3 pb-2 border-b border-white/6">
+          <span class="col-span-3 text-xs text-gray-600 font-medium uppercase tracking-wider">Canal</span>
+          <span class="col-span-2 text-xs text-gray-600 font-medium uppercase tracking-wider text-right">Vues</span>
+          <span class="col-span-2 text-xs text-gray-600 font-medium uppercase tracking-wider text-right">Leads</span>
+          <span class="col-span-2 text-xs text-gray-600 font-medium uppercase tracking-wider text-right">Revenue</span>
+          <span class="col-span-3 text-xs text-gray-600 font-medium uppercase tracking-wider text-right">Part</span>
+        </div>
+        {channels.map((ch, i) => {
+          const sharePct = totalChViews > 0 ? Math.round((ch.views / totalChViews) * 100) : 0;
+          const chClass  = ch.name.includes('Google') ? 'ch-google' : ch.name.includes('Meta') ? 'ch-meta' : ch.name.includes('TikTok') ? 'ch-tiktok' : (ch.name.includes('Organic') || ch.name === 'SEO') ? 'ch-organic' : ch.name === 'Email' ? 'ch-email' : ch.name === 'Influenceurs' ? 'ch-infl' : ch.name === 'Direct' ? 'ch-direct' : 'ch-other';
+          return (
+            <div class="grid grid-cols-12 gap-2 items-center px-3 py-2.5 rounded-xl hover:bg-white/3 transition-colors">
+              <div class="col-span-3"><span class={`text-xs font-bold px-2 py-0.5 rounded-full ${chClass}`}>{ch.name}</span></div>
+              <span class="col-span-2 text-sm text-white font-semibold tabular-nums text-right">{ch.views.toLocaleString('fr-FR')}</span>
+              <span class="col-span-2 text-sm tabular-nums text-right" style="color:#f59e0b">{ch.leads > 0 ? ch.leads : <span class="text-gray-700">—</span>}</span>
+              <span class="col-span-2 text-sm tabular-nums text-right" style="color:#a78bfa">{ch.revenue > 0 ? ch.revenue.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : <span class="text-gray-700">—</span>}</span>
+              <div class="col-span-3 flex items-center gap-2">
+                <div class="bar-track flex-1" style="height:4px"><div class="bar-fill" style={`width:${sharePct}%;background:#00ff9d60;animation-delay:${i*50}ms`}></div></div>
+                <span class="text-xs text-gray-500 tabular-nums w-7 text-right">{sharePct}%</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+    {isPro && channels.some(c => c.revenue > 0) && (
+      <div class="mt-4 pt-4 border-t border-white/6">
+        <p class="text-xs text-gray-600 uppercase tracking-widest font-medium mb-3">Revenue par canal</p>
+        <canvas id="roas-chart" style="max-height:100px;width:100%"></canvas>
+      </div>
+    )}
+  </div>
 
-    <!-- Tab nav -->
+  <!-- INSIGHTS TABBED (v3 intact) -->
+  <div class="fade-slide d-3 p-5 glass rounded-2xl border border-white/8 mb-6">
     <div class="flex items-center gap-1 mb-6 border-b border-white/8 pb-3 -mt-1 overflow-x-auto scrollbar-none">
       {[
-        { id: 'geo',     label: 'Géographie', icon: 'M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064' },
-        { id: 'sources', label: 'Sources',    icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.1-1.1m-.757-4.9a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1' },
-        { id: 'blocks',  label: 'Top Blocks', icon: 'M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5' },
+        { id:'geo',     label:'Géographie', icon:'M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064' },
+        { id:'sources', label:'Sources',    icon:'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.1-1.1m-.757-4.9a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1' },
+        { id:'blocks',  label:'Top Blocks', icon:'M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5' },
       ].map((tab, i) => (
-        <button
-          class={`insight-tab flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${i === 0 ? 'text-white bg-white/8' : 'text-gray-500 hover:text-gray-300'}`}
-          data-tab={tab.id}>
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={tab.icon}/>
-          </svg>
+        <button class={`insight-tab flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${i === 0 ? 'text-white bg-white/8' : 'text-gray-500 hover:text-gray-300'}`} data-tab={tab.id}>
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={tab.icon}/></svg>
           {tab.label}
         </button>
       ))}
     </div>
 
-    <!-- Panel: Geo -->
     <div class="insight-panel active" id="panel-geo">
       {topCountries.length === 0 ? (
         <div class="flex flex-col items-center justify-center py-16 gap-3 text-gray-600">
-          <svg class="w-12 h-12 opacity-15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064"/>
-          </svg>
+          <svg class="w-12 h-12 opacity-15" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064"/></svg>
           <p class="text-sm">Aucune donnée géographique disponible</p>
         </div>
       ) : (
         <div>
-          <!-- Choropleth map -->
           <div class="relative rounded-xl overflow-hidden mb-5" id="map-container" style="background:#07100d;">
-            <!-- Loader -->
-            <div id="world-map-loader" class="absolute inset-0 flex items-center justify-center z-10">
-              <div class="map-spinner"></div>
-            </div>
-            <!-- SVG map -->
+            <div id="world-map-loader" class="absolute inset-0 flex items-center justify-center z-10"><div class="map-spinner"></div></div>
             <svg id="world-map" style="width:100%;height:340px;display:block;opacity:0;transition:opacity 0.5s;cursor:grab;"></svg>
-            <!-- Tooltip -->
-            <div id="map-tooltip" class="pointer-events-none absolute hidden z-20
-              bg-black/95 border border-neon-green/25 text-white text-xs px-3 py-2 rounded-lg
-              backdrop-blur-sm shadow-xl whitespace-nowrap">
-            </div>
-            <!-- Zoom controls -->
+            <div id="map-tooltip" class="pointer-events-none absolute hidden z-20 bg-black/95 border border-neon-green/25 text-white text-xs px-3 py-2 rounded-lg backdrop-blur-sm shadow-xl whitespace-nowrap"></div>
             <div class="absolute bottom-3 right-3 z-20 flex flex-col gap-1">
-              <button id="map-zoom-in"
-                class="w-7 h-7 rounded-lg glass border border-white/10 text-gray-400 hover:text-neon-green hover:border-neon-green/30 transition-all flex items-center justify-center text-base leading-none"
-                title="Zoom +">+</button>
-              <button id="map-zoom-out"
-                class="w-7 h-7 rounded-lg glass border border-white/10 text-gray-400 hover:text-neon-green hover:border-neon-green/30 transition-all flex items-center justify-center text-base leading-none"
-                title="Zoom −">−</button>
-              <button id="map-reset"
-                class="w-7 h-7 rounded-lg glass border border-white/10 text-gray-400 hover:text-neon-green hover:border-neon-green/30 transition-all flex items-center justify-center"
-                title="Reset">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                </svg>
-              </button>
+              <button id="map-zoom-in"  class="w-7 h-7 rounded-lg glass border border-white/10 text-gray-400 hover:text-neon-green hover:border-neon-green/30 transition-all flex items-center justify-center text-base leading-none" title="Zoom +">+</button>
+              <button id="map-zoom-out" class="w-7 h-7 rounded-lg glass border border-white/10 text-gray-400 hover:text-neon-green hover:border-neon-green/30 transition-all flex items-center justify-center text-base leading-none" title="Zoom −">−</button>
+              <button id="map-reset"    class="w-7 h-7 rounded-lg glass border border-white/10 text-gray-400 hover:text-neon-green hover:border-neon-green/30 transition-all flex items-center justify-center" title="Reset"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button>
             </div>
-            <!-- Scale hint -->
             <div class="absolute bottom-3 left-3 text-xs text-gray-700 select-none">Scroll · Glisser</div>
           </div>
-
-          <!-- Country list -->
           <div class="grid sm:grid-cols-2 gap-2">
             {topCountries.slice(0, 8).map((ctry, i) => {
               const pct = Math.round((ctry.views / maxCountryViews) * 100);
               return (
-                <div class="country-row flex items-center gap-2.5 px-3 py-2 rounded-xl border border-white/5
-                  hover:border-neon-green/20 hover:bg-neon-green/3 transition-all cursor-default group"
-                  data-iso={ctry.country}>
+                <div class="country-row flex items-center gap-2.5 px-3 py-2 rounded-xl border border-white/5 hover:border-neon-green/20 hover:bg-neon-green/3 transition-all cursor-default group" data-iso={ctry.country}>
                   <span class="text-base leading-none shrink-0 w-6 text-center">{countryFlag(ctry.country ?? '')}</span>
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center justify-between gap-2 mb-1">
                       <span class="text-xs text-gray-300 font-medium group-hover:text-neon-green transition-colors truncate">{ctry.country || '??'}</span>
                       <span class="text-xs text-gray-600 tabular-nums font-mono shrink-0">{ctry.views.toLocaleString('fr-FR')}</span>
                     </div>
-                    <div class="bar-track">
-                      <div class="bar-fill" style={`width:${pct}%;background:linear-gradient(90deg,#00ff9d,#00ff9d40);animation-delay:${i*50}ms`}></div>
-                    </div>
+                    <div class="bar-track"><div class="bar-fill" style={`width:${pct}%;background:linear-gradient(90deg,#00ff9d,#00ff9d40);animation-delay:${i*50}ms`}></div></div>
                   </div>
-                  <span class="text-xs shrink-0 w-5 text-right opacity-50">
-                    {i < 3 ? ['🥇','🥈','🥉'][i] : `#${i+1}`}
-                  </span>
+                  <span class="text-xs shrink-0 w-5 text-right opacity-50">{i < 3 ? ['🥇','🥈','🥉'][i] : `#${i+1}`}</span>
                 </div>
               );
             })}
@@ -579,7 +586,6 @@ const exportedDays    = days;
       )}
     </div>
 
-    <!-- Panel: Sources -->
     <div class="insight-panel" id="panel-sources">
       {aggregatedReferrers.length === 0 ? (
         <p class="text-sm text-gray-600 text-center py-8">Aucune source identifiée</p>
@@ -591,22 +597,16 @@ const exportedDays    = days;
             const label = CAT_LABELS[r.category] ?? r.category;
             return (
               <div class="flex items-center gap-3">
-                <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold text-gray-600 border border-white/8 bg-white/3">
-                  {i + 1}
-                </div>
+                <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold text-gray-600 border border-white/8 bg-white/3">{i + 1}</div>
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center justify-between mb-1">
                     <div class="flex items-center gap-2 min-w-0">
                       <span class="text-sm text-white font-medium truncate">{r.label}</span>
-                      <span class="source-badge shrink-0" style={`background:${color}15; color:${color}; border: 1px solid ${color}30;`}>
-                        {label}
-                      </span>
+                      <span class="source-badge shrink-0" style={`background:${color}15;color:${color};border:1px solid ${color}30;`}>{label}</span>
                     </div>
                     <span class="text-xs text-gray-500 tabular-nums font-mono ml-2 shrink-0">{r.views.toLocaleString('fr-FR')}</span>
                   </div>
-                  <div class="bar-track">
-                    <div class="bar-fill" style={`width:${pct}%; background:${color}70; animation-delay:${i * 60}ms`}></div>
-                  </div>
+                  <div class="bar-track"><div class="bar-fill" style={`width:${pct}%;background:${color}70;animation-delay:${i * 60}ms`}></div></div>
                 </div>
               </div>
             );
@@ -615,7 +615,6 @@ const exportedDays    = days;
       )}
     </div>
 
-    <!-- Panel: Blocks -->
     <div class="insight-panel" id="panel-blocks">
       {topBlocks.length === 0 ? (
         <div class="text-center py-8">
@@ -630,22 +629,16 @@ const exportedDays    = days;
             const isFirst = i === 0;
             return (
               <div class={`flex items-center gap-3 p-3 rounded-xl border transition-all ${isFirst ? 'border-neon-green/20 bg-neon-green/3' : 'border-white/5 hover:border-white/10'}`}>
-                <div class={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 border ${i < 3 ? ['rank-1','rank-2','rank-3'][i] : 'text-gray-600 bg-white/3 border-white/8'}`}>
-                  {i + 1}
-                </div>
+                <div class={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 border ${i < 3 ? ['rank-1','rank-2','rank-3'][i] : 'text-gray-600 bg-white/3 border-white/8'}`}>{i + 1}</div>
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2 mb-1">
                     <Badge variant="default" size="sm">{block.type}</Badge>
                     <span class="text-sm text-white font-medium truncate">{block.title || 'Untitled'}</span>
                   </div>
-                  <div class="bar-track">
-                    <div class="bar-fill" style={`width:${barPct}%; background: ${isFirst ? '#00ff9d' : '#00ff9d50'}; animation-delay:${i * 50}ms`}></div>
-                  </div>
+                  <div class="bar-track"><div class="bar-fill" style={`width:${barPct}%;background:${isFirst ? '#00ff9d' : '#00ff9d50'};animation-delay:${i * 50}ms`}></div></div>
                 </div>
                 <div class="text-right shrink-0 pl-2">
-                  <div class={`text-sm font-bold tabular-nums ${isFirst ? 'text-neon-green' : 'text-white'}`}>
-                    {block.clicks.toLocaleString('fr-FR')}
-                  </div>
+                  <div class={`text-sm font-bold tabular-nums ${isFirst ? 'text-neon-green' : 'text-white'}`}>{block.clicks.toLocaleString('fr-FR')}</div>
                   <div class="text-xs text-gray-600">{ctr}%</div>
                 </div>
               </div>
@@ -654,24 +647,147 @@ const exportedDays    = days;
         </div>
       )}
     </div>
-
   </div>
 
-  <!-- ===== ALL BLOCKS TABLE ===== -->
+  <!-- v4: SHORT URL TRACKER (Creator+) -->
+  {isCreator && (
+    <div class="fade-slide d-3 p-5 glass rounded-2xl border border-white/8 mb-6">
+      <div class="flex items-center justify-between mb-5">
+        <div>
+          <h3 class="text-sm font-semibold text-white flex items-center gap-2">Short URL Tracker <span class="badge-creator">👑 Creator</span></h3>
+          <p class="text-xs text-gray-500 mt-0.5">Performance de chaque lien court · {shortUrls.length} lien{shortUrls.length !== 1 ? 's' : ''}</p>
+        </div>
+        <a href="/dashboard/links" class="text-xs text-neon-green/70 hover:text-neon-green transition-colors">Gérer →</a>
+      </div>
+      {shortUrls.length === 0 ? (
+        <div class="text-center py-8 text-gray-700">
+          <p class="text-sm">Aucun lien court créé</p>
+          <a href="/dashboard/links" class="text-xs text-neon-green hover:underline mt-1 inline-block">Créer un lien →</a>
+        </div>
+      ) : (
+        <div class="overflow-x-auto -mx-1 scrollbar-none">
+          <table class="w-full text-sm min-w-[520px]">
+            <thead>
+              <tr>
+                <th class="text-left pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5">Lien</th>
+                <th class="text-left pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5 hidden sm:table-cell">Destination</th>
+                <th class="text-right pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5">Clics</th>
+                <th class="text-right pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5 hidden md:table-cell">Créé</th>
+                <th class="pb-3 px-2 border-b border-white/5 w-28 hidden lg:table-cell"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {shortUrls.map((link, i) => {
+                const maxC   = shortUrls[0]?.click_count ?? 1;
+                const barPct = maxC > 0 ? Math.round((link.click_count / maxC) * 100) : 0;
+                return (
+                  <tr class="border-b border-white/4 last:border-0 hover:bg-white/2 transition-colors">
+                    <td class="py-3 px-2">
+                      <div class="flex items-center gap-2">
+                        {i === 0 && <span class="text-yellow-400 text-xs shrink-0">★</span>}
+                        <span class="font-mono text-neon-green text-xs font-semibold">/{link.slug}</span>
+                        {link.title && <span class="text-gray-500 text-xs truncate max-w-[90px] hidden sm:inline">{link.title}</span>}
+                      </div>
+                    </td>
+                    <td class="py-3 px-2 hidden sm:table-cell"><span class="text-gray-500 text-xs">{link.target_url?.replace(/^https?:\/\/(www\.)?/,'').slice(0,36)}</span></td>
+                    <td class="py-3 px-2 text-right"><span class={`font-semibold tabular-nums ${link.click_count > 0 ? 'text-neon-green' : 'text-gray-700'}`}>{(link.click_count ?? 0).toLocaleString('fr-FR')}</span></td>
+                    <td class="py-3 px-2 text-right text-gray-600 text-xs hidden md:table-cell">{new Date(link.created_at).toLocaleDateString('fr-FR', {day:'2-digit',month:'short'})}</td>
+                    <td class="py-3 px-2 hidden lg:table-cell"><div class="bar-track" style="height:4px"><div class="bar-fill" style={`width:${barPct}%;background:#00ff9d60;animation-delay:${i*40}ms`}></div></div></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )}
+
+  <!-- v4: UTM CAMPAIGNS (Pro gate) -->
+  <div class="fade-slide d-4 p-5 glass rounded-2xl border border-white/8 mb-6" style="position:relative;overflow:hidden">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h3 class="text-sm font-semibold text-white flex items-center gap-2">Campagnes UTM <span class="badge-pro">⚡ Pro</span></h3>
+        <p class="text-xs text-gray-500 mt-0.5">source · medium · campaign · device · pays · CPA</p>
+      </div>
+      {isPro && utmData.length > 0 && <span class="text-xs text-gray-600">{utmData.length} événements</span>}
+    </div>
+    {!isPro ? (
+      <div style="position:absolute;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(8px);background:rgba(0,0,0,.72);border-radius:inherit">
+        <div class="text-center px-8 py-6">
+          <div class="text-3xl mb-3">⚡</div>
+          <p class="text-sm font-bold text-white mb-1">Tracking UTM avancé</p>
+          <p class="text-xs text-gray-500 mb-5 max-w-xs mx-auto">Suis chaque campagne Google, Meta, TikTok avec source / medium / device / pays et calcule ROAS et CPA.</p>
+          <a href="/dashboard/billing" style="display:inline-flex;padding:10px 20px;border-radius:12px;background:rgba(168,85,247,.2);border:1px solid rgba(168,85,247,.4);color:#c084fc;font-size:14px;font-weight:700;text-decoration:none">Passer Pro →</a>
+        </div>
+        <div class="w-full px-5 pb-4" style="visibility:hidden;pointer-events:none">
+          <div style="height:32px;background:rgba(255,255,255,.04);border-radius:8px;margin-bottom:8px"></div>
+          <div style="height:32px;background:rgba(255,255,255,.03);border-radius:8px;margin-bottom:8px"></div>
+          <div style="height:32px;background:rgba(255,255,255,.03);border-radius:8px"></div>
+        </div>
+      </div>
+    ) : utmData.length === 0 ? (
+      <div class="text-center py-8 text-gray-700">
+        <p class="text-sm">Aucun événement UTM sur cette période</p>
+        <p class="text-xs mt-1">Ajoute <code class="text-neon-green">?utm_source=google&utm_medium=cpc&utm_campaign=nom</code> à tes liens</p>
+      </div>
+    ) : (
+      <div class="overflow-x-auto -mx-1 scrollbar-none">
+        {(() => {
+          type CS = { source:string; medium:string; campaign:string; views:number; leads:number; sales:number; revenue:number; devices:Record<string,number>; countries:Record<string,number> };
+          const cm = new Map<string, CS>();
+          for (const row of utmData) {
+            const key = `${row.source}|${row.medium}|${row.campaign ?? '(none)'}`;
+            const e   = cm.get(key) ?? { source:row.source??'', medium:row.medium??'', campaign:row.campaign??'(none)', views:0, leads:0, sales:0, revenue:0, devices:{}, countries:{} };
+            e.views++;
+            if (row.converted)   e.leads++;
+            if (row.revenue > 0) { e.sales++; e.revenue += row.revenue; }
+            if (row.device)  e.devices[row.device]  = (e.devices[row.device]  ?? 0) + 1;
+            if (row.country) e.countries[row.country] = (e.countries[row.country] ?? 0) + 1;
+            cm.set(key, e);
+          }
+          const camps = Array.from(cm.values()).sort((a,b) => b.views - a.views).slice(0, 10);
+          return (
+            <table class="w-full text-sm min-w-[680px]">
+              <thead>
+                <tr>{['Campaign','Source','Medium','Vues','Leads','Revenue','CPA','Device','Pays'].map(h => <th class="text-left pb-3 px-2 text-xs font-medium text-gray-600 uppercase tracking-widest border-b border-white/5 whitespace-nowrap">{h}</th>)}</tr>
+              </thead>
+              <tbody>
+                {camps.map(c => {
+                  const topDev  = Object.entries(c.devices).sort((a,b)=>b[1]-a[1])[0]?.[0] ?? '—';
+                  const topCtry = Object.entries(c.countries).sort((a,b)=>b[1]-a[1])[0]?.[0] ?? '—';
+                  const cpa     = c.sales > 0 ? `${(c.revenue/c.sales).toFixed(0)}€` : '—';
+                  const chCls   = c.medium?.toLowerCase().includes('cpc') ? 'ch-google' : 'ch-organic';
+                  return (
+                    <tr class="border-b border-white/4 last:border-0 hover:bg-white/2 transition-colors">
+                      <td class="py-2.5 px-2 text-white text-xs font-medium max-w-[110px] truncate">{c.campaign}</td>
+                      <td class="py-2.5 px-2"><span class={`text-xs font-semibold px-2 py-0.5 rounded-full ${chCls}`}>{c.source||'—'}</span></td>
+                      <td class="py-2.5 px-2 text-gray-500 text-xs">{c.medium||'—'}</td>
+                      <td class="py-2.5 px-2 tabular-nums font-semibold text-white">{c.views.toLocaleString('fr-FR')}</td>
+                      <td class="py-2.5 px-2 tabular-nums text-xs" style="color:#f59e0b">{c.leads > 0 ? c.leads : <span class="text-gray-700">—</span>}</td>
+                      <td class="py-2.5 px-2 tabular-nums text-xs" style="color:#a78bfa">{c.revenue > 0 ? c.revenue.toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}) : <span class="text-gray-700">—</span>}</td>
+                      <td class="py-2.5 px-2 tabular-nums text-gray-400 text-xs">{cpa}</td>
+                      <td class="py-2.5 px-2 text-gray-400 text-xs capitalize">{topDev}</td>
+                      <td class="py-2.5 px-2 text-gray-400 text-xs">{topCtry !== '—' ? `${countryFlag(topCtry)} ${topCtry}` : '—'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          );
+        })()}
+      </div>
+    )}
+  </div>
+
+  <!-- ALL BLOCKS TABLE (v3 intact) -->
   <div class="fade-slide d-4 p-5 glass rounded-2xl border border-white/8">
     <div class="flex items-center justify-between mb-5">
-      <div>
-        <h3 class="text-sm font-semibold text-white">Tous les blocs</h3>
-        <p class="text-xs text-gray-500 mt-0.5">Performance complète · {blocks.length} bloc{blocks.length !== 1 ? 's' : ''}</p>
-      </div>
-      <a href="/dashboard/blocks" class="text-xs text-neon-green/70 hover:text-neon-green transition-colors">
-        Gérer →
-      </a>
+      <div><h3 class="text-sm font-semibold text-white">Tous les blocs</h3><p class="text-xs text-gray-500 mt-0.5">Performance complète · {blocks.length} bloc{blocks.length !== 1 ? 's' : ''}</p></div>
+      <a href="/dashboard/blocks" class="text-xs text-neon-green/70 hover:text-neon-green transition-colors">Gérer →</a>
     </div>
     {blocks.length === 0 ? (
-      <div class="text-center py-10 text-gray-600 text-sm">
-        <a href="/dashboard/blocks" class="text-neon-green hover:underline">Ajouter des blocs</a>
-      </div>
+      <div class="text-center py-10 text-gray-600 text-sm"><a href="/dashboard/blocks" class="text-neon-green hover:underline">Ajouter des blocs</a></div>
     ) : (
       <div class="overflow-x-auto -mx-1 scrollbar-none">
         <table class="w-full text-sm min-w-[500px]">
@@ -687,27 +803,18 @@ const exportedDays    = days;
             {blocks.map((block, i) => {
               const found       = topBlocks.find((tb) => tb.block_id === block.id);
               const blockClicks = found?.clicks ?? 0;
-              const ctr         = summary.totalViews > 0
-                ? ((blockClicks / summary.totalViews) * 100).toFixed(1) : '0.0';
+              const ctr         = summary.totalViews > 0 ? ((blockClicks / summary.totalViews) * 100).toFixed(1) : '0.0';
               const isTop       = !!found;
               return (
                 <tr class="group border-b border-white/4 last:border-0 hover:bg-white/2 transition-colors">
                   <td class="py-3 px-2">
                     <div class="flex items-center gap-2.5">
                       <Badge variant="default" size="sm">{block.type}</Badge>
-                      <span class="text-white font-medium truncate max-w-[200px]">
-                        {block.title || 'Untitled'}
-                      </span>
-                      {i === 0 && topBlocks.length > 0 && isTop && (
-                        <span class="text-xs text-yellow-400/70">★</span>
-                      )}
+                      <span class="text-white font-medium truncate max-w-[200px]">{block.title || 'Untitled'}</span>
+                      {i === 0 && topBlocks.length > 0 && isTop && <span class="text-xs text-yellow-400/70">★</span>}
                     </div>
                   </td>
-                  <td class="py-3 px-2 text-right">
-                    <span class={`font-semibold tabular-nums ${blockClicks > 0 ? 'text-neon-green' : 'text-gray-700'}`}>
-                      {blockClicks.toLocaleString('fr-FR')}
-                    </span>
-                  </td>
+                  <td class="py-3 px-2 text-right"><span class={`font-semibold tabular-nums ${blockClicks > 0 ? 'text-neon-green' : 'text-gray-700'}`}>{blockClicks.toLocaleString('fr-FR')}</span></td>
                   <td class="py-3 px-2 text-right text-gray-500 tabular-nums">{ctr}%</td>
                   <td class="py-3 px-2 text-center">
                     <span class={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${block.active ? 'text-neon-green bg-neon-green/10' : 'text-gray-600 bg-white/5'}`}>
@@ -724,23 +831,28 @@ const exportedDays    = days;
     )}
   </div>
 
-  <!-- ===== DATA BRIDGE + SCRIPT ===== -->
+  <!-- DATA BRIDGE (v3 keys + v4 channels + isPro) -->
   <div aria-hidden="true" class="contents">
     <div id="chart-data" class="hidden"
       data-chart={JSON.stringify(exportedChart)}
       data-devices={JSON.stringify(exportedDevices)}
       data-days={String(exportedDays)}
-      data-countries={JSON.stringify(topCountries)}>
+      data-countries={JSON.stringify(topCountries)}
+      data-channels={JSON.stringify(exportedChannels)}
+      data-is-pro={String(isPro)}>
     </div>
   </div>
 
+  <!-- SCRIPT (v3 intact + ROAS chart + Export CSV) -->
   <script>
     (async () => {
       const el = document.getElementById('chart-data');
       if (!el) return;
-      const exportedChart   = JSON.parse(el.dataset.chart   ?? '{}');
-      const exportedDevices = JSON.parse(el.dataset.devices ?? '{}');
-      const exportedDays    = Number(el.dataset.days ?? 7);
+      const exportedChart    = JSON.parse(el.dataset.chart    ?? '{}');
+      const exportedDevices  = JSON.parse(el.dataset.devices  ?? '{}');
+      const exportedDays     = Number(el.dataset.days ?? 7);
+      const exportedChannels = JSON.parse(el.dataset.channels ?? '[]');
+      const isPro            = el.dataset.isPro === 'true';
 
       await new Promise((resolve, reject) => {
         if (typeof Chart !== 'undefined') { resolve(null); return; }
@@ -755,7 +867,7 @@ const exportedDays    = days;
       const GREEN  = '#00ff9d';
       const PURPLE = '#bf00ff';
 
-      // ── Traffic chart ──────────────────────────────────────────────────
+      // Traffic chart (v3 intact)
       const trafficCtx = document.getElementById('traffic-chart');
       if (trafficCtx && exportedChart.labels?.length > 0) {
         new Chart(trafficCtx, {
@@ -764,132 +876,79 @@ const exportedDays    = days;
             labels: exportedChart.labels,
             datasets: [
               {
-                label: 'Vues',
-                data: exportedChart.views,
-                borderColor: GREEN,
-                backgroundColor: (ctx) => {
-                  const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height);
-                  gradient.addColorStop(0,   GREEN + '22');
-                  gradient.addColorStop(1,   GREEN + '00');
-                  return gradient;
-                },
-                borderWidth: 2,
-                tension: 0.4,
-                fill: true,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                pointHoverBackgroundColor: GREEN,
-                pointHoverBorderColor: '#0a0a0a',
-                pointHoverBorderWidth: 2,
+                label: 'Vues', data: exportedChart.views, borderColor: GREEN,
+                backgroundColor: (ctx) => { const g = ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height); g.addColorStop(0,GREEN+'22'); g.addColorStop(1,GREEN+'00'); return g; },
+                borderWidth: 2, tension: 0.4, fill: true, pointRadius: 0, pointHoverRadius: 4,
+                pointHoverBackgroundColor: GREEN, pointHoverBorderColor: '#0a0a0a', pointHoverBorderWidth: 2,
               },
               {
-                label: 'Clics',
-                data: exportedChart.clicks,
-                borderColor: PURPLE,
-                backgroundColor: (ctx) => {
-                  const gradient = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height);
-                  gradient.addColorStop(0,   PURPLE + '22');
-                  gradient.addColorStop(1,   PURPLE + '00');
-                  return gradient;
-                },
-                borderWidth: 2,
-                tension: 0.4,
-                fill: true,
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                pointHoverBackgroundColor: PURPLE,
-                pointHoverBorderColor: '#0a0a0a',
-                pointHoverBorderWidth: 2,
+                label: 'Clics', data: exportedChart.clicks, borderColor: PURPLE,
+                backgroundColor: (ctx) => { const g = ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height); g.addColorStop(0,PURPLE+'22'); g.addColorStop(1,PURPLE+'00'); return g; },
+                borderWidth: 2, tension: 0.4, fill: true, pointRadius: 0, pointHoverRadius: 4,
+                pointHoverBackgroundColor: PURPLE, pointHoverBorderColor: '#0a0a0a', pointHoverBorderWidth: 2,
               },
             ],
           },
           options: {
-            responsive: true,
-            maintainAspectRatio: false,
+            responsive: true, maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                backgroundColor: '#111115',
-                titleColor: '#fff',
-                bodyColor: '#9ca3af',
-                borderColor: 'rgba(255,255,255,0.08)',
-                borderWidth: 1,
-                padding: 12,
-                displayColors: true,
-                boxWidth: 8,
-                boxHeight: 8,
-                boxPadding: 4,
-                usePointStyle: true,
-              },
-            },
+            plugins: { legend: { display: false }, tooltip: { backgroundColor: '#111115', titleColor: '#fff', bodyColor: '#9ca3af', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1, padding: 12, displayColors: true, boxWidth: 8, boxHeight: 8, boxPadding: 4, usePointStyle: true } },
             scales: {
-              y: {
-                beginAtZero: true,
-                ticks: { color: '#4b5563', font: { size: 10 }, maxTicksLimit: 5 },
-                grid: { color: GRID },
-                border: { display: false },
-              },
-              x: {
-                ticks: {
-                  color: '#4b5563',
-                  font: { size: 10 },
-                  maxTicksLimit: exportedDays === 7 ? 7 : exportedDays === 30 ? 10 : 12,
-                  maxRotation: 0,
-                },
-                grid: { display: false },
-                border: { display: false },
-              },
+              y: { beginAtZero: true, ticks: { color: '#4b5563', font: { size: 10 }, maxTicksLimit: 5 }, grid: { color: GRID }, border: { display: false } },
+              x: { ticks: { color: '#4b5563', font: { size: 10 }, maxTicksLimit: exportedDays === 7 ? 7 : exportedDays === 30 ? 10 : 12, maxRotation: 0 }, grid: { display: false }, border: { display: false } },
             },
           },
         });
       }
 
-      // ── Click rate mini bar chart ────────────────────────────────────────
+      // CTR mini bar (v3 intact)
       const rateCtx = document.getElementById('rate-chart');
       if (rateCtx && exportedChart.labels?.length > 0) {
         new Chart(rateCtx, {
           type: 'bar',
-          data: {
-            labels: exportedChart.labels,
-            datasets: [{
-              data: exportedChart.rates,
-              backgroundColor: GREEN + '30',
-              borderColor: GREEN + '70',
-              borderWidth: 1,
-              borderRadius: 3,
-            }],
-          },
+          data: { labels: exportedChart.labels, datasets: [{ data: exportedChart.rates, backgroundColor: GREEN+'30', borderColor: GREEN+'70', borderWidth: 1, borderRadius: 3 }] },
           options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                backgroundColor: '#111115',
-                titleColor: '#fff',
-                bodyColor: '#9ca3af',
-                borderColor: 'rgba(255,255,255,0.08)',
-                borderWidth: 1,
-                callbacks: { label: (ctx) => ` ${ctx.parsed.y}%` },
-              },
-            },
-            scales: {
-              y: {
-                display: false, beginAtZero: true,
-                grid: { display: false }, border: { display: false },
-              },
-              x: {
-                display: false,
-                grid: { display: false }, border: { display: false },
-              },
-            },
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { backgroundColor: '#111115', titleColor: '#fff', bodyColor: '#9ca3af', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1, callbacks: { label: (ctx) => ` ${ctx.parsed.y}%` } } },
+            scales: { y: { display: false, beginAtZero: true, grid: { display: false }, border: { display: false } }, x: { display: false, grid: { display: false }, border: { display: false } } },
           },
         });
       }
 
+      // ROAS chart (v4 new — Pro only)
+      const roasCtx = document.getElementById('roas-chart');
+      if (roasCtx && isPro && exportedChannels?.length > 0) {
+        const chWithRev = exportedChannels.filter(c => c.revenue > 0);
+        if (chWithRev.length > 0) {
+          const COLORS = ['#a78bfa','#38bdf8','#00ff9d','#f59e0b','#fb7185','#34d399'];
+          new Chart(roasCtx, {
+            type: 'bar',
+            data: { labels: chWithRev.map(c => c.name), datasets: [{ label: 'Revenue', data: chWithRev.map(c => c.revenue), backgroundColor: COLORS.slice(0, chWithRev.length).map(c => c+'44'), borderColor: COLORS.slice(0, chWithRev.length), borderWidth: 1.5, borderRadius: 6 }] },
+            options: {
+              responsive: true, maintainAspectRatio: false,
+              plugins: { legend: { display: false }, tooltip: { backgroundColor: '#111115', titleColor: '#fff', bodyColor: '#9ca3af', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1, callbacks: { label: (ctx) => ` ${Number(ctx.parsed.y).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}` } } },
+              scales: {
+                y: { beginAtZero: true, ticks: { color: '#4b5563', font: { size: 10 }, maxTicksLimit: 4, callback: (v) => v >= 1000 ? `${Math.round(v/1000)}k€` : `${v}€` }, grid: { color: GRID }, border: { display: false } },
+                x: { ticks: { color: '#4b5563', font: { size: 10 } }, grid: { display: false }, border: { display: false } },
+              },
+            },
+          });
+        }
+      }
 
-      // ── D3 Choropleth World Map ─────────────────────────────────────────────
+      // Export CSV (v4 new)
+      document.getElementById('export-csv-btn')?.addEventListener('click', () => {
+        if (!exportedChart?.labels?.length) { alert('Aucune donnée à exporter'); return; }
+        const rows = [['Date','Vues','Clics','CTR%']];
+        exportedChart.labels.forEach((l, i) => rows.push([l, exportedChart.views[i], exportedChart.clicks[i], exportedChart.rates[i]]));
+        const csv  = rows.map(r => r.join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url  = URL.createObjectURL(blob);
+        Object.assign(document.createElement('a'), { href: url, download: `analytics-${exportedDays}j.csv` }).click();
+        URL.revokeObjectURL(url);
+      });
+
+      // D3 Map (v3 intact)
       const countriesData = JSON.parse(el.dataset.countries ?? '[]');
       const mapSvgEl   = document.getElementById('world-map');
       const mapLoader  = document.getElementById('world-map-loader');
@@ -899,291 +958,124 @@ const exportedDays    = days;
       const btnReset   = document.getElementById('map-reset');
 
       if (mapSvgEl) {
-        // ── Load D3 + TopoJSON in parallel ──────────────────────────────────
         await Promise.all([
-          new Promise((res, rej) => {
-            if (window.d3) { res(null); return; }
-            const s = document.createElement('script');
-            s.src = 'https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js';
-            s.onload = res; s.onerror = rej;
-            document.head.appendChild(s);
-          }),
-          new Promise((res, rej) => {
-            if (window.topojson) { res(null); return; }
-            const s = document.createElement('script');
-            s.src = 'https://cdn.jsdelivr.net/npm/topojson@3.0.2/dist/topojson.min.js';
-            s.onload = res; s.onerror = rej;
-            document.head.appendChild(s);
-          }),
+          new Promise((res, rej) => { if (window.d3) { res(null); return; } const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s); }),
+          new Promise((res, rej) => { if (window.topojson) { res(null); return; } const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/topojson@3.0.2/dist/topojson.min.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s); }),
         ]);
 
-        // ── Fetch 50m world data (more detail than 110m) ────────────────────
-        const world = await fetch(
-          'https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json'
-        ).then(r => r.json());
+        const world = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json').then(r => r.json());
 
-        // ── ISO2 → numeric map ───────────────────────────────────────────────
         const ISO2_NUM = {
-          AF:'4',AL:'8',DZ:'12',AO:'24',AR:'32',AU:'36',AT:'40',AZ:'31',
-          BD:'50',BE:'56',BJ:'204',BO:'68',BR:'76',BG:'100',CA:'124',CL:'152',
-          CN:'156',CO:'170',CD:'180',CR:'188',HR:'191',CZ:'203',DK:'208',
-          EG:'818',ET:'231',FI:'246',FR:'250',DE:'276',GH:'288',GR:'300',
-          HK:'344',HU:'348',IN:'356',ID:'360',IR:'364',IQ:'368',IE:'372',
-          IL:'376',IT:'380',CI:'384',JP:'392',JO:'400',KZ:'398',KE:'404',
-          KR:'410',KW:'414',LB:'422',LY:'434',MA:'504',MX:'484',MM:'104',
-          NL:'528',NZ:'554',NG:'566',NO:'578',PK:'586',PE:'604',PH:'608',
-          PL:'616',PT:'620',QA:'634',RO:'642',RU:'643',SA:'682',SN:'686',
-          SG:'702',SK:'703',SI:'705',SO:'706',ZA:'710',ES:'724',SE:'752',
-          CH:'756',SY:'760',TW:'158',TZ:'834',TH:'764',TN:'788',TR:'792',
-          UA:'804',AE:'784',GB:'826',US:'840',UY:'858',VE:'862',VN:'704',
-          YE:'887',ZW:'716',MG:'450',CM:'120',GN:'324',ML:'466',TD:'148',
-          NE:'562',LK:'144',KH:'116',MN:'496',IS:'352',LV:'428',LT:'440',
-          EE:'233',RS:'688',BA:'70',MK:'807',GE:'268',BY:'112',MD:'498',
-          AM:'51',UZ:'860',TM:'795',KG:'417',TJ:'762',LU:'442',CY:'196',
-          MT:'470',MZ:'508',ZM:'894',MW:'454',UG:'800',RW:'646',BI:'108',
-          SS:'728',SD:'729',LR:'430',SL:'694',BF:'854',GW:'624',GM:'270',
-          CV:'132',GQ:'226',GA:'266',CG:'178',CF:'140',ER:'232',DJ:'262',
-          KM:'174',SC:'690',MU:'480',MR:'478',LI:'438',MC:'492',SM:'674',
+          AF:'4',AL:'8',DZ:'12',AO:'24',AR:'32',AU:'36',AT:'40',AZ:'31',BD:'50',BE:'56',BJ:'204',BO:'68',BR:'76',BG:'100',CA:'124',CL:'152',
+          CN:'156',CO:'170',CD:'180',CR:'188',HR:'191',CZ:'203',DK:'208',EG:'818',ET:'231',FI:'246',FR:'250',DE:'276',GH:'288',GR:'300',
+          HK:'344',HU:'348',IN:'356',ID:'360',IR:'364',IQ:'368',IE:'372',IL:'376',IT:'380',CI:'384',JP:'392',JO:'400',KZ:'398',KE:'404',
+          KR:'410',KW:'414',LB:'422',LY:'434',MA:'504',MX:'484',MM:'104',NL:'528',NZ:'554',NG:'566',NO:'578',PK:'586',PE:'604',PH:'608',
+          PL:'616',PT:'620',QA:'634',RO:'642',RU:'643',SA:'682',SN:'686',SG:'702',SK:'703',SI:'705',SO:'706',ZA:'710',ES:'724',SE:'752',
+          CH:'756',SY:'760',TW:'158',TZ:'834',TH:'764',TN:'788',TR:'792',UA:'804',AE:'784',GB:'826',US:'840',UY:'858',VE:'862',VN:'704',
+          YE:'887',ZW:'716',MG:'450',CM:'120',GN:'324',ML:'466',TD:'148',NE:'562',LK:'144',KH:'116',MN:'496',IS:'352',LV:'428',LT:'440',
+          EE:'233',RS:'688',BA:'70',MK:'807',GE:'268',BY:'112',MD:'498',AM:'51',UZ:'860',TM:'795',KG:'417',TJ:'762',LU:'442',CY:'196',
+          MT:'470',MZ:'508',ZM:'894',MW:'454',UG:'800',RW:'646',BI:'108',SS:'728',SD:'729',LR:'430',SL:'694',BF:'854',GW:'624',GM:'270',
+          CV:'132',GQ:'226',GA:'266',CG:'178',CF:'140',ER:'232',DJ:'262',KM:'174',SC:'690',MU:'480',MR:'478',LI:'438',MC:'492',SM:'674',
           VA:'336',AD:'20',ME:'499',XK:'383',
         };
 
-        // Build views maps (numeric ID → data)
-        const maxViews  = countriesData.length > 0 ? countriesData[0].views : 1;
-        const viewsMap  = new Map();
-        const iso2Map   = new Map(); // num → ISO2
-        const labelMap  = new Map(); // num → display name
-
+        const maxViews = countriesData.length > 0 ? countriesData[0].views : 1;
+        const viewsMap = new Map(); const iso2Map = new Map(); const labelMap = new Map();
         countriesData.forEach(row => {
-          const num = ISO2_NUM[row.country];
-          if (!num) return;
-          viewsMap.set(+num, row.views);
-          iso2Map.set(+num, row.country);
-          labelMap.set(+num, row.country);
+          const num = ISO2_NUM[row.country]; if (!num) return;
+          viewsMap.set(+num, row.views); iso2Map.set(+num, row.country); labelMap.set(+num, row.country);
         });
 
-        // ── Color scale ──────────────────────────────────────────────────────
-        // Log scale so small countries aren't invisible
         const colorScale = maxViews > 1
-          ? d3.scaleSequentialLog()
-              .domain([1, maxViews])
-              .interpolator(d3.interpolate('#0f2a1a', '#00ff9d'))
+          ? d3.scaleSequentialLog().domain([1, maxViews]).interpolator(d3.interpolate('#0f2a1a', '#00ff9d'))
           : () => '#0f2a1a';
 
-        const W = mapSvgEl.clientWidth  || 720;
-        const H = 340;
-
-        const svg = d3.select(mapSvgEl)
-          .attr('width',  W)
-          .attr('height', H);
-
-        // ── Projection: Natural Earth ────────────────────────────────────────
-        const projection = d3.geoNaturalEarth1()
-          .scale(W / 6.1)
-          .translate([W / 2, H / 2 + 15]);
-
+        const W = mapSvgEl.clientWidth || 720, H = 340;
+        const svg = d3.select(mapSvgEl).attr('width', W).attr('height', H);
+        const projection = d3.geoNaturalEarth1().scale(W / 6.1).translate([W / 2, H / 2 + 15]);
         const pathGen = d3.geoPath().projection(projection);
-
-        // ── Zoom group (all map content goes here) ───────────────────────────
         const g = svg.append('g').attr('class', 'map-root');
 
-        // Background sphere
-        g.append('path')
-          .datum({ type: 'Sphere' })
-          .attr('d', pathGen)
-          .attr('fill', '#060d0a')
-          .attr('stroke', 'rgba(0,255,157,0.04)')
-          .attr('stroke-width', 0.8);
+        g.append('path').datum({ type: 'Sphere' }).attr('d', pathGen).attr('fill', '#060d0a').attr('stroke', 'rgba(0,255,157,0.04)').attr('stroke-width', 0.8);
+        g.append('path').datum(d3.geoGraticule().step([20, 20])()).attr('d', pathGen).attr('fill', 'none').attr('stroke', 'rgba(255,255,255,0.025)').attr('stroke-width', 0.4);
 
-        // Graticule
-        const graticule = d3.geoGraticule().step([20, 20]);
-        g.append('path')
-          .datum(graticule())
-          .attr('d', pathGen)
-          .attr('fill', 'none')
-          .attr('stroke', 'rgba(255,255,255,0.025)')
-          .attr('stroke-width', 0.4);
-
-        // Country fills
         const countries = topojson.feature(world, world.objects.countries);
-        g.selectAll('.country')
-          .data(countries.features)
-          .join('path')
-          .attr('class', 'country')
-          .attr('d', pathGen)
-          .attr('fill', d => {
-            const v = viewsMap.get(+d.id);
-            return v ? colorScale(v) : '#101f16';
-          })
-          .attr('stroke', '#0c1a12')
-          .attr('stroke-width', 0.4);
+        g.selectAll('.country').data(countries.features).join('path').attr('class', 'country').attr('d', pathGen)
+          .attr('fill', d => { const v = viewsMap.get(+d.id); return v ? colorScale(v) : '#101f16'; })
+          .attr('stroke', '#0c1a12').attr('stroke-width', 0.4);
 
-        // Country borders (mesh)
-        g.append('path')
-          .datum(topojson.mesh(world, world.objects.countries, (a, b) => a !== b))
-          .attr('d', pathGen)
-          .attr('fill', 'none')
-          .attr('stroke', 'rgba(0,255,157,0.07)')
-          .attr('stroke-width', 0.5);
+        g.append('path').datum(topojson.mesh(world, world.objects.countries, (a, b) => a !== b)).attr('d', pathGen).attr('fill', 'none').attr('stroke', 'rgba(0,255,157,0.07)').attr('stroke-width', 0.5);
 
-        // ── Pulse dots on top countries ──────────────────────────────────────
         const dotsGroup = g.append('g').attr('class', 'dots');
         countriesData.slice(0, 6).forEach((row, idx) => {
-          const num  = ISO2_NUM[row.country];
-          if (!num) return;
-          const feat = countries.features.find(f => +f.id === +num);
-          if (!feat) return;
-          const cen  = pathGen.centroid(feat);
-          if (!cen || isNaN(cen[0]) || isNaN(cen[1])) return;
-
+          const num  = ISO2_NUM[row.country]; if (!num) return;
+          const feat = countries.features.find(f => +f.id === +num); if (!feat) return;
+          const cen  = pathGen.centroid(feat); if (!cen || isNaN(cen[0]) || isNaN(cen[1])) return;
           const intensity = row.views / maxViews;
           const r = 2.5 + intensity * 5.5;
-
-          // Outer glow
-          dotsGroup.append('circle')
-            .attr('cx', cen[0]).attr('cy', cen[1])
-            .attr('r', r + 6).attr('fill', `rgba(0,255,157,${0.06 + intensity * 0.08})`)
-            .attr('pointer-events', 'none');
-
-          // Core dot
-          dotsGroup.append('circle')
-            .attr('cx', cen[0]).attr('cy', cen[1])
-            .attr('r', r)
-            .attr('fill', idx === 0 ? '#00ff9d' : `rgba(0,255,157,${0.5 + intensity * 0.4})`)
-            .attr('stroke', idx === 0 ? 'rgba(0,255,157,0.4)' : 'none')
-            .attr('stroke-width', 1.5)
-            .attr('pointer-events', 'none');
+          dotsGroup.append('circle').attr('cx', cen[0]).attr('cy', cen[1]).attr('r', r + 6).attr('fill', `rgba(0,255,157,${0.06 + intensity * 0.08})`).attr('pointer-events', 'none');
+          dotsGroup.append('circle').attr('cx', cen[0]).attr('cy', cen[1]).attr('r', r).attr('fill', idx === 0 ? '#00ff9d' : `rgba(0,255,157,${0.5 + intensity * 0.4})`).attr('stroke', idx === 0 ? 'rgba(0,255,157,0.4)' : 'none').attr('stroke-width', 1.5).attr('pointer-events', 'none');
         });
 
-        // ── Hover interaction ────────────────────────────────────────────────
-        // Invisible overlay for hover detection (on top of everything)
-        g.selectAll('.country-hit')
-          .data(countries.features)
-          .join('path')
-          .attr('class', 'country-hit')
-          .attr('d', pathGen)
-          .attr('fill', 'transparent')
-          .attr('stroke', 'none')
+        g.selectAll('.country-hit').data(countries.features).join('path').attr('class', 'country-hit').attr('d', pathGen).attr('fill', 'transparent').attr('stroke', 'none')
           .attr('cursor', d => viewsMap.has(+d.id) ? 'pointer' : 'default')
           .on('mousemove', function(event, d) {
-            const views = viewsMap.get(+d.id);
-            if (!views || !mapTooltip) return;
-            const iso2  = iso2Map.get(+d.id) || '';
-            const name  = labelMap.get(+d.id) || iso2;
-            const pct   = ((views / maxViews) * 100).toFixed(0);
-            const rect  = mapSvgEl.getBoundingClientRect();
-            mapTooltip.innerHTML =
-              `<span style="color:#00ff9d;font-weight:700">${iso2} — ${name}</span>` +
-              `<span style="color:#4b5563;margin:0 6px">·</span>` +
-              `<span style="color:#e5e7eb">${views.toLocaleString('fr-FR')} vues</span>` +
-              `<span style="color:#374151;margin-left:6px">${pct}%</span>`;
-            let tx = event.clientX - rect.left + 14;
-            let ty = event.clientY - rect.top - 38;
-            // Keep tooltip inside bounds
-            if (tx + 240 > W) tx = tx - 260;
-            if (ty < 4) ty = event.clientY - rect.top + 18;
-            mapTooltip.style.left = tx + 'px';
-            mapTooltip.style.top  = ty + 'px';
-            mapTooltip.classList.remove('hidden');
-
-            // Highlight country fill
-            d3.select(this.parentNode).selectAll('.country')
-              .filter(fd => fd === d)
-              .attr('fill', v => {
-                const val = viewsMap.get(+v.id);
-                return val ? d3.color(colorScale(val)).brighter(0.8).formatHex() : '#1e3525';
-              });
+            const views = viewsMap.get(+d.id); if (!views || !mapTooltip) return;
+            const iso2 = iso2Map.get(+d.id) || ''; const name = labelMap.get(+d.id) || iso2;
+            const pct  = ((views / maxViews) * 100).toFixed(0);
+            const rect = mapSvgEl.getBoundingClientRect();
+            mapTooltip.innerHTML = `<span style="color:#00ff9d;font-weight:700">${iso2} — ${name}</span><span style="color:#4b5563;margin:0 6px">·</span><span style="color:#e5e7eb">${views.toLocaleString('fr-FR')} vues</span><span style="color:#374151;margin-left:6px">${pct}%</span>`;
+            let tx = event.clientX - rect.left + 14; let ty = event.clientY - rect.top - 38;
+            if (tx + 240 > W) tx = tx - 260; if (ty < 4) ty = event.clientY - rect.top + 18;
+            mapTooltip.style.left = tx + 'px'; mapTooltip.style.top = ty + 'px'; mapTooltip.classList.remove('hidden');
+            d3.select(this.parentNode).selectAll('.country').filter(fd => fd === d).attr('fill', v => { const val = viewsMap.get(+v.id); return val ? d3.color(colorScale(val)).brighter(0.8).formatHex() : '#1e3525'; });
           })
           .on('mouseleave', function(event, d) {
             if (mapTooltip) mapTooltip.classList.add('hidden');
-            // Restore fill
-            d3.select(this.parentNode).selectAll('.country')
-              .filter(fd => fd === d)
-              .attr('fill', fd => {
-                const v = viewsMap.get(+fd.id);
-                return v ? colorScale(v) : '#101f16';
-              });
+            d3.select(this.parentNode).selectAll('.country').filter(fd => fd === d).attr('fill', fd => { const v = viewsMap.get(+fd.id); return v ? colorScale(v) : '#101f16'; });
           });
 
-        // ── D3 Zoom behaviour ────────────────────────────────────────────────
-        const initialScale     = 1;
-        const initialTransform = d3.zoomIdentity;
-
-        const zoom = d3.zoom()
-          .scaleExtent([0.9, 12])
-          .translateExtent([[-W * 0.5, -H * 0.5], [W * 1.5, H * 1.5]])
-          .filter(event => {
-            // Allow wheel zoom + drag; disable dblclick default
-            if (event.type === 'dblclick') return false;
-            return true;
-          })
+        const zoom = d3.zoom().scaleExtent([0.9, 12]).translateExtent([[-W * 0.5, -H * 0.5], [W * 1.5, H * 1.5]])
+          .filter(event => { if (event.type === 'dblclick') return false; return true; })
           .on('zoom', (event) => {
             g.attr('transform', event.transform);
-            // Thin strokes at high zoom
             const k = event.transform.k;
             g.selectAll('.country').attr('stroke-width', Math.max(0.2, 0.4 / k));
-            g.selectAll('.country-hit').attr('d', pathGen); // keep hit areas
+            g.selectAll('.country-hit').attr('d', pathGen);
             mapSvgEl.style.cursor = event.sourceEvent?.buttons ? 'grabbing' : 'grab';
           });
-
         svg.call(zoom);
 
-        // ── Zoom control buttons ─────────────────────────────────────────────
-        const smoothZoom = (factor) => {
-          svg.transition().duration(300)
-            .call(zoom.scaleBy, factor);
-        };
+        const smoothZoom = (factor) => svg.transition().duration(300).call(zoom.scaleBy, factor);
         btnZoomIn?.addEventListener('click',  () => smoothZoom(1.6));
         btnZoomOut?.addEventListener('click', () => smoothZoom(0.625));
-        btnReset?.addEventListener('click',   () => {
-          svg.transition().duration(450)
-            .call(zoom.transform, d3.zoomIdentity);
-        });
+        btnReset?.addEventListener('click',   () => svg.transition().duration(450).call(zoom.transform, d3.zoomIdentity));
 
-        // ── Country-list row hover → zoom map to country ─────────────────────
         document.querySelectorAll('.country-row').forEach(row => {
           row.addEventListener('mouseenter', () => {
-            const iso2 = row.getAttribute('data-iso');
-            const num  = ISO2_NUM[iso2];
-            if (!num) return;
-            const feat = countries.features.find(f => +f.id === +num);
-            if (!feat) return;
-
-            // Highlight
-            g.selectAll('.country')
-              .classed('highlighted', fd => +fd.id === +num);
-
-            // Zoom to country bounds
-            const bounds  = pathGen.bounds(feat);
-            const dx = bounds[1][0] - bounds[0][0];
-            const dy = bounds[1][1] - bounds[0][1];
-            const cx = (bounds[0][0] + bounds[1][0]) / 2;
-            const cy = (bounds[0][1] + bounds[1][1]) / 2;
+            const iso2 = row.getAttribute('data-iso'); const num = ISO2_NUM[iso2]; if (!num) return;
+            const feat = countries.features.find(f => +f.id === +num); if (!feat) return;
+            g.selectAll('.country').classed('highlighted', fd => +fd.id === +num);
+            const bounds = pathGen.bounds(feat);
+            const dx = bounds[1][0] - bounds[0][0]; const dy = bounds[1][1] - bounds[0][1];
+            const cx = (bounds[0][0] + bounds[1][0]) / 2; const cy = (bounds[0][1] + bounds[1][1]) / 2;
             const scale = Math.max(1.2, Math.min(8, 0.85 / Math.max(dx / W, dy / H)));
-            const t = d3.zoomIdentity
-              .translate(W / 2 - scale * cx, H / 2 - scale * cy)
-              .scale(scale);
-            svg.transition().duration(550).ease(d3.easeCubicOut)
-              .call(zoom.transform, t);
+            const t = d3.zoomIdentity.translate(W / 2 - scale * cx, H / 2 - scale * cy).scale(scale);
+            svg.transition().duration(550).ease(d3.easeCubicOut).call(zoom.transform, t);
           });
           row.addEventListener('mouseleave', () => {
             g.selectAll('.country').classed('highlighted', false);
-            // Smooth reset
-            svg.transition().duration(450).ease(d3.easeCubicOut)
-              .call(zoom.transform, d3.zoomIdentity);
+            svg.transition().duration(450).ease(d3.easeCubicOut).call(zoom.transform, d3.zoomIdentity);
           });
         });
 
-        // ── Reveal ───────────────────────────────────────────────────────────
         mapSvgEl.style.opacity = '1';
         if (mapLoader) mapLoader.style.display = 'none';
 
-        // ── Responsive resize ────────────────────────────────────────────────
         const ro = new ResizeObserver(() => {
-          const nW = mapSvgEl.clientWidth;
-          if (!nW) return;
+          const nW = mapSvgEl.clientWidth; if (!nW) return;
           projection.scale(nW / 6.1).translate([nW / 2, H / 2 + 15]);
-          svg.attr('width', nW);
-          g.selectAll('path').attr('d', pathGen);
+          svg.attr('width', nW); g.selectAll('path').attr('d', pathGen);
         });
         ro.observe(mapSvgEl);
 
@@ -1191,7 +1083,7 @@ const exportedDays    = days;
         mapLoader.innerHTML = '<p style="color:#374151;font-size:12px;padding:24px">Carte non disponible</p>';
       }
 
-      // ── Insight tabs ─────────────────────────────────────────────────────
+      // Insight tabs (v3 intact)
       document.querySelectorAll('.insight-tab').forEach(btn => {
         btn.addEventListener('click', () => {
           const target = btn.getAttribute('data-tab');
