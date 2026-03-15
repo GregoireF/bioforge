@@ -225,6 +225,150 @@ function sparkline(data: number[], color: string): string {
   </svg>`;
 }
 
+
+const viewSparkline    = sparkline(chartViews,  '#00ff9d');
+const clickSparkline   = sparkline(chartClicks, '#bf00ff');
+const revenueSparkline = sparkline(conversionRows.filter(r => r.type === 'sale').map(r => r.value ?? 0), '#a78bfa');
+
+const deviceData = { mobile: devices['mobile'] ?? 0, desktop: devices['desktop'] ?? 0, tablet: devices['tablet'] ?? 0, unknown: devices['unknown'] ?? 0 };
+const deviceTotal = deviceData.mobile + deviceData.desktop + deviceData.tablet + deviceData.unknown;
+
+const SOCIAL = ['twitter.com','x.com','instagram.com','tiktok.com','facebook.com','linkedin.com','youtube.com','pinterest.com','snapchat.com','reddit.com','discord.com','twitch.tv'];
+const SEARCH  = ['google.','bing.com','duckduckgo.com','yahoo.com','baidu.com','yandex.'];
+function classifyReferrer(ref: string | null): { label: string; category: 'direct'|'social'|'search'|'other' } {
+  if (!ref) return { label: 'Direct / liens', category: 'direct' };
+  try {
+    const host = new URL(ref.includes('://') ? ref : `https://${ref}`).hostname.replace(/^www\./, '');
+    if (SOCIAL.some(s => host.includes(s))) return { label: host, category: 'social' };
+    if (SEARCH.some(s => host.includes(s)))  return { label: host, category: 'search' };
+    return { label: host, category: 'other' };
+  } catch { return { label: ref.slice(0, 40), category: 'other' }; }
+}
+const parsedReferrers     = topReferrers.map(r => ({ ...classifyReferrer(r.referrer), views: r.views }));
+const refAgg              = new Map<string, { label: string; category: string; views: number }>();
+for (const r of parsedReferrers) { const e = refAgg.get(r.label); if (e) e.views += r.views; else refAgg.set(r.label, { ...r }); }
+const aggregatedReferrers = Array.from(refAgg.values()).sort((a, b) => b.views - a.views).slice(0, 6);
+const maxReferrerViews    = aggregatedReferrers[0]?.views ?? 1;
+const maxCountryViews     = topCountries[0]?.views ?? 1;
+
+function countryFlag(code: string): string {
+  if (!code || code.length !== 2) return '🌐';
+  return String.fromCodePoint(...[...code.toUpperCase()].map(c => 0x1F1E0 - 65 + c.charCodeAt(0)));
+}
+
+const CAT_COLORS: Record<string, string> = { direct: '#00ff9d', social: '#bf00ff', search: '#00aaff', other: '#ff6b6b' };
+const CAT_LABELS: Record<string, string> = { direct: 'Direct', social: 'Social', search: 'Recherche', other: 'Autre' };
+
+// UTM campaigns aggregated (computed in frontmatter — no TS generics in JSX)
+const utmCamps: { source:string; medium:string; campaign:string; views:number; leads:number; sales:number; revenue:number; topDevice:string; topCountry:string }[] = [];
+if (isPro && utmData.length > 0) {
+  const cm = new Map<string, { source:string; medium:string; campaign:string; views:number; leads:number; sales:number; revenue:number; devices:Record<string,number>; countries:Record<string,number> }>();
+  for (const row of utmData) {
+    const key = `${row.source}|${row.medium}|${row.campaign ?? '(none)'}`;
+    const e   = cm.get(key) ?? { source:row.source??'', medium:row.medium??'', campaign:row.campaign??'(none)', views:0, leads:0, sales:0, revenue:0, devices:{} as Record<string,number>, countries:{} as Record<string,number> };
+    e.views++;
+    if (row.converted)   e.leads++;
+    if (row.revenue > 0) { e.sales++; e.revenue += row.revenue; }
+    if (row.device)  e.devices[row.device]  = (e.devices[row.device]  ?? 0) + 1;
+    if (row.country) e.countries[row.country] = (e.countries[row.country] ?? 0) + 1;
+    cm.set(key, e);
+  }
+  for (const c of Array.from(cm.values()).sort((a,b) => b.views - a.views).slice(0, 10)) {
+    utmCamps.push({
+      source:     c.source,
+      medium:     c.medium,
+      campaign:   c.campaign,
+      views:      c.views,
+      leads:      c.leads,
+      sales:      c.sales,
+      revenue:    c.revenue,
+      topDevice:  Object.entries(c.devices).sort((a,b)=>b[1]-a[1])[0]?.[0] ?? '—',
+      topCountry: Object.entries(c.countries).sort((a,b)=>b[1]-a[1])[0]?.[0] ?? '—',
+    });
+  }
+}
+
+// ── v5: PREVIOUS PERIOD (for delta comparisons) ─────────────────────────────
+const prevSince = new Date(since);
+prevSince.setDate(prevSince.getDate() - days);
+const { data: prevRpcRaw } = await supabase.rpc('get_profile_analytics', {
+  p_profile_id: profileId,
+  p_days: days * 2,
+});
+// We use the difference: total over 2x period minus current period ≈ previous period
+// Simpler: fetch with prev window
+const { data: prevConvRows } = await supabase.from('conversion_events')
+  .select('type, value, created_at').eq('profile_id', profileId)
+  .gte('created_at', prevSince.toISOString()).lt('created_at', since.toISOString());
+const prevConv = prevConvRows ?? [];
+
+// Prev period proxied from doubled RPC minus current
+const prevRpc = prevRpcRaw as typeof rpcData;
+const prevViews    = Math.max(0, (prevRpc?.total_views     ?? 0) - summary.totalViews);
+const prevClicks   = Math.max(0, (prevRpc?.total_clicks    ?? 0) - summary.totalClicks);
+const prevUniques  = Math.max(0, (prevRpc?.unique_visitors ?? 0) - summary.uniqueVisitors);
+const prevLeads    = prevConv.filter(r => r.type === 'lead').length;
+const prevSales    = prevConv.filter(r => r.type === 'sale').length;
+const prevRevenue  = prevConv.filter(r => r.type === 'sale').reduce((s, r) => s + (r.value ?? 0), 0);
+
+function pctDelta(curr: number, prev: number): { val: number; pos: boolean; neutral: boolean } {
+  if (prev === 0) return { val: curr > 0 ? 100 : 0, pos: curr > 0, neutral: curr === 0 };
+  const v = Math.round(((curr - prev) / prev) * 100);
+  return { val: Math.abs(v), pos: v >= 0, neutral: v === 0 };
+}
+const deltaViews   = pctDelta(summary.totalViews,  prevViews);
+const deltaClicks  = pctDelta(summary.totalClicks, prevClicks);
+const deltaUniques = pctDelta(summary.uniqueVisitors, prevUniques);
+const deltaLeads   = pctDelta(leads,   prevLeads);
+const deltaRevenue = pctDelta(revenue, prevRevenue);
+
+// ── v5: PERFORMANCE SCORE IA (deterministic, no API call) ────────────────────
+function scoreMetric(val: number, thresholds: [number, number, number, number]): number {
+  if (val >= thresholds[3]) return 25;
+  if (val >= thresholds[2]) return 20;
+  if (val >= thresholds[1]) return 12;
+  if (val >= thresholds[0]) return 5;
+  return 0;
+}
+const scoreCTR        = scoreMetric(summary.clickRate,   [1, 3, 7, 12]);
+const scoreGrowth     = scoreMetric(deltaViews.pos ? deltaViews.val : -deltaViews.val, [-20, 0, 10, 25]);
+const scoreConversion = scoreMetric(convRate,            [0, 5, 15, 30]);
+const scoreRevenue    = scoreMetric(revenue,             [0, 50, 200, 1000]);
+const perfScore       = Math.min(100, scoreCTR + scoreGrowth + scoreConversion + scoreRevenue);
+const perfGrade       = perfScore >= 80 ? 'A' : perfScore >= 60 ? 'B' : perfScore >= 40 ? 'C' : 'D';
+const perfColor       = perfScore >= 80 ? '#00ff9d' : perfScore >= 60 ? '#38bdf8' : perfScore >= 40 ? '#f59e0b' : '#f87171';
+
+const perfRecos: string[] = [];
+if (summary.clickRate < 5)  perfRecos.push("Améliore tes titres de liens — un CTR < 5% signale un manque d'accroche.");
+if (summary.clickRate >= 5) perfRecos.push('Bon CTR ! Teste des variantes de CTA pour encore progresser.');
+if (deltaViews.pos === false && deltaViews.val > 10) perfRecos.push('Trafic en baisse vs période préc. — relance une campagne ou poste plus fréquemment.');
+if (channels.length <= 1) perfRecos.push("Diversifie tes sources : tu dépends d'un seul canal, risqué.");
+if (leads === 0 && summary.totalClicks > 20) perfRecos.push('Beaucoup de clics mais 0 lead — ajoute un formulaire ou une offre directe.');
+if (revenue > 0 && convRate < 10) perfRecos.push(`Taux de conv. ${convRate.toFixed(1)}% — teste une page de vente plus courte ou une offre à durée limitée.`);
+if (perfRecos.length < 3) perfRecos.push('Continue sur cette lancée — ta cohérence est ta meilleure arme de croissance.');
+const topRecos = perfRecos.slice(0, 3);
+
+// ── v5: PREDICTIONS (linear regression on daily views last 7d) ───────────────
+const last7Views  = chartViews.slice(-7);
+const last7Clicks = chartClicks.slice(-7);
+function linReg(data: number[]): { slope: number; intercept: number } {
+  const n = data.length;
+  if (n < 2) return { slope: 0, intercept: data[0] ?? 0 };
+  const sumX = data.reduce((s, _, i) => s + i, 0);
+  const sumY = data.reduce((s, v) => s + v, 0);
+  const sumXY = data.reduce((s, v, i) => s + i * v, 0);
+  const sumX2 = data.reduce((s, _, i) => s + i * i, 0);
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+  return { slope, intercept };
+}
+const regViews  = linReg(last7Views);
+const regClicks = linReg(last7Clicks);
+// Project 30 days ahead
+const proj30Views  = Math.max(0, Math.round((regViews.intercept  + regViews.slope  * (last7Views.length  + 22)) * 30));
+const proj30Clicks = Math.max(0, Math.round((regClicks.intercept + regClicks.slope * (last7Clicks.length + 22)) * 30));
+const proj30Revenue = revenue > 0 && days > 0 ? Math.round((revenue / days) * 30) : 0;
+// Sparkline for predictions (extended)
 function sparklinePred(data: number[], slope: number, intercept: number, color: string): string {
   const W = 200, H = 40;
   const extended = [...data];
@@ -252,6 +396,26 @@ function sparklinePred(data: number[], slope: number, intercept: number, color: 
     <line x1="${x(data.length-1)}" y1="0" x2="${x(data.length-1)}" y2="${H}" stroke="${color}" stroke-width="0.5" stroke-dasharray="2 3" opacity="0.3"/>
   </svg>`;
 }
+// ── Predictions data (linear regression) ────────────────────────────────────
+const last7Views  = chartViews.slice(-7);
+const last7Clicks = chartClicks.slice(-7);
+function linReg(data: number[]): { slope: number; intercept: number } {
+  const n = data.length;
+  if (n < 2) return { slope: 0, intercept: data[0] ?? 0 };
+  const sumX  = data.reduce((s, _, i) => s + i, 0);
+  const sumY  = data.reduce((s, v)    => s + v, 0);
+  const sumXY = data.reduce((s, v, i) => s + i * v, 0);
+  const sumX2 = data.reduce((s, _, i) => s + i * i, 0);
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+  const intercept = (sumY - slope * sumX) / n;
+  return { slope, intercept };
+}
+const regViews  = linReg(last7Views);
+const regClicks = linReg(last7Clicks);
+const proj30Views  = Math.max(0, Math.round((regViews.intercept  + regViews.slope  * (last7Views.length  + 22)) * 30));
+const proj30Clicks = Math.max(0, Math.round((regClicks.intercept + regClicks.slope * (last7Clicks.length + 22)) * 30));
+const proj30Revenue = revenue > 0 && days > 0 ? Math.round((revenue / days) * 30) : 0;
+
 const predSparkViews  = sparklinePred(last7Views,  regViews.slope,  regViews.intercept,  '#00ff9d');
 const predSparkClicks = sparklinePred(last7Clicks, regClicks.slope, regClicks.intercept, '#38bdf8');
 
@@ -263,6 +427,57 @@ const heatmapBlocks = blocks.map((b, i) => {
   const intensity = maxClicks > 0 ? clicks / maxClicks : 0;
   return { id: b.id, title: b.title || 'Untitled', type: b.type, clicks, intensity, position: i + 1, active: b.active };
 });
+
+const exportedChart    = { labels: chartLabels, views: chartViews, clicks: chartClicks, rates: chartRates };
+const exportedDevices  = deviceData;
+const exportedDays     = days;
+const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, revenue: c.revenue }));
+// ── v6: RETENTION ────────────────────────────────────────────────────────────
+// Proxy retention from unique vs total: uniqueVisitors / totalViews ratio
+// Compare current vs previous period
+const retentionRate     = summary.totalViews > 0 ? Math.round((summary.uniqueVisitors / summary.totalViews) * 100) : 0;
+const prevRetentionRate = prevViews > 0 ? Math.round((prevUniques / prevViews) * 100) : 0;
+const returningVisitors = Math.max(0, summary.totalViews - summary.uniqueVisitors);
+const returningRate     = summary.totalViews > 0 ? Math.round((returningVisitors / summary.totalViews) * 100) : 0;
+// Returning vs new over time — estimate from daily data
+const retentionData = chartViews.map((v, i) => {
+  const newV = Math.round(v * (retentionRate / 100));
+  const retV = v - newV;
+  return { date: chartLabels[i] ?? '', total: v, new: newV, returning: retV };
+});
+
+
+// ── v6: A/B TEST BLOCS ───────────────────────────────────────────────────────
+// Top 2 blocks by clicks — compare side by side
+const abBlocks = heatmapBlocks.filter(b => b.clicks > 0).slice(0, 4);
+
+
+// ── v6: SMART ALERTS ─────────────────────────────────────────────────────────
+type AlertItem = { type: 'warning'|'success'|'info'; icon: string; title: string; body: string };
+const alerts: AlertItem[] = [];
+
+if (summary.clickRate < 2 && summary.totalViews > 100)
+  alerts.push({ type:"warning", icon:"↓", title:"CTR très faible", body:`${summary.clickRate.toFixed(1)}% de taux de clic — tes liens n'attirent pas assez l'attention. Teste des emojis ou des CTA plus directs.` });
+
+if (deltaViews.pos === false && deltaViews.val > 20)
+  alerts.push({ type:"warning", icon:"↘", title:"Trafic en baisse significative", body:`-${deltaViews.val}% de vues vs la période précédente. Vérifie si une source s'est tarie.` });
+
+if (revenue > 0 && deltaRevenue.pos === false && deltaRevenue.val > 15)
+  alerts.push({ type:"warning", icon:"⚠", title:"Revenue en recul", body:`-${deltaRevenue.val}% de revenue. Ton CPA a probablement augmenté — réévalue tes campagnes.` });
+
+if (deltaViews.pos && deltaViews.val > 30)
+  alerts.push({ type:"success", icon:"🚀", title:"Forte croissance du trafic", body:`+${deltaViews.val}% de vues vs la période précédente — capitalise sur cette dynamique.` });
+
+if (summary.clickRate >= 12)
+  alerts.push({ type:"success", icon:"🔥", title:"CTR exceptionnel", body:`${summary.clickRate.toFixed(1)}% de CTR — tu es dans le top des profils BioForge.` });
+
+if (channels.length > 0 && channels[0].views / Math.max(totalChViews, 1) > 0.8)
+  alerts.push({ type:"info", icon:"⚡", title:"Dépendance à 1 seul canal", body:`${Math.round((channels[0].views/totalChViews)*100)}% de ton trafic vient de "${channels[0].name}". Diversifie pour éviter un risque de coupure.` });
+
+if (alerts.length === 0)
+  alerts.push({ type:"info", icon:"✓", title:"Tout est nominal", body:"Aucune anomalie détectée. Continue sur ta lancée." });
+
+const alertCount = alerts.filter(a => a.type === 'warning').length;
 
 
 // ── v7: NEW METRICS ──────────────────────────────────────────────────────────
@@ -292,57 +507,6 @@ const activationRate = blocks.length > 0 ? Math.round((activeBlocks / blocks.len
 
 // Best delta bloc (highest click intensity)
 const bestBloc = heatmapBlocks.find(b => b.intensity === 1);
-
-const exportedChart    = { labels: chartLabels, views: chartViews, clicks: chartClicks, rates: chartRates };
-const exportedDevices  = deviceData;
-const exportedDays     = days;
-const exportedChannels = channels.map(c => ({ name: c.name, views: c.views, revenue: c.revenue }));
-
-// ── v6: RETENTION ────────────────────────────────────────────────────────────
-// Proxy retention from unique vs total: uniqueVisitors / totalViews ratio
-// Compare current vs previous period
-const retentionRate     = summary.totalViews > 0 ? Math.round((summary.uniqueVisitors / summary.totalViews) * 100) : 0;
-const prevRetentionRate = prevViews > 0 ? Math.round((prevUniques / prevViews) * 100) : 0;
-const returningVisitors = Math.max(0, summary.totalViews - summary.uniqueVisitors);
-const returningRate     = summary.totalViews > 0 ? Math.round((returningVisitors / summary.totalViews) * 100) : 0;
-// Returning vs new over time — estimate from daily data
-const retentionData = chartViews.map((v, i) => {
-  const newV = Math.round(v * (retentionRate / 100));
-  const retV = v - newV;
-  return { date: chartLabels[i] ?? '', total: v, new: newV, returning: retV };
-});
-
-// ── v6: A/B TEST BLOCS ───────────────────────────────────────────────────────
-// Top 2 blocks by clicks — compare side by side
-const abBlocks = heatmapBlocks.filter(b => b.clicks > 0).slice(0, 4);
-
-// ── v6: SMART ALERTS ─────────────────────────────────────────────────────────
-type AlertItem = { type: 'warning'|'success'|'info'; icon: string; title: string; body: string };
-const alerts: AlertItem[] = [];
-
-if (summary.clickRate < 2 && summary.totalViews > 100)
-  alerts.push({ type:"warning", icon:"↓", title:"CTR très faible", body:`${summary.clickRate.toFixed(1)}% de taux de clic — tes liens n'attirent pas assez l'attention. Teste des emojis ou des CTA plus directs.` });
-
-if (deltaViews.pos === false && deltaViews.val > 20)
-  alerts.push({ type:"warning", icon:"↘", title:"Trafic en baisse significative", body:`-${deltaViews.val}% de vues vs la période précédente. Vérifie si une source s'est tarie.` });
-
-if (revenue > 0 && deltaRevenue.pos === false && deltaRevenue.val > 15)
-  alerts.push({ type:"warning", icon:"⚠", title:"Revenue en recul", body:`-${deltaRevenue.val}% de revenue. Ton CPA a probablement augmenté — réévalue tes campagnes.` });
-
-if (deltaViews.pos && deltaViews.val > 30)
-  alerts.push({ type:"success", icon:"🚀", title:"Forte croissance du trafic", body:`+${deltaViews.val}% de vues vs la période précédente — capitalise sur cette dynamique.` });
-
-if (summary.clickRate >= 12)
-  alerts.push({ type:"success", icon:"🔥", title:"CTR exceptionnel", body:`${summary.clickRate.toFixed(1)}% de CTR — tu es dans le top des profils BioForge.` });
-
-if (channels.length > 0 && channels[0].views / Math.max(totalChViews, 1) > 0.8)
-  alerts.push({ type:"info", icon:"⚡", title:"Dépendance à 1 seul canal", body:`${Math.round((channels[0].views/totalChViews)*100)}% de ton trafic vient de "${channels[0].name}". Diversifie pour éviter un risque de coupure.` });
-
-if (alerts.length === 0)
-  alerts.push({ type:"info", icon:"✓", title:"Tout est nominal", body:"Aucune anomalie détectée. Continue sur ta lancée." });
-
-const alertCount = alerts.filter(a => a.type === 'warning').length;
-
 
 ---
 
