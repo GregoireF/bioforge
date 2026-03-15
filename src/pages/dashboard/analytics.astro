@@ -192,163 +192,65 @@ const chartRates   = sortedDates.map((_, i) => { const v = chartViews[i], c = ch
 function sparkline(data: number[], color: string): string {
   if (!data.length) return '';
   const max = Math.max(...data, 1);
-  const W = 80, H = 24;
-  const pts = data.map((v, i) => { const x = (i / Math.max(data.length - 1, 1)) * W; const y = H - (v / max) * H; return `${x.toFixed(1)},${y.toFixed(1)}`; }).join(' ');
-  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" fill="none" xmlns="http://www.w3.org/2000/svg"><polyline points="${pts}" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.8"/></svg>`;
-}
-const viewSparkline    = sparkline(chartViews,  '#00ff9d');
-const clickSparkline   = sparkline(chartClicks, '#bf00ff');
-const revenueSparkline = sparkline(conversionRows.filter(r => r.type === 'sale').map(r => r.value ?? 0), '#a78bfa');
-
-const deviceData = { mobile: devices['mobile'] ?? 0, desktop: devices['desktop'] ?? 0, tablet: devices['tablet'] ?? 0, unknown: devices['unknown'] ?? 0 };
-const deviceTotal = deviceData.mobile + deviceData.desktop + deviceData.tablet + deviceData.unknown;
-
-const SOCIAL = ['twitter.com','x.com','instagram.com','tiktok.com','facebook.com','linkedin.com','youtube.com','pinterest.com','snapchat.com','reddit.com','discord.com','twitch.tv'];
-const SEARCH  = ['google.','bing.com','duckduckgo.com','yahoo.com','baidu.com','yandex.'];
-function classifyReferrer(ref: string | null): { label: string; category: 'direct'|'social'|'search'|'other' } {
-  if (!ref) return { label: 'Direct / liens', category: 'direct' };
-  try {
-    const host = new URL(ref.includes('://') ? ref : `https://${ref}`).hostname.replace(/^www\./, '');
-    if (SOCIAL.some(s => host.includes(s))) return { label: host, category: 'social' };
-    if (SEARCH.some(s => host.includes(s)))  return { label: host, category: 'search' };
-    return { label: host, category: 'other' };
-  } catch { return { label: ref.slice(0, 40), category: 'other' }; }
-}
-const parsedReferrers     = topReferrers.map(r => ({ ...classifyReferrer(r.referrer), views: r.views }));
-const refAgg              = new Map<string, { label: string; category: string; views: number }>();
-for (const r of parsedReferrers) { const e = refAgg.get(r.label); if (e) e.views += r.views; else refAgg.set(r.label, { ...r }); }
-const aggregatedReferrers = Array.from(refAgg.values()).sort((a, b) => b.views - a.views).slice(0, 6);
-const maxReferrerViews    = aggregatedReferrers[0]?.views ?? 1;
-const maxCountryViews     = topCountries[0]?.views ?? 1;
-
-function countryFlag(code: string): string {
-  if (!code || code.length !== 2) return '🌐';
-  return String.fromCodePoint(...[...code.toUpperCase()].map(c => 0x1F1E0 - 65 + c.charCodeAt(0)));
-}
-
-const CAT_COLORS: Record<string, string> = { direct: '#00ff9d', social: '#bf00ff', search: '#00aaff', other: '#ff6b6b' };
-const CAT_LABELS: Record<string, string> = { direct: 'Direct', social: 'Social', search: 'Recherche', other: 'Autre' };
-
-// UTM campaigns aggregated (computed in frontmatter — no TS generics in JSX)
-const utmCamps: { source:string; medium:string; campaign:string; views:number; leads:number; sales:number; revenue:number; topDevice:string; topCountry:string }[] = [];
-if (isPro && utmData.length > 0) {
-  const cm = new Map<string, { source:string; medium:string; campaign:string; views:number; leads:number; sales:number; revenue:number; devices:Record<string,number>; countries:Record<string,number> }>();
-  for (const row of utmData) {
-    const key = `${row.source}|${row.medium}|${row.campaign ?? '(none)'}`;
-    const e   = cm.get(key) ?? { source:row.source??'', medium:row.medium??'', campaign:row.campaign??'(none)', views:0, leads:0, sales:0, revenue:0, devices:{} as Record<string,number>, countries:{} as Record<string,number> };
-    e.views++;
-    if (row.converted)   e.leads++;
-    if (row.revenue > 0) { e.sales++; e.revenue += row.revenue; }
-    if (row.device)  e.devices[row.device]  = (e.devices[row.device]  ?? 0) + 1;
-    if (row.country) e.countries[row.country] = (e.countries[row.country] ?? 0) + 1;
-    cm.set(key, e);
-  }
-  for (const c of Array.from(cm.values()).sort((a,b) => b.views - a.views).slice(0, 10)) {
-    utmCamps.push({
-      source:     c.source,
-      medium:     c.medium,
-      campaign:   c.campaign,
-      views:      c.views,
-      leads:      c.leads,
-      sales:      c.sales,
-      revenue:    c.revenue,
-      topDevice:  Object.entries(c.devices).sort((a,b)=>b[1]-a[1])[0]?.[0] ?? '—',
-      topCountry: Object.entries(c.countries).sort((a,b)=>b[1]-a[1])[0]?.[0] ?? '—',
-    });
-  }
+  const min = Math.min(...data, 0);
+  const range = max - min || 1;
+  const W = 88, H = 28, PAD = 2;
+  const uid = `sp${Math.abs(data.reduce((a,b)=>a+b,0)).toString(36).slice(0,4)}${color.slice(1,4)}`;
+  const xs = data.map((_, i) => PAD + (i / Math.max(data.length - 1, 1)) * (W - PAD * 2));
+  const ys = data.map(v    => PAD + ((max - v) / range) * (H - PAD * 2));
+  const polyPts = xs.map((x, i) => `${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
+  const lx = xs[xs.length - 1] ?? (W - PAD);
+  const ly = ys[ys.length - 1] ?? (H / 2);
+  const x0 = xs[0]?.toFixed(1) ?? '2';
+  const fillPath = `M${x0},${(H-PAD).toFixed(1)} L${polyPts.split(' ').join(' L')} L${lx.toFixed(1)},${(H-PAD).toFixed(1)} Z`;
+  const trend = data.length > 3
+    ? (data.slice(-3).reduce((a,b)=>a+b,0)/3) - (data.slice(0,3).reduce((a,b)=>a+b,0)/3)
+    : 0;
+  const dotColor = trend >= 0 ? color : '#f87171';
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" fill="none" xmlns="http://www.w3.org/2000/svg" style="overflow:visible">
+    <defs>
+      <linearGradient id="${uid}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${color}" stop-opacity="0.2"/>
+        <stop offset="65%" stop-color="${color}" stop-opacity="0.04"/>
+        <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <path d="${fillPath}" fill="url(#${uid})"/>
+    <polyline points="${polyPts}" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.9"/>
+    <circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="2.5" fill="${dotColor}"/>
+    <circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="2.5" fill="${dotColor}" opacity="0.25">
+      <animate attributeName="r" values="2.5;5.5;2.5" dur="2.4s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.25;0;0.25" dur="2.4s" repeatCount="indefinite"/>
+    </circle>
+  </svg>`;
 }
 
-// ── v5: PREVIOUS PERIOD (for delta comparisons) ─────────────────────────────
-const prevSince = new Date(since);
-prevSince.setDate(prevSince.getDate() - days);
-const { data: prevRpcRaw } = await supabase.rpc('get_profile_analytics', {
-  p_profile_id: profileId,
-  p_days: days * 2,
-});
-// We use the difference: total over 2x period minus current period ≈ previous period
-// Simpler: fetch with prev window
-const { data: prevConvRows } = await supabase.from('conversion_events')
-  .select('type, value, created_at').eq('profile_id', profileId)
-  .gte('created_at', prevSince.toISOString()).lt('created_at', since.toISOString());
-const prevConv = prevConvRows ?? [];
-
-// Prev period proxied from doubled RPC minus current
-const prevRpc = prevRpcRaw as typeof rpcData;
-const prevViews    = Math.max(0, (prevRpc?.total_views     ?? 0) - summary.totalViews);
-const prevClicks   = Math.max(0, (prevRpc?.total_clicks    ?? 0) - summary.totalClicks);
-const prevUniques  = Math.max(0, (prevRpc?.unique_visitors ?? 0) - summary.uniqueVisitors);
-const prevLeads    = prevConv.filter(r => r.type === 'lead').length;
-const prevSales    = prevConv.filter(r => r.type === 'sale').length;
-const prevRevenue  = prevConv.filter(r => r.type === 'sale').reduce((s, r) => s + (r.value ?? 0), 0);
-
-function pctDelta(curr: number, prev: number): { val: number; pos: boolean; neutral: boolean } {
-  if (prev === 0) return { val: curr > 0 ? 100 : 0, pos: curr > 0, neutral: curr === 0 };
-  const v = Math.round(((curr - prev) / prev) * 100);
-  return { val: Math.abs(v), pos: v >= 0, neutral: v === 0 };
-}
-const deltaViews   = pctDelta(summary.totalViews,  prevViews);
-const deltaClicks  = pctDelta(summary.totalClicks, prevClicks);
-const deltaUniques = pctDelta(summary.uniqueVisitors, prevUniques);
-const deltaLeads   = pctDelta(leads,   prevLeads);
-const deltaRevenue = pctDelta(revenue, prevRevenue);
-
-// ── v5: PERFORMANCE SCORE IA (deterministic, no API call) ────────────────────
-function scoreMetric(val: number, thresholds: [number, number, number, number]): number {
-  if (val >= thresholds[3]) return 25;
-  if (val >= thresholds[2]) return 20;
-  if (val >= thresholds[1]) return 12;
-  if (val >= thresholds[0]) return 5;
-  return 0;
-}
-const scoreCTR        = scoreMetric(summary.clickRate,   [1, 3, 7, 12]);
-const scoreGrowth     = scoreMetric(deltaViews.pos ? deltaViews.val : -deltaViews.val, [-20, 0, 10, 25]);
-const scoreConversion = scoreMetric(convRate,            [0, 5, 15, 30]);
-const scoreRevenue    = scoreMetric(revenue,             [0, 50, 200, 1000]);
-const perfScore       = Math.min(100, scoreCTR + scoreGrowth + scoreConversion + scoreRevenue);
-const perfGrade       = perfScore >= 80 ? 'A' : perfScore >= 60 ? 'B' : perfScore >= 40 ? 'C' : 'D';
-const perfColor       = perfScore >= 80 ? '#00ff9d' : perfScore >= 60 ? '#38bdf8' : perfScore >= 40 ? '#f59e0b' : '#f87171';
-
-const perfRecos: string[] = [];
-if (summary.clickRate < 5)  perfRecos.push("Améliore tes titres de liens — un CTR < 5% signale un manque d'accroche.");
-if (summary.clickRate >= 5) perfRecos.push("Bon CTR ! Teste des variantes de CTA pour encore progresser.");
-if (deltaViews.pos === false && deltaViews.val > 10) perfRecos.push("Trafic en baisse vs période préc. — relance une campagne ou poste plus fréquemment.");
-if (channels.length <= 1) perfRecos.push("Diversifie tes sources : tu dépends d'un seul canal, risqué.");
-if (leads === 0 && summary.totalClicks > 20) perfRecos.push("Beaucoup de clics mais 0 lead — ajoute un formulaire ou une offre directe.");
-if (revenue > 0 && convRate < 10) perfRecos.push(`Taux de conv. ${convRate.toFixed(1)}% — teste une page de vente plus courte ou une offre à durée limitée.`);
-if (perfRecos.length < 3) perfRecos.push("Continue sur cette lancée — ta cohérence est ta meilleure arme de croissance.");
-const topRecos = perfRecos.slice(0, 3);
-
-// ── v5: PREDICTIONS (linear regression on daily views last 7d) ───────────────
-const last7Views  = chartViews.slice(-7);
-const last7Clicks = chartClicks.slice(-7);
-function linReg(data: number[]): { slope: number; intercept: number } {
-  const n = data.length;
-  if (n < 2) return { slope: 0, intercept: data[0] ?? 0 };
-  const sumX = data.reduce((s, _, i) => s + i, 0);
-  const sumY = data.reduce((s, v) => s + v, 0);
-  const sumXY = data.reduce((s, v, i) => s + i * v, 0);
-  const sumX2 = data.reduce((s, _, i) => s + i * i, 0);
-  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
-  const intercept = (sumY - slope * sumX) / n;
-  return { slope, intercept };
-}
-const regViews  = linReg(last7Views);
-const regClicks = linReg(last7Clicks);
-// Project 30 days ahead
-const proj30Views  = Math.max(0, Math.round((regViews.intercept  + regViews.slope  * (last7Views.length  + 22)) * 30));
-const proj30Clicks = Math.max(0, Math.round((regClicks.intercept + regClicks.slope * (last7Clicks.length + 22)) * 30));
-const proj30Revenue = revenue > 0 && days > 0 ? Math.round((revenue / days) * 30) : 0;
-// Sparkline for predictions (extended)
 function sparklinePred(data: number[], slope: number, intercept: number, color: string): string {
-  const W = 200, H = 36;
+  const W = 200, H = 40;
   const extended = [...data];
   for (let i = data.length; i < data.length + 14; i++) {
     extended.push(Math.max(0, intercept + slope * i));
   }
   const max = Math.max(...extended, 1);
-  const pts = data.map((v, i) => `${((i / (extended.length - 1)) * W).toFixed(1)},${(H - (v / max) * H).toFixed(1)}`).join(' ');
-  const predPts = extended.slice(data.length - 1).map((v, i) => `${(((data.length - 1 + i) / (extended.length - 1)) * W).toFixed(1)},${(H - (v / max) * H).toFixed(1)}`).join(' ');
-  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" fill="none"><polyline points="${pts}" stroke="${color}" stroke-width="1.5" stroke-linecap="round" opacity="0.9"/><polyline points="${predPts}" stroke="${color}" stroke-width="1.5" stroke-dasharray="4 3" stroke-linecap="round" opacity="0.5"/></svg>`;
+  const uid = Math.random().toString(36).slice(2, 7);
+  const x = (i: number) => ((i / (extended.length - 1)) * W).toFixed(1);
+  const y = (v: number) => (H - (v / max) * (H - 4) - 2).toFixed(1);
+  const pts     = data.map((v, i) => `${x(i)},${y(v)}`).join(' ');
+  const predPts = extended.slice(data.length - 1).map((v, i) => `${x(data.length - 1 + i)},${y(v)}`).join(' ');
+  // Fill under real data
+  const fillPath = `M0,${H} L${pts.replace(/ /g,'L')} L${x(data.length-1)},${H} Z`;
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" fill="none" style="overflow:visible">
+    <defs>
+      <linearGradient id="pf${uid}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${color}" stop-opacity="0.15"/>
+        <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <path d="${fillPath}" fill="url(#pf${uid})"/>
+    <polyline points="${pts}" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+    <polyline points="${predPts}" stroke="${color}" stroke-width="1.5" stroke-dasharray="4 3" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
+    <line x1="${x(data.length-1)}" y1="0" x2="${x(data.length-1)}" y2="${H}" stroke="${color}" stroke-width="0.5" stroke-dasharray="2 3" opacity="0.3"/>
+  </svg>`;
 }
 const predSparkViews  = sparklinePred(last7Views,  regViews.slope,  regViews.intercept,  '#00ff9d');
 const predSparkClicks = sparklinePred(last7Clicks, regClicks.slope, regClicks.intercept, '#38bdf8');
@@ -1422,13 +1324,20 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
       const isPro            = el.dataset.isPro === 'true';
       const retentionData    = JSON.parse(el.dataset.retention ?? '[]');
 
-      // ── Skeleton → show while Chart.js loads ─────────────────────────────
+      // ── Skeleton loaders while Chart.js loads ────────────────────────────
       ['traffic-chart','rate-chart','roas-chart','retention-chart'].forEach(id => {
         const c = document.getElementById(id);
-        if (c) { c.style.display = 'none'; const sk = document.createElement('div'); sk.className = 'skeleton'; sk.style.cssText = `height:${id==='rate-chart'?'80px':id==='roas-chart'||id==='retention-chart'?'100px':'240px'};width:100%;margin-bottom:0`; c.parentNode.insertBefore(sk, c); c._skeleton = sk; }
+        if (!c) return;
+        c.style.display = 'none';
+        const sk = document.createElement('div');
+        const h  = id === 'rate-chart' ? '80px' : (id === 'roas-chart' || id === 'retention-chart') ? '110px' : '248px';
+        sk.className  = 'skeleton';
+        sk.style.cssText = `height:${h};width:100%;border-radius:12px`;
+        c.parentNode.insertBefore(sk, c);
+        c._skeleton = sk;
       });
 
-      // ── Chart.js (lazy) ──────────────────────────────────────────────────
+      // ── Chart.js ─────────────────────────────────────────────────────────
       await new Promise((resolve, reject) => {
         if (typeof Chart !== 'undefined') { resolve(null); return; }
         const s = document.createElement('script');
@@ -1437,37 +1346,161 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
         document.head.appendChild(s);
       });
 
-      // Remove skeletons & show canvas
-      document.querySelectorAll('canvas[id]').forEach(c => {
+      // Remove skeletons
+      document.querySelectorAll('canvas').forEach(c => {
         if (c._skeleton) { c._skeleton.remove(); c.style.display = ''; }
       });
 
       Chart.defaults.font.family = 'DM Sans, system-ui, sans-serif';
-      const GRID   = 'rgba(255,255,255,0.03)';
+
+      // ── Shared helpers ────────────────────────────────────────────────────
+      const GRID_C = 'rgba(255,255,255,0.03)';
       const GREEN  = '#00ff9d';
       const PURPLE = '#bf00ff';
+      const BLUE   = '#38bdf8';
+      const AMBER  = '#f59e0b';
 
-      // ── Traffic chart (with metric toggle) ──────────────────────────────
+      function makeGrad(ctx, color, alphaTop = 0.22, alphaBot = 0.00) {
+        const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height);
+        g.addColorStop(0,   color + Math.round(alphaTop * 255).toString(16).padStart(2,'0'));
+        g.addColorStop(0.6, color + Math.round((alphaTop * 0.3) * 255).toString(16).padStart(2,'0'));
+        g.addColorStop(1,   color + Math.round(alphaBot * 255).toString(16).padStart(2,'0'));
+        return g;
+      }
+
+      const TOOLTIP_BASE = {
+        backgroundColor: '#0d1117',
+        titleColor:      '#e6edf3',
+        bodyColor:       '#8b949e',
+        borderColor:     'rgba(0,255,157,0.18)',
+        borderWidth:     1,
+        padding:         14,
+        cornerRadius:    10,
+        displayColors:   true,
+        boxWidth:        8,
+        boxHeight:       8,
+        boxPadding:      5,
+        usePointStyle:   true,
+        titleFont:       { size: 11, weight: '600' },
+        bodyFont:        { size: 11 },
+      };
+
+      const SCALE_Y = {
+        beginAtZero: true,
+        grid:        { color: GRID_C, drawBorder: false },
+        border:      { display: false },
+        ticks:       { color: '#484f58', font: { size: 10 }, maxTicksLimit: 4, padding: 6 },
+      };
+      const SCALE_X_HIDE = {
+        display: false, grid: { display: false }, border: { display: false },
+      };
+      const SCALE_X = {
+        grid:   { display: false },
+        border: { display: false },
+        ticks:  { color: '#484f58', font: { size: 10 }, maxRotation: 0 },
+      };
+
+      // ── TRAFFIC CHART (premium) ───────────────────────────────────────────
       let trafficChart = null;
       const trafficCtx = document.getElementById('traffic-chart');
+
       function buildTrafficChart(mode) {
         if (trafficChart) trafficChart.destroy();
         if (!trafficCtx || !exportedChart.labels?.length) return;
-        const isCTR    = mode === 'ctr';
-        const isViews  = mode === 'views' || mode === 'both';
-        const isClicks = mode === 'clicks' || mode === 'both';
+
+        const isCTR = mode === 'ctr', isViews = mode === 'views' || mode === 'both', isClicks = mode === 'clicks' || mode === 'both';
         const datasets = [];
-        if (isViews && !isCTR)  datasets.push({ label:'Vues',  data:exportedChart.views,  borderColor:GREEN,  backgroundColor:(ctx)=>{ const g=ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height); g.addColorStop(0,GREEN+'22'); g.addColorStop(1,GREEN+'00'); return g; }, borderWidth:2,tension:0.4,fill:true,pointRadius:0,pointHoverRadius:4,pointHoverBackgroundColor:GREEN,pointHoverBorderColor:'#0a0a0a',pointHoverBorderWidth:2 });
-        if (isClicks && !isCTR) datasets.push({ label:'Clics', data:exportedChart.clicks, borderColor:PURPLE, backgroundColor:(ctx)=>{ const g=ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height); g.addColorStop(0,PURPLE+'22'); g.addColorStop(1,PURPLE+'00'); return g; }, borderWidth:2,tension:0.4,fill:true,pointRadius:0,pointHoverRadius:4,pointHoverBackgroundColor:PURPLE,pointHoverBorderColor:'#0a0a0a',pointHoverBorderWidth:2 });
-        if (isCTR) datasets.push({ label:'CTR%', data:exportedChart.rates, borderColor:'#f59e0b', backgroundColor:(ctx)=>{ const g=ctx.chart.ctx.createLinearGradient(0,0,0,ctx.chart.height); g.addColorStop(0,'#f59e0b22'); g.addColorStop(1,'#f59e0b00'); return g; }, borderWidth:2,tension:0.4,fill:true,pointRadius:0,pointHoverRadius:4,pointHoverBackgroundColor:'#f59e0b',pointHoverBorderColor:'#0a0a0a',pointHoverBorderWidth:2 });
+
+        // Compute annotations
+        const viewsAvg  = exportedChart.views.length  ? Math.round(exportedChart.views.reduce((a,b)=>a+b,0)  / exportedChart.views.length)  : 0;
+        const clicksAvg = exportedChart.clicks.length ? Math.round(exportedChart.clicks.reduce((a,b)=>a+b,0) / exportedChart.clicks.length) : 0;
+        const peakViewIdx  = exportedChart.views.indexOf(Math.max(...exportedChart.views));
+        const peakClickIdx = exportedChart.clicks.indexOf(Math.max(...exportedChart.clicks));
+
+        if (isViews && !isCTR) datasets.push({
+          label: 'Vues', data: exportedChart.views, borderColor: GREEN,
+          backgroundColor: ctx => makeGrad(ctx, GREEN, 0.18, 0),
+          borderWidth: 2, tension: 0.42, fill: true,
+          pointRadius: exportedChart.views.map((_, i) => i === peakViewIdx ? 5 : 0),
+          pointHoverRadius: 5, pointBackgroundColor: GREEN, pointBorderColor: '#0d1117', pointBorderWidth: 2,
+          pointHoverBackgroundColor: GREEN, pointHoverBorderColor: '#0d1117', pointHoverBorderWidth: 2,
+          shadowOffsetX: 0, shadowOffsetY: 3, shadowBlur: 12, shadowColor: GREEN + '50',
+        });
+        if (isClicks && !isCTR) datasets.push({
+          label: 'Clics', data: exportedChart.clicks, borderColor: PURPLE,
+          backgroundColor: ctx => makeGrad(ctx, PURPLE, 0.15, 0),
+          borderWidth: 2, tension: 0.42, fill: true,
+          pointRadius: exportedChart.clicks.map((_, i) => i === peakClickIdx ? 5 : 0),
+          pointHoverRadius: 5, pointBackgroundColor: PURPLE, pointBorderColor: '#0d1117', pointBorderWidth: 2,
+          pointHoverBackgroundColor: PURPLE, pointHoverBorderColor: '#0d1117', pointHoverBorderWidth: 2,
+        });
+        if (isCTR) datasets.push({
+          label: 'CTR %', data: exportedChart.rates, borderColor: AMBER,
+          backgroundColor: ctx => makeGrad(ctx, AMBER, 0.15, 0),
+          borderWidth: 2, tension: 0.42, fill: true,
+          pointRadius: 0, pointHoverRadius: 5,
+          pointHoverBackgroundColor: AMBER, pointHoverBorderColor: '#0d1117', pointHoverBorderWidth: 2,
+        });
+
         trafficChart = new Chart(trafficCtx, {
-          type:'line', data:{ labels:exportedChart.labels, datasets },
-          options:{ responsive:true,maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{ legend:{display:false}, tooltip:{backgroundColor:'#111115',titleColor:'#fff',bodyColor:'#9ca3af',borderColor:'rgba(255,255,255,0.08)',borderWidth:1,padding:12,displayColors:true,boxWidth:8,boxHeight:8,boxPadding:4,usePointStyle:true} }, scales:{ y:{beginAtZero:true,ticks:{color:'#4b5563',font:{size:10},maxTicksLimit:5},grid:{color:GRID},border:{display:false}}, x:{ticks:{color:'#4b5563',font:{size:10},maxTicksLimit:exportedDays===7?7:exportedDays===30?10:12,maxRotation:0},grid:{display:false},border:{display:false}} } },
+          type: 'line',
+          data: { labels: exportedChart.labels, datasets },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                ...TOOLTIP_BASE,
+                callbacks: {
+                  title: items => items[0].label,
+                  label: item => {
+                    const v = item.parsed.y;
+                    const suffix = item.dataset.label === 'CTR %' ? '%' : '';
+                    return ` ${item.dataset.label}: ${v.toLocaleString('fr-FR')}${suffix}`;
+                  },
+                  afterBody: items => {
+                    if (items.length === 0) return '';
+                    const i     = items[0].dataIndex;
+                    const views = exportedChart.views[i] ?? 0;
+                    const total = exportedChart.views.reduce((a,b)=>a+b,0);
+                    if (total === 0) return '';
+                    return [``, `  Part du trafic : ${Math.round((views/total)*100)}%`];
+                  },
+                },
+              },
+              // Inline average annotation via custom plugin
+              annotation_avg: false,
+            },
+            scales: {
+              y: { ...SCALE_Y, ticks: { ...SCALE_Y.ticks, callback: v => v >= 1000 ? `${(v/1000).toFixed(1)}k` : v } },
+              x: { ...SCALE_X, ticks: { ...SCALE_X.ticks, maxTicksLimit: exportedDays===7?7:exportedDays===30?10:12 } },
+            },
+          },
+          plugins: [{
+            id: 'avgLine',
+            afterDraw(chart) {
+              if (isCTR) return;
+              const { ctx: c, chartArea: { left, right, top, bottom }, scales: { y } } = chart;
+              const avg = isViews && !isCTR ? viewsAvg : clicksAvg;
+              if (!avg) return;
+              const yPos = y.getPixelForValue(avg);
+              c.save();
+              c.setLineDash([4, 5]);
+              c.strokeStyle = isViews ? GREEN + '45' : PURPLE + '45';
+              c.lineWidth = 1;
+              c.beginPath(); c.moveTo(left, yPos); c.lineTo(right, yPos); c.stroke();
+              c.setLineDash([]);
+              c.fillStyle = isViews ? GREEN + '90' : PURPLE + '90';
+              c.font = '9px DM Sans, sans-serif';
+              c.fillText(`moy. ${avg.toLocaleString('fr-FR')}`, right - 70, yPos - 4);
+              c.restore();
+            },
+          }],
         });
       }
       buildTrafficChart('both');
 
-      // Metric toggle handler
       document.getElementById('metric-toggle')?.querySelectorAll('.metric-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           document.querySelectorAll('.metric-btn').forEach(b => b.classList.remove('active'));
@@ -1476,39 +1509,172 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
         });
       });
 
-      // ── CTR mini bar ──────────────────────────────────────────────────────
+      // ── CTR MINI-BAR (premium) ────────────────────────────────────────────
       const rateCtx = document.getElementById('rate-chart');
       if (rateCtx && exportedChart.labels?.length > 0) {
+        const rates  = exportedChart.rates;
+        const avgCTR = rates.length ? rates.reduce((a,b)=>a+b,0) / rates.length : 0;
+
         new Chart(rateCtx, {
-          type:'bar',
-          data:{labels:exportedChart.labels,datasets:[{data:exportedChart.rates,backgroundColor:GREEN+'30',borderColor:GREEN+'70',borderWidth:1,borderRadius:3}]},
-          options:{ responsive:true,maintainAspectRatio:false, plugins:{legend:{display:false},tooltip:{backgroundColor:'#111115',titleColor:'#fff',bodyColor:'#9ca3af',borderColor:'rgba(255,255,255,0.08)',borderWidth:1,callbacks:{label:(ctx)=>` ${ctx.parsed.y}%`}}}, scales:{y:{display:false,beginAtZero:true,grid:{display:false},border:{display:false}},x:{display:false,grid:{display:false},border:{display:false}}} },
+          type: 'bar',
+          data: {
+            labels: exportedChart.labels,
+            datasets: [{
+              data: rates,
+              backgroundColor: rates.map(r => r >= 8 ? GREEN + '55' : r >= 3 ? AMBER + '55' : '#f87171' + '55'),
+              borderColor:     rates.map(r => r >= 8 ? GREEN + 'cc' : r >= 3 ? AMBER + 'cc' : '#f87171cc'),
+              borderWidth: 1, borderRadius: 4,
+            }],
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: { ...TOOLTIP_BASE, callbacks: { label: ctx => ` CTR: ${ctx.parsed.y.toFixed(1)}%` } },
+            },
+            scales: { y: { ...SCALE_Y, ticks: { ...SCALE_Y.ticks, callback: v => `${v}%` } }, x: SCALE_X_HIDE },
+          },
+          plugins: [{
+            id: 'ctrAvgLine',
+            afterDraw(chart) {
+              const { ctx: c, chartArea: { left, right }, scales: { y } } = chart;
+              if (!avgCTR) return;
+              const yPos = y.getPixelForValue(avgCTR);
+              c.save();
+              c.setLineDash([3, 4]);
+              c.strokeStyle = 'rgba(255,255,255,0.2)';
+              c.lineWidth = 1;
+              c.beginPath(); c.moveTo(left, yPos); c.lineTo(right, yPos); c.stroke();
+              c.setLineDash([]);
+              c.restore();
+            },
+          }],
         });
       }
 
-      // ── Retention stacked bar ────────────────────────────────────────────
+      // ── RETENTION CHART (premium stacked) ────────────────────────────────
       const retCtx = document.getElementById('retention-chart');
       if (retCtx && retentionData.length > 0) {
         new Chart(retCtx, {
-          type:'bar',
-          data:{ labels:retentionData.map(d=>d.date), datasets:[
-            {label:'Nouveaux',   data:retentionData.map(d=>d.new),       backgroundColor:GREEN+'40',  borderColor:GREEN+'80',  borderWidth:1,borderRadius:2,stack:'s'},
-            {label:'Récurrents', data:retentionData.map(d=>d.returning), backgroundColor:'#38bdf440', borderColor:'#38bdf480', borderWidth:1,borderRadius:2,stack:'s'},
-          ]},
-          options:{ responsive:true,maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{legend:{display:true,position:'top',labels:{color:'#6b7280',font:{size:10},boxWidth:8,boxHeight:8,usePointStyle:true}},tooltip:{backgroundColor:'#111115',titleColor:'#fff',bodyColor:'#9ca3af',borderColor:'rgba(255,255,255,0.08)',borderWidth:1}}, scales:{ y:{beginAtZero:true,stacked:true,ticks:{color:'#4b5563',font:{size:10},maxTicksLimit:4},grid:{color:GRID},border:{display:false}}, x:{stacked:true,ticks:{color:'#4b5563',font:{size:10},maxTicksLimit:exportedDays===7?7:10,maxRotation:0},grid:{display:false},border:{display:false}} } },
+          type: 'bar',
+          data: {
+            labels: retentionData.map(d => d.date),
+            datasets: [
+              {
+                label: 'Nouveaux',
+                data: retentionData.map(d => d.new),
+                backgroundColor: ctx => {
+                  const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height);
+                  g.addColorStop(0, GREEN + '66');
+                  g.addColorStop(1, GREEN + '22');
+                  return g;
+                },
+                borderColor: GREEN + 'aa',
+                borderWidth: 1,
+                borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 },
+                borderSkipped: 'bottom',
+                stack: 's',
+              },
+              {
+                label: 'Récurrents',
+                data: retentionData.map(d => d.returning),
+                backgroundColor: ctx => {
+                  const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height);
+                  g.addColorStop(0, BLUE + '55');
+                  g.addColorStop(1, BLUE + '22');
+                  return g;
+                },
+                borderColor: BLUE + '88',
+                borderWidth: 1,
+                borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 4, bottomRight: 4 },
+                borderSkipped: 'top',
+                stack: 's',
+              },
+            ],
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: { display: true, position: 'top', labels: { color: '#6b7280', font: { size: 10 }, boxWidth: 8, usePointStyle: true } },
+              tooltip: {
+                ...TOOLTIP_BASE,
+                callbacks: {
+                  label: item => ` ${item.dataset.label}: ${item.parsed.y.toLocaleString('fr-FR')}`,
+                  afterBody: items => {
+                    const total = items.reduce((s, it) => s + it.parsed.y, 0);
+                    if (!total) return '';
+                    const lines = items.map(it => `  ${it.dataset.label}: ${Math.round((it.parsed.y/total)*100)}%`);
+                    return ['', ...lines];
+                  },
+                },
+              },
+            },
+            scales: {
+              y: { ...SCALE_Y, stacked: true },
+              x: { ...SCALE_X, stacked: true, ticks: { ...SCALE_X.ticks, maxTicksLimit: exportedDays===7?7:10 } },
+            },
+          },
         });
       }
 
-      // ── ROAS chart ────────────────────────────────────────────────────────
+      // ── ROAS CHART (horizontal bar, premium) ──────────────────────────────
       const roasCtx = document.getElementById('roas-chart');
       if (roasCtx && isPro && exportedChannels?.length > 0) {
-        const chR = exportedChannels.filter(c => c.revenue > 0);
+        const chR = exportedChannels.filter(c => c.revenue > 0).sort((a,b) => b.revenue - a.revenue);
         if (chR.length > 0) {
-          const COLS = ['#a78bfa','#38bdf8',GREEN,'#f59e0b','#fb7185','#34d399'];
+          const PALETTE = ['#a78bfa','#38bdf8',GREEN,AMBER,'#fb7185','#34d399'];
           new Chart(roasCtx, {
-            type:'bar',
-            data:{labels:chR.map(c=>c.name),datasets:[{label:'Revenue',data:chR.map(c=>c.revenue),backgroundColor:COLS.slice(0,chR.length).map(c=>c+'44'),borderColor:COLS.slice(0,chR.length),borderWidth:1.5,borderRadius:6}]},
-            options:{ responsive:true,maintainAspectRatio:false, plugins:{legend:{display:false},tooltip:{backgroundColor:'#111115',titleColor:'#fff',bodyColor:'#9ca3af',borderColor:'rgba(255,255,255,0.08)',borderWidth:1,callbacks:{label:(ctx)=>` ${Number(ctx.parsed.y).toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0})}`}}}, scales:{y:{beginAtZero:true,ticks:{color:'#4b5563',font:{size:10},maxTicksLimit:4,callback:(v)=>v>=1000?`${Math.round(v/1000)}k€`:`${v}€`},grid:{color:GRID},border:{display:false}},x:{ticks:{color:'#4b5563',font:{size:10}},grid:{display:false},border:{display:false}}} },
+            type: 'bar',
+            data: {
+              labels: chR.map(c => c.name),
+              datasets: [{
+                label: 'Revenue',
+                data: chR.map(c => c.revenue),
+                backgroundColor: chR.map((_, i) => {
+                  const col = PALETTE[i % PALETTE.length];
+                  return col + '55';
+                }),
+                borderColor:  chR.map((_, i) => PALETTE[i % PALETTE.length] + 'cc'),
+                borderWidth:  1.5,
+                borderRadius: 6,
+                borderSkipped: false,
+              }],
+            },
+            options: {
+              indexAxis: 'y',
+              responsive: true, maintainAspectRatio: false,
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  ...TOOLTIP_BASE,
+                  callbacks: {
+                    label: ctx => ` ${Number(ctx.parsed.x).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })}`,
+                  },
+                },
+              },
+              scales: {
+                x: { ...SCALE_Y, ticks: { ...SCALE_Y.ticks, callback: v => v >= 1000 ? `${Math.round(v/1000)}k€` : `${v}€` } },
+                y: { grid: { display: false }, border: { display: false }, ticks: { color: '#8b949e', font: { size: 10 }, padding: 4 } },
+              },
+            },
+            plugins: [{
+              id: 'roasLabels',
+              afterDatasetsDraw(chart) {
+                const { ctx: c, data, scales: { x, y } } = chart;
+                data.datasets[0].data.forEach((val, i) => {
+                  if (!val) return;
+                  const xPos = x.getPixelForValue(val);
+                  const yPos = y.getPixelForValue(i);
+                  c.save();
+                  c.fillStyle = '#8b949e';
+                  c.font = '9px DM Sans, sans-serif';
+                  c.textAlign = 'left';
+                  c.fillText(Number(val).toLocaleString('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}), xPos + 6, yPos + 3.5);
+                  c.restore();
+                });
+              },
+            }],
           });
         }
       }
@@ -1532,64 +1698,51 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
       function renderGoals() {
         const goals  = loadGoals();
         const actual = { views:Number(el.dataset.goalsViews??0), clicks:Number(el.dataset.goalsClicks??0), leads:Number(el.dataset.goalsLeads??0), revenue:Number(el.dataset.goalsRevenue??0) };
-        const items  = [{key:'views',label:'Vues',color:GREEN},{key:'clicks',label:'Clics',color:'#38bdf8'},{key:'leads',label:'Leads',color:'#f59e0b'},{key:'revenue',label:'Revenue',color:'#a78bfa'}];
+        const items  = [{key:'views',label:'Vues',color:GREEN},{key:'clicks',label:'Clics',color:BLUE},{key:'leads',label:'Leads',color:AMBER},{key:'revenue',label:'Revenue',color:'#a78bfa'}];
         const list   = document.getElementById('goals-list');
         if (!list) return;
         if (!Object.values(goals).some(v => Number(v) > 0)) {
-          list.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:80px;gap:8px;color:rgba(255,255,255,0.25);font-size:12px;text-align:center"><span style="font-size:20px;opacity:.4">🎯</span>Aucun objectif<br>Clique sur "Modifier"</div>';
+          list.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:80px;gap:8px;color:rgba(255,255,255,0.2);font-size:12px;text-align:center"><span style="font-size:20px;opacity:.3">🎯</span>Aucun objectif<br>Clique sur Modifier</div>';
           return;
         }
         list.innerHTML = items.map(item => {
           const g = Number(goals[item.key]??0); if (!g) return '';
           const a = actual[item.key]??0, pct = Math.min(100,g>0?Math.round((a/g)*100):0), done = pct>=100;
-          return `<div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px"><span style="font-size:11px;color:rgba(255,255,255,.4)">${item.label}</span><div style="display:flex;align-items:center;gap:6px">${done?'<span style="font-size:10px;font-weight:700;color:#00ff9d">✓ Atteint</span>':''}<span style="font-size:11px;font-weight:700;color:${done?'#00ff9d':item.color}">${pct}%</span></div></div><div style="background:rgba(255,255,255,.04);border-radius:9999px;height:5px;overflow:hidden"><div style="height:100%;border-radius:9999px;width:${pct}%;background:${done?'#00ff9d':item.color};opacity:${done?1:.7};transition:width .8s cubic-bezier(.16,1,.3,1)"></div></div><div style="font-size:10px;color:rgba(255,255,255,.2);margin-top:3px">${a.toLocaleString('fr-FR')} / ${g.toLocaleString('fr-FR')}</div></div>`;
+          return `<div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px"><span style="font-size:11px;color:#484f58">${item.label}</span><div style="display:flex;align-items:center;gap:6px">${done?'<span style="font-size:10px;font-weight:700;color:#00ff9d;letter-spacing:.02em">✓ ATTEINT</span>':''}<span style="font-size:12px;font-weight:700;color:${done?'#00ff9d':item.color};font-variant-numeric:tabular-nums">${pct}%</span></div></div><div style="background:rgba(255,255,255,.04);border-radius:9999px;height:4px;overflow:hidden"><div style="height:100%;border-radius:9999px;width:${pct}%;background:${done?'#00ff9d':item.color};transition:width .9s cubic-bezier(.16,1,.3,1)"></div></div><div style="font-size:10px;color:rgba(255,255,255,.18);margin-top:3px;font-variant-numeric:tabular-nums">${a.toLocaleString('fr-FR')} / ${g.toLocaleString('fr-FR')}</div></div>`;
         }).join('');
       }
       document.getElementById('edit-goals-btn')?.addEventListener('click', () => {
         const ed = document.getElementById('goals-editor');
         if (!ed) return;
-        const hidden = ed.classList.contains('hidden');
-        ed.classList.toggle('hidden', !hidden);
-        if (!hidden) return;
+        ed.classList.toggle('hidden');
+        if (ed.classList.contains('hidden')) return;
         const g = loadGoals();
         ['views','clicks','leads','revenue'].forEach(k => { const inp = document.getElementById(`goal-${k}`); if (inp && g[k]) inp.value = g[k]; });
       });
       document.getElementById('save-goals-btn')?.addEventListener('click', () => {
         const g = {};
-        ['views','clicks','leads','revenue'].forEach(k => { const val = parseInt(document.getElementById(`goal-${k}`)?.value??'0'); if (val>0) g[k]=val; });
+        ['views','clicks','leads','revenue'].forEach(k => { const val=parseInt(document.getElementById(`goal-${k}`)?.value??'0'); if(val>0)g[k]=val; });
         saveGoals(g); document.getElementById('goals-editor')?.classList.add('hidden'); renderGoals();
       });
       renderGoals();
 
-      // ── Section tabs (like Appearance) + sessionStorage ──────────────────
+      // ── Section tabs ──────────────────────────────────────────────────────
       function activateTab(id) {
         document.querySelectorAll('.sec-tab').forEach(t => t.classList.toggle('active', t.dataset.section===id));
         document.querySelectorAll('.sec-panel').forEach(p => p.classList.toggle('active', p.id===`panel-${id}`));
         try { sessionStorage.setItem('bf_analytics_tab', id); } catch {}
-        // Animated tab indicator
-        const activeBtn = document.querySelector(`.sec-tab[data-section="${id}"]`);
-        const indicator = document.getElementById('tab-indicator');
-        if (activeBtn && indicator) {
-          indicator.style.left  = activeBtn.offsetLeft + 'px';
-          indicator.style.width = activeBtn.offsetWidth + 'px';
-        }
+        const btn = document.querySelector(`.sec-tab[data-section="${id}"]`);
+        const ind = document.getElementById('tab-indicator');
+        if (btn && ind) { ind.style.left = btn.offsetLeft+'px'; ind.style.width = btn.offsetWidth+'px'; }
       }
       document.querySelectorAll('.sec-tab').forEach(btn => {
-        btn.addEventListener('click', () => {
-          activateTab(btn.dataset.section);
-          history.replaceState(null,'',`?days=${exportedDays}&tab=${btn.dataset.section}`);
-        });
+        btn.addEventListener('click', () => { activateTab(btn.dataset.section); history.replaceState(null,'',`?days=${exportedDays}&tab=${btn.dataset.section}`); });
       });
-      // Restore: URL > sessionStorage > default
       const urlTab = new URLSearchParams(location.search).get('tab');
-      let storedTab = null;
-      try { storedTab = sessionStorage.getItem('bf_analytics_tab'); } catch {}
-      const initTab = (urlTab && document.getElementById(`panel-${urlTab}`)) ? urlTab
-                    : (storedTab && document.getElementById(`panel-${storedTab}`)) ? storedTab
-                    : 'overview';
-      activateTab(initTab);
+      let storedTab; try { storedTab = sessionStorage.getItem('bf_analytics_tab'); } catch {}
+      activateTab((urlTab && document.getElementById(`panel-${urlTab}`)) ? urlTab : (storedTab && document.getElementById(`panel-${storedTab}`)) ? storedTab : 'overview');
 
-      // ── Inner tabs (Geo / Sources) ───────────────────────────────────────
+      // ── Inner tabs ────────────────────────────────────────────────────────
       document.querySelectorAll('.insight-tab-inner').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.dataset.innerTab;
@@ -1598,7 +1751,7 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
         });
       });
 
-      // ── UTM source filter ────────────────────────────────────────────────
+      // ── UTM filter ────────────────────────────────────────────────────────
       document.getElementById('utm-filter')?.querySelectorAll('.filter-chip').forEach(btn => {
         btn.addEventListener('click', () => {
           document.querySelectorAll('#utm-filter .filter-chip').forEach(b => b.classList.remove('active'));
@@ -1615,20 +1768,16 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
         btn.addEventListener('click', () => {
           document.querySelectorAll('#heatmap-sort .sort-btn').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
-          const sortKey = btn.dataset.sort;
+          const k = btn.dataset.sort;
           const container = document.getElementById('heatmap-rows');
           if (!container) return;
           const rows = [...container.children];
-          rows.sort((a, b) => {
-            if (sortKey === 'position') return Number(a.dataset.pos||0) - Number(b.dataset.pos||0);
-            if (sortKey === 'ctr')      return Number(b.dataset.ctr||0) - Number(a.dataset.ctr||0);
-            return Number(b.dataset.clicks||0) - Number(a.dataset.clicks||0);
-          });
+          rows.sort((a,b) => k==='position' ? Number(a.dataset.pos||0)-Number(b.dataset.pos||0) : k==='ctr' ? Number(b.dataset.ctr||0)-Number(a.dataset.ctr||0) : Number(b.dataset.clicks||0)-Number(a.dataset.clicks||0));
           rows.forEach(r => container.appendChild(r));
         });
       });
 
-      // ── D3 Choropleth Map (IntersectionObserver lazy init) ───────────────
+      // ── D3 Map (IntersectionObserver lazy) ────────────────────────────────
       const countriesData = JSON.parse(el.dataset.countries ?? '[]');
       const mapSvgEl   = document.getElementById('world-map');
       const mapLoader  = document.getElementById('world-map-loader');
@@ -1637,7 +1786,6 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
       async function initMap() {
         if (!mapSvgEl || mapSvgEl._mapInited) return;
         mapSvgEl._mapInited = true;
-
         await Promise.all([
           new Promise((res,rej)=>{ if(window.d3){res(null);return;} const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s); }),
           new Promise((res,rej)=>{ if(window.topojson){res(null);return;} const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/topojson@3.0.2/dist/topojson.min.js';s.onload=res;s.onerror=rej;document.head.appendChild(s); }),
@@ -1652,9 +1800,9 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
         const svg=d3.select(mapSvgEl).attr('width',W).attr('height',H);
         const projection=d3.geoNaturalEarth1().scale(W/6.1).translate([W/2,H/2+15]);
         const pathGen=d3.geoPath().projection(projection);
-        const g=svg.append('g').attr('class','map-root');
+        const g=svg.append('g');
         g.append('path').datum({type:'Sphere'}).attr('d',pathGen).attr('fill','#060d0a').attr('stroke','rgba(0,255,157,0.04)').attr('stroke-width',0.8);
-        g.append('path').datum(d3.geoGraticule().step([20,20])()).attr('d',pathGen).attr('fill','none').attr('stroke','rgba(255,255,255,0.025)').attr('stroke-width',0.4);
+        g.append('path').datum(d3.geoGraticule().step([20,20])()).attr('d',pathGen).attr('fill','none').attr('stroke','rgba(255,255,255,0.02)').attr('stroke-width',0.4);
         const countries=topojson.feature(world,world.objects.countries);
         g.selectAll('.country').data(countries.features).join('path').attr('class','country').attr('d',pathGen).attr('fill',d=>{const v=viewsMap.get(+d.id);return v?colorScale(v):'#101f16';}).attr('stroke','#0c1a12').attr('stroke-width',0.4);
         g.append('path').datum(topojson.mesh(world,world.objects.countries,(a,b)=>a!==b)).attr('d',pathGen).attr('fill','none').attr('stroke','rgba(0,255,157,0.07)').attr('stroke-width',0.5);
@@ -1664,8 +1812,8 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
           const feat=countries.features.find(f=>+f.id===+num);if(!feat)return;
           const cen=pathGen.centroid(feat);if(!cen||isNaN(cen[0])||isNaN(cen[1]))return;
           const intensity=row.views/maxViews,r=2.5+intensity*5.5;
-          dotsG.append('circle').attr('cx',cen[0]).attr('cy',cen[1]).attr('r',r+6).attr('fill',`rgba(0,255,157,${0.06+intensity*0.08})`).attr('pointer-events','none');
-          dotsG.append('circle').attr('cx',cen[0]).attr('cy',cen[1]).attr('r',r).attr('fill',idx===0?'#00ff9d':`rgba(0,255,157,${0.5+intensity*0.4})`).attr('stroke',idx===0?'rgba(0,255,157,0.4)':'none').attr('stroke-width',1.5).attr('pointer-events','none');
+          dotsG.append('circle').attr('cx',cen[0]).attr('cy',cen[1]).attr('r',r+6).attr('fill',`rgba(0,255,157,${.06+intensity*.08})`).attr('pointer-events','none');
+          dotsG.append('circle').attr('cx',cen[0]).attr('cy',cen[1]).attr('r',r).attr('fill',idx===0?'#00ff9d':`rgba(0,255,157,${.5+intensity*.4})`).attr('stroke',idx===0?'rgba(0,255,157,0.4)':'none').attr('stroke-width',1.5).attr('pointer-events','none');
         });
         g.selectAll('.country-hit').data(countries.features).join('path').attr('class','country-hit').attr('d',pathGen).attr('fill','transparent').attr('stroke','none')
           .attr('cursor',d=>viewsMap.has(+d.id)?'pointer':'default')
@@ -1673,31 +1821,31 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
             const views=viewsMap.get(+d.id);if(!views||!mapTooltip)return;
             const iso2=iso2Map.get(+d.id)||'',name=labelMap.get(+d.id)||iso2,pct=((views/maxViews)*100).toFixed(0);
             const rect=mapSvgEl.getBoundingClientRect();
-            mapTooltip.innerHTML=`<span style="color:#00ff9d;font-weight:700">${iso2} — ${name}</span><span style="color:#4b5563;margin:0 6px">·</span><span style="color:#e5e7eb">${views.toLocaleString('fr-FR')} vues</span><span style="color:#374151;margin-left:6px">${pct}%</span>`;
+            mapTooltip.innerHTML=`<span style="color:#00ff9d;font-weight:700">${iso2} — ${name}</span><span style="color:#484f58;margin:0 6px">·</span><span style="color:#e6edf3">${views.toLocaleString('fr-FR')} vues</span><span style="color:#484f58;margin-left:6px">${pct}%</span>`;
             let tx=event.clientX-rect.left+14,ty=event.clientY-rect.top-38;
-            if(tx+240>W)tx=tx-260;if(ty<4)ty=event.clientY-rect.top+18;
+            if(tx+240>W)tx-=260;if(ty<4)ty=event.clientY-rect.top+18;
             mapTooltip.style.left=tx+'px';mapTooltip.style.top=ty+'px';mapTooltip.classList.remove('hidden');
-            d3.select(this.parentNode).selectAll('.country').filter(fd=>fd===d).attr('fill',v=>{const val=viewsMap.get(+v.id);return val?d3.color(colorScale(val)).brighter(0.8).formatHex():'#1e3525';});
+            d3.select(this.parentNode).selectAll('.country').filter(fd=>fd===d).attr('fill',v=>{const val=viewsMap.get(+v.id);return val?d3.color(colorScale(val)).brighter(.8).formatHex():'#1e3525';});
           })
           .on('mouseleave',function(event,d){
             if(mapTooltip)mapTooltip.classList.add('hidden');
             d3.select(this.parentNode).selectAll('.country').filter(fd=>fd===d).attr('fill',fd=>{const v=viewsMap.get(+fd.id);return v?colorScale(v):'#101f16';});
           });
-        const zoom=d3.zoom().scaleExtent([0.9,12]).translateExtent([[-W*.5,-H*.5],[W*1.5,H*1.5]])
+        const zoom=d3.zoom().scaleExtent([.9,12]).translateExtent([[-W*.5,-H*.5],[W*1.5,H*1.5]])
           .filter(ev=>{if(ev.type==='dblclick')return false;return true;})
-          .on('zoom',(ev)=>{g.attr('transform',ev.transform);g.selectAll('.country').attr('stroke-width',Math.max(0.2,0.4/ev.transform.k));mapSvgEl.style.cursor=ev.sourceEvent?.buttons?'grabbing':'grab';});
+          .on('zoom',ev=>{g.attr('transform',ev.transform);g.selectAll('.country').attr('stroke-width',Math.max(.2,.4/ev.transform.k));mapSvgEl.style.cursor=ev.sourceEvent?.buttons?'grabbing':'grab';});
         svg.call(zoom);
         document.getElementById('map-zoom-in')?.addEventListener('click',()=>svg.transition().duration(300).call(zoom.scaleBy,1.6));
-        document.getElementById('map-zoom-out')?.addEventListener('click',()=>svg.transition().duration(300).call(zoom.scaleBy,0.625));
+        document.getElementById('map-zoom-out')?.addEventListener('click',()=>svg.transition().duration(300).call(zoom.scaleBy,.625));
         document.getElementById('map-reset')?.addEventListener('click',()=>svg.transition().duration(450).call(zoom.transform,d3.zoomIdentity));
         document.querySelectorAll('.country-row').forEach(row=>{
           row.addEventListener('mouseenter',()=>{
-            const iso2=row.getAttribute('data-iso'),num=ISO2_NUM[iso2];if(!num)return;
+            const num=ISO2_NUM[row.getAttribute('data-iso')];if(!num)return;
             const feat=countries.features.find(f=>+f.id===+num);if(!feat)return;
             g.selectAll('.country').classed('highlighted',fd=>+fd.id===+num);
             const b=pathGen.bounds(feat),dx=b[1][0]-b[0][0],dy=b[1][1]-b[0][1];
             const cx=(b[0][0]+b[1][0])/2,cy=(b[0][1]+b[1][1])/2;
-            const scale=Math.max(1.2,Math.min(8,0.85/Math.max(dx/W,dy/H)));
+            const scale=Math.max(1.2,Math.min(8,.85/Math.max(dx/W,dy/H)));
             svg.transition().duration(550).ease(d3.easeCubicOut).call(zoom.transform,d3.zoomIdentity.translate(W/2-scale*cx,H/2-scale*cy).scale(scale));
           });
           row.addEventListener('mouseleave',()=>{
@@ -1711,14 +1859,11 @@ const alertCount = alerts.filter(a => a.type === 'warning').length;
         ro.observe(mapSvgEl);
       }
 
-      // Lazy-init map via IntersectionObserver
       if (mapSvgEl) {
-        const obs = new IntersectionObserver(entries => {
-          if (entries[0].isIntersecting) { initMap(); obs.disconnect(); }
-        }, { threshold: 0.1 });
+        const obs = new IntersectionObserver(entries => { if(entries[0].isIntersecting){initMap();obs.disconnect();} }, {threshold:0.1});
         obs.observe(mapSvgEl);
       } else if (mapLoader) {
-        mapLoader.innerHTML = '<p style="color:#374151;font-size:12px;padding:24px">Carte non disponible</p>';
+        mapLoader.innerHTML = '<p style="color:#484f58;font-size:12px;padding:24px">Carte non disponible</p>';
       }
 
     })();
