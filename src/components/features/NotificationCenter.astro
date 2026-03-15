@@ -287,8 +287,8 @@ const { userId, supabaseUrl, supabaseKey } = Astro.props;
   .nc-list::-webkit-scrollbar { width: 3px; }
   .nc-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.07); border-radius: 2px; }
 
-  /* ── SECTION LABEL ──────────────────────────────── */
-  .nc-section {
+  /* ── SECTION LABEL — :global() car éléments créés en JS ── */
+  :global(.nc-section) {
     padding: 8px 6px 3px;
     font-size: 10px;
     font-weight: 700;
@@ -299,14 +299,14 @@ const { userId, supabaseUrl, supabaseKey } = Astro.props;
   }
 
   /* ── DIVIDER ────────────────────────────────────── */
-  .nc-divider {
+  :global(.nc-divider) {
     height: 0.5px;
     background: rgba(255,255,255,0.05);
     margin: 4px 6px;
   }
 
   /* ── ITEM ───────────────────────────────────────── */
-  .nc-item {
+  :global(.nc-item) {
     display: flex;
     align-items: flex-start;
     gap: 12px;
@@ -318,38 +318,37 @@ const { userId, supabaseUrl, supabaseKey } = Astro.props;
     position: relative;
     animation: nc-item-in 0.35s cubic-bezier(0.22,1,0.36,1) both;
   }
-  .nc-item:hover {
+  :global(.nc-item:hover) {
     background: rgba(255,255,255,0.04);
     border-color: rgba(255,255,255,0.06);
   }
-  .nc-item.unread {
+  :global(.nc-item.unread) {
     background: rgba(0,255,157,0.03);
     border-color: rgba(0,255,157,0.09);
   }
-  .nc-item.unread:hover {
+  :global(.nc-item.unread:hover) {
     background: rgba(0,255,157,0.055);
     border-color: rgba(0,255,157,0.14);
   }
 
   /* ── ITEM ICON ──────────────────────────────────── */
-  .nc-item-icon {
+  :global(.nc-item-icon) {
     width: 38px; height: 38px;
     border-radius: 12px;
     flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     font-size: 16px;
   }
-  /* color variants */
-  .nc-icon-green  { background: rgba(0,255,157,0.09);   box-shadow: 0 0 0 0.5px rgba(0,255,157,0.18); }
-  .nc-icon-blue   { background: rgba(56,189,248,0.09);  box-shadow: 0 0 0 0.5px rgba(56,189,248,0.18); }
-  .nc-icon-orange { background: rgba(251,146,60,0.09);  box-shadow: 0 0 0 0.5px rgba(251,146,60,0.18); }
-  .nc-icon-purple { background: rgba(167,139,250,0.09); box-shadow: 0 0 0 0.5px rgba(167,139,250,0.18); }
-  .nc-icon-gray   { background: rgba(255,255,255,0.05); box-shadow: 0 0 0 0.5px rgba(255,255,255,0.09); }
+  :global(.nc-icon-green)  { background: rgba(0,255,157,0.09);   box-shadow: 0 0 0 0.5px rgba(0,255,157,0.18); }
+  :global(.nc-icon-blue)   { background: rgba(56,189,248,0.09);  box-shadow: 0 0 0 0.5px rgba(56,189,248,0.18); }
+  :global(.nc-icon-orange) { background: rgba(251,146,60,0.09);  box-shadow: 0 0 0 0.5px rgba(251,146,60,0.18); }
+  :global(.nc-icon-purple) { background: rgba(167,139,250,0.09); box-shadow: 0 0 0 0.5px rgba(167,139,250,0.18); }
+  :global(.nc-icon-gray)   { background: rgba(255,255,255,0.05); box-shadow: 0 0 0 0.5px rgba(255,255,255,0.09); }
 
   /* ── ITEM CONTENT ───────────────────────────────── */
-  .nc-item-content { flex: 1; min-width: 0; }
+  :global(.nc-item-content) { flex: 1; min-width: 0; }
 
-  .nc-item-title {
+  :global(.nc-item-title) {
     font-size: 13px;
     font-weight: 700;
     color: #fff;
@@ -361,9 +360,9 @@ const { userId, supabaseUrl, supabaseKey } = Astro.props;
     text-overflow: ellipsis;
     transition: color 0.3s;
   }
-  .nc-item-title.read { color: rgba(255,255,255,0.5); }
+  :global(.nc-item-title.read) { color: rgba(255,255,255,0.5); }
 
-  .nc-item-body {
+  :global(.nc-item-body) {
     font-size: 12px;
     color: rgba(255,255,255,0.4);
     line-height: 1.55;
@@ -373,20 +372,20 @@ const { userId, supabaseUrl, supabaseKey } = Astro.props;
     overflow: hidden;
   }
 
-  .nc-item-meta {
+  :global(.nc-item-meta) {
     display: flex;
     align-items: center;
     gap: 6px;
     margin-top: 5px;
   }
 
-  .nc-item-time {
+  :global(.nc-item-time) {
     font-size: 10.5px;
     color: rgba(255,255,255,0.2);
     font-weight: 500;
   }
 
-  .nc-item-tag {
+  :global(.nc-item-tag) {
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.02em;
@@ -394,13 +393,13 @@ const { userId, supabaseUrl, supabaseKey } = Astro.props;
     border-radius: 5px;
     line-height: 1.65;
   }
-  .nc-tag-green  { background: rgba(0,255,157,0.1);    color: #00ff9d; }
-  .nc-tag-blue   { background: rgba(56,189,248,0.1);   color: #38bdf8; }
-  .nc-tag-orange { background: rgba(251,146,60,0.1);   color: #fb923c; }
-  .nc-tag-purple { background: rgba(167,139,250,0.12); color: #a78bfa; }
+  :global(.nc-tag-green)  { background: rgba(0,255,157,0.1);    color: #00ff9d; }
+  :global(.nc-tag-blue)   { background: rgba(56,189,248,0.1);   color: #38bdf8; }
+  :global(.nc-tag-orange) { background: rgba(251,146,60,0.1);   color: #fb923c; }
+  :global(.nc-tag-purple) { background: rgba(167,139,250,0.12); color: #a78bfa; }
 
   /* ── UNREAD DOT ─────────────────────────────────── */
-  .nc-unread-dot {
+  :global(.nc-unread-dot) {
     position: absolute;
     top: 13px; right: 13px;
     width: 7px; height: 7px;
@@ -692,7 +691,7 @@ const { userId, supabaseUrl, supabaseKey } = Astro.props;
 
   /* ── RENDER ──────────────────────────────────────── */
   function renderList() {
-    var now = new Date();
+    var now = new Date(); // déclaré localement — pas de dépendance externe
 
     var filtered = allNotifs.filter(function (n) {
       if (filter === 'unread')  return !n.is_read;
