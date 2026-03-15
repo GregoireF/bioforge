@@ -348,7 +348,7 @@ if (revenue > 0 && convRate < 10) perfRecos.push(`Taux de conv. ${convRate.toFix
 if (perfRecos.length < 3) perfRecos.push('Continue sur cette lancée — ta cohérence est ta meilleure arme de croissance.');
 const topRecos = perfRecos.slice(0, 3);
 
-// ── v5: PREDICTIONS (linear regression on daily views last 7d) ───────────────
+function sparklinePred(data: number[], slope: number, intercept: number, color: string): string {
   const W = 200, H = 40;
   const extended = [...data];
   for (let i = data.length; i < data.length + 14; i++) {
