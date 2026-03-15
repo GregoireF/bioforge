@@ -6,8 +6,9 @@
 import CommandPalette from '@/components/features/CommandPalette.astro';
 import OnboardingTour  from '@/components/features/OnboardingTour.astro';
 import UpgradeModal    from '@/components/features/UpgradeModal.astro';
-import FeedbackWidget  from '@/components/features/FeedbackWidget.astro';
-import CollabBanner    from '@/components/features/CollabBanner.astro';
+import FeedbackWidget       from '@/components/features/FeedbackWidget.astro';
+import CollabBanner         from '@/components/features/CollabBanner.astro';
+import NotificationCenter   from '@/components/features/NotificationCenter.astro';
 import '@/styles/global.css';
 import { Image } from 'astro:assets';
 import { withAuth } from '@/lib/auth/auth';
@@ -52,12 +53,29 @@ const displayName = profile?.display_name || profile?.username || 'User';
 const initials    = displayName.slice(0, 2).toUpperCase();
 
 // ── AI Chatbot — context passé au script client ────────────────────────────────
+const supabaseUrl     = import.meta.env.PUBLIC_SUPABASE_URL ?? '';
+const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY ?? '';
+
 const chatContext = JSON.stringify({
   username:    profile?.username    ?? '',
   displayName: profile?.display_name ?? profile?.username ?? 'User',
   plan,
   isPaid,
 });
+
+// ── Completion score ──────────────────────────────────────────────────────────
+type CompletionStep = { id: string; label: string; href: string; done: boolean };
+const completionSteps: CompletionStep[] = [
+  { id:'avatar',   label:'Photo de profil',        href:'/dashboard/settings', done: !!profile?.avatar_url },
+  { id:'bio',      label:'Bio renseignée',          href:'/dashboard/settings', done: !!(profile?.bio && profile.bio.length > 5) },
+  { id:'username', label:'Pseudo personnalisé',     href:'/dashboard/settings', done: !!(profile?.username && !profile.username.startsWith('user_')) },
+  { id:'theme',    label:'Apparence configurée',    href:'/dashboard/appearance', done: !!(profile?.theme && typeof profile.theme === 'object') },
+  { id:'links',    label:'3 liens ajoutés',         href:'/dashboard/blocks', done: false }, // resolved client-side via API
+];
+const completionDone  = completionSteps.filter(s => s.done).length;
+const completionTotal = completionSteps.length;
+const completionPct   = Math.round((completionDone / completionTotal) * 100);
+const completionFull  = completionDone === completionTotal;
 
 // ── Changelog entries ─────────────────────────────────────────────────────────
 const CHANGELOG = [
@@ -351,6 +369,48 @@ function navClass(href: string, exact: boolean): string {
     </div>
   )}
 
+    <!-- Profile completion bar -->
+    {!completionFull && (
+      <div id="completion-bar"
+        class="hidden lg:flex items-center gap-4 px-6 py-2 shrink-0"
+        style="background:rgba(255,255,255,0.02);border-bottom:1px solid rgba(255,255,255,0.06)">
+        <!-- Label -->
+        <div class="flex items-center gap-2 shrink-0">
+          <div class="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
+            style="background:rgba(0,255,157,0.12);border:1px solid rgba(0,255,157,0.2)">
+            <svg class="w-2.5 h-2.5 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+            </svg>
+          </div>
+          <span class="text-xs font-semibold text-white/60 whitespace-nowrap">Profil <span class="text-white font-bold">{completionPct}%</span> complet</span>
+        </div>
+        <!-- Progress track -->
+        <div class="flex-1 h-1.5 rounded-full overflow-hidden" style="background:rgba(255,255,255,0.08);max-width:160px">
+          <div class="h-full rounded-full transition-all duration-700"
+            style={`width:${completionPct}%;background:linear-gradient(90deg,#00ff9d,#00cc7a)`}></div>
+        </div>
+        <!-- Steps chips -->
+        <div class="flex items-center gap-1.5 flex-1 overflow-hidden">
+          {completionSteps.filter(s => !s.done).slice(0, 3).map(step => (
+            <a href={step.href}
+              class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium shrink-0 transition-all"
+              style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.5)"
+              onmouseover="this.style.background='rgba(255,255,255,0.09)';this.style.color='#fff'"
+              onmouseout="this.style.background='rgba(255,255,255,0.05)';this.style.color='rgba(255,255,255,0.5)'">
+              <svg class="w-2.5 h-2.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+              </svg>
+              {step.label}
+            </a>
+          ))}
+        </div>
+        <!-- Dismiss -->
+        <button id="completion-dismiss"
+          class="shrink-0 text-white/20 hover:text-white/50 transition-colors text-xs"
+          aria-label="Masquer">✕</button>
+      </div>
+    )}
+
     <!-- Top Bar -->
     <header class="h-14 lg:h-16 glass-strong border-b border-white/10 flex items-center justify-between px-4 lg:px-6 shrink-0 gap-3">
 
@@ -399,12 +459,24 @@ function navClass(href: string, exact: boolean): string {
           </a>
         )}
 
+        <!-- Notification Center (realtime) -->
+        {profile?.id && (
+          <div class="hidden lg:block">
+            <NotificationCenter
+              userId={profile.id}
+              supabaseUrl={supabaseUrl}
+              supabaseKey={supabaseAnonKey}
+            />
+          </div>
+        )}
+
         <!-- Changelog bell -->
         <button id="changelog-btn"
           class="relative hidden lg:flex items-center justify-center w-8 h-8 rounded-lg glass border border-white/10 hover:border-white/20 transition-all text-gray-400 hover:text-white"
-          aria-label="Quoi de neuf">
+          aria-label="Quoi de neuf"
+          title="Nouveautés">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
           </svg>
           {newCount > 0 && (
             <span class="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-neon-green text-black text-[9px] font-bold flex items-center justify-center">{newCount}</span>
@@ -1184,6 +1256,46 @@ function navClass(href: string, exact: boolean): string {
       var badge = btn.querySelector('span');
       if (badge) badge.style.display = 'none';
     }
+  })();
+
+  /* ══ COMPLETION BAR ═════════════════════════════════════════════════════════ */
+  (function () {
+    var bar     = document.getElementById('completion-bar');
+    var dismiss = document.getElementById('completion-dismiss');
+    if (!bar) return;
+
+    if (sessionStorage.getItem('bf_completion_dismissed')) {
+      bar.style.display = 'none';
+      return;
+    }
+
+    if (dismiss) {
+      dismiss.addEventListener('click', function () {
+        bar.style.height  = '0';
+        bar.style.opacity = '0';
+        bar.style.overflow = 'hidden';
+        bar.style.transition = 'height 0.3s ease, opacity 0.2s ease';
+        setTimeout(function () { bar.style.display = 'none'; }, 320);
+        sessionStorage.setItem('bf_completion_dismissed', '1');
+      });
+    }
+
+    // Check block count via API and update the "3 liens" step
+    fetch('/api/blocks?count=1')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var count = d.data?.total ?? d.data?.count ?? 0;
+        if (count >= 3) {
+          // All chips might need refreshing — soft approach: just update if visible
+          var chips = bar.querySelectorAll('a');
+          chips.forEach(function (chip) {
+            if (chip.textContent.includes('3 liens')) {
+              chip.style.display = 'none';
+            }
+          });
+        }
+      })
+      .catch(function () {/* silent */});
   })();
 
   /* ══ USAGE INDICATOR ════════════════════════════════════════════════════════ */

@@ -1,0 +1,500 @@
+---
+// src/components/features/NotificationCenter.astro
+// Notification bell + dropdown panel avec Supabase Realtime
+// Intégration : <NotificationCenter userId={profile.id} supabaseUrl={...} supabaseKey={...} />
+
+interface Props {
+  userId:      string;
+  supabaseUrl: string;
+  supabaseKey: string; // anon key uniquement
+}
+
+const { userId, supabaseUrl, supabaseKey } = Astro.props;
+---
+
+<!-- Bell button — s'insère dans la topbar -->
+<button
+  id="notif-bell"
+  aria-label="Notifications"
+  aria-haspopup="true"
+  aria-expanded="false"
+  class="relative flex items-center justify-center w-8 h-8 rounded-lg glass border border-white/10 hover:border-white/20 transition-all text-gray-400 hover:text-white"
+>
+  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+    <path stroke-linecap="round" stroke-linejoin="round"
+      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+  </svg>
+  <!-- Badge compteur non-lus -->
+  <span
+    id="notif-badge"
+    style="display:none"
+    class="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full
+      bg-neon-green text-black text-[9px] font-bold
+      flex items-center justify-center leading-none"
+  ></span>
+</button>
+
+<!-- Panel dropdown -->
+<div
+  id="notif-panel"
+  role="dialog"
+  aria-label="Centre de notifications"
+  style="
+    display:none; position:fixed; top:60px; right:16px; z-index:9980;
+    width:380px;
+    background:linear-gradient(160deg,#0e1317 0%,#090c0f 100%);
+    border:1px solid rgba(255,255,255,0.09);
+    border-top:1px solid rgba(255,255,255,0.14);
+    border-radius:20px; overflow:hidden;
+    box-shadow:0 32px 64px rgba(0,0,0,0.65),0 0 0 1px rgba(0,0,0,0.5);
+    opacity:0; transform:translateY(-10px) scale(0.97);
+    transition:opacity 0.25s ease,transform 0.25s cubic-bezier(0.22,1,0.36,1);
+  "
+>
+  <!-- Header -->
+  <div style="
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 18px 12px;
+    border-bottom:1px solid rgba(255,255,255,0.06);
+  ">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-family:'Cabinet Grotesk',system-ui;font-size:15px;font-weight:900;color:#fff;letter-spacing:-0.02em">
+        Notifications
+      </span>
+      <span id="notif-header-count" style="display:none;font-size:11px;font-weight:700;background:#00ff9d;color:#000;padding:2px 8px;border-radius:99px"></span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <!-- Mark all read -->
+      <button id="notif-read-all"
+        style="font-size:11px;color:rgba(255,255,255,0.35);background:none;border:none;cursor:pointer;font-family:inherit;padding:4px 8px;border-radius:7px;transition:all 0.15s"
+        onmouseover="this.style.background='rgba(255,255,255,0.06)';this.style.color='#fff'"
+        onmouseout="this.style.background='none';this.style.color='rgba(255,255,255,0.35)'"
+      >
+        Tout lire
+      </button>
+      <!-- Close -->
+      <button id="notif-close"
+        style="width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgba(255,255,255,0.4);font-size:11px;transition:all 0.15s"
+        onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'"
+        aria-label="Fermer"
+      >✕</button>
+    </div>
+  </div>
+
+  <!-- Filter tabs -->
+  <div style="display:flex;gap:2px;padding:8px 10px 4px">
+    <button class="notif-tab active" data-filter="all"
+      style="padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;font-family:inherit;background:rgba(255,255,255,0.08);color:#fff">
+      Toutes
+    </button>
+    <button class="notif-tab" data-filter="unread"
+      style="padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;font-family:inherit;background:transparent;color:rgba(255,255,255,0.4)">
+      Non lues
+    </button>
+    <button class="notif-tab" data-filter="roadmap"
+      style="padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;font-family:inherit;background:transparent;color:rgba(255,255,255,0.4)">
+      Roadmap
+    </button>
+  </div>
+
+  <!-- List -->
+  <div id="notif-list" style="max-height:400px;overflow-y:auto;padding:6px 8px 8px">
+    <!-- Loading state -->
+    <div id="notif-loading" style="padding:32px 0;text-align:center">
+      <div style="width:32px;height:32px;border-radius:50%;border:2px solid rgba(255,255,255,0.08);border-top-color:#00ff9d;animation:nspin 0.8s linear infinite;margin:0 auto 12px"></div>
+      <p style="font-size:12px;color:rgba(255,255,255,0.3)">Chargement…</p>
+    </div>
+    <!-- Empty state (hidden by default) -->
+    <div id="notif-empty" style="display:none;padding:36px 16px;text-align:center">
+      <div style="font-size:32px;margin-bottom:10px;opacity:0.4">🔔</div>
+      <p style="font-size:13px;font-weight:600;color:rgba(255,255,255,0.5);margin-bottom:4px">Aucune notification</p>
+      <p style="font-size:12px;color:rgba(255,255,255,0.25)">Tu seras notifié dès qu'il se passe quelque chose.</p>
+    </div>
+  </div>
+
+  <!-- Footer — lien settings notifs -->
+  <div style="padding:10px 18px;border-top:1px solid rgba(255,255,255,0.06);display:flex;justify-content:center">
+    <a href="/dashboard/settings#notifications"
+      style="font-size:11px;color:rgba(255,255,255,0.25);text-decoration:none;transition:color 0.2s"
+      onmouseover="this.style.color='rgba(255,255,255,0.55)'" onmouseout="this.style.color='rgba(255,255,255,0.25)'"
+    >
+      Gérer les préférences de notification →
+    </a>
+  </div>
+</div>
+
+<!-- Realtime toast container -->
+<div id="notif-toast-wrap"
+  style="position:fixed;top:72px;right:20px;z-index:9990;display:flex;flex-direction:column;gap:8px;pointer-events:none">
+</div>
+
+<style>
+  @keyframes nspin {
+    to { transform: rotate(360deg) }
+  }
+  @keyframes ntoast-in {
+    from { opacity:0; transform:translateX(20px) scale(0.95) }
+    to   { opacity:1; transform:none }
+  }
+  @keyframes ntoast-out {
+    to { opacity:0; transform:translateX(20px) scale(0.95) }
+  }
+  @keyframes nitem-in {
+    from { opacity:0; transform:translateY(-6px) }
+    to   { opacity:1; transform:none }
+  }
+  .notif-item {
+    display:flex; align-items:flex-start; gap:11px;
+    padding:11px 12px; border-radius:13px; cursor:pointer;
+    transition:background 0.15s; border:1px solid transparent;
+    animation:nitem-in 0.3s cubic-bezier(0.22,1,0.36,1) both;
+    position:relative;
+  }
+  .notif-item:hover { background:rgba(255,255,255,0.05) }
+  .notif-item.unread { background:rgba(0,255,157,0.04); border-color:rgba(0,255,157,0.1) }
+  .notif-item.unread:hover { background:rgba(0,255,157,0.07) }
+  .notif-dot {
+    position:absolute; top:14px; right:14px;
+    width:7px; height:7px; border-radius:50%;
+    background:#00ff9d;
+    box-shadow:0 0 0 2px rgba(0,255,157,0.15);
+  }
+  .notif-icon {
+    width:36px; height:36px; border-radius:11px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-size:17px; line-height:1;
+  }
+  .notif-title {
+    font-size:13px; font-weight:700; color:#fff;
+    letter-spacing:-0.01em; margin-bottom:3px; line-height:1.2;
+    font-family:'Cabinet Grotesk',system-ui,sans-serif;
+  }
+  .notif-body { font-size:12px; color:rgba(255,255,255,0.45); line-height:1.55 }
+  .notif-time { font-size:10px; color:rgba(255,255,255,0.25); margin-top:4px }
+  .notif-tab.active { background:rgba(255,255,255,0.08) !important; color:#fff !important }
+
+  /* Realtime toast */
+  .ntoast {
+    pointer-events:all;
+    display:flex; align-items:center; gap:10px;
+    padding:11px 15px; border-radius:14px;
+    background:linear-gradient(135deg,#0d1114,#090c0f);
+    border:1px solid rgba(255,255,255,0.1);
+    border-left:3px solid #00ff9d;
+    box-shadow:0 16px 40px rgba(0,0,0,0.55);
+    max-width:320px;
+    cursor:pointer;
+    animation:ntoast-in 0.35s cubic-bezier(0.22,1,0.36,1) both;
+  }
+  .ntoast.out { animation:ntoast-out 0.25s ease forwards }
+  .ntoast-icon { font-size:18px; flex-shrink:0 }
+  .ntoast-title { font-size:13px; font-weight:700; color:#fff; font-family:'Cabinet Grotesk',system-ui,sans-serif; letter-spacing:-0.01em }
+  .ntoast-body  { font-size:11px; color:rgba(255,255,255,0.45); margin-top:1px }
+
+  /* Scrollbar notif list */
+  #notif-list::-webkit-scrollbar { width:3px }
+  #notif-list::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:2px }
+</style>
+
+<script define:vars={{ userId, supabaseUrl, supabaseKey }}>
+(function () {
+  /* ── CONFIG ─────────────────────────────────────────────────────────────── */
+  var ICON_MAP = {
+    welcome:         { bg:'rgba(0,255,157,0.1)',  border:'rgba(0,255,157,0.2)'  },
+    new_visit:       { bg:'rgba(56,189,248,0.1)', border:'rgba(56,189,248,0.2)' },
+    visit_milestone: { bg:'rgba(56,189,248,0.1)', border:'rgba(56,189,248,0.2)' },
+    click_milestone: { bg:'rgba(251,146,60,0.1)', border:'rgba(251,146,60,0.2)' },
+    roadmap_shipped: { bg:'rgba(0,255,157,0.1)',  border:'rgba(0,255,157,0.2)'  },
+    suggestion_ok:   { bg:'rgba(0,255,157,0.1)',  border:'rgba(0,255,157,0.2)'  },
+    suggestion_no:   { bg:'rgba(107,114,128,0.12)',border:'rgba(107,114,128,0.2)'},
+    upgrade_success: { bg:'rgba(167,139,250,0.1)', border:'rgba(167,139,250,0.2)'},
+  };
+
+  /* ── STATE ──────────────────────────────────────────────────────────────── */
+  var allNotifs  = [];
+  var filter     = 'all';
+  var panelOpen  = false;
+
+  /* ── DOM refs ───────────────────────────────────────────────────────────── */
+  var bell        = document.getElementById('notif-bell');
+  var badge       = document.getElementById('notif-badge');
+  var panel       = document.getElementById('notif-panel');
+  var list        = document.getElementById('notif-list');
+  var loading     = document.getElementById('notif-loading');
+  var empty       = document.getElementById('notif-empty');
+  var closeBtn    = document.getElementById('notif-close');
+  var readAllBtn  = document.getElementById('notif-read-all');
+  var headerCount = document.getElementById('notif-header-count');
+  var toastWrap   = document.getElementById('notif-toast-wrap');
+
+  if (!bell || !panel) return;
+
+  /* ── HELPERS ─────────────────────────────────────────────────────────────── */
+  function timeAgo(iso) {
+    var diff = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (diff < 60)   return 'À l\'instant';
+    if (diff < 3600) return Math.floor(diff / 60) + ' min';
+    if (diff < 86400)return Math.floor(diff / 3600) + 'h';
+    return Math.floor(diff / 86400) + 'j';
+  }
+
+  function updateBadge(count) {
+    if (count > 0) {
+      badge.textContent = count > 99 ? '99+' : String(count);
+      badge.style.display = 'flex';
+      headerCount.textContent = String(count);
+      headerCount.style.display = 'inline-flex';
+    } else {
+      badge.style.display = 'none';
+      headerCount.style.display = 'none';
+    }
+  }
+
+  /* ── RENDER LIST ─────────────────────────────────────────────────────────── */
+  function renderList() {
+    var filtered = allNotifs.filter(function (n) {
+      if (filter === 'unread')  return !n.is_read;
+      if (filter === 'roadmap') return n.type === 'roadmap_shipped' || n.type === 'suggestion_ok' || n.type === 'suggestion_no';
+      return true;
+    });
+
+    loading.style.display = 'none';
+
+    if (!filtered.length) {
+      empty.style.display = 'block';
+      // clear previous items
+      var old = list.querySelectorAll('.notif-item');
+      old.forEach(function (el) { el.remove(); });
+      return;
+    }
+    empty.style.display = 'none';
+
+    var existingIds = {};
+    list.querySelectorAll('.notif-item').forEach(function (el) {
+      existingIds[el.dataset.id] = true;
+    });
+
+    // Remove stale items
+    list.querySelectorAll('.notif-item').forEach(function (el) {
+      if (!filtered.find(function (n) { return String(n.id) === el.dataset.id; })) {
+        el.remove();
+      }
+    });
+
+    filtered.forEach(function (n, idx) {
+      if (existingIds[String(n.id)]) {
+        // Update read state
+        var el = list.querySelector('[data-id="' + n.id + '"]');
+        if (el) {
+          if (n.is_read) el.classList.remove('unread');
+          var dot = el.querySelector('.notif-dot');
+          if (dot) dot.style.display = n.is_read ? 'none' : 'block';
+          el.querySelector('.notif-time').textContent = timeAgo(n.created_at);
+        }
+        return;
+      }
+      var colors = ICON_MAP[n.type] || { bg:'rgba(255,255,255,0.06)', border:'rgba(255,255,255,0.1)' };
+      var item = document.createElement('div');
+      item.className = 'notif-item' + (n.is_read ? '' : ' unread');
+      item.dataset.id   = String(n.id);
+      item.style.animationDelay = (idx * 30) + 'ms';
+
+      item.innerHTML =
+        '<div class="notif-icon" style="background:' + colors.bg + ';border:1px solid ' + colors.border + '">' + (n.icon || '✦') + '</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div class="notif-title">' + escHtml(n.title) + '</div>' +
+          (n.body ? '<div class="notif-body">' + escHtml(n.body) + '</div>' : '') +
+          '<div class="notif-time">' + timeAgo(n.created_at) + '</div>' +
+        '</div>' +
+        (!n.is_read ? '<div class="notif-dot"></div>' : '');
+
+      item.addEventListener('click', function () {
+        markRead(n.id);
+        if (n.href) window.location.href = n.href;
+        else closePanel();
+      });
+
+      // Insert in correct position
+      var allItems = list.querySelectorAll('.notif-item');
+      var before = null;
+      for (var i = 0; i < allItems.length; i++) {
+        var other = filtered.find(function (x) { return String(x.id) === allItems[i].dataset.id; });
+        if (other && filtered.indexOf(other) > idx) { before = allItems[i]; break; }
+      }
+      if (before) list.insertBefore(item, before);
+      else list.insertBefore(item, empty);
+    });
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  /* ── FETCH ───────────────────────────────────────────────────────────────── */
+  async function fetchNotifs() {
+    try {
+      var r = await fetch('/api/notifications');
+      var d = await r.json();
+      if (d.success) {
+        allNotifs = d.data.notifications || [];
+        updateBadge(d.data.unread || 0);
+        renderList();
+      }
+    } catch (_) {}
+  }
+
+  /* ── MARK READ ───────────────────────────────────────────────────────────── */
+  async function markRead(id) {
+    var n = allNotifs.find(function (x) { return x.id === id; });
+    if (n && n.is_read) return;
+    if (n) n.is_read = true;
+    var unread = allNotifs.filter(function (x) { return !x.is_read; }).length;
+    updateBadge(unread);
+    renderList();
+    try {
+      await fetch('/api/notifications/read', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id }),
+      });
+    } catch (_) {}
+  }
+
+  async function markAllRead() {
+    allNotifs.forEach(function (n) { n.is_read = true; });
+    updateBadge(0);
+    renderList();
+    try {
+      await fetch('/api/notifications/read', { method: 'PATCH', headers: { 'Content-Type': 'application/json' } });
+    } catch (_) {}
+  }
+
+  /* ── REALTIME TOAST ──────────────────────────────────────────────────────── */
+  function showToast(notif) {
+    var toast = document.createElement('div');
+    toast.className = 'ntoast';
+    toast.innerHTML =
+      '<div class="ntoast-icon">' + (notif.icon || '✦') + '</div>' +
+      '<div><div class="ntoast-title">' + escHtml(notif.title) + '</div>' +
+        (notif.body ? '<div class="ntoast-body">' + escHtml(notif.body.slice(0, 70)) + (notif.body.length > 70 ? '…' : '') + '</div>' : '') +
+      '</div>';
+
+    toast.addEventListener('click', function () {
+      dismissToast(toast);
+      markRead(notif.id);
+      if (notif.href) window.location.href = notif.href;
+    });
+    toastWrap.appendChild(toast);
+
+    // Auto-dismiss after 5s
+    setTimeout(function () { dismissToast(toast); }, 5000);
+  }
+
+  function dismissToast(toast) {
+    toast.classList.add('out');
+    setTimeout(function () { toast.remove(); }, 280);
+  }
+
+  /* ── PANEL OPEN/CLOSE ────────────────────────────────────────────────────── */
+  function openPanel() {
+    panelOpen = true;
+    panel.style.display = 'block';
+    bell.setAttribute('aria-expanded', 'true');
+    requestAnimationFrame(function () {
+      panel.style.opacity   = '1';
+      panel.style.transform = 'translateY(0) scale(1)';
+    });
+    fetchNotifs();
+  }
+
+  function closePanel() {
+    panelOpen = false;
+    bell.setAttribute('aria-expanded', 'false');
+    panel.style.opacity   = '0';
+    panel.style.transform = 'translateY(-10px) scale(0.97)';
+    setTimeout(function () { panel.style.display = 'none'; }, 260);
+  }
+
+  /* ── FILTER TABS ─────────────────────────────────────────────────────────── */
+  document.querySelectorAll('.notif-tab').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.notif-tab').forEach(function (b) {
+        b.classList.remove('active');
+        b.style.background = 'transparent';
+        b.style.color = 'rgba(255,255,255,0.4)';
+      });
+      btn.classList.add('active');
+      btn.style.background = 'rgba(255,255,255,0.08)';
+      btn.style.color = '#fff';
+      filter = btn.dataset.filter;
+      renderList();
+    });
+  });
+
+  /* ── LISTENERS ───────────────────────────────────────────────────────────── */
+  bell.addEventListener('click', function (e) {
+    e.stopPropagation();
+    panelOpen ? closePanel() : openPanel();
+  });
+
+  if (closeBtn)   closeBtn.addEventListener('click', closePanel);
+  if (readAllBtn) readAllBtn.addEventListener('click', markAllRead);
+
+  document.addEventListener('click', function (e) {
+    if (panelOpen && !panel.contains(e.target) && e.target !== bell) closePanel();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && panelOpen) closePanel();
+  });
+
+  /* ── SUPABASE REALTIME ───────────────────────────────────────────────────── */
+  function initRealtime() {
+    if (typeof window === 'undefined') return;
+    // Import Supabase client dynamically
+    var script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+    script.onload = function () {
+      var client = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+      client
+        .channel('notifications:' + userId)
+        .on(
+          'postgres_changes',
+          {
+            event:  'INSERT',
+            schema: 'public',
+            table:  'notifications',
+            filter: 'user_id=eq.' + userId,
+          },
+          function (payload) {
+            var notif = payload.new;
+            // Prepend to list
+            allNotifs.unshift(notif);
+            var unread = allNotifs.filter(function (x) { return !x.is_read; }).length;
+            updateBadge(unread);
+            // Show in-app toast si panel fermé
+            if (!panelOpen) showToast(notif);
+            else renderList();
+          }
+        )
+        .subscribe();
+    };
+    document.head.appendChild(script);
+  }
+
+  /* ── INIT ────────────────────────────────────────────────────────────────── */
+  // Fetch initial au load
+  fetchNotifs();
+  // Refresh badge count toutes les 60s (fallback si realtime down)
+  setInterval(function () {
+    if (!panelOpen) {
+      fetch('/api/notifications')
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (d.success) updateBadge(d.data.unread || 0); })
+        .catch(function () {});
+    }
+  }, 60000);
+  // Démarrer Realtime
+  initRealtime();
+})();
+</script>
