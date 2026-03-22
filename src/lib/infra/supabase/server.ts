@@ -1,20 +1,20 @@
 import { createServerClient } from '@supabase/ssr'
 import type { AstroCookies } from 'astro'
 import type { Database } from '@/lib/supabase/database.types'
-
+ 
 export function createSupabaseServer(context: {
   request: Request
   cookies: AstroCookies
 }) {
   const isProd = import.meta.env.PROD
-
+ 
   const cookieDefaults = {
     path:     '/',
     httpOnly: true,
     secure:   isProd,
-    sameSite: (isProd ? 'none' : 'lax') as 'none' | 'lax',
+    sameSite: 'lax' as const,  // ✅ lax, pas none
   }
-
+ 
   return createServerClient<Database>(
     import.meta.env.PUBLIC_SUPABASE_URL!,
     import.meta.env.PUBLIC_SUPABASE_ANON_KEY!,
@@ -33,3 +33,4 @@ export function createSupabaseServer(context: {
     }
   )
 }
+ 

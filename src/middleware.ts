@@ -2,47 +2,33 @@
 import { defineMiddleware } from 'astro:middleware'
 import { createSupabaseServer } from '@/lib/infra/supabase/server'
 
-// Routes accessibles sans authentification
-const PUBLIC_ROUTES = new Set(['/', '/signin', '/signup'])
-
-// Préfixes publics
-const PUBLIC_PREFIXES = [
-  '/auth/',          // auth/callback, auth/confirm…
-  '/api/',           // toutes les API gèrent leur propre auth via wrapApiHandler
-  '/@',              // pages publiques profil /@username
-]
+const PUBLIC_ROUTES = ['/', '/signin', '/signup', '/auth/callback']
 
 export const onRequest = defineMiddleware(async (context, next) => {
-  const { pathname } = context.url
+  const { url } = context
+  const pathname = url.pathname
 
-  // ─── Routes API et préfixes publics — passe directement
-  if (PUBLIC_PREFIXES.some(p => pathname.startsWith(p))) {
-    return next()
-  }
+  // Routes API — jamais de redirect (chaque handler gère son auth)
+  if (pathname.startsWith('/api/')) return next()
 
-  // ─── Crée le client Supabase et peuple locals
+  // Pages profil publiques /@username
+  if (pathname.startsWith('/@')) return next()
+
   const supabase = createSupabaseServer({
     cookies: context.cookies,
     request: context.request,
   })
 
+  const { data: { user }, error } = await supabase.auth.getUser()
+  const isAuthenticated = !!user && !error
+
+  context.locals.user     = user ?? null
   context.locals.supabase = supabase
 
-  // ─── getSession() — lecture locale du cookie JWT, pas d'appel réseau
-  // Note : getUser() fait un appel réseau vers Supabase Auth — trop lent pour
-  // le middleware et source de redirect loops si le réseau est lent.
-  // La validation JWT côté serveur (getUser) se fait dans wrapApiHandler.
-  const { data: { session } } = await supabase.auth.getSession()
-  const isAuthenticated = !!session?.user
-
-  context.locals.user = session?.user ?? null
-
-  // ─── Logique de redirection
-  const isPublic = PUBLIC_ROUTES.has(pathname)
+  const isPublic = PUBLIC_ROUTES.some(route => pathname === route || pathname.startsWith(route + '/'))
 
   if (!isPublic && !isAuthenticated) {
-    const redirectUrl = encodeURIComponent(pathname)
-    return context.redirect(`/signin?redirect=${redirectUrl}`)
+    return context.redirect('/signin')
   }
 
   if ((pathname === '/signin' || pathname === '/signup') && isAuthenticated) {
