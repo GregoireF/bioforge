@@ -1,49 +1,46 @@
 // src/middleware.ts
 import { defineMiddleware } from 'astro:middleware'
-import { createSupabaseServer } from '@/lib/infra/supabase/server'  // ✅ nouveau chemin
+import { createSupabaseServer } from '@/lib/infra/supabase/server'
 
 // Routes accessibles sans authentification
 const PUBLIC_ROUTES = new Set(['/', '/signin', '/signup'])
 
-// Préfixes publics — routes qui commencent par ces segments
+// Préfixes publics
 const PUBLIC_PREFIXES = [
-  '/auth/',        // auth/callback, auth/confirm…
-  '/api/analytics/', // click + view — publics (visiteurs)
-  '/api/rgpd/consent', // consentement sans auth
-  '/@',            // pages publiques profil /@username
+  '/auth/',          // auth/callback, auth/confirm…
+  '/api/',           // toutes les API gèrent leur propre auth via wrapApiHandler
+  '/@',              // pages publiques profil /@username
 ]
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { pathname } = context.url
 
-  // ─── Routes API — pas de redirect, juste passer (auth gérée par wrapApiHandler)
-  if (pathname.startsWith('/api/')) {
-    const isPublicApi = PUBLIC_PREFIXES.some(p => pathname.startsWith(p))
-    if (isPublicApi) return next()
-    // Les autres routes API gèrent leur propre auth via wrapApiHandler
+  // ─── Routes API et préfixes publics — passe directement
+  if (PUBLIC_PREFIXES.some(p => pathname.startsWith(p))) {
     return next()
   }
 
-  // ─── Auth check pour les pages SSR
+  // ─── Crée le client Supabase et peuple locals
   const supabase = createSupabaseServer({
     cookies: context.cookies,
     request: context.request,
   })
 
-  const { data: { user }, error } = await supabase.auth.getUser()
-  const isAuthenticated = !!user && !error
+  context.locals.supabase = supabase
 
-  // Stocker dans locals — typé via env.d.ts
-  context.locals.user       = user ?? null
-  context.locals.supabase   = supabase
+  // ─── getSession() — lecture locale du cookie JWT, pas d'appel réseau
+  // Note : getUser() fait un appel réseau vers Supabase Auth — trop lent pour
+  // le middleware et source de redirect loops si le réseau est lent.
+  // La validation JWT côté serveur (getUser) se fait dans wrapApiHandler.
+  const { data: { session } } = await supabase.auth.getSession()
+  const isAuthenticated = !!session?.user
+
+  context.locals.user = session?.user ?? null
 
   // ─── Logique de redirection
-  const isPublic =
-    PUBLIC_ROUTES.has(pathname) ||
-    PUBLIC_PREFIXES.some(p => pathname.startsWith(p))
+  const isPublic = PUBLIC_ROUTES.has(pathname)
 
   if (!isPublic && !isAuthenticated) {
-    // Préserver l'URL de destination pour redirect post-login
     const redirectUrl = encodeURIComponent(pathname)
     return context.redirect(`/signin?redirect=${redirectUrl}`)
   }
