@@ -1,18 +1,14 @@
 // src/pages/api/analytics/click.ts
-import type { APIRoute } from 'astro'
-import { createClient } from '@supabase/supabase-js'
-import { z } from 'zod'
+// POST — enregistre un clic sur un bloc (public, sans auth)
+import type { APIRoute }  from 'astro'
+import { supabaseAdmin }  from '@/lib/infra/supabase/admin'
+import { z }              from 'zod'
 import {
-  getIP, hashIP,
-  detectBot, parseUA,
+  getIP, hashIP, detectBot, parseUA,
   resolveGeoIP, cleanReferrer, cleanUtm,
 } from '@/lib/analytics/helpers'
 import { checkRateLimit, rateLimitedResponse } from '@/lib/security/rate-limit'
-
-const supabase = createClient(
-  import.meta.env.PUBLIC_SUPABASE_URL,
-  import.meta.env.SUPABASE_SERVICE_ROLE_KEY
-)
+import { json }           from '@/lib/core/http'
 
 const schema = z.object({
   block_id:     z.string().uuid(),
@@ -23,98 +19,74 @@ const schema = z.object({
 })
 
 export const POST: APIRoute = async ({ request }) => {
-  // 1. Content-type
   if (!request.headers.get('content-type')?.includes('application/json'))
     return new Response(null, { status: 415 })
 
-  // 2. Protection : profile_id/block_id UUID valide + SUPABASE_SERVICE_ROLE_KEY côté serveur.
-  //    Pas de origin guard — les navigateurs n'envoient pas l'header Origin
-  //    sur les requêtes same-origin fetch, ce qui bloquerait toutes les requêtes légitimes.
-
-  // 3. Parse + validate
   let body: unknown
-  try { body = await request.json() } catch {
-    return new Response(null, { status: 400 })
-  }
+  try { body = await request.json() }
+  catch { return new Response(null, { status: 400 }) }
 
   const parsed = schema.safeParse(body)
-  if (!parsed.success) {
-    console.warn('[analytics/click] validation failed:', parsed.error.flatten())
-    return new Response(null, { status: 400 })
-  }
-  const d = parsed.data
+  if (!parsed.success) return new Response(null, { status: 400 })
 
-  // 4. Bot check
-  const ua = request.headers.get('user-agent') || ''
+  const d  = parsed.data
+  const ua = request.headers.get('user-agent') ?? ''
+
+  // Bot check — répondre ok sans enregistrer
   const { isBot, botName } = detectBot(ua)
-  if (isBot) {
-    return new Response(JSON.stringify({ ok: true, skipped: 'bot', name: botName }), {
-      status: 200, headers: { 'Content-Type': 'application/json' },
-    })
-  }
+  if (isBot) return json({ ok: true, skipped: 'bot', name: botName })
 
-  // 5. Résoudre profile_id depuis block_id
-  const { data: block, error: blockError } = await supabase
+  // Résoudre profile_id depuis block_id
+  const { data: block, error: blockError } = await supabaseAdmin
     .from('blocks')
     .select('profile_id')
     .eq('id', d.block_id)
     .is('deleted_at', null)
     .single()
 
-  if (blockError || !block) {
-    console.error('[analytics/click] block not found:', d.block_id, blockError?.message)
-    return new Response(JSON.stringify({ ok: false }), { status: 200 })
-  }
+  if (blockError || !block) return json({ ok: false })
 
-  // 6. IP + hash + UA
+  // IP + hash + rate limit
   const ip     = getIP(request)
-  const ipHash = hashIP(ip)
+  const ipHash = await hashIP(ip)  // ✅ async
 
   const { allowed } = await checkRateLimit('analytics_click', ipHash)
   if (!allowed) return rateLimitedResponse(60)
+
   const { browser, os, device_type, inferredReferrer } = parseUA(ua)
   const { domain: referrerDomain } = cleanReferrer(d.referrer)
   const referrer = referrerDomain || inferredReferrer
 
-  // 7. ⚡ RPC d'abord — incrément compteur journalier (chemin critique)
+  // RPC compteur journalier (chemin critique — avant GeoIP)
   const today = new Date().toISOString().split('T')[0]
-  const { error: rpcError } = await supabase.rpc('increment_block_clicks', {
+  const { error: rpcError } = await supabaseAdmin.rpc('increment_block_clicks', {
     p_block_id: d.block_id,
     p_date:     today,
   })
   if (rpcError) console.error('[analytics/click] rpc error:', rpcError.message)
 
-  // 8. GeoIP awaité — Vercel tue la fonction dès que Response est retournée,
-  //    le fire-and-forget ne s'exécute jamais.
+  // GeoIP awaité — Vercel tue la fonction dès que Response retournée
   const { country, city, is_vpn, is_hosting } = await resolveGeoIP(ip)
 
-  const basePayload = {
+  const payload = {
     block_id:    d.block_id,
     profile_id:  block.profile_id,
     ip_hash:     ipHash,
-    device_type,
-    os,
-    browser,
-    referrer,
+    device_type, os, browser, referrer,
     utm_source:   cleanUtm(d.utm_source),
     utm_medium:   cleanUtm(d.utm_medium),
     utm_campaign: cleanUtm(d.utm_campaign),
   }
 
-  const { error: insertError } = await supabase.from('block_clicks').insert({
-    ...basePayload, country, city, is_vpn, is_hosting,
+  const { error: insertError } = await supabaseAdmin.from('block_clicks').insert({
+    ...payload, country, city, is_vpn, is_hosting,
   })
 
   if (insertError) {
-    console.warn('[analytics/click] insert with geo failed, trying fallback:', insertError.message)
-    const { error: e2 } = await supabase.from('block_clicks').insert({
-      ...basePayload, country, city,
-    })
-    if (e2) console.error('[analytics/click] insert fallback error:', e2.message)
+    console.warn('[analytics/click] insert failed, fallback:', insertError.message)
+    const { error: e2 } = await supabaseAdmin.from('block_clicks').insert({ ...payload, country, city })
+    if (e2) console.error('[analytics/click] fallback error:', e2.message)
   }
 
-  // 9. Réponse
-  return new Response(JSON.stringify({ ok: true }), {
-    status: 200, headers: { 'Content-Type': 'application/json' },
-  })
+  return json({ ok: true })
 }

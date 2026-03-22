@@ -1,103 +1,81 @@
-import type { APIRoute } from 'astro'
-import { requireUser } from '@/lib/auth/require-user'
-import { createClient } from '@supabase/supabase-js'
-import { hashIP, getIP } from '@/lib/analytics/helpers'
-import { checkRateLimit, rateLimitedResponse } from '@/lib/security/rate-limit'
-import { Audit } from '@/lib/security/audit'
+import type { APIRoute }          from 'astro'
+import { wrapApiHandler, type ApiHandlerContext }         from '@/lib/api/handler'
+import { supabaseAdmin }          from '@/lib/infra/supabase/admin'
+import { getIP, hashIP }          from '@/lib/analytics/helpers'
+import { checkRateLimit } from '@/lib/security/rate-limit'
+import { Audit }                  from '@/lib/security/audit'
 import { notifyGdprDeletionRequest, notifyGdprDeletionConfirm } from '@/lib/security/email-notify'
-import { z } from 'zod'
-
-const supabase = createClient(
-  import.meta.env.PUBLIC_SUPABASE_URL,
-  import.meta.env.SUPABASE_SERVICE_ROLE_KEY
-)
+import { AppError, ErrorCode }    from '@/lib/core/errors'
+import { z }                      from 'zod'
 
 const schema = z.object({
   confirm: z.literal('DELETE MY ACCOUNT'),
   reason:  z.string().max(500).optional(),
 })
 
-export const POST: APIRoute = async (context) => {
-  const { request } = context
+type DeleteBody = z.infer<typeof schema>
 
-  if (!request.headers.get('content-type')?.includes('application/json'))
-    return new Response(null, { status: 415 })
+export const POST: APIRoute = wrapApiHandler<DeleteBody>(
+  async ({ user, profile, body, context }: ApiHandlerContext<DeleteBody>) => {
+    const { request } = context
 
-  // 1. Auth
-  const auth = await requireUser(context)
-  if ('error' in auth)
-    return new Response(JSON.stringify({ error: auth.error }), { status: 401 })
+    const ip     = getIP(request)
+    const ipHash = await hashIP(ip)
 
-  const profileId = auth.user.id
-  const ip        = getIP(request)
-  const ipHash    = hashIP(ip)
+    const { allowed } = await checkRateLimit('gdpr_delete', ipHash)
+    if (!allowed) {
+      await Audit.rateLimitBlocked(profile.id, 'gdpr_delete', ipHash)
+      throw new AppError({ message: 'Too many requests', code: ErrorCode.RATE_LIMITED, statusCode: 429 })
+    }
 
-  // 2. Rate limiting (2 tentatives/heure max)
-  const { allowed } = await checkRateLimit('gdpr_delete', ipHash)
-  if (!allowed) {
-    await Audit.rateLimitBlocked(profileId, 'gdpr_delete', ipHash)
-    return rateLimitedResponse(3600)
-  }
+    const parsed = schema.safeParse(body)
+    if (!parsed.success)
+      throw new AppError({
+        message: 'Envoyez { "confirm": "DELETE MY ACCOUNT" } pour confirmer',
+        code: ErrorCode.VALIDATION_ERROR,
+        statusCode: 400,
+      })
 
-  // 3. Parse + validate
-  let body: unknown
-  try { body = await request.json() } catch {
-    return new Response(JSON.stringify({ error: 'invalid_json' }), { status: 400 })
-  }
-  const parsed = schema.safeParse(body)
-  if (!parsed.success)
-    return new Response(JSON.stringify({
-      error:   'missing_confirmation',
-      message: 'Envoyez { "confirm": "DELETE MY ACCOUNT" } pour confirmer.',
-    }), { status: 400 })
+    const { data: userData } = await supabaseAdmin.auth.admin.getUserById(user.id)
+    const userEmail    = userData?.user?.email ?? null
+    const userUsername = typeof user.user_metadata?.username === 'string'
+      ? user.user_metadata.username
+      : profile.username
 
-  // 4. Récupère email + username avant suppression
-  const { data: userData } = await supabase.auth.admin.getUserById(profileId)
-  const userEmail    = userData?.user?.email ?? null
-  const userUsername = auth.user.user_metadata?.username ?? 'utilisateur'
+    await Audit.gdprDeletionRequested(profile.id, request)
+    await supabaseAdmin.from('gdpr_requests').insert({
+      profile_id: profile.id,
+      type:       'deletion',
+      status:     'processing',
+      ip_hash:    ipHash,
+      notes:      parsed.data.reason ?? null,
+    })
 
-  // 5. Audit + gdpr_requests
-  await Audit.gdprDeletionRequested(profileId, request)
-  await supabase.from('gdpr_requests').insert({
-    profile_id:   profileId,
-    type:         'deletion',
-    status:       'processing',
-    ip_hash:      ipHash,
-    notes:        parsed.data.reason ?? null,
-  })
+    if (userEmail) await notifyGdprDeletionRequest(userEmail, userUsername)
 
-  // 6. Email réception
-  if (userEmail) await notifyGdprDeletionRequest(userEmail, userUsername)
+    const { data, error } = await supabaseAdmin.rpc('gdpr_delete_profile', {
+      p_profile_id: profile.id,
+    })
 
-  // 7. RPC suppression
-  const { data, error } = await supabase.rpc('gdpr_delete_profile', {
-    p_profile_id: profileId,
-  })
+    if (error) {
+      console.error('[rgpd/delete] rpc error:', error.message)
+      await Audit.gdprDeletionFailed(profile.id, error.message)
+      await supabaseAdmin.from('gdpr_requests')
+        .update({ status: 'failed', processed_at: new Date().toISOString() })
+        .eq('profile_id', profile.id).eq('status', 'processing')
+      throw new AppError({ message: 'Deletion failed', code: ErrorCode.DB_ERROR, statusCode: 500 })
+    }
 
-  if (error) {
-    console.error('[gdpr/delete] rpc error:', error.message)
-    await Audit.gdprDeletionFailed(profileId, error.message)
-    await supabase.from('gdpr_requests')
-      .update({ status: 'failed', processed_at: new Date().toISOString() })
-      .eq('profile_id', profileId).eq('status', 'processing')
-    return new Response(JSON.stringify({ error: 'deletion_failed' }), { status: 500 })
-  }
+    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(user.id)
+    if (authError) console.error('[rgpd/delete] auth delete error:', authError.message)
 
-  // 8. Supprime auth.users
-  const { error: authError } = await supabase.auth.admin.deleteUser(profileId)
-  if (authError) console.error('[gdpr/delete] auth delete error:', authError.message)
+    await supabaseAdmin.from('gdpr_requests')
+      .update({ status: 'completed', processed_at: new Date().toISOString() })
+      .eq('profile_id', profile.id).eq('status', 'processing')
 
-  // 9. Statut final
-  await supabase.from('gdpr_requests')
-    .update({ status: 'completed', processed_at: new Date().toISOString() })
-    .eq('profile_id', profileId).eq('status', 'processing')
+    if (userEmail) await notifyGdprDeletionConfirm(userEmail, userUsername)
 
-  // 10. Email confirmation
-  if (userEmail) await notifyGdprDeletionConfirm(userEmail, userUsername)
-
-  return new Response(JSON.stringify({
-    success: true,
-    message: 'Votre compte et toutes vos données ont été supprimés.',
-    summary: data,
-  }), { status: 200, headers: { 'Content-Type': 'application/json' } })
-}
+    return { success: true, message: 'Votre compte et toutes vos données ont été supprimés.', summary: data }
+  },
+  { requireBody: true }
+)

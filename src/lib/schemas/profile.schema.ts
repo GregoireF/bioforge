@@ -1,112 +1,41 @@
-import { z } from 'zod';
+// src/lib/schemas/profile.schema.ts
+import { z } from 'zod'
+import { VALID_USAGES, VALID_SOURCES, PRESET_THEMES } from '@/lib/shared/constants'
 
-// ==================== PROFILE SCHEMA ====================
+export const USERNAME_RE = /^[a-z0-9_]{3,24}$/
 
-export const profileSchema = z.object({
-  id: z.string().uuid(),
-  username: z
-    .string()
-    .min(3, 'Username must be at least 3 characters')
-    .max(24, 'Username must be less than 24 characters')
-    .regex(/^[a-z0-9_]+$/, 'Username can only contain lowercase letters, numbers and underscores'),
-  display_name: z.string().min(1, 'Display name is required').max(100),
-  bio: z.string().max(500).nullable(),
-  avatar_url: z.string().url().nullable(),
-  plan: z.enum(['Free', 'Creator', 'Pro', 'Enterprise']),
-  theme: z.record(z.string(), z.unknown()),
-  is_active: z.boolean(),
-  subscription_status: z.enum(['none', 'active', 'canceled', 'past_due']),
-  subscription_id: z.string().nullable(),
-  stripe_customer_id: z.string().nullable(),
-  created_at: z.string().datetime(),
-  updated_at: z.string().datetime(),
-  deleted_at: z.string().datetime().nullable(),
-});
-
-export type Profile = z.infer<typeof profileSchema>;
-
-// ==================== PROFILE UPDATE SCHEMA ====================
+export const usernameSchema = z
+  .string()
+  .regex(USERNAME_RE, 'Format invalide : 3-24 chars, a-z0-9_ uniquement')
+  .transform(v => v.toLowerCase().trim())
 
 export const profileUpdateSchema = z.object({
-  username: z
-    .string()
-    .min(3)
-    .max(24)
-    .regex(/^[a-z0-9_]+$/)
-    .optional(),
-  display_name: z.string().min(1).max(100).optional(),
-  bio: z.string().max(500).nullable().optional(),
-  avatar_url: z.string().url().nullable().optional(),
-  theme: z.record(z.string(), z.unknown()).optional(),
-  is_active: z.boolean().optional(),
-});
+  display_name: z.string().max(60).nullable().optional(),
+  bio:          z.string().max(320).nullable().optional(),
+  theme:        z.record(z.string(), z.unknown()).optional(),
+}).strict()
 
-export type ProfileUpdate = z.infer<typeof profileUpdateSchema>;
+export const onboardingFeedbackSchema = z.object({
+  usages:  z.array(z.enum(VALID_USAGES)).max(6).optional(),
+  source:  z.enum(VALID_SOURCES).optional(),
+  nps:     z.number().int().min(0).max(10).optional(),
+  comment: z.string().max(500).optional(),
+}).strict()
 
-// ==================== THEME SCHEMA ====================
+export const onboardingSchema = z.object({
+  username:     usernameSchema,
+  display_name: z.string().max(60).optional(),
+  bio:          z.string().max(320).optional(),
+  preset:       z.enum(PRESET_THEMES).optional(),
+  feedback:     onboardingFeedbackSchema.optional(),
+}).strict()
 
-export const themePresetSchema = z.enum(['dark', 'light', 'gradient', 'custom']);
+export const seoSchema = z.object({
+  seo_keywords:    z.array(z.string().min(1).max(50)).max(20).optional(),
+  seo_description: z.string().max(160).nullable().optional(),
+}).strict()
 
-export const themeSchema = z.object({
-  preset: themePresetSchema,
-  background_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
-  primary_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
-  text_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
-  button_style: z.enum(['filled', 'outline', 'soft']).optional(),
-  border_radius: z.number().int().min(0).max(24).optional(),
-  font_family: z.string().optional(),
-});
-
-export type Theme = z.infer<typeof themeSchema>;
-
-// ==================== VALIDATION FUNCTIONS ====================
-
-/**
- * Validate profile update data
- */
-export function validateProfileUpdate(data: unknown) {
-  return profileUpdateSchema.parse(data);
-}
-
-/**
- * Validate theme data
- */
-export function validateTheme(data: unknown) {
-  return themeSchema.parse(data);
-}
-
-/**
- * Validate username format
- */
-export function isValidUsername(username: string): boolean {
-  try {
-    z.string().min(3).max(24).regex(/^[a-z0-9_]+$/).parse(username);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Validate email format
- */
-export function isValidEmail(email: string): boolean {
-  try {
-    z.string().email().parse(email);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Validate URL format
- */
-export function isValidUrl(url: string): boolean {
-  try {
-    z.string().url().parse(url);
-    return true;
-  } catch {
-    return false;
-  }
-}
+export type ProfileUpdateInput    = z.infer<typeof profileUpdateSchema>
+export type OnboardingInput       = z.infer<typeof onboardingSchema>
+export type OnboardingFeedback    = z.infer<typeof onboardingFeedbackSchema>
+export type SeoInput              = z.infer<typeof seoSchema>

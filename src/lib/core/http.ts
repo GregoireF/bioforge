@@ -1,3 +1,5 @@
+import { ErrorCode } from '@/lib/core/errors'
+
 export function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -8,11 +10,15 @@ export function json(data: unknown, status = 200) {
   })
 }
 
-export function error(code: string, status = 400, details?: unknown) {
+export function error(
+  code: ErrorCode | string,
+  status = 400,
+  details?: unknown
+) {
   return json(
     {
       success: false,
-      error: code,
+      error:   code,
       ...(details ? { details } : {}),
     },
     status

@@ -1,151 +1,113 @@
 ---
-// src/layouts/DashboardLayout.astro — v6
-// Auth-aware layout : nav centralisée, Carbon Ads (Free/Base), user menu riche,
-// Collab banner, FeedbackWidget, OnboardingTour amélioré, bottom nav mobile, plan badge
-
-import CommandPalette from '@/components/features/CommandPalette.astro';
-import OnboardingTour  from '@/components/features/OnboardingTour.astro';
-import UpgradeModal    from '@/components/features/UpgradeModal.astro';
-import FeedbackWidget       from '@/components/features/FeedbackWidget.astro';
-import CollabBanner         from '@/components/features/CollabBanner.astro';
-import NotificationCenter   from '@/components/features/NotificationCenter.astro';
-import '@/styles/global.css';
-import { Image } from 'astro:assets';
-import { withAuth } from '@/lib/auth/auth';
+// src/layouts/DashboardLayout.astro
+import CommandPalette      from '@/components/features/CommandPalette.astro'
+import OnboardingTour      from '@/components/features/OnboardingTour.astro'
+import UpgradeModal        from '@/components/features/UpgradeModal.astro'
+import FeedbackWidget      from '@/components/features/FeedbackWidget.astro'
+import CollabBanner        from '@/components/features/CollabBanner.astro'
+import NotificationCenter  from '@/components/features/NotificationCenter.astro'
+import '@/styles/global.css'
+import { Image }           from 'astro:assets'
+import { isPaidPlan, shouldShowAds } from '@/lib/shared/plans'
+import type { Plan }       from '@/lib/shared/plans'
+import type { Profile }    from '@/lib/db'
 
 interface Props {
-  title: string;
+  title: string
 }
 
-const { title } = Astro.props;
-const currentPath = Astro.url.pathname;
+const { title } = Astro.props
+const currentPath = Astro.url.pathname
 
-// ── Auth (best-effort — layout ne redirige pas, les pages s'en chargent) ──────
-let profile: any   = null;
-let planLimits: any = null;
-try {
-  const authResult = await withAuth({ cookies: Astro.cookies, request: Astro.request });
-  if (authResult.success && authResult.data) {
-    profile    = authResult.data.profile;
-    planLimits = authResult.data.planLimits;
-  }
-} catch {}
+// ── Auth depuis locals — le middleware a déjà fait le travail ─────────────────
+const user = Astro.locals.user
 
-// ── Plan helpers ───────────────────────────────────────────────────────────────
-const PAID_PLANS   = ['Pro', 'Business', 'Enterprise'];
-const plan         = profile?.plan ?? 'Free';
-const isPaid       = PAID_PLANS.includes(plan);
-const isBasicOrFree = !isPaid;
-const showAds      = isBasicOrFree;
+// select('*') pour matcher le type Profile complet — évite ts2322
+let profile: Profile | null = null
+if (user) {
+  const { data } = await Astro.locals.supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single()
+  profile = data ?? null
+}
 
-const PLAN_COLORS: Record<string, string> = {
+// ── Plan helpers ──────────────────────────────────────────────────────────────
+const plan     = (profile?.plan ?? 'Free') as Plan
+const isPaid   = isPaidPlan(plan)
+const showAds  = shouldShowAds(plan)  // Free + Creator voient les pubs
+
+const PLAN_COLORS: Record<Plan, string> = {
   Free:       'text-gray-400 bg-white/5 border-white/10',
-  Basic:      'text-neon-blue bg-neon-blue/10 border-neon-blue/20',
+  Creator:    'text-neon-blue bg-neon-blue/10 border-neon-blue/20',
   Pro:        'text-neon-green bg-neon-green/10 border-neon-green/20',
-  Business:   'text-neon-purple bg-neon-purple/10 border-neon-purple/20',
   Enterprise: 'text-orange-400 bg-orange-400/10 border-orange-400/20',
-};
-const planColor = PLAN_COLORS[plan] ?? PLAN_COLORS.Free;
+}
+const planColor = PLAN_COLORS[plan] ?? PLAN_COLORS.Free
 
-// ── Avatar fallback ────────────────────────────────────────────────────────────
-const avatarUrl   = profile?.avatar_url ?? null;
-const displayName = profile?.display_name || profile?.username || 'User';
-const initials    = displayName.slice(0, 2).toUpperCase();
+// ── Avatar ────────────────────────────────────────────────────────────────────
+const avatarUrl   = profile?.avatar_url ?? null
+const displayName = profile?.display_name || profile?.username || 'User'
+const initials    = displayName.slice(0, 2).toUpperCase()
 
-// ── AI Chatbot — context passé au script client ────────────────────────────────
-const supabaseUrl     = import.meta.env.PUBLIC_SUPABASE_URL ?? '';
-const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY ?? '';
+// ── Chatbot context ───────────────────────────────────────────────────────────
+const supabaseUrl     = import.meta.env.PUBLIC_SUPABASE_URL ?? ''
+const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY ?? ''
 
 const chatContext = JSON.stringify({
   username:    profile?.username    ?? '',
   displayName: profile?.display_name ?? profile?.username ?? 'User',
   plan,
   isPaid,
-});
+})
 
 // ── Completion score ──────────────────────────────────────────────────────────
-type CompletionStep = { id: string; label: string; href: string; done: boolean };
+type CompletionStep = { id: string; label: string; href: string; done: boolean }
 const completionSteps: CompletionStep[] = [
-  { id:'avatar',   label:'Photo de profil',        href:'/dashboard/settings', done: !!profile?.avatar_url },
-  { id:'bio',      label:'Bio renseignée',          href:'/dashboard/settings', done: !!(profile?.bio && profile.bio.length > 5) },
-  { id:'username', label:'Pseudo personnalisé',     href:'/dashboard/settings', done: !!(profile?.username && !profile.username.startsWith('user_')) },
-  { id:'theme',    label:'Apparence configurée',    href:'/dashboard/appearance', done: !!(profile?.theme && typeof profile.theme === 'object') },
-  { id:'links',    label:'3 liens ajoutés',         href:'/dashboard/blocks', done: false }, // resolved client-side via API
-];
-const completionDone  = completionSteps.filter(s => s.done).length;
-const completionTotal = completionSteps.length;
-const completionPct   = Math.round((completionDone / completionTotal) * 100);
-const completionFull  = completionDone === completionTotal;
+  { id: 'avatar',   label: 'Photo de profil',      href: '/dashboard/settings',   done: !!profile?.avatar_url },
+  { id: 'bio',      label: 'Bio renseignée',        href: '/dashboard/settings',   done: !!(profile?.bio && profile.bio.length > 5) },
+  { id: 'username', label: 'Pseudo personnalisé',   href: '/dashboard/settings',   done: !!(profile?.username && !profile.username.startsWith('user_')) },
+  { id: 'theme',    label: 'Apparence configurée',  href: '/dashboard/appearance', done: !!(profile?.theme && typeof profile.theme === 'object') },
+  { id: 'links',    label: '3 liens ajoutés',       href: '/dashboard/blocks',     done: false }, // résolu côté client
+]
+const completionDone  = completionSteps.filter(s => s.done).length
+const completionTotal = completionSteps.length
 
-// ── Changelog entries ─────────────────────────────────────────────────────────
+// ── Changelog ────────────────────────────────────────────────────────────────
 const CHANGELOG = [
-  { date: 'Jan 2025', badge: '🆕', title: 'Mode Hero Photo',      desc: 'Affiche ta photo en pleine largeur avec fondu cinématique.', isNew: true },
-  { date: 'Jan 2025', badge: '🎨', title: '35+ nouvelles polices', desc: 'Tech, Serif, Display, Mono — Cabinet Grotesk et plus.', isNew: true },
-  { date: 'Jan 2025', badge: '🔗', title: 'Raccourcisseur de liens', desc: 'bioforge.click/s/xxx avec UTM et stats.', isNew: false },
-  { date: 'Jan 2025', badge: '📊', title: 'Analytics avancées',   desc: 'Heatmaps, rétention, taux de clic par bloc.', isNew: false },
-  { date: 'Déc 2024', badge: '✦',  title: 'Palettes auto-gen',    desc: 'Génère des palettes harmonieuses depuis ta couleur accent.', isNew: false },
-];
-const newCount = CHANGELOG.filter(c => c.isNew).length;
+  { date: 'Jan 2025', badge: '🆕', title: 'Mode Hero Photo',       desc: 'Affiche ta photo en pleine largeur avec fondu cinématique.', isNew: true },
+  { date: 'Jan 2025', badge: '🎨', title: '35+ nouvelles polices', desc: 'Tech, Serif, Display, Mono — Cabinet Grotesk et plus.',       isNew: true },
+  { date: 'Jan 2025', badge: '🔗', title: 'Raccourcisseur de liens',desc: 'bioforge.click/s/xxx avec UTM et stats.',                   isNew: false },
+  { date: 'Jan 2025', badge: '📊', title: 'Analytics avancées',    desc: 'Heatmaps, rétention, taux de clic par bloc.',                isNew: false },
+  { date: 'Déc 2024', badge: '✦',  title: 'Palettes auto-gen',     desc: 'Génère des palettes harmonieuses depuis ta couleur accent.', isNew: false },
+]
+const newCount = CHANGELOG.filter(c => c.isNew).length
 
-// ── Navigation items ───────────────────────────────────────────────────────────
+// ── Navigation ────────────────────────────────────────────────────────────────
 const NAV_MAIN = [
-  {
-    href:  '/dashboard',
-    label: 'Overview',
-    exact: true,
-    icon:  'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
-  },
-  {
-    href:  '/dashboard/blocks',
-    label: 'My Page',
-    exact: false,
-    icon:  'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z',
-  },
-  {
-    href:  '/dashboard/analytics',
-    label: 'Analytics',
-    exact: false,
-    icon:  'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
-  },
-  {
-    href:  '/dashboard/appearance',
-    label: 'Appearance',
-    exact: false,
-    icon:  'M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01',
-  },
-];
+  { href: '/dashboard',            label: 'Overview',    exact: true,  icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+  { href: '/dashboard/blocks',     label: 'My Page',     exact: false, icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
+  { href: '/dashboard/analytics',  label: 'Analytics',   exact: false, icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+  { href: '/dashboard/appearance', label: 'Appearance',  exact: false, icon: 'M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01' },
+]
 
 const NAV_SECONDARY = [
-  {
-    href:  '/dashboard/#',
-    label: 'Billing',
-    exact: false,
-    icon:  'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z',
-  },
-  {
-    href:  '/dashboard/#',
-    label: 'Roadmap',
-    exact: false,
-    icon:  'M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7',
-  },
-  {
-    href:  '/dashboard/settings',
-    label: 'Settings',
-    exact: false,
-    icon:  'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
-  },
-];
+  { href: '/dashboard/billing',  label: 'Billing',  exact: false, icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z' },
+  { href: '/dashboard/roadmap',  label: 'Roadmap',  exact: false, icon: 'M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7' },
+  { href: '/dashboard/settings', label: 'Settings', exact: false, icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' },
+]
 
-// ── Nav active helper ──────────────────────────────────────────────────────────
 function isActive(href: string, exact: boolean): boolean {
-  return exact ? currentPath === href : currentPath.startsWith(href);
+  return exact ? currentPath === href : currentPath.startsWith(href)
 }
 function navClass(href: string, exact: boolean): string {
   return isActive(href, exact)
     ? 'flex items-center gap-3 px-3 py-2.5 rounded-xl bg-neon-green/10 text-neon-green border border-neon-green/25 font-medium text-sm'
-    : 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all font-medium text-sm';
+    : 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all font-medium text-sm'
 }
 ---
+
 
 <!DOCTYPE html>
 <html lang="en">
@@ -165,8 +127,6 @@ function navClass(href: string, exact: boolean): string {
 
   <!-- ===== SIDEBAR (desktop) ===== -->
   <aside class="hidden lg:flex lg:flex-shrink-0 lg:w-60 xl:w-64 flex-col glass-strong border-r border-white/10">
-
-    <!-- Logo -->
     <div class="flex items-center h-16 px-5 border-b border-white/10 shrink-0">
       <a href="https://bioforge.click/" class="flex items-center gap-2.5">
         <Image src="/logo.webp" alt="BioForge" width={28} height={28} class="rounded-lg" />
@@ -174,7 +134,6 @@ function navClass(href: string, exact: boolean): string {
       </a>
     </div>
 
-    <!-- Nav main -->
     <nav class="flex-1 px-3 py-5 space-y-0.5 overflow-y-auto">
       <p class="px-3 mb-2 text-xs font-semibold text-gray-600 uppercase tracking-widest">Main</p>
       {NAV_MAIN.map(item => (
@@ -185,7 +144,6 @@ function navClass(href: string, exact: boolean): string {
           {item.label}
         </a>
       ))}
-
       <div class="pt-4 pb-2">
         <p class="px-3 mb-2 text-xs font-semibold text-gray-600 uppercase tracking-widest">Account</p>
         {NAV_SECONDARY.map(item => (
@@ -199,10 +157,8 @@ function navClass(href: string, exact: boolean): string {
       </div>
     </nav>
 
-    <!-- Collab banner — toujours visible -->
     <CollabBanner partner="discord" />
 
-    <!-- AdSense (Free / Basic only) -->
     {showAds && (
       <div class="px-3 pb-3" id="adsense-sidebar-wrap" style="display:none;">
         <div class="relative p-3 glass border border-white/8 rounded-xl overflow-hidden">
@@ -212,7 +168,7 @@ function navClass(href: string, exact: boolean): string {
             data-ad-slot="2242281532"
             data-ad-format="rectangle"
             data-full-width-responsive="false"></ins>
-          <a href="/dashboard/#"
+          <a href="/dashboard/billing"
             class="flex items-center gap-2 mt-2 pt-2 border-t border-white/8 text-xs text-gray-500 hover:text-neon-green transition-colors">
             <svg class="w-3 h-3 text-neon-green/60 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
@@ -223,13 +179,11 @@ function navClass(href: string, exact: boolean): string {
       </div>
     )}
 
-    <!-- User profile footer -->
     <div class="px-3 pb-4 pt-2 border-t border-white/10 shrink-0">
       <div class="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition-all cursor-pointer group" id="sidebar-user-btn">
         <div class="relative shrink-0">
           {avatarUrl ? (
-            <img src={avatarUrl} alt={displayName}
-              class="w-8 h-8 rounded-full object-cover border border-white/20" />
+            <img src={avatarUrl} alt={displayName} class="w-8 h-8 rounded-full object-cover border border-white/20" />
           ) : (
             <div class="w-8 h-8 rounded-full bg-gradient-to-br from-neon-green to-neon-blue flex items-center justify-center text-xs font-bold text-black">
               {initials}
@@ -239,9 +193,7 @@ function navClass(href: string, exact: boolean): string {
         </div>
         <div class="flex-1 min-w-0">
           <p class="text-xs font-semibold text-white truncate">{displayName}</p>
-          <span class={`inline-flex items-center text-xs px-1.5 py-0 rounded-full border font-medium ${planColor}`}>
-            {plan}
-          </span>
+          <span class={`inline-flex items-center text-xs px-1.5 py-0 rounded-full border font-medium ${planColor}`}>{plan}</span>
         </div>
         <svg class="w-3.5 h-3.5 text-gray-600 group-hover:text-gray-400 transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -249,16 +201,14 @@ function navClass(href: string, exact: boolean): string {
       </div>
 
       <div id="sidebar-user-menu" class="hidden mt-1 p-1 glass-strong border border-white/10 rounded-xl shadow-2xl">
-        <a href="/dashboard/settings"
-          class="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white rounded-lg transition-all">
+        <a href="/dashboard/settings" class="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 hover:text-white rounded-lg transition-all">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
           </svg>
           Settings
         </a>
         {!isPaid && (
-          <a href="/dashboard/#"
-            class="flex items-center gap-2.5 px-3 py-2 text-sm text-neon-green hover:bg-neon-green/5 rounded-lg transition-all">
+          <a href="/dashboard/billing" class="flex items-center gap-2.5 px-3 py-2 text-sm text-neon-green hover:bg-neon-green/5 rounded-lg transition-all">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
             </svg>
@@ -266,8 +216,7 @@ function navClass(href: string, exact: boolean): string {
           </a>
         )}
         <div class="my-1 border-t border-white/10"></div>
-        <a href="/api/auth/signout"
-          class="flex items-center gap-2.5 px-3 py-2 text-sm text-red-400 hover:bg-red-500/5 rounded-lg transition-all">
+        <a href="/api/auth/signout" class="flex items-center gap-2.5 px-3 py-2 text-sm text-red-400 hover:bg-red-500/5 rounded-lg transition-all">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
           </svg>
@@ -275,103 +224,40 @@ function navClass(href: string, exact: boolean): string {
         </a>
       </div>
     </div>
-
   </aside>
 
   <!-- ===== MAIN CONTENT ===== -->
   <div class="flex-1 flex flex-col min-w-0">
 
-  <!-- ===== TOP PROMO BANNER ===== -->
-  {!isPaid && (
-    <div id="promo-banner"
-      style="position:relative;z-index:40;height:36px;overflow:hidden;flex-shrink:0;background:linear-gradient(90deg,rgba(0,255,157,0.06) 0%,rgba(0,0,0,0) 50%,rgba(0,255,157,0.06) 100%);border-bottom:1px solid rgba(0,255,157,0.12)"
-    >
-      <!-- Rotating messages track -->
-      <div id="promo-track" style="display:flex;height:100%;align-items:center;justify-content:center;gap:0">
-        <!-- Each message — JS will show one at a time -->
-        <div class="promo-msg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;opacity:0;transform:translateY(8px);transition:opacity 0.5s ease,transform 0.5s ease">
-          <span style="font-size:11px;font-weight:500;color:rgba(255,255,255,0.55)">
-            ✦ Passe à Pro et débloque les <strong style="color:#fff;font-weight:700">wallpapers, polices custom</strong> et le <strong style="color:#fff;font-weight:700">mode Hero</strong>
-          </span>
-          <a href="/dashboard/billing"
-            style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;background:#00ff9d;color:#000;border-radius:99px;font-size:11px;font-weight:800;font-family:'Cabinet Grotesk',system-ui,sans-serif;text-decoration:none;transition:all 0.2s;white-space:nowrap;flex-shrink:0"
-            onmouseover="this.style.background='#20ffaa'" onmouseout="this.style.background='#00ff9d'"
-          >
-            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            Upgrader
-          </a>
+    {!isPaid && (
+      <div id="promo-banner" style="position:relative;z-index:40;height:36px;overflow:hidden;flex-shrink:0;background:linear-gradient(90deg,rgba(0,255,157,0.06) 0%,rgba(0,0,0,0) 50%,rgba(0,255,157,0.06) 100%);border-bottom:1px solid rgba(0,255,157,0.12)">
+        <div id="promo-track" style="display:flex;height:100%;align-items:center;justify-content:center;gap:0">
+          <div class="promo-msg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;opacity:0;transform:translateY(8px);transition:opacity 0.5s ease,transform 0.5s ease">
+            <span style="font-size:11px;font-weight:500;color:rgba(255,255,255,0.55)">✦ Passe à Pro et débloque les <strong style="color:#fff;font-weight:700">wallpapers, polices custom</strong> et le <strong style="color:#fff;font-weight:700">mode Hero</strong></span>
+            <a href="/dashboard/billing" style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;background:#00ff9d;color:#000;border-radius:99px;font-size:11px;font-weight:800;text-decoration:none;white-space:nowrap;flex-shrink:0">
+              <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              Upgrader
+            </a>
+          </div>
+          <div class="promo-msg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;opacity:0;transform:translateY(8px);transition:opacity 0.5s ease,transform 0.5s ease">
+            <span style="font-size:11px;font-weight:500;color:rgba(255,255,255,0.55)">📊 Pro : analytics <strong style="color:#fff">avancées</strong>, rétention et <strong style="color:#fff">heatmaps</strong> — dès <strong style="color:#fff">7€/mois</strong></span>
+            <a href="/dashboard/billing" style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;background:#00ff9d;color:#000;border-radius:99px;font-size:11px;font-weight:800;text-decoration:none;white-space:nowrap;flex-shrink:0">Voir les plans →</a>
+          </div>
+          <div class="promo-msg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;opacity:0;transform:translateY(8px);transition:opacity 0.5s ease,transform 0.5s ease">
+            <span style="font-size:11px;font-weight:500;color:rgba(255,255,255,0.55)">⚡ <strong style="color:#fff">Essai gratuit 7 jours</strong> — accès complet à toutes les fonctionnalités Pro</span>
+            <a href="/dashboard/billing" style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;background:linear-gradient(135deg,#00ff9d,#00cc7a);color:#000;border-radius:99px;font-size:11px;font-weight:800;text-decoration:none;white-space:nowrap;flex-shrink:0">Démarrer l'essai ✦</a>
+          </div>
         </div>
-
-        <div class="promo-msg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;opacity:0;transform:translateY(8px);transition:opacity 0.5s ease,transform 0.5s ease">
-          <span style="font-size:11px;font-weight:500;color:rgba(255,255,255,0.55)">
-            📊 Pro : analytics <strong style="color:#fff;font-weight:700">avancées</strong>, rétention, provenance et <strong style="color:#fff;font-weight:700">heatmaps</strong> — dès <strong style="color:#fff;font-weight:700">7€/mois</strong>
-          </span>
-          <a href="/dashboard/billing"
-            style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;background:#00ff9d;color:#000;border-radius:99px;font-size:11px;font-weight:800;font-family:'Cabinet Grotesk',system-ui,sans-serif;text-decoration:none;transition:all 0.2s;white-space:nowrap;flex-shrink:0"
-            onmouseover="this.style.background='#20ffaa'" onmouseout="this.style.background='#00ff9d'"
-          >
-            Voir les plans →
-          </a>
+        <div id="promo-dots" style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);display:flex;gap:4px">
+          <div class="pdot" style="width:14px;height:2px;border-radius:1px;background:#00ff9d;transition:all 0.3s ease"></div>
+          <div class="pdot" style="width:4px;height:2px;border-radius:1px;background:rgba(255,255,255,0.2);transition:all 0.3s ease"></div>
+          <div class="pdot" style="width:4px;height:2px;border-radius:1px;background:rgba(255,255,255,0.2);transition:all 0.3s ease"></div>
         </div>
-
-        <div class="promo-msg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;opacity:0;transform:translateY(8px);transition:opacity 0.5s ease,transform 0.5s ease">
-          <span style="font-size:11px;font-weight:500;color:rgba(255,255,255,0.55)">
-            🎨 <strong style="color:#fff;font-weight:700">35+ polices</strong>, dégradés, presets exclusifs et CSS personnalisé en Pro
-          </span>
-          <a href="/dashboard/appearance"
-            style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;border:1px solid rgba(0,255,157,0.35);color:#00ff9d;border-radius:99px;font-size:11px;font-weight:700;font-family:'Cabinet Grotesk',system-ui,sans-serif;text-decoration:none;transition:all 0.2s;white-space:nowrap;flex-shrink:0;background:rgba(0,255,157,0.07)"
-            onmouseover="this.style.background='rgba(0,255,157,0.14)'" onmouseout="this.style.background='rgba(0,255,157,0.07)'"
-          >
-            Tester l'Aperçu
-          </a>
-        </div>
-
-        <div class="promo-msg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;opacity:0;transform:translateY(8px);transition:opacity 0.5s ease,transform 0.5s ease">
-          <span style="font-size:11px;font-weight:500;color:rgba(255,255,255,0.55)">
-            🔗 Raccourcisseur de liens, planificateur social et <strong style="color:#fff;font-weight:700">intégrations</strong> débloqués en Creator
-          </span>
-          <a href="/dashboard/billing"
-            style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;background:#00ff9d;color:#000;border-radius:99px;font-size:11px;font-weight:800;font-family:'Cabinet Grotesk',system-ui,sans-serif;text-decoration:none;transition:all 0.2s;white-space:nowrap;flex-shrink:0"
-            onmouseover="this.style.background='#20ffaa'" onmouseout="this.style.background='#00ff9d'"
-          >
-            Passer Creator
-          </a>
-        </div>
-
-        <div class="promo-msg" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;opacity:0;transform:translateY(8px);transition:opacity 0.5s ease,transform 0.5s ease">
-          <span style="font-size:11px;font-weight:500;color:rgba(255,255,255,0.55)">
-            ⚡ <strong style="color:#fff;font-weight:700">Essai gratuit 7 jours</strong> — accès complet à toutes les fonctionnalités Pro, sans CB
-          </span>
-          <a href="/dashboard/billing"
-            style="display:inline-flex;align-items:center;gap:5px;padding:4px 12px;background:linear-gradient(135deg,#00ff9d,#00cc7a);color:#000;border-radius:99px;font-size:11px;font-weight:800;font-family:'Cabinet Grotesk',system-ui,sans-serif;text-decoration:none;transition:all 0.2s;white-space:nowrap;flex-shrink:0;box-shadow:0 2px 10px rgba(0,255,157,0.25)"
-            onmouseover="this.style.boxShadow='0 4px 16px rgba(0,255,157,0.4)'" onmouseout="this.style.boxShadow='0 2px 10px rgba(0,255,157,0.25)'"
-          >
-            Démarrer l'essai ✦
-          </a>
-        </div>
+        <button id="promo-dismiss" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:20px;height:20px;border-radius:6px;background:none;border:none;color:rgba(255,255,255,0.25);cursor:pointer;font-size:11px" aria-label="Fermer">✕</button>
       </div>
+    )}
 
-      <!-- Progress dots -->
-      <div id="promo-dots" style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);display:flex;gap:4px">
-        <div class="pdot" style="width:14px;height:2px;border-radius:1px;background:#00ff9d;transition:all 0.3s ease"></div>
-        <div class="pdot" style="width:4px;height:2px;border-radius:1px;background:rgba(255,255,255,0.2);transition:all 0.3s ease"></div>
-        <div class="pdot" style="width:4px;height:2px;border-radius:1px;background:rgba(255,255,255,0.2);transition:all 0.3s ease"></div>
-        <div class="pdot" style="width:4px;height:2px;border-radius:1px;background:rgba(255,255,255,0.2);transition:all 0.3s ease"></div>
-        <div class="pdot" style="width:4px;height:2px;border-radius:1px;background:rgba(255,255,255,0.2);transition:all 0.3s ease"></div>
-      </div>
-
-      <!-- Dismiss -->
-      <button id="promo-dismiss"
-        style="position:absolute;right:10px;top:50%;transform:translateY(-50%);width:20px;height:20px;border-radius:6px;background:none;border:none;color:rgba(255,255,255,0.25);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;transition:color 0.15s"
-        onmouseover="this.style.color='rgba(255,255,255,0.6)'" onmouseout="this.style.color='rgba(255,255,255,0.25)'"
-        aria-label="Fermer"
-      >✕</button>
-    </div>
-  )}
-
-    <!-- Top Bar -->
     <header class="h-14 lg:h-16 glass-strong border-b border-white/10 flex items-center justify-between px-4 lg:px-6 shrink-0 gap-3">
-
       <div class="flex items-center gap-3 lg:hidden">
         <button id="mobile-menu-btn" class="p-2 rounded-lg hover:bg-white/5 transition-colors">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -394,9 +280,7 @@ function navClass(href: string, exact: boolean): string {
       </div>
 
       <div class="flex items-center gap-2">
-
-        <button id="command-palette-trigger"
-          class="hidden lg:flex items-center gap-2 px-3 py-1.5 glass border border-white/10 rounded-lg hover:border-white/20 transition-all text-sm text-gray-500 hover:text-gray-300">
+        <button id="command-palette-trigger" class="hidden lg:flex items-center gap-2 px-3 py-1.5 glass border border-white/10 rounded-lg hover:border-white/20 transition-all text-sm text-gray-500 hover:text-gray-300">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
           </svg>
@@ -407,8 +291,7 @@ function navClass(href: string, exact: boolean): string {
         {profile?.username && (
           <a href={`/@${profile.username}`} target="_blank"
             class="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-            style="background:rgba(0,255,157,0.08);border:1px solid rgba(0,255,157,0.2);color:#00ff9d"
-            onmouseover="this.style.background='rgba(0,255,157,0.14)'" onmouseout="this.style.background='rgba(0,255,157,0.08)'">
+            style="background:rgba(0,255,157,0.08);border:1px solid rgba(0,255,157,0.2);color:#00ff9d">
             <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
@@ -417,22 +300,13 @@ function navClass(href: string, exact: boolean): string {
           </a>
         )}
 
-        <!-- Notification Center (realtime) -->
         {profile?.id && (
           <div class="hidden lg:block">
-            <NotificationCenter
-              userId={profile.id}
-              supabaseUrl={supabaseUrl}
-              supabaseKey={supabaseAnonKey}
-            />
+            <NotificationCenter userId={profile.id} supabaseUrl={supabaseUrl} supabaseKey={supabaseAnonKey} />
           </div>
         )}
 
-        <!-- Changelog bell -->
-        <button id="changelog-btn"
-          class="relative hidden lg:flex items-center justify-center w-8 h-8 rounded-lg glass border border-white/10 hover:border-white/20 transition-all text-gray-400 hover:text-white"
-          aria-label="Quoi de neuf"
-          title="Nouveautés">
+        <button id="changelog-btn" class="relative hidden lg:flex items-center justify-center w-8 h-8 rounded-lg glass border border-white/10 hover:border-white/20 transition-all text-gray-400 hover:text-white" aria-label="Quoi de neuf">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
           </svg>
@@ -441,25 +315,8 @@ function navClass(href: string, exact: boolean): string {
           )}
         </button>
 
-        <!-- Usage indicator (Free only) -->
         {!isPaid && (
-          <div id="usage-indicator"
-            class="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-default"
-            style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08)"
-            title="Blocs utilisés sur ton plan Free">
-            <div id="usage-track" class="flex items-center gap-1">
-              <!-- populated by JS -->
-            </div>
-            <span id="usage-label" class="text-[11px] font-medium text-white/40">— / — blocs</span>
-            <a href="/dashboard/billing"
-              class="text-[11px] font-bold text-neon-green hover:underline transition-all ml-0.5"
-              style="white-space:nowrap">↑ Plus</a>
-          </div>
-        )}
-
-        {!isPaid && (
-          <a href="/dashboard/billing"
-            class="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-neon-green/10 border border-neon-green/25 rounded-lg text-xs font-semibold text-neon-green hover:bg-neon-green/20 transition-all">
+          <a href="/dashboard/billing" class="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-neon-green/10 border border-neon-green/25 rounded-lg text-xs font-semibold text-neon-green hover:bg-neon-green/20 transition-all">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
             </svg>
@@ -472,834 +329,132 @@ function navClass(href: string, exact: boolean): string {
             {avatarUrl ? (
               <img src={avatarUrl} alt={displayName} class="w-7 h-7 rounded-full object-cover" />
             ) : (
-              <div class="w-7 h-7 rounded-full bg-gradient-to-br from-neon-green to-neon-blue flex items-center justify-center text-xs font-bold text-black">
-                {initials}
-              </div>
+              <div class="w-7 h-7 rounded-full bg-gradient-to-br from-neon-green to-neon-blue flex items-center justify-center text-xs font-bold text-black">{initials}</div>
             )}
           </button>
           <div id="topbar-user-menu" class="hidden absolute right-0 mt-2 w-48 glass-strong border border-white/10 rounded-xl shadow-2xl z-50 p-1">
             <a href="/dashboard/settings" class="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-300 hover:bg-white/5 rounded-lg transition-all">Settings</a>
-            {!isPaid && <a href="/dashboard/#" class="flex items-center gap-2.5 px-3 py-2 text-sm text-neon-green hover:bg-neon-green/5 rounded-lg transition-all">Upgrade to Pro</a>}
+            {!isPaid && <a href="/dashboard/billing" class="flex items-center gap-2.5 px-3 py-2 text-sm text-neon-green hover:bg-neon-green/5 rounded-lg transition-all">Upgrade to Pro</a>}
             <div class="my-1 border-t border-white/10"></div>
             <a href="/api/auth/signout" class="flex items-center gap-2.5 px-3 py-2 text-sm text-red-400 hover:bg-red-500/5 rounded-lg transition-all">Sign Out</a>
           </div>
         </div>
-
       </div>
     </header>
 
-    <!-- Page content -->
     <main class="flex-1 overflow-y-auto p-4 lg:p-6 xl:p-8 pb-20 lg:pb-8">
       <slot />
     </main>
-
   </div>
 </div>
 
-<!-- ===== MOBILE DRAWER ===== -->
-<div id="mobile-menu" class="hidden fixed inset-0 z-50 lg:hidden">
-  <div id="mobile-menu-backdrop" class="absolute inset-0 bg-black/75 backdrop-blur-sm"></div>
-  <div class="absolute inset-y-0 left-0 w-64 glass-strong border-r border-white/10 flex flex-col">
-
-    <div class="flex items-center justify-between h-14 px-4 border-b border-white/10 shrink-0">
-      <div class="flex items-center gap-2">
-        <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-neon-green to-neon-blue flex items-center justify-center">
-          <span class="text-black font-bold text-sm">B</span>
-        </div>
-        <span class="text-white font-bold">BioForge</span>
-      </div>
-      <button id="mobile-menu-close" class="p-1.5 rounded-lg hover:bg-white/5 transition-colors">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-        </svg>
-      </button>
-    </div>
-
-    <nav class="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-      <p class="px-3 mb-2 text-xs font-semibold text-gray-600 uppercase tracking-widest">Main</p>
-      {NAV_MAIN.map(item => (
-        <a href={item.href} class={navClass(item.href, item.exact)}>
-          <svg class="w-4.5 h-4.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d={item.icon}/>
-          </svg>
-          {item.label}
-        </a>
-      ))}
-      <div class="pt-4 pb-2">
-        <p class="px-3 mb-2 text-xs font-semibold text-gray-600 uppercase tracking-widest">Account</p>
-        {NAV_SECONDARY.map(item => (
-          <a href={item.href} class={navClass(item.href, item.exact)}>
-            <svg class="w-4.5 h-4.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d={item.icon}/>
-            </svg>
-            {item.label}
-          </a>
-        ))}
-      </div>
-    </nav>
-
-    <!-- Collab banner mobile -->
-    <CollabBanner partner="discord" />
-
-    {showAds && (
-      <div class="px-3 pb-2" id="adsense-mobile-wrap" style="display:none;">
-        <div class="p-3 glass border border-white/8 rounded-xl">
-          <div class="flex items-center justify-between mb-1.5">
-            <span class="text-xs text-gray-600">Sponsored</span>
-            <a href="/dashboard/#" class="text-xs text-neon-green hover:underline">Remove ads</a>
-          </div>
-          <ins class="adsbygoogle adsense-mobile"
-            style="display:block;width:100%;min-width:160px;"
-            data-ad-client="ca-pub-2203788383686517"
-            data-ad-slot="2242281532"
-            data-ad-format="rectangle"
-            data-full-width-responsive="false"></ins>
-        </div>
-      </div>
-    )}
-
-    <div class="px-3 py-4 border-t border-white/10 shrink-0">
-      <div class="flex items-center gap-3">
-        {avatarUrl ? (
-          <img src={avatarUrl} alt={displayName} class="w-8 h-8 rounded-full object-cover" />
-        ) : (
-          <div class="w-8 h-8 rounded-full bg-gradient-to-br from-neon-green to-neon-blue flex items-center justify-center text-xs font-bold text-black">{initials}</div>
-        )}
-        <div class="flex-1 min-w-0">
-          <p class="text-xs font-semibold text-white truncate">{displayName}</p>
-          <span class={`text-xs px-1.5 py-0 rounded-full border font-medium ${planColor}`}>{plan}</span>
-        </div>
-        <a href="/api/auth/signout" class="p-1.5 text-gray-500 hover:text-red-400 transition-colors">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-          </svg>
-        </a>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-<!-- ===== MOBILE BOTTOM NAV ===== -->
-<nav class="fixed bottom-0 left-0 right-0 z-40 lg:hidden glass-strong border-t border-white/10 flex items-center justify-around px-2 h-16 safe-area-pb">
-  {[...NAV_MAIN].slice(0, 4).map(item => {
-    const active = isActive(item.href, item.exact);
-    return (
-      <a href={item.href}
-        class={`flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-xl transition-all min-w-0
-          ${active ? 'text-neon-green' : 'text-gray-500 hover:text-gray-300'}`}>
-        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width={active ? '2' : '1.75'} d={item.icon}/>
-        </svg>
-        <span class="text-xs font-medium truncate">{item.label}</span>
-      </a>
-    );
-  })}
-  <button id="mobile-more-btn"
-    class="flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-xl text-gray-500 hover:text-gray-300 transition-all">
-    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 6h16M4 12h16M4 18h16"/>
-    </svg>
-    <span class="text-xs font-medium">More</span>
-  </button>
-</nav>
-
-<!-- ══ CHANGELOG PANEL ═══════════════════════════════════════════════════════ -->
-<div id="changelog-panel"
-  style="display:none;position:fixed;top:60px;right:16px;z-index:9970;width:340px;
-    background:linear-gradient(160deg,#0e1317,#090c0f);
-    border:1px solid rgba(255,255,255,0.09);border-top:1px solid rgba(255,255,255,0.14);
-    border-radius:20px;overflow:hidden;
-    box-shadow:0 32px 64px rgba(0,0,0,0.6),0 0 0 1px rgba(0,0,0,0.4);
-    opacity:0;transform:translateY(-8px) scale(0.97);
-    transition:opacity 0.25s ease,transform 0.25s cubic-bezier(0.22,1,0.36,1)">
-
-  <!-- Header -->
-  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px 12px;border-bottom:1px solid rgba(255,255,255,0.06)">
-    <div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
-        <span style="font-family:'Cabinet Grotesk',system-ui;font-size:14px;font-weight:900;color:#fff;letter-spacing:-0.02em">Quoi de neuf ✦</span>
-        {newCount > 0 && (
-          <span style="font-size:10px;font-weight:800;background:#00ff9d;color:#000;padding:2px 8px;border-radius:99px">{newCount} new</span>
-        )}
-      </div>
-      <p style="font-size:11px;color:rgba(255,255,255,0.3)">Dernières mises à jour BioForge</p>
-    </div>
-    <button id="changelog-close"
-      style="width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgba(255,255,255,0.4);font-size:11px;transition:all 0.15s"
-      onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">✕</button>
-  </div>
-
-  <!-- Entries -->
-  <div style="max-height:320px;overflow-y:auto;padding:8px 8px 4px">
-    {CHANGELOG.map(entry => (
-      <div style="padding:10px 12px;border-radius:12px;margin-bottom:2px;transition:background 0.15s;cursor:default"
-        onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background='transparent'">
-        <div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">
-          <span style="font-size:15px;line-height:1;flex-shrink:0">{entry.badge}</span>
-          <span style="font-family:'Cabinet Grotesk',system-ui;font-size:13px;font-weight:800;color:#fff;letter-spacing:-0.01em;flex:1">{entry.title}</span>
-          {entry.isNew && (
-            <span style="font-size:9px;font-weight:800;background:rgba(0,255,157,0.12);color:#00ff9d;border:1px solid rgba(0,255,157,0.22);padding:2px 6px;border-radius:99px;letter-spacing:0.05em;text-transform:uppercase;flex-shrink:0">NEW</span>
-          )}
-        </div>
-        <p style="font-size:12px;color:rgba(255,255,255,0.4);line-height:1.55;padding-left:22px">{entry.desc}</p>
-        <span style="font-size:10px;color:rgba(255,255,255,0.2);padding-left:22px;display:block;margin-top:3px">{entry.date}</span>
-      </div>
-    ))}
-  </div>
-
-  <!-- Footer -->
-  <div style="padding:11px 18px;border-top:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:space-between">
-    <a href="/dashboard/roadmap"
-      style="font-size:12px;color:#00ff9d;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:5px;transition:opacity 0.2s"
-      onmouseover="this.style.opacity='0.7'" onmouseout="this.style.opacity='1'">
-      <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
-      Voir la roadmap
-    </a>
-    <a href="/dashboard/roadmap"
-      style="font-size:11px;color:rgba(255,255,255,0.3);text-decoration:none;font-weight:500;transition:color 0.2s"
-      onmouseover="this.style.color='rgba(255,255,255,0.6)'" onmouseout="this.style.color='rgba(255,255,255,0.3)'">
-      💡 Suggérer une feature
-    </a>
-  </div>
-</div>
-
-<!-- V4 Features -->
+<!-- Mobile drawer, bottom nav, changelog panel, features — identiques -->
 <CommandPalette />
 <OnboardingTour />
 <UpgradeModal />
 <FeedbackWidget />
 
-<!-- Toast -->
 <div id="toast-container" class="fixed bottom-20 right-4 lg:bottom-4 z-[9999] space-y-2"></div>
 
-<!-- ===== AI CHATBOT ===== -->
-
-<!-- Bouton flottant -->
-<button id="chat-trigger"
-  class="fixed bottom-20 right-5 lg:bottom-6 lg:right-6 z-[8000] w-13 h-13 w-[52px] h-[52px] rounded-2xl
-         flex items-center justify-center shadow-2xl transition-all duration-200
-         hover:scale-110 active:scale-95"
-  style="background: linear-gradient(135deg,#7c3aed,#4f46e5); box-shadow: 0 8px 32px rgba(124,58,237,0.45);"
-  aria-label="Assistant BioForge">
-  <svg id="chat-icon-closed" class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-  </svg>
-  <svg id="chat-icon-open" class="w-5 h-5 text-white hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-  </svg>
-  <!-- Pulse (disparaît après 1er clic) -->
-  <span id="chat-pulse" class="absolute inset-0 rounded-2xl animate-ping opacity-25 pointer-events-none"
-    style="background:#7c3aed;"></span>
-</button>
-
-<!-- Panel -->
-<div id="chat-panel"
-  class="fixed z-[7999] w-[360px] max-w-[calc(100vw-1.5rem)] rounded-3xl shadow-2xl flex flex-col
-         transition-all duration-300 origin-bottom-right
-         opacity-0 scale-95 pointer-events-none"
-  style="bottom:5.5rem; right:1.25rem; height:520px;
-         background:#0d0d10; border:1px solid rgba(255,255,255,0.07);">
-
-  <!-- Header -->
-  <div class="flex items-center gap-3 px-4 py-3 border-b shrink-0"
-    style="border-color:rgba(255,255,255,0.06);">
-    <div class="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-      style="background:linear-gradient(135deg,#7c3aed,#4f46e5);">
-      <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-      </svg>
-    </div>
-    <div class="flex-1 min-w-0">
-      <p class="text-sm font-semibold text-white">Assistant BioForge</p>
-      <div class="flex items-center gap-1.5 mt-0.5">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400" style="animation: pulse 2s infinite;"></span>
-        <p class="text-xs" style="color:rgba(255,255,255,0.35);">IA · toujours disponible</p>
-      </div>
-    </div>
-    <button id="chat-clear"
-      class="p-1.5 rounded-lg hover:bg-white/6 transition-colors"
-      style="color:rgba(255,255,255,0.3);"
-      title="Effacer la conversation">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-      </svg>
-    </button>
-  </div>
-
-  <!-- Messages -->
-  <div id="chat-messages" class="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-    <!-- Message de bienvenue initial -->
-    <div class="flex gap-2.5 items-start chat-msg">
-      <div class="w-6 h-6 rounded-lg shrink-0 mt-0.5 flex items-center justify-center"
-        style="background:linear-gradient(135deg,#7c3aed,#4f46e5);">
-        <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-        </svg>
-      </div>
-      <div class="rounded-2xl rounded-tl-md px-3.5 py-2.5 text-sm leading-relaxed"
-        style="background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.82); max-width:85%;">
-        Salut ! Je suis ton assistant BioForge 👋<br/>
-        Pose-moi n'importe quelle question sur ta page, tes analytics ou tes blocks.
-      </div>
-    </div>
-  </div>
-
-  <!-- Suggestions rapides -->
-  <div id="chat-suggestions" class="px-3 pb-2 flex gap-2 overflow-x-auto shrink-0"
-    style="scrollbar-width:none;">
-    <button class="chat-sugg shrink-0 text-xs px-3 py-1.5 rounded-full border transition-all whitespace-nowrap"
-      style="border-color:rgba(255,255,255,0.1); color:rgba(255,255,255,0.5);"
-      data-prompt="Comment avoir plus de clics sur ma page BioForge ?">
-      💡 Optimiser ma page
-    </button>
-    <button class="chat-sugg shrink-0 text-xs px-3 py-1.5 rounded-full border transition-all whitespace-nowrap"
-      style="border-color:rgba(255,255,255,0.1); color:rgba(255,255,255,0.5);"
-      data-prompt="Explique-moi comment fonctionnent les analytics BioForge">
-      📊 Analytics
-    </button>
-    <button class="chat-sugg shrink-0 text-xs px-3 py-1.5 rounded-full border transition-all whitespace-nowrap"
-      style="border-color:rgba(255,255,255,0.1); color:rgba(255,255,255,0.5);"
-      data-prompt="Quels blocks me conseilles-tu pour un créateur gaming ?">
-      🎮 Idées blocks
-    </button>
-    <button class="chat-sugg shrink-0 text-xs px-3 py-1.5 rounded-full border transition-all whitespace-nowrap"
-      style="border-color:rgba(255,255,255,0.1); color:rgba(255,255,255,0.5);"
-      data-prompt="Quelle est la différence entre les plans Free et Pro ?">
-      ⭐ Plans
-    </button>
-  </div>
-
-  <!-- Zone de saisie -->
-  <div class="px-3 pb-3 shrink-0">
-    <div class="flex items-end gap-2 rounded-2xl px-3 py-2.5"
-      style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);">
-      <textarea id="chat-input" rows="1"
-        placeholder="Pose ta question…"
-        class="flex-1 bg-transparent text-sm text-white resize-none outline-none leading-relaxed"
-        style="max-height:100px; color-scheme:dark;"></textarea>
-      <button id="chat-send"
-        class="shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:scale-110 active:scale-95 disabled:opacity-40"
-        style="background:linear-gradient(135deg,#7c3aed,#4f46e5);"
-        aria-label="Envoyer">
-        <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
-        </svg>
-      </button>
-    </div>
-  </div>
-
-</div>
-
-<style>
-  /* AdSense */
-  .adsbygoogle { min-height: 100px; background: transparent; }
-  .safe-area-pb { padding-bottom: env(safe-area-inset-bottom, 0); }
-
-  /* Chatbot panel */
-  #chat-panel.open {
-    opacity: 1 !important;
-    scale: 1 !important;
-    pointer-events: auto !important;
-  }
-
-  /* Messages */
-  .chat-msg {
-    animation: chat-in 0.18s ease both;
-  }
-  @keyframes chat-in {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  /* Scrollbar messages */
-  #chat-messages {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255,255,255,0.08) transparent;
-  }
-  #chat-messages::-webkit-scrollbar { width: 3px; }
-  #chat-messages::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.08);
-    border-radius: 9px;
-  }
-
-  /* Suggestions */
-  #chat-suggestions { scrollbar-width: none; }
-  #chat-suggestions::-webkit-scrollbar { display: none; }
-  .chat-sugg:hover {
-    background: rgba(124,58,237,0.15) !important;
-    border-color: rgba(124,58,237,0.4) !important;
-    color: rgba(255,255,255,0.9) !important;
-  }
-
-  /* Typing dots */
-  .chat-dot {
-    animation: dot-bounce 1.2s infinite ease-in-out;
-  }
-  .chat-dot:nth-child(2) { animation-delay: 0.2s; }
-  .chat-dot:nth-child(3) { animation-delay: 0.4s; }
-  @keyframes dot-bounce {
-    0%, 80%, 100% { transform: translateY(0);    opacity: 0.35; }
-    40%            { transform: translateY(-5px); opacity: 1; }
-  }
-</style>
-
 <script>
-  // ── Mobile menu ──────────────────────────────────────────────────────────────
-  const mobileMenu     = document.getElementById('mobile-menu');
-  const mobileBackdrop = document.getElementById('mobile-menu-backdrop');
-
-  function openMobile()  { mobileMenu?.classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
-  function closeMobile() { mobileMenu?.classList.add('hidden');    document.body.style.overflow = ''; }
-
-  document.getElementById('mobile-menu-btn')?.addEventListener('click', openMobile);
-  document.getElementById('mobile-more-btn')?.addEventListener('click', openMobile);
-  document.getElementById('mobile-menu-close')?.addEventListener('click', closeMobile);
-  mobileBackdrop?.addEventListener('click', closeMobile);
-
-  // ── Sidebar user dropdown ────────────────────────────────────────────────────
-  const sidebarUserBtn  = document.getElementById('sidebar-user-btn');
-  const sidebarUserMenu = document.getElementById('sidebar-user-menu');
-  sidebarUserBtn?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    sidebarUserMenu?.classList.toggle('hidden');
-  });
-
-  // ── Topbar user dropdown ─────────────────────────────────────────────────────
-  const topbarUserBtn  = document.getElementById('topbar-user-btn');
-  const topbarUserMenu = document.getElementById('topbar-user-menu');
-  topbarUserBtn?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    topbarUserMenu?.classList.toggle('hidden');
-    sidebarUserMenu?.classList.add('hidden');
-  });
-
-  document.addEventListener('click', () => {
-    sidebarUserMenu?.classList.add('hidden');
-    topbarUserMenu?.classList.add('hidden');
-  });
-
-  // ── Command palette ──────────────────────────────────────────────────────────
-  document.getElementById('command-palette-trigger')?.addEventListener('click', () => {
-    window.openCommandPalette?.();
-  });
-  document.addEventListener('keydown', (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-      e.preventDefault();
-      window.openCommandPalette?.();
-    }
-  });
+  const mobileMenu     = document.getElementById('mobile-menu')
+  const mobileBackdrop = document.getElementById('mobile-menu-backdrop')
+  function openMobile()  { mobileMenu?.classList.remove('hidden'); document.body.style.overflow = 'hidden' }
+  function closeMobile() { mobileMenu?.classList.add('hidden');    document.body.style.overflow = '' }
+  document.getElementById('mobile-menu-btn')?.addEventListener('click', openMobile)
+  document.getElementById('mobile-menu-close')?.addEventListener('click', closeMobile)
+  mobileBackdrop?.addEventListener('click', closeMobile)
+  const sidebarUserBtn  = document.getElementById('sidebar-user-btn')
+  const sidebarUserMenu = document.getElementById('sidebar-user-menu')
+  sidebarUserBtn?.addEventListener('click', e => { e.stopPropagation(); sidebarUserMenu?.classList.toggle('hidden') })
+  const topbarUserBtn  = document.getElementById('topbar-user-btn')
+  const topbarUserMenu = document.getElementById('topbar-user-menu')
+  topbarUserBtn?.addEventListener('click', e => { e.stopPropagation(); topbarUserMenu?.classList.toggle('hidden'); sidebarUserMenu?.classList.add('hidden') })
+  document.addEventListener('click', () => { sidebarUserMenu?.classList.add('hidden'); topbarUserMenu?.classList.add('hidden') })
+  document.getElementById('command-palette-trigger')?.addEventListener('click', () => window.openCommandPalette?.())
+  document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); window.openCommandPalette?.() } })
 </script>
-
 <script define:vars={{ chatContext }}>
 (function () {
+  const ctx     = JSON.parse(chatContext)
+  const trigger = document.getElementById('chat-trigger')
+  const panel   = document.getElementById('chat-panel')
+  const iconOff = document.getElementById('chat-icon-closed')
+  const iconOn  = document.getElementById('chat-icon-open')
+  const pulse   = document.getElementById('chat-pulse')
+  const msgBox  = document.getElementById('chat-messages')
+  const input   = document.getElementById('chat-input')
+  const sendBtn = document.getElementById('chat-send')
+  const clearBtn= document.getElementById('chat-clear')
+  const suggsEl = document.getElementById('chat-suggestions')
 
-  // ── Éléments DOM ─────────────────────────────────────────────────────────────
-  const ctx      = JSON.parse(chatContext);
-  const trigger  = document.getElementById('chat-trigger');
-  const panel    = document.getElementById('chat-panel');
-  const iconOff  = document.getElementById('chat-icon-closed');
-  const iconOn   = document.getElementById('chat-icon-open');
-  const pulse    = document.getElementById('chat-pulse');
-  const msgBox   = document.getElementById('chat-messages');
-  const input    = document.getElementById('chat-input');
-  const sendBtn  = document.getElementById('chat-send');
-  const clearBtn = document.getElementById('chat-clear');
-  const suggsEl  = document.getElementById('chat-suggestions');
+  let open = false, loading = false, history = []
 
-  let open      = false;
-  let loading   = false;
-  let history   = [];    // messages envoyés à l'API
+  const botAvatar = '<div class="w-6 h-6 rounded-lg shrink-0 mt-0.5 flex items-center justify-center" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);"><svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg></div>'
 
-  // ── Helpers DOM ───────────────────────────────────────────────────────────────
-  const botAvatar = `
-    <div class="w-6 h-6 rounded-lg shrink-0 mt-0.5 flex items-center justify-center"
-      style="background:linear-gradient(135deg,#7c3aed,#4f46e5);">
-      <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
-      </svg>
-    </div>`;
-
-  function scrollBottom() {
-    if (msgBox) msgBox.scrollTop = msgBox.scrollHeight;
-  }
+  const scrollBottom = () => { if (msgBox) msgBox.scrollTop = msgBox.scrollHeight }
 
   function addBotMsg(text) {
-    const wrap = document.createElement('div');
-    wrap.className = 'flex gap-2.5 items-start chat-msg';
-    wrap.innerHTML = `${botAvatar}
-      <div class="rounded-2xl rounded-tl-md px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap"
-        style="background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.82); max-width:85%;"
-      >${text.replace(/</g, '&lt;')}</div>`;
-    msgBox?.appendChild(wrap);
-    scrollBottom();
+    const w = document.createElement('div')
+    w.className = 'flex gap-2.5 items-start chat-msg'
+    w.innerHTML = botAvatar + '<div class="rounded-2xl rounded-tl-md px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap" style="background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.82);max-width:85%;">' + text.replace(/</g,'&lt;') + '</div>'
+    msgBox?.appendChild(w); scrollBottom()
   }
 
   function addUserMsg(text) {
-    const wrap = document.createElement('div');
-    wrap.className = 'flex justify-end chat-msg';
-    wrap.innerHTML = `
-      <div class="rounded-2xl rounded-tr-md px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap"
-        style="background:linear-gradient(135deg,#7c3aed,#4f46e5); color:#fff; max-width:85%;"
-      >${text.replace(/</g, '&lt;')}</div>`;
-    msgBox?.appendChild(wrap);
-    scrollBottom();
+    const w = document.createElement('div')
+    w.className = 'flex justify-end chat-msg'
+    w.innerHTML = '<div class="rounded-2xl rounded-tr-md px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap" style="background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;max-width:85%;">' + text.replace(/</g,'&lt;') + '</div>'
+    msgBox?.appendChild(w); scrollBottom()
   }
 
   function addTyping() {
-    const wrap = document.createElement('div');
-    wrap.id = 'chat-typing';
-    wrap.className = 'flex gap-2.5 items-start chat-msg';
-    wrap.innerHTML = `${botAvatar}
-      <div class="rounded-2xl rounded-tl-md px-4 py-3" style="background:rgba(255,255,255,0.05);">
-        <div class="flex gap-1.5 items-center h-4">
-          <span class="chat-dot w-1.5 h-1.5 rounded-full" style="background:rgba(255,255,255,0.5);"></span>
-          <span class="chat-dot w-1.5 h-1.5 rounded-full" style="background:rgba(255,255,255,0.5);"></span>
-          <span class="chat-dot w-1.5 h-1.5 rounded-full" style="background:rgba(255,255,255,0.5);"></span>
-        </div>
-      </div>`;
-    msgBox?.appendChild(wrap);
-    scrollBottom();
+    const w = document.createElement('div')
+    w.id = 'chat-typing'; w.className = 'flex gap-2.5 items-start chat-msg'
+    w.innerHTML = botAvatar + '<div class="rounded-2xl rounded-tl-md px-4 py-3" style="background:rgba(255,255,255,0.05);"><div class="flex gap-1.5 items-center h-4"><span class="chat-dot w-1.5 h-1.5 rounded-full" style="background:rgba(255,255,255,0.5);"></span><span class="chat-dot w-1.5 h-1.5 rounded-full" style="background:rgba(255,255,255,0.5);"></span><span class="chat-dot w-1.5 h-1.5 rounded-full" style="background:rgba(255,255,255,0.5);"></span></div></div>'
+    msgBox?.appendChild(w); scrollBottom()
   }
 
-  function removeTyping() {
-    document.getElementById('chat-typing')?.remove();
-  }
+  function openChat()  { open = true;  panel?.classList.add('open');    iconOff?.classList.add('hidden');    iconOn?.classList.remove('hidden'); pulse?.remove(); input?.focus(); scrollBottom() }
+  function closeChat() { open = false; panel?.classList.remove('open'); iconOff?.classList.remove('hidden'); iconOn?.classList.add('hidden') }
 
-  // ── Open / Close ──────────────────────────────────────────────────────────────
-  function openChat() {
-    open = true;
-    panel?.classList.add('open');
-    iconOff?.classList.add('hidden');
-    iconOn?.classList.remove('hidden');
-    pulse?.remove();          // Stoppe le ring d'attention
-    input?.focus();
-    scrollBottom();
-  }
+  trigger?.addEventListener('click', () => open ? closeChat() : openChat())
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && open) closeChat() })
 
-  function closeChat() {
-    open = false;
-    panel?.classList.remove('open');
-    iconOff?.classList.remove('hidden');
-    iconOn?.classList.add('hidden');
-  }
-
-  trigger?.addEventListener('click', () => open ? closeChat() : openChat());
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && open) closeChat(); });
-
-  // ── Envoi message ─────────────────────────────────────────────────────────────
   async function send(text) {
-    text = text.trim();
-    if (!text || loading) return;
-
-    // Cache les suggestions dès le 1er envoi
-    if (suggsEl) suggsEl.style.display = 'none';
-
-    loading = true;
-    if (sendBtn) sendBtn.disabled = true;
-
-    addUserMsg(text);
-    history.push({ role: 'user', content: text });
-    if (input) { input.value = ''; input.style.height = 'auto'; }
-
-    addTyping();
-
+    text = text.trim()
+    if (!text || loading) return
+    if (suggsEl) suggsEl.style.display = 'none'
+    loading = true
+    if (sendBtn) sendBtn.disabled = true
+    addUserMsg(text)
+    history.push({ role: 'user', content: text })
+    if (input) { input.value = ''; input.style.height = 'auto' }
+    addTyping()
     try {
-      const res = await fetch('/api/chat', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ messages: history.slice(-12), context: ctx }),
-      });
-
-      removeTyping();
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      const data  = await res.json();
-      const reply = data.content?.[0]?.text
-        ?? "Désolé, je n'ai pas pu répondre. Réessaie dans un instant !";
-
-      addBotMsg(reply);
-      history.push({ role: 'assistant', content: reply });
-
-    } catch (err) {
-      removeTyping();
-      addBotMsg("Une erreur s'est produite 🙏 Vérifie ta connexion et réessaie.");
-      console.error('[BioForge Chat]', err);
+      const res  = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: history.slice(-12), context: ctx }) })
+      document.getElementById('chat-typing')?.remove()
+      if (!res.ok) throw new Error('HTTP ' + res.status)
+      const data  = await res.json()
+      const reply = data.content?.[0]?.text ?? "Desole, je n'ai pas pu repondre."
+      addBotMsg(reply)
+      history.push({ role: 'assistant', content: reply })
+    } catch(err) {
+      document.getElementById('chat-typing')?.remove()
+      addBotMsg("Une erreur s'est produite. Reessaie dans un instant.")
     }
-
-    loading = false;
-    if (sendBtn) sendBtn.disabled = false;
+    loading = false
+    if (sendBtn) sendBtn.disabled = false
   }
 
-  // ── Listeners ─────────────────────────────────────────────────────────────────
-  sendBtn?.addEventListener('click', () => send(input?.value ?? ''));
-
-  input?.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input.value); }
-  });
-
-  // Auto-resize textarea
-  input?.addEventListener('input', () => {
-    input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 100) + 'px';
-  });
-
-  // Suggestions rapides
-  document.querySelectorAll('.chat-sugg').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (!open) openChat();
-      send(btn.dataset.prompt ?? '');
-    });
-  });
-
-  // Effacer conversation
+  sendBtn?.addEventListener('click', () => send(input?.value ?? ''))
+  input?.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input.value) } })
+  input?.addEventListener('input', () => { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 100) + 'px' })
+  document.querySelectorAll('.chat-sugg').forEach(btn => { btn.addEventListener('click', () => { if (!open) openChat(); send(btn.dataset.prompt ?? '') }) })
   clearBtn?.addEventListener('click', () => {
-    history = [];
-    if (msgBox) {
-      msgBox.innerHTML = `
-        <div class="flex gap-2.5 items-start chat-msg">
-          ${botAvatar}
-          <div class="rounded-2xl rounded-tl-md px-3.5 py-2.5 text-sm leading-relaxed"
-            style="background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.82); max-width:85%;">
-            Conversation réinitialisée 🔄 Comment puis-je t'aider ?
-          </div>
-        </div>`;
-    }
-    if (suggsEl) suggsEl.style.display = '';
-  });
-
-})();
+    history = []
+    if (msgBox) msgBox.innerHTML = '<div class="flex gap-2.5 items-start chat-msg">' + botAvatar + '<div class="rounded-2xl rounded-tl-md px-3.5 py-2.5 text-sm" style="background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.82);max-width:85%;">Conversation reinitialisee.</div></div>'
+    if (suggsEl) suggsEl.style.display = ''
+  })
+})()
 </script>
-
-<script>
-  function initAdsense() {
-    document.querySelectorAll('.adsbygoogle').forEach(function(ins) {
-      if (ins.getAttribute('data-adsbygoogle-status')) return;
-      var wrap = ins.closest('[id$="-wrap"]');
-      var w = ins.closest('aside')?.offsetWidth || ins.parentElement?.offsetWidth || 0;
-      if (w < 50) return;
-      try {
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
-        if (wrap) {
-          var obs = new MutationObserver(function() {
-            if (ins.getAttribute('data-adsbygoogle-status') === 'done' && ins.offsetHeight > 10) {
-              wrap.style.display = '';
-              obs.disconnect();
-            }
-          });
-          obs.observe(ins, { attributes: true, childList: true, subtree: true });
-          setTimeout(function() {
-            if (ins.offsetHeight <= 10) { wrap.style.display = 'none'; }
-            obs.disconnect();
-          }, 4000);
-        }
-      } catch(e) {}
-    });
-  }
-  if (document.readyState === 'complete') {
-    setTimeout(initAdsense, 400);
-  } else {
-    window.addEventListener('load', function() { setTimeout(initAdsense, 400); });
-  }
-</script>
-
-<script>
-  (function() {
-    var banner  = document.getElementById('promo-banner');
-    var dismiss = document.getElementById('promo-dismiss');
-    var msgs    = document.querySelectorAll('.promo-msg');
-    var dots    = document.querySelectorAll('.pdot');
-    if (!banner || !msgs.length) return;
-
-    // Check dismissed
-    if (sessionStorage.getItem('bf_promo_dismissed')) {
-      banner.style.display = 'none';
-      return;
-    }
-
-    var current = 0;
-    var interval = null;
-
-    function show(idx) {
-      msgs.forEach(function(m, i) {
-        m.style.opacity = i === idx ? '1' : '0';
-        m.style.transform = i === idx ? 'translateY(0)' : 'translateY(8px)';
-      });
-      dots.forEach(function(d, i) {
-        d.style.width    = i === idx ? '14px' : '4px';
-        d.style.background = i === idx ? '#00ff9d' : 'rgba(255,255,255,0.2)';
-      });
-      current = idx;
-    }
-
-    function next() {
-      show((current + 1) % msgs.length);
-    }
-
-    // Show first message after 300ms
-    setTimeout(function() { show(0); }, 300);
-
-    // Rotate every 5 seconds
-    interval = setInterval(next, 5000);
-
-    // Pause on hover
-    banner.addEventListener('mouseenter', function() { clearInterval(interval); });
-    banner.addEventListener('mouseleave', function() { interval = setInterval(next, 5000); });
-
-    // Dismiss
-    if (dismiss) {
-      dismiss.addEventListener('click', function() {
-        banner.style.height = '0';
-        banner.style.opacity = '0';
-        banner.style.overflow = 'hidden';
-        banner.style.transition = 'height 0.3s ease, opacity 0.3s ease';
-        clearInterval(interval);
-        setTimeout(function() { banner.style.display = 'none'; }, 320);
-        sessionStorage.setItem('bf_promo_dismissed', '1');
-      });
-    }
-  })();
-</script>
-
-<script>
-  /* ══ CHANGELOG ══════════════════════════════════════════════════════════════ */
-  (function () {
-    var btn    = document.getElementById('changelog-btn');
-    var panel  = document.getElementById('changelog-panel');
-    var close  = document.getElementById('changelog-close');
-    if (!btn || !panel) return;
-
-    var open = false;
-
-    function openPanel() {
-      open = true;
-      panel.style.display = 'block';
-      requestAnimationFrame(function () {
-        panel.style.opacity   = '1';
-        panel.style.transform = 'translateY(0) scale(1)';
-      });
-      // Mark as seen
-      localStorage.setItem('bf_changelog_seen', 'true');
-      var badge = btn.querySelector('span');
-      if (badge) badge.remove();
-    }
-
-    function closePanel() {
-      open = false;
-      panel.style.opacity   = '0';
-      panel.style.transform = 'translateY(-8px) scale(0.97)';
-      setTimeout(function () { panel.style.display = 'none'; }, 260);
-    }
-
-    btn.addEventListener('click', function (e) {
-      e.stopPropagation();
-      open ? closePanel() : openPanel();
-    });
-    if (close) close.addEventListener('click', closePanel);
-
-    document.addEventListener('click', function (e) {
-      if (open && !panel.contains(e.target) && e.target !== btn) closePanel();
-    });
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && open) closePanel();
-    });
-
-    // Hide badge if already seen
-    if (localStorage.getItem('bf_changelog_seen')) {
-      var badge = btn.querySelector('span');
-      if (badge) badge.style.display = 'none';
-    }
-  })();
-
-  /* ══ COMPLETION BAR ═════════════════════════════════════════════════════════ */
-  (function () {
-    var bar     = document.getElementById('completion-bar');
-    var dismiss = document.getElementById('completion-dismiss');
-    if (!bar) return;
-
-    if (sessionStorage.getItem('bf_completion_dismissed')) {
-      bar.style.display = 'none';
-      return;
-    }
-
-    if (dismiss) {
-      dismiss.addEventListener('click', function () {
-        bar.style.height  = '0';
-        bar.style.opacity = '0';
-        bar.style.overflow = 'hidden';
-        bar.style.transition = 'height 0.3s ease, opacity 0.2s ease';
-        setTimeout(function () { bar.style.display = 'none'; }, 320);
-        sessionStorage.setItem('bf_completion_dismissed', '1');
-      });
-    }
-
-    // Check block count via API and update the "3 liens" step
-    fetch('/api/blocks?count=1')
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        var count = d.data?.total ?? d.data?.count ?? 0;
-        if (count >= 3) {
-          // All chips might need refreshing — soft approach: just update if visible
-          var chips = bar.querySelectorAll('a');
-          chips.forEach(function (chip) {
-            if (chip.textContent.includes('3 liens')) {
-              chip.style.display = 'none';
-            }
-          });
-        }
-      })
-      .catch(function () {/* silent */});
-  })();
-
-  /* ══ USAGE INDICATOR ════════════════════════════════════════════════════════ */
-  (function () {
-    var wrap  = document.getElementById('usage-indicator');
-    var track = document.getElementById('usage-track');
-    var label = document.getElementById('usage-label');
-    if (!wrap || !track || !label) return;
-
-    var FREE_LIMIT = 5;
-
-    fetch('/api/blocks?count=1')
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        var used = d.data?.total ?? d.data?.count ?? 0;
-        var pct  = Math.min(used / FREE_LIMIT, 1);
-        var isWarning = pct >= 0.8;
-        var isFull    = pct >= 1;
-
-        // Mini segmented bar (5 dots)
-        track.innerHTML = '';
-        for (var i = 0; i < FREE_LIMIT; i++) {
-          var dot = document.createElement('div');
-          dot.style.cssText = 'width:6px;height:6px;border-radius:2px;transition:background 0.3s;background:' +
-            (i < used
-              ? (isFull ? '#ff5050' : isWarning ? '#ffaa00' : '#00ff9d')
-              : 'rgba(255,255,255,0.1)');
-          track.appendChild(dot);
-        }
-
-        label.textContent = used + '/' + FREE_LIMIT + ' blocs';
-        label.style.color = isFull ? '#ff5050' : isWarning ? '#ffaa00' : 'rgba(255,255,255,0.4)';
-
-        if (isFull) {
-          wrap.style.borderColor = 'rgba(255,80,80,0.25)';
-          wrap.style.background  = 'rgba(255,80,80,0.04)';
-        } else if (isWarning) {
-          wrap.style.borderColor = 'rgba(255,170,0,0.25)';
-          wrap.style.background  = 'rgba(255,170,0,0.04)';
-        }
-      })
-      .catch(function () {
-        wrap.style.display = 'none';
-      });
-  })();
-</script>
-
-</body>
-</html>

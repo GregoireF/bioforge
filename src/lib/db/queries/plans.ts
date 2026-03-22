@@ -1,32 +1,70 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/supabase/database.types";
-import { AppError, ErrorCode } from "@/lib/core/errors";
-
-type PlanLimit = Database["public"]["Tables"]["plan_limits"]["Row"];
-
-const planCache = new Map<string, PlanLimit>();
-const PLAN_CACHE_TTL = 60 * 60 * 1000; // 1h
-
+import type { Database } from '@/lib/infra/supabase/database.types'
+import {
+  type Supabase, type Result,
+  handleSingle, handleArray,
+  normalizeError, logError,
+} from './utils'
+ 
+// ─── Types ────────────────────────────────────────────────────────────────────
+ 
+export type PlanLimit = Database['public']['Tables']['plan_limits']['Row']
+export type Plan = 'Free' | 'Creator' | 'Pro' | 'Enterprise'
+ 
+// ─── Constantes ───────────────────────────────────────────────────────────────
+export const PLANS         = ['Free', 'Creator', 'Pro', 'Enterprise'] as const satisfies readonly Plan[]
+export const PAID_PLANS    = ['Creator', 'Pro', 'Enterprise']           as const satisfies readonly Plan[]
+export const PREMIUM_PLANS = ['Pro', 'Enterprise']                       as const satisfies readonly Plan[]
+ 
+// ─── Type Guards & Helpers ────────────────────────────────────────────────────
+export function isValidPlan(value: unknown): value is Plan {
+  return typeof value === 'string' && (PLANS as readonly string[]).includes(value)
+}
+ 
+export function isPaidPlan(plan: Plan): boolean {
+  return (PAID_PLANS as readonly string[]).includes(plan)
+}
+ 
+export function isPremiumPlan(plan: Plan): boolean {
+  return (PREMIUM_PLANS as readonly string[]).includes(plan)
+}
+ 
+// Free + Creator voient des ads, Pro + Enterprise non
+export function shouldShowAds(plan: Plan): boolean {
+  return !isPremiumPlan(plan)
+}
+ 
+// ─── Queries ──────────────────────────────────────────────────────────────────
 export async function getPlanLimits(
-  supabase: SupabaseClient<Database>,
-  plan: string
-): Promise<PlanLimit> {
-  if (!plan) throw new AppError({ message: "Plan ID required", code: ErrorCode.VALIDATION_ERROR });
-
-  const cached = planCache.get(plan);
-  if (cached) return cached;
-
-  const { data, error } = await supabase
-    .from("plan_limits")
-    .select("*")
-    .eq("plan", plan)
-    .single();
-
-  if (error) throw new AppError({ message: error.message, code: ErrorCode.DB_ERROR });
-  if (!data) throw new AppError({ message: "Plan not found", code: ErrorCode.NOT_FOUND, statusCode: 404 });
-
-  planCache.set(plan, data);
-  setTimeout(() => planCache.delete(plan), PLAN_CACHE_TTL);
-
-  return data;
+  db: Supabase,
+  plan: Plan
+): Promise<Result<PlanLimit>> {
+  try {
+    return handleSingle(
+      await db
+        .from('plan_limits')
+        .select('*')
+        .eq('plan', plan)
+        .maybeSingle(),
+      `Plan limits not found for: ${plan}`
+    )
+  } catch (err) {
+    logError('getPlanLimits', err, { plan })
+    return { success: false, error: normalizeError(err) }
+  }
+}
+ 
+export async function getAllPlanLimits(
+  db: Supabase
+): Promise<Result<PlanLimit[]>> {
+  try {
+    return handleArray(
+      await db
+        .from('plan_limits')
+        .select('*')
+        .order('monthly_price_cents', { ascending: true })
+    )
+  } catch (err) {
+    logError('getAllPlanLimits', err)
+    return { success: false, error: normalizeError(err) }
+  }
 }
