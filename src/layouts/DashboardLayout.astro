@@ -10,7 +10,7 @@ import '@/styles/global.css'
 import { Image }           from 'astro:assets'
 import { isPaidPlan, shouldShowAds } from '@/lib/shared/plans'
 import type { Plan }       from '@/lib/shared/plans'
-import type { Profile }    from '@/lib/db'
+import { createSupabaseServer } from '@/lib/infra/supabase/server'
 
 interface Props {
   title: string
@@ -19,24 +19,32 @@ interface Props {
 const { title } = Astro.props
 const currentPath = Astro.url.pathname
 
-// ── Auth depuis locals — le middleware a déjà fait le travail ─────────────────
+// ── Auth — utilise locals.user du middleware + recrée le client pour le profil
 const user = Astro.locals.user
 
-// select('*') pour matcher le type Profile complet — évite ts2322
-let profile: Profile | null = null
+const supabaseUrl     = import.meta.env.PUBLIC_SUPABASE_URL ?? ''
+const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY ?? ''
+
+let profile: Record<string, unknown> | null = null
 if (user) {
-  const { data } = await Astro.locals.supabase
+  // locals.supabase peut ne pas être peuplé selon la version du middleware
+  // On recrée le client proprement avec le chemin qui fonctionne en prod
+  const supabase = Astro.locals.supabase ?? createSupabaseServer({
+    cookies: Astro.cookies,
+    request: Astro.request,
+  })
+  const { data } = await supabase
     .from('profiles')
-    .select('*')
+    .select('id, username, display_name, avatar_url, plan, bio, theme')
     .eq('id', user.id)
     .single()
   profile = data ?? null
 }
 
 // ── Plan helpers ──────────────────────────────────────────────────────────────
-const plan     = (profile?.plan ?? 'Free') as Plan
-const isPaid   = isPaidPlan(plan)
-const showAds  = shouldShowAds(plan)  // Free + Creator voient les pubs
+const plan    = ((profile?.plan as string) ?? 'Free') as Plan
+const isPaid  = isPaidPlan(plan)
+const showAds = shouldShowAds(plan)
 
 const PLAN_COLORS: Record<Plan, string> = {
   Free:       'text-gray-400 bg-white/5 border-white/10',
@@ -47,17 +55,14 @@ const PLAN_COLORS: Record<Plan, string> = {
 const planColor = PLAN_COLORS[plan] ?? PLAN_COLORS.Free
 
 // ── Avatar ────────────────────────────────────────────────────────────────────
-const avatarUrl   = profile?.avatar_url ?? null
-const displayName = profile?.display_name || profile?.username || 'User'
+const avatarUrl   = (profile?.avatar_url as string) ?? null
+const displayName = (profile?.display_name as string) || (profile?.username as string) || 'User'
 const initials    = displayName.slice(0, 2).toUpperCase()
 
 // ── Chatbot context ───────────────────────────────────────────────────────────
-const supabaseUrl     = import.meta.env.PUBLIC_SUPABASE_URL ?? ''
-const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY ?? ''
-
 const chatContext = JSON.stringify({
-  username:    profile?.username    ?? '',
-  displayName: profile?.display_name ?? profile?.username ?? 'User',
+  username:    (profile?.username    as string) ?? '',
+  displayName: (profile?.display_name as string) ?? (profile?.username as string) ?? 'User',
   plan,
   isPaid,
 })
@@ -66,32 +71,31 @@ const chatContext = JSON.stringify({
 type CompletionStep = { id: string; label: string; href: string; done: boolean }
 const completionSteps: CompletionStep[] = [
   { id: 'avatar',   label: 'Photo de profil',      href: '/dashboard/settings',   done: !!profile?.avatar_url },
-  { id: 'bio',      label: 'Bio renseignée',        href: '/dashboard/settings',   done: !!(profile?.bio && profile.bio.length > 5) },
-  { id: 'username', label: 'Pseudo personnalisé',   href: '/dashboard/settings',   done: !!(profile?.username && !profile.username.startsWith('user_')) },
+  { id: 'bio',      label: 'Bio renseignée',        href: '/dashboard/settings',   done: !!(profile?.bio && (profile.bio as string).length > 5) },
+  { id: 'username', label: 'Pseudo personnalisé',   href: '/dashboard/settings',   done: !!(profile?.username && !(profile.username as string).startsWith('user_')) },
   { id: 'theme',    label: 'Apparence configurée',  href: '/dashboard/appearance', done: !!(profile?.theme && typeof profile.theme === 'object') },
-  { id: 'links',    label: '3 liens ajoutés',       href: '/dashboard/blocks',     done: false }, // résolu côté client
+  { id: 'links',    label: '3 liens ajoutés',       href: '/dashboard/blocks',     done: false },
 ]
 const completionDone  = completionSteps.filter(s => s.done).length
 const completionTotal = completionSteps.length
 
-// ── Changelog ────────────────────────────────────────────────────────────────
+// ── Changelog ─────────────────────────────────────────────────────────────────
 const CHANGELOG = [
-  { date: 'Jan 2025', badge: '🆕', title: 'Mode Hero Photo',       desc: 'Affiche ta photo en pleine largeur avec fondu cinématique.', isNew: true },
-  { date: 'Jan 2025', badge: '🎨', title: '35+ nouvelles polices', desc: 'Tech, Serif, Display, Mono — Cabinet Grotesk et plus.',       isNew: true },
-  { date: 'Jan 2025', badge: '🔗', title: 'Raccourcisseur de liens',desc: 'bioforge.click/s/xxx avec UTM et stats.',                   isNew: false },
-  { date: 'Jan 2025', badge: '📊', title: 'Analytics avancées',    desc: 'Heatmaps, rétention, taux de clic par bloc.',                isNew: false },
-  { date: 'Déc 2024', badge: '✦',  title: 'Palettes auto-gen',     desc: 'Génère des palettes harmonieuses depuis ta couleur accent.', isNew: false },
+  { date: 'Jan 2025', badge: '🆕', title: 'Mode Hero Photo',        desc: 'Affiche ta photo en pleine largeur avec fondu cinématique.', isNew: true },
+  { date: 'Jan 2025', badge: '🎨', title: '35+ nouvelles polices',  desc: 'Tech, Serif, Display, Mono — Cabinet Grotesk et plus.',       isNew: true },
+  { date: 'Jan 2025', badge: '🔗', title: 'Raccourcisseur de liens', desc: 'bioforge.click/s/xxx avec UTM et stats.',                   isNew: false },
+  { date: 'Jan 2025', badge: '📊', title: 'Analytics avancées',     desc: 'Heatmaps, rétention, taux de clic par bloc.',                isNew: false },
+  { date: 'Déc 2024', badge: '✦',  title: 'Palettes auto-gen',      desc: 'Génère des palettes harmonieuses depuis ta couleur accent.', isNew: false },
 ]
 const newCount = CHANGELOG.filter(c => c.isNew).length
 
-// ── Navigation ────────────────────────────────────────────────────────────────
+// ── Navigation ─────────────────────────────────────────────────────────────────
 const NAV_MAIN = [
-  { href: '/dashboard',            label: 'Overview',    exact: true,  icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
-  { href: '/dashboard/blocks',     label: 'My Page',     exact: false, icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
-  { href: '/dashboard/analytics',  label: 'Analytics',   exact: false, icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-  { href: '/dashboard/appearance', label: 'Appearance',  exact: false, icon: 'M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01' },
+  { href: '/dashboard',            label: 'Overview',   exact: true,  icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+  { href: '/dashboard/blocks',     label: 'My Page',    exact: false, icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
+  { href: '/dashboard/analytics',  label: 'Analytics',  exact: false, icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
+  { href: '/dashboard/appearance', label: 'Appearance', exact: false, icon: 'M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01' },
 ]
-
 const NAV_SECONDARY = [
   { href: '/dashboard/billing',  label: 'Billing',  exact: false, icon: 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z' },
   { href: '/dashboard/roadmap',  label: 'Roadmap',  exact: false, icon: 'M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7' },
@@ -107,6 +111,8 @@ function navClass(href: string, exact: boolean): string {
     : 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-gray-400 hover:text-white hover:bg-white/5 transition-all font-medium text-sm'
 }
 ---
+
+
 
 
 <!DOCTYPE html>
