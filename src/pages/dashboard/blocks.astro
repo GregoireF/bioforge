@@ -1,8 +1,8 @@
 ---
 import DashboardLayout from '@/layouts/DashboardLayout.astro';
 import PlanLimitIndicator from '@/components/features/PlanLimitIndicator.astro';
-import { getBlocks } from '@/lib/supabase/queries';
-import { getAnalyticsSummary } from '@/lib/db/queries.server';
+import { getBlocks } from '@/lib/db/queries/blocks';
+import { getAnalyticsSummary } from '@/lib/db/queries/analytics';
 import type { Block } from '@/lib/db';
  
 // ── Auth depuis locals — le middleware a déjà validé ─────────────────────────
