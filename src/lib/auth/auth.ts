@@ -1,121 +1,104 @@
-import { createSupabaseServer } from '@/lib/infra/supabase/server';
-import { getProfile, getProfileWithPlanLimits } from '@/lib/supabase/queries';
+// src/lib/auth/auth.ts
+import { createSupabaseServer }    from '@/lib/infra/supabase/server'
 import { ok, err }                 from '@/lib/core/result'
 import type { Result }             from '@/lib/core/result'
 import type { Profile, PlanLimit } from '@/lib/db'
-import type { User, Session } from '@supabase/supabase-js';
-import type { AstroCookies } from 'astro';
+import type { User, Session }      from '@supabase/supabase-js'
+import type { AstroCookies }       from 'astro'
 
 export interface AuthData {
-  user: User | null;
-  session: Session | null;
-  profile?: Profile | null;
-  planLimits?: any;
+  user:       User
+  session:    Session
+  profile:    Profile
+  planLimits: PlanLimit | null
 }
 
-export interface AuthResult {
-  success: boolean;
-  data?: AuthData;
-  error?: string;
-  statusCode?: number;
-  redirect?: string;
+export type AuthError = {
+  message:    string
+  statusCode: number
+  redirect:   string
+}
+
+export type AuthResult = Result<AuthData, AuthError>
+
+function withTimeout<T>(thenable: PromiseLike<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    Promise.resolve(thenable),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`[withAuth] Timeout: ${label} exceeded ${ms}ms`)), ms)
+    ),
+  ])
+}
+
+function authErr(message: string, statusCode: number, redirect = '/signin'): AuthResult {
+  return err({ message, statusCode, redirect })
 }
 
 export async function withAuth(
   context: { cookies: AstroCookies; request: Request }
 ): Promise<AuthResult> {
-  const supabase = createSupabaseServer({
-    cookies: context.cookies,
-    request: context.request,
-  });
 
-  // 1. Récupère et valide la session
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  const supabase = createSupabaseServer({ cookies: context.cookies, request: context.request })
 
-  if (sessionError || !session || !session.user) {
-    return {
-      success: false,
-      error: sessionError || new Error('Aucune session valide'),
-      redirect: '/signin?error=session_invalid'
-    };
-  }
-
-  const user = session.user;
-
-  // 2. Validation stricte côté serveur (supprime le warning + plus sécurisé)
-  const { data: { user: validatedUser }, error: userError } = await supabase.auth.getUser();
-
-
-  if (userError || !validatedUser) {
-    return {
-      success: false,
-      error: userError || new Error('Utilisateur invalide'),
-      redirect: '/signin?error=invalid_user'
-    };
-
-  }
-
-  // 3. Récupère le profile (en passant le client authentifié si possible)
-  const profileResult = await getProfile(validatedUser.id);
-
-
-
-
-
-
-
-
-
-
-
-
-  if (!profileResult.success || !profileResult.data) {
-    return {
-      success: false,
-      error: new Error(profileResult.message || 'Profil introuvable'),
-      redirect: '/signin?error=profile_missing'
-    };
-
-
-
-
-
-
-  }
-
-  const profile = profileResult.data;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  // 4. Récupère les limites du plan (optionnel, seulement si nécessaire)
-  let planLimits = null;
+  // ✅ getUser() uniquement — valide le JWT côté serveur, pas de getSession() avant
+  let user: User
   try {
-    const limitsResult = await getProfileWithPlanLimits(validatedUser.id);
-    if (limitsResult.success) {
-      planLimits = limitsResult.data;
-    }
-  } catch (err) {
-    console.warn('Impossible de charger les limites du plan:', err);
+    const { data: { user: u }, error } = await withTimeout(
+      supabase.auth.getUser(), 5000, 'getUser'
+    )
+    if (error || !u) return authErr(error?.message ?? 'Unauthorized', 401)
+    user = u
+  } catch (e) {
+    return authErr(e instanceof Error ? e.message : 'Auth timeout', 503)
   }
 
-  return {
-    success: true,
-    data: {
-      user: validatedUser,
-      session,
-      profile,
-      planLimits,
-    }
-  };
+  // getSession() local — lecture cookie uniquement, pas d'appel réseau
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return authErr('No active session', 401)
+
+  let profile: Profile
+  try {
+    const { data, error } = await withTimeout(
+      supabase.from('profiles').select('*')
+        .eq('id', user.id).eq('is_active', true).is('deleted_at', null).single(),
+      5000, 'getProfile'
+    )
+    if (error || !data) return authErr(error?.message ?? 'Profile not found', 404)
+    profile = data
+  } catch (e) {
+    return authErr(e instanceof Error ? e.message : 'Database timeout', 503)
+  }
+
+  let planLimits: PlanLimit | null = null
+  try {
+    const { data } = await withTimeout(
+      supabase.from('plan_limits').select('*').eq('plan', profile.plan).single(),
+      3000, 'getPlanLimits'
+    )
+    planLimits = data ?? null
+  } catch (e) {
+    console.error('[withAuth] planLimits failed:', e instanceof Error ? e.message : String(e))
+  }
+
+  return ok({ user, session, profile, planLimits })
+}
+
+export type AuthOnlyResult = Result<{ user: User; session: Session }, AuthError>
+
+export async function withAuthOnly(
+  context: { cookies: AstroCookies; request: Request }
+): Promise<AuthOnlyResult> {
+  const supabase = createSupabaseServer(context)
+
+  try {
+    const { data: { user }, error } = await withTimeout(
+      supabase.auth.getUser(), 5000, 'getUser'
+    )
+    if (error || !user) return authErr(error?.message ?? 'Unauthorized', 401)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return authErr('No session', 401)
+    return ok({ user, session })
+  } catch (e) {
+    return authErr(e instanceof Error ? e.message : 'Timeout', 503)
+  }
 }

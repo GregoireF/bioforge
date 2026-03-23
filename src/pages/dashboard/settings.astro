@@ -577,7 +577,7 @@ const bridge = JSON.stringify({
     let pct = 0;
     const tick = setInterval(() => { pct = Math.min(pct + 10, 85); if (progressBar) progressBar.style.width = `${pct}%`; }, 80);
     try {
-      const res = await fetch('/api/profile/avatar', { method: 'POST', body: fd });
+      const res = await fetch('/api/v1/profile/avatar', { method: 'POST', body: fd });
       clearInterval(tick);
       if (progressBar) progressBar.style.width = '100%';
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `HTTP ${res.status}`); }
@@ -600,7 +600,7 @@ const bridge = JSON.stringify({
     if (!url) return;
     try { new URL(url); } catch { toast.error('Invalid URL'); return; }
     if (avatarPreview) { avatarPreview.src = url; avatarPreview.onerror = () => toast.error('Could not load image from that URL'); }
-    fetch('/api/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ avatar_url: url }) })
+    fetch('/api/v1/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ avatar_url: url }) })
       .then(r => r.ok ? toast.success('Avatar URL saved!') : toast.error('Failed to save avatar URL'));
   });
 
@@ -635,7 +635,7 @@ const bridge = JSON.stringify({
     if (!/^[a-z0-9_]{3,24}$/.test(val)) { showFeedback('3\u201324 chars \u00b7 lowercase, numbers, underscores only', false); return; }
     if (val === username) { showFeedback('\u2713 This is your current username', true); return; }
     try {
-      const r = await fetch(`/api/profile/check-username?username=${encodeURIComponent(val)}`);
+      const r = await fetch(`/api/v1/profile/check-username?username=${encodeURIComponent(val)}`);
       const d = await r.json();
       const available = d.data?.available ?? false;
       showFeedback(available ? '\u2713 Available!' : '\u2717 Already taken', available);
@@ -714,7 +714,7 @@ const bridge = JSON.stringify({
   async function exportData() {
     try {
       toast.info('Preparing your data export\u2026');
-      const res = await fetch('/api/rgpd/export', { method: 'POST' });
+      const res = await fetch('/api/v1/rgpd/export', { method: 'POST' });
       if (res.status === 429) { toast.error('Too many export requests. Try again later.'); return; }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -740,7 +740,7 @@ const bridge = JSON.stringify({
     const list = document.getElementById('sessions-list');
     if (!list) return;
     try {
-      const res = await fetch('/api/profile/sessions');
+      const res = await fetch('/api/v1/profile/sessions');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const { data: sessions } = await res.json();
       if (!sessions?.length) { list.innerHTML = '<p class="text-xs text-gray-500 text-center py-6">No sessions found</p>'; return; }
@@ -771,7 +771,7 @@ const bridge = JSON.stringify({
         btn.addEventListener('click', async () => {
           const id = btn.dataset.id;
           try {
-            const r = await fetch(`/api/profile/sessions/${id}`, { method: 'DELETE' });
+            const r = await fetch(`/api/v1/profile/sessions/${id}`, { method: 'DELETE' });
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             btn.closest('.flex.items-center.gap-4')?.remove();
             toast.success('Session revoked');
@@ -786,7 +786,7 @@ const bridge = JSON.stringify({
   document.getElementById('revoke-all-btn')?.addEventListener('click', async () => {
     if (!confirm('Sign out all other devices?')) return;
     try {
-      const r = await fetch('/api/profile/sessions', { method: 'DELETE' });
+      const r = await fetch('/api/v1/profile/sessions', { method: 'DELETE' });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       toast.success('All other sessions revoked');
       loadSessions();
@@ -833,7 +833,7 @@ const bridge = JSON.stringify({
       // 1. localStorage — m\u00eame format que CookieBanner
       localStorage.setItem(CONSENT_KEY, JSON.stringify({ analytics, timestamp: Date.now() }));
       // 2. Audit serveur
-      await fetch('/api/rgpd/consent', {
+      await fetch('/api/v1/rgpd/consent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -875,7 +875,7 @@ const bridge = JSON.stringify({
     deleteBtn.setAttribute('disabled', '');
     deleteBtn.textContent = 'Deleting\u2026';
     try {
-      const r = await fetch('/api/rgpd/delete', {
+      const r = await fetch('/api/v1/rgpd/delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         // Champ requis par l'API RGPD (double protection c\u00f4t\u00e9 serveur)
