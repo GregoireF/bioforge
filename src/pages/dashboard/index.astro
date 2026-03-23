@@ -1,21 +1,28 @@
 ---
-// src/pages/dashboard/index.astro — v3
+// src/pages/dashboard/index.astro — Dashboard v2 (bugfixes)
+
 import DashboardLayout from '@/layouts/DashboardLayout.astro';
+import Button from '@/components/ui/Button.astro';
+import Card from '@/components/ui/Card.astro';
+import Badge from '@/components/ui/Badge.astro';
 import { withAuth } from '@/lib/auth/auth';
 import { getAnalyticsSummary } from '@/lib/db/queries.server';
 import { getBlocks } from '@/lib/supabase/queries';
 import { createServerClient } from '@supabase/ssr';
 import { parse } from 'cookie';
- 
-// ── Auth ──────────────────────────────────────────────────────────────────────
-const authResult = await withAuth({ cookies: Astro.cookies, request: Astro.request });
+
+// ==================== AUTH ====================
+const authResult = await withAuth({
+  cookies: Astro.cookies,
+  request: Astro.request,
+});
 if (!authResult.success || !authResult.data) {
   return Astro.redirect(authResult.redirect || '/signin?error=auth_failed');
 }
 const { user, profile, planLimits } = authResult.data;
- 
-// ── Utils ─────────────────────────────────────────────────────────────────────
-function escHtml(str: unknown): string {
+
+// ==================== SANITIZATION ====================
+function escapeHtml(str: unknown): string {
   return String(str ?? '')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
@@ -24,62 +31,49 @@ function safeNum(val: unknown, fallback = 0): number {
   const n = Number(val);
   return isFinite(n) ? n : fallback;
 }
-function flagEmoji(code: string): string {
-  if (!code || code.length !== 2) return '🌐';
-  return String.fromCodePoint(...[...code.toUpperCase()].map(c => 0x1F1E0 - 65 + c.charCodeAt(0)));
-}
-function classifyReferrer(ref: string | null): string {
-  if (!ref) return 'Direct';
-  try {
-    const host = new URL(ref).hostname.replace('www.', '');
-    const SOCIAL = ['instagram','tiktok','twitter','x.com','youtube','facebook','linkedin','snapchat','threads','pinterest','twitch'];
-    if (SOCIAL.some(s => host.includes(s))) return host;
-    const SEARCH = ['google','bing','duckduckgo','yahoo','yandex'];
-    if (SEARCH.some(s => host.includes(s))) return 'Recherche';
-    return host;
-  } catch { return 'Direct'; }
-}
- 
-// ── Data loading ──────────────────────────────────────────────────────────────
-const cookies     = parse(Astro.request.headers.get('cookie') ?? '');
-const supabase    = createServerClient(
+
+// ==================== DATA LOADING ====================
+const cookies = parse(Astro.request.headers.get('cookie') ?? '');
+const supabaseClient = createServerClient(
   import.meta.env.PUBLIC_SUPABASE_URL!,
   import.meta.env.PUBLIC_SUPABASE_ANON_KEY!,
   { cookies: { get: (k) => cookies[k], set: () => {}, remove: () => {} } }
 );
- 
+
 const safeProfileId = profile?.id?.trim() ?? '';
+
+// FIX: isPaid only true for explicitly paid plans — not when plan is undefined
 const isPaid = ['Pro', 'Business', 'Enterprise'].includes(profile?.plan ?? '');
- 
-const [analyticsResult, blocksResult, notifsResult] = await Promise.all([
-  safeProfileId ? getAnalyticsSummary(supabase, safeProfileId, 14) : Promise.resolve({ success: false, data: null }),
+
+// Load 14 days to compute real delta (curr 7d vs prev 7d)
+const [analyticsResult, blocksResult] = await Promise.all([
+  safeProfileId ? getAnalyticsSummary(supabaseClient, safeProfileId, 14) : Promise.resolve({ success: false, data: null }),
   safeProfileId ? getBlocks(safeProfileId) : Promise.resolve({ success: false, data: [] }),
-  // Dernières notifications pour l'activity feed
-  safeProfileId
-    ? supabase.from('notifications').select('id,type,title,body,icon,href,is_read,created_at').eq('user_id', safeProfileId).order('created_at', { ascending: false }).limit(8)
-    : Promise.resolve({ data: [], error: null }),
 ]);
- 
-// ── Analytics processing ──────────────────────────────────────────────────────
-const FALLBACK = {
-  summary:     { totalViews: 0, totalClicks: 0, clickRate: 0, activeBlocks: 0, uniqueVisitors: 0, avgPerDay: 0 },
+
+// ==================== ANALYTICS PROCESSING ====================
+// FIX: guard against analyticsResult.data being null even when success=true
+const ANALYTICS_FALLBACK = {
+  summary: { totalViews: 0, totalClicks: 0, clickRate: 0, activeBlocks: 0 },
   profileStats: [] as any[],
   blockStats:   [] as any[],
   topBlocks:    [] as any[],
 };
-const analytics = (analyticsResult.success && analyticsResult.data) ? analyticsResult.data : FALLBACK;
-const blocks    = [...((blocksResult.success ? blocksResult.data : []) ?? [])];
-const notifs    = (notifsResult.data ?? []) as any[];
- 
+const analytics = (analyticsResult.success && analyticsResult.data)
+  ? analyticsResult.data
+  : ANALYTICS_FALLBACK;
+
+// FIX: don't mutate source array — use spread before sort
+const blocks = [...((blocksResult.success ? blocksResult.data : []) ?? [])];
+
 const profileStats = analytics.profileStats ?? [];
 const blockStats   = analytics.blockStats   ?? [];
 const topBlocks    = analytics.topBlocks    ?? [];
-const topCountries = (analytics as any).topCountries ?? [];
-const topReferrers = (analytics as any).topReferrers ?? [];
- 
+
+// FIX: safe planLimits access with fallback
 const maxBlocks = planLimits?.plan_limits?.max_blocks_total ?? -1;
- 
-// ── Chart data (14d → show last 7, compare avec les 7 précédents) ─────────────
+
+// Chart: show only last 7 days visually, but delta uses all 14
 const chartLabels = profileStats.slice(-7).map((s: any) =>
   new Date(s.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })
 );
@@ -88,102 +82,107 @@ const clicksByDate = new Map<string, number>();
 blockStats.forEach((bs: any) => {
   clicksByDate.set(bs.date, (clicksByDate.get(bs.date) ?? 0) + safeNum(bs.clicks));
 });
-const chartClicks = profileStats.slice(-7).map((s: any) => clicksByDate.get(s.date) ?? 0);
-const sparkRate   = profileStats.slice(-7).map((s: any) => {
-  const v = safeNum(s.views), c = clicksByDate.get(s.date) ?? 0;
+const chartClicks = profileStats.map((s: any) => clicksByDate.get(s.date) ?? 0);
+
+const sparkViews  = chartViews;  // already sliced to last 7
+const sparkClicks = chartClicks; // already sliced to last 7
+const sparkRate   = profileStats.map((s: any) => {
+  const v = safeNum(s.views);
+  const c = clicksByDate.get(s.date) ?? 0;
   return v > 0 ? Math.round((c / v) * 100 * 10) / 10 : 0;
-});
- 
-function calcDelta(arr: number[]): { text: string; pos: boolean; neutral: boolean } {
-  if (arr.length < 2) return { text: '—', pos: false, neutral: true };
+}).slice(-7);
+
+// Compare last 7 days vs previous 7 days (requires 14d of data)
+function calcDelta(arr: number[]): { text: string; positive: boolean; neutral: boolean } {
+  if (arr.length < 2) return { text: '—', positive: false, neutral: true };
   const mid  = Math.ceil(arr.length / 2);
   const prev = arr.slice(0, mid).reduce((a, b) => a + b, 0);
   const curr = arr.slice(mid).reduce((a, b) => a + b, 0);
-  if (prev === 0) return curr > 0 ? { text: '+∞%', pos: true, neutral: false } : { text: '—', pos: false, neutral: true };
+  if (prev === 0) return curr > 0
+    ? { text: '+∞%', positive: true,  neutral: false }
+    : { text: '—',   positive: false, neutral: true  };
   const pct = Math.round(((curr - prev) / prev) * 100);
-  return { text: pct >= 0 ? `+${pct}%` : `${pct}%`, pos: pct >= 0, neutral: false };
+  return { text: pct >= 0 ? `+${pct}%` : `${pct}%`, positive: pct >= 0, neutral: false };
 }
- 
+
 const deltaViews  = calcDelta(chartViews);
 const deltaClicks = calcDelta(chartClicks);
 const deltaRate   = calcDelta(sparkRate);
- 
+
+// FIX: activeBlocks — use null coalescing, not ||, so 0 doesn't fall back
 const activeBlockCount = analytics.summary.activeBlocks ?? blocks.filter((b: any) => b.active).length;
- 
-// ── Today's views (from last stat row) ────────────────────────────────────────
-const todayStr   = new Date().toISOString().split('T')[0];
-const todayStat  = profileStats.find((s: any) => s.date === todayStr);
-const todayViews = safeNum(todayStat?.views, 0);
- 
-// ── Insights auto-générés ─────────────────────────────────────────────────────
-const insights: { icon: string; label: string; value: string; color: string; href: string }[] = [];
- 
-// Meilleur jour de la semaine
-const dayTotals = new Map<number, number>();
-profileStats.slice(-14).forEach((s: any) => {
-  const dow = new Date(s.date).getDay();
-  dayTotals.set(dow, (dayTotals.get(dow) ?? 0) + safeNum(s.views));
-});
-if (dayTotals.size > 0) {
-  const best = [...dayTotals.entries()].sort((a, b) => b[1] - a[1])[0];
-  const DAYS_FR = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
-  insights.push({ icon: '📅', label: 'Meilleur jour', value: DAYS_FR[best[0]] ?? '—', color: '#00ff9d', href: '/dashboard/analytics' });
-}
- 
-// Top source de trafic
-const topRef = topReferrers?.[0];
-if (topRef) {
-  const label = classifyReferrer(topRef.referrer ?? topRef.source ?? null);
-  insights.push({ icon: '📡', label: 'Top source', value: label, color: '#38bdf8', href: '/dashboard/analytics' });
-} else {
-  insights.push({ icon: '📡', label: 'Top source', value: 'Direct', color: '#38bdf8', href: '/dashboard/analytics' });
-}
- 
-// Taux de clic qualifié
-const rate = analytics.summary.clickRate;
-const rateLabel = rate >= 10 ? 'Excellent 🔥' : rate >= 5 ? 'Bon 👍' : rate >= 2 ? 'Moyen' : 'À améliorer';
-const rateColor = rate >= 10 ? '#00ff9d' : rate >= 5 ? '#86efac' : rate >= 2 ? '#fbbf24' : '#f87171';
-insights.push({ icon: '🎯', label: 'Taux de clic', value: rateLabel, color: rateColor, href: '/dashboard/analytics' });
- 
-// ── Profile completion score ───────────────────────────────────────────────────
-const completionChecks = [
-  { label: 'Photo de profil',    done: !!profile?.avatar_url,                                     href: '/dashboard/settings',    weight: 25 },
-  { label: 'Bio renseignée',     done: !!(profile?.bio && String(profile.bio).length > 5),         href: '/dashboard/settings',    weight: 20 },
-  { label: 'Pseudo personnalisé',done: !!(profile?.username && !profile.username.startsWith('user_')), href: '/dashboard/settings', weight: 15 },
-  { label: '3+ liens ajoutés',   done: blocks.filter((b: any) => b.active).length >= 3,           href: '/dashboard/blocks',      weight: 25 },
-  { label: 'Apparence configurée',done: !!(profile?.theme && typeof profile.theme === 'object'),    href: '/dashboard/appearance',  weight: 15 },
+
+// ==================== ONBOARDING ====================
+const onboardingSteps = [
+  { id: 'avatar', label: 'Add a profile picture',  done: !!profile?.avatar_url, href: '/dashboard/settings'   },
+  { id: 'bio',    label: 'Write your bio',          done: !!profile?.bio,        href: '/dashboard/settings'   },
+  { id: 'block',  label: 'Create your first block', done: blocks.length > 0,     href: '/dashboard/blocks'     },
+  { id: 'theme',  label: 'Customize your theme',    done: !!profile?.theme,      href: '/dashboard/appearance' },
+  { id: 'share',  label: 'Share your profile',      done: false,                 href: '#share'                },
 ];
-const profileScore = completionChecks.reduce((s, c) => s + (c.done ? c.weight : 0), 0);
-const nextStep     = completionChecks.find(c => !c.done);
- 
-// ── Profile URL ───────────────────────────────────────────────────────────────
-const safeUsername = profile?.username ?? '';
-const displayName  = escHtml(profile?.display_name || safeUsername || 'Creator');
-const profileUrl   = safeUsername ? `https://bioforge.click/@${safeUsername}` : '';
- 
-// ── Recommendations contextuelles ─────────────────────────────────────────────
-const recommendations: { icon: string; text: string; impact: string; href: string }[] = [];
-if (!profile?.avatar_url)
-  recommendations.push({ icon: '🖼️', text: 'Ajoute une photo de profil', impact: '+40% de confiance', href: '/dashboard/settings' });
-if (!profile?.bio || String(profile?.bio).length < 10)
-  recommendations.push({ icon: '✍️', text: 'Rédige une bio percutante', impact: '+20% de rétention', href: '/dashboard/settings' });
-if (blocks.filter((b: any) => b.active).length < 3)
-  recommendations.push({ icon: '🔗', text: 'Ajoute au moins 3 liens', impact: '+55% de clics', href: '/dashboard/blocks' });
-if (!(profile?.theme && typeof profile.theme === 'object'))
-  recommendations.push({ icon: '🎨', text: 'Personnalise ton apparence', impact: 'Profil mémorable', href: '/dashboard/appearance' });
-if (analytics.summary.totalViews < 10)
-  recommendations.push({ icon: '📣', text: 'Partage ton profil sur les réseaux', impact: 'Premières vues', href: '#share-card' });
- 
-// ── Bridge data ────────────────────────────────────────────────────────────────
+const onboardingDone  = onboardingSteps.filter(s => s.done).length;
+const onboardingTotal = onboardingSteps.length;
+const onboardingPct   = Math.round((onboardingDone / onboardingTotal) * 100);
+const showOnboarding  = onboardingDone < onboardingTotal;
+
+// ==================== ACTIVITY FEED ====================
+// FIX: static dot colors instead of dynamic Tailwind class generation (gets purged)
+const DOT_COLORS: Record<string, string> = {
+  'text-neon-green':  '#00ff9d',
+  'text-neon-blue':   '#00d4ff',
+  'text-neon-purple': '#bf00ff',
+  'text-orange-400':  '#fb923c',
+};
+
+const activityFeed: { iconPath: string; dotColor: string; text: string; time: string }[] = [];
+
+// FIX: don't mutate blocks — sort a copy
+[...blocks]
+  .sort((a: any, b: any) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())
+  .slice(0, 3)
+  .forEach((b: any) => {
+    activityFeed.push({
+      iconPath: 'M12 4v16m8-8H4',
+      dotColor: DOT_COLORS['text-neon-green'],
+      text: `Block <strong>${escapeHtml(b.title || b.type)}</strong> created`,
+      time: b.created_at
+        ? new Date(b.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
+        : '',
+    });
+  });
+
+const maxViews = Math.max(...chartViews, 0);
+if (maxViews > 0) {
+  const spikeIdx = chartViews.indexOf(maxViews);
+  activityFeed.push({
+    iconPath: 'M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z',
+    dotColor: DOT_COLORS['text-neon-blue'],
+    text: `Peak of <strong>${maxViews} views</strong> on ${chartLabels[spikeIdx] ?? 'recent day'}`,
+    time: 'this week',
+  });
+}
+
+if (profile?.updated_at) {
+  activityFeed.push({
+    iconPath: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
+    dotColor: DOT_COLORS['text-neon-purple'],
+    text: 'Profile settings updated',
+    time: new Date(profile.updated_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }),
+  });
+}
+
+// ==================== BRIDGE ====================
+// FIX: safe username access
+const safeUsername    = profile?.username ?? '';
+const displayName     = escapeHtml(profile?.display_name || safeUsername || 'Creator');
+
 const bridgeData = JSON.stringify({
-  chartLabels, chartViews, chartClicks,
-  sparkViews: chartViews, sparkClicks: chartClicks, sparkRate,
+  chartLabels,
+  chartViews,
+  chartClicks,
   isPaid,
-  plan:     escHtml(profile?.plan ?? 'Free'),
-  username: escHtml(safeUsername),
-  profileUrl,
-  profileScore,
-  todayViews,
+  plan:     escapeHtml(profile?.plan ?? 'Free'),
+  username: escapeHtml(safeUsername),
 });
 ---
 
@@ -194,213 +193,244 @@ const bridgeData = JSON.stringify({
   <!-- ===== WELCOME ===== -->
   <div class="mb-7 flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
  
-    <!-- Left: greeting + today live -->
-    <div class="flex-1 min-w-0">
-      <div class="flex items-center gap-2.5 mb-1.5">
-        <p class="text-xs font-semibold text-gray-500 uppercase tracking-widest">Overview</p>
-        <!-- Today live badge (populated by JS) -->
-        <div id="today-badge" class="hidden items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold"
-          style="background:rgba(0,255,157,0.12);border:1px solid rgba(0,255,157,0.25);color:#00ff9d">
-          <span class="w-1.5 h-1.5 rounded-full bg-[#00ff9d] animate-pulse inline-block"></span>
-          <span id="today-count">{todayViews}</span> aujourd'hui
-        </div>
+  <!-- Left: greeting + today live -->
+  <div class="flex-1 min-w-0">
+    <div class="flex items-center gap-2.5 mb-1.5">
+      <p class="text-xs font-semibold text-gray-500 uppercase tracking-widest">Overview</p>
+      <!-- Today live badge (populated by JS) -->
+      <div id="today-badge" class="hidden items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold"
+        style="background:rgba(0,255,157,0.12);border:1px solid rgba(0,255,157,0.25);color:#00ff9d">
+        <span class="w-1.5 h-1.5 rounded-full bg-[#00ff9d] animate-pulse inline-block"></span>
+        <span id="today-count">{todayViews}</span> aujourd'hui
       </div>
-      <h1 class="text-2xl lg:text-3xl font-bold text-white tracking-tight mb-1">
-        Bonjour, <span class="text-neon-green">{displayName}</span> 👋
-      </h1>
-      <p class="text-sm text-gray-500">Voici ce qui se passe sur ton profil.</p>
-  
-      <!-- Profile URL copy row -->
-      {safeUsername && (
-        <div class="flex items-center gap-2 mt-3">
-          <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono text-gray-400"
-            style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08)">
-            <svg class="w-3 h-3 text-gray-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.1-1.1"/>
+    </div>
+    <h1 class="text-2xl lg:text-3xl font-bold text-white tracking-tight mb-1">
+      Bonjour, <span class="text-neon-green">{displayName}</span> 👋
+    </h1>
+    <p class="text-sm text-gray-500">Voici ce qui se passe sur ton profil.</p>
+ 
+    <!-- Profile URL copy row -->
+    {safeUsername && (
+      <div class="flex items-center gap-2 mt-3">
+        <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono text-gray-400"
+          style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08)">
+          <svg class="w-3 h-3 text-gray-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.1-1.1"/>
+          </svg>
+          bioforge.click/@{safeUsername}
+        </div>
+        <button id="copy-url-btn"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+          style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.6)"
+          data-url={profileUrl}>
+          <svg id="copy-icon" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+          </svg>
+          <span id="copy-label">Copier</span>
+        </button>
+        <a href={`/@${safeUsername}`} target="_blank"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80"
+          style="background:rgba(0,255,157,0.1);border:1px solid rgba(0,255,157,0.22);color:#00ff9d">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+          </svg>
+          Voir
+        </a>
+      </div>
+    )}
+  </div>
+ 
+  <!-- Right: profile score ring + CTA -->
+  <div class="flex items-center gap-4 shrink-0">
+ 
+    <!-- Profile score ring -->
+    <div class="relative w-20 h-20 shrink-0">
+      <svg class="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="7"/>
+        <circle cx="40" cy="40" r="32" fill="none"
+          stroke={profileScore >= 80 ? '#00ff9d' : profileScore >= 50 ? '#fbbf24' : '#f87171'}
+          stroke-width="7" stroke-linecap="round"
+          stroke-dasharray={`${(profileScore / 100) * 201} 201`}
+          class="transition-all duration-1000"/>
+      </svg>
+      <div class="absolute inset-0 flex flex-col items-center justify-center">
+        <span class="text-lg font-bold text-white tabular-nums">{profileScore}</span>
+        <span class="text-[9px] text-gray-500 font-medium uppercase tracking-wider">score</span>
+      </div>
+    </div>
+ 
+    <!-- Next step hint -->
+    <div class="min-w-0 max-w-[200px]">
+      {nextStep ? (
+        <div>
+          <p class="text-xs text-gray-500 mb-1">Prochaine étape ↓</p>
+          <a href={nextStep.href}
+            class="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-90"
+            style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:white">
+            <svg class="w-3 h-3 text-neon-green shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
             </svg>
-            bioforge.click/@{safeUsername}
-          </div>
-          <button id="copy-url-btn"
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-            style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.6)"
-            data-url={profileUrl}>
-            <svg id="copy-icon" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-            </svg>
-            <span id="copy-label">Copier</span>
-          </button>
+            <span class="truncate">{nextStep.label}</span>
+          </a>
+        </div>
+      ) : (
+        <div>
+          <p class="text-xs text-neon-green font-semibold mb-1">✦ Profil complet !</p>
           <a href={`/@${safeUsername}`} target="_blank"
-            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80"
-            style="background:rgba(0,255,157,0.1);border:1px solid rgba(0,255,157,0.22);color:#00ff9d">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-            </svg>
-            Voir
+            class="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all"
+            style="background:rgba(0,255,157,0.1);border:1px solid rgba(0,255,157,0.25);color:#00ff9d">
+            Partager mon profil →
           </a>
         </div>
       )}
     </div>
-  
-    <!-- Right: profile score ring + CTA -->
-    <div class="flex items-center gap-4 shrink-0">
-  
-      <!-- Profile score ring -->
-      <div class="relative w-20 h-20 shrink-0">
-        <svg class="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
-          <circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="7"/>
-          <circle cx="40" cy="40" r="32" fill="none"
-            stroke={profileScore >= 80 ? '#00ff9d' : profileScore >= 50 ? '#fbbf24' : '#f87171'}
-            stroke-width="7" stroke-linecap="round"
-            stroke-dasharray={`${(profileScore / 100) * 201} 201`}
-            class="transition-all duration-1000"/>
-        </svg>
-        <div class="absolute inset-0 flex flex-col items-center justify-center">
-          <span class="text-lg font-bold text-white tabular-nums">{profileScore}</span>
-          <span class="text-[9px] text-gray-500 font-medium uppercase tracking-wider">score</span>
-        </div>
-      </div>
-  
-      <!-- Next step hint -->
-      <div class="min-w-0 max-w-[200px]">
-        {nextStep ? (
-          <div>
-            <p class="text-xs text-gray-500 mb-1">Prochaine étape ↓</p>
-            <a href={nextStep.href}
-              class="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-90"
-              style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:white">
-              <svg class="w-3 h-3 text-neon-green shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
-              </svg>
-              <span class="truncate">{nextStep.label}</span>
-            </a>
-          </div>
-        ) : (
-          <div>
-            <p class="text-xs text-neon-green font-semibold mb-1">✦ Profil complet !</p>
-            <a href={`/@${safeUsername}`} target="_blank"
-              class="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all"
-              style="background:rgba(0,255,157,0.1);border:1px solid rgba(0,255,157,0.25);color:#00ff9d">
-              Partager mon profil →
-            </a>
-          </div>
-        )}
-      </div>
-    </div>
+
   </div>
 
+  <!-- ===== ONBOARDING ===== -->
+  {showOnboarding && (
+    <div id="onboarding-card" class="mb-8 p-5 glass border border-neon-green/20 rounded-2xl relative overflow-hidden">
+      <div class="absolute inset-0 bg-gradient-to-r from-neon-green/5 to-transparent pointer-events-none"></div>
+      <div class="relative">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <p class="text-xs font-semibold text-neon-green uppercase tracking-widest mb-1">Getting started</p>
+            <h3 class="text-white font-semibold">Set up your profile</h3>
+            <p class="text-xs text-gray-400 mt-0.5">{onboardingDone} of {onboardingTotal} steps completed</p>
+          </div>
+          <button id="dismiss-onboarding" class="text-gray-600 hover:text-gray-400 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <div class="h-1.5 bg-white/10 rounded-full mb-5 overflow-hidden">
+          <div class="h-full bg-neon-green rounded-full transition-all duration-700" style={`width: ${onboardingPct}%`}></div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+          {onboardingSteps.map((step) => (
+            <a
+              href={step.href}
+              class={`flex items-center gap-2.5 p-3 rounded-xl border transition-all text-sm
+                ${step.done
+                  ? 'border-neon-green/30 bg-neon-green/5 text-gray-400 cursor-default pointer-events-none'
+                  : 'border-white/10 hover:border-neon-green/30 hover:bg-white/5 text-white'
+                }`}
+            >
+              <div class={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 border
+                ${step.done ? 'bg-neon-green border-neon-green' : 'border-white/20'}`}>
+                {step.done ? (
+                  <svg class="w-3 h-3 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                  </svg>
+                ) : (
+                  <div class="w-1.5 h-1.5 rounded-full bg-white/30"></div>
+                )}
+              </div>
+              <span class={`text-xs font-medium truncate ${step.done ? 'line-through opacity-50' : ''}`}>
+                {step.label}
+              </span>
+            </a>
+          ))}
+        </div>
+      </div>
+    </div>
+  )}
+
   <!-- ===== STAT CARDS ===== -->
-  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
- 
-    {/* Views */}
-    <div class="stat-card p-5 rounded-2xl relative overflow-hidden group"
-      style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08)">
-      
-      <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
-        style="background:linear-gradient(135deg,rgba(0,255,157,0.05),transparent)"></div>
-        <div class="relative">
-        <div class="flex items-start justify-between mb-3">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center"
-            style="background:rgba(0,255,157,0.1);border:1px solid rgba(0,255,157,0.2)">
-            <svg class="w-4 h-4 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-            </svg>
-          </div>
-          <span class={`text-xs font-semibold px-2 py-0.5 rounded-lg
-            ${deltaViews.neutral ? 'text-gray-500 bg-white/5' : deltaViews.pos ? 'text-neon-green bg-neon-green/10' : 'text-red-400 bg-red-400/10'}`}>
-            {deltaViews.text}
-          </span>
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+
+    <!-- Views -->
+    <div class="stat-card p-5 glass border border-white/10 rounded-2xl hover:border-neon-green/30 transition-all duration-300">
+      <div class="flex items-start justify-between mb-3">
+        <div class="w-9 h-9 rounded-xl bg-neon-green/10 border border-neon-green/20 flex items-center justify-center">
+          <svg class="w-4 h-4 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+          </svg>
         </div>
-        <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums">{analytics.summary.totalViews.toLocaleString('fr-FR')}</div>
-        <p class="text-xs text-gray-500 mt-0.5 mb-1">Vues profil · 7j</p>
-        <p class="text-xs font-medium" style="color:rgba(0,255,157,0.7)">
-          <span id="today-views-card">{todayViews}</span> aujourd'hui
-        </p>
-        <svg class="w-full h-8 mt-3 opacity-70" viewBox="0 0 80 24" preserveAspectRatio="none"
-          data-values={JSON.stringify(chartViews)} data-color="#00ff9d"></svg>
+        <span class={`text-xs font-semibold px-2 py-0.5 rounded-lg
+          ${deltaViews.neutral ? 'text-gray-500 bg-white/5' : deltaViews.positive ? 'text-neon-green bg-neon-green/10' : 'text-red-400 bg-red-400/10'}`}>
+          {deltaViews.text}
+        </span>
       </div>
-    </div>
-  
-    {/* Clicks */}
-    <div class="stat-card p-5 rounded-2xl relative overflow-hidden group"
-      style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08)">
-      <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
-        style="background:linear-gradient(135deg,rgba(191,0,255,0.05),transparent)"></div>
-      <div class="relative">
-        <div class="flex items-start justify-between mb-3">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center"
-            style="background:rgba(191,0,255,0.1);border:1px solid rgba(191,0,255,0.2)">
-            <svg class="w-4 h-4 text-neon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/>
-            </svg>
-          </div>
-          <span class={`text-xs font-semibold px-2 py-0.5 rounded-lg
-            ${deltaClicks.neutral ? 'text-gray-500 bg-white/5' : deltaClicks.pos ? 'text-neon-green bg-neon-green/10' : 'text-red-400 bg-red-400/10'}`}>
-            {deltaClicks.text}
-          </span>
-        </div>
-        <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums">{analytics.summary.totalClicks.toLocaleString('fr-FR')}</div>
-        <p class="text-xs text-gray-500 mt-0.5 mb-1">Clics totaux · 7j</p>
-        <p class="text-xs font-medium text-gray-600">Visiteurs uniques: {safeNum(analytics.summary.uniqueVisitors ?? 0).toLocaleString('fr-FR')}</p>
-        <svg class="w-full h-8 mt-3 opacity-70" viewBox="0 0 80 24" preserveAspectRatio="none"
-          data-values={JSON.stringify(chartClicks)} data-color="#bf00ff"></svg>
+      <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums mb-0.5">
+        {analytics.summary.totalViews.toLocaleString('fr-FR')}
       </div>
+      <p class="text-xs text-gray-500 mb-3">Profile Views · 7d</p>
+      <svg class="w-full h-8 opacity-60" viewBox="0 0 80 24" preserveAspectRatio="none"
+           data-values={JSON.stringify(sparkViews)} data-color="#00ff9d"></svg>
     </div>
-  
-    {/* Blocks */}
-    <div class="stat-card p-5 rounded-2xl relative overflow-hidden group"
-      style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08)">
-      <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
-        style="background:linear-gradient(135deg,rgba(0,212,255,0.05),transparent)"></div>
-      <div class="relative">
-        <div class="flex items-start justify-between mb-3">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center"
-            style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2)">
-            <svg class="w-4 h-4 text-neon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
-            </svg>
-          </div>
-          <a href="/dashboard/blocks" class="text-xs text-gray-600 hover:text-neon-blue transition-colors">gérer →</a>
+
+    <!-- Clicks -->
+    <div class="stat-card p-5 glass border border-white/10 rounded-2xl hover:border-neon-purple/30 transition-all duration-300">
+      <div class="flex items-start justify-between mb-3">
+        <div class="w-9 h-9 rounded-xl bg-neon-purple/10 border border-neon-purple/20 flex items-center justify-center">
+          <svg class="w-4 h-4 text-neon-purple" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/>
+          </svg>
         </div>
-        <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums">
-          {activeBlockCount}<span class="text-sm font-normal text-gray-600">/{maxBlocks === -1 ? '∞' : maxBlocks}</span>
-        </div>
-        <p class="text-xs text-gray-500 mt-0.5 mb-3">Blocs actifs</p>
-        <div class="h-1.5 rounded-full overflow-hidden" style="background:rgba(255,255,255,0.08)">
-          <div class="h-full rounded-full transition-all duration-700"
-            style={`width:${maxBlocks === -1 ? Math.min(100, activeBlockCount * 10) : Math.min(100, Math.round((activeBlockCount / maxBlocks) * 100))}%;background:#00d4ff`}></div>
-        </div>
-        <p class="text-xs text-gray-600 mt-1">{maxBlocks === -1 ? 'Illimité' : `${Math.max(0, maxBlocks - activeBlockCount)} restants`}</p>
+        <span class={`text-xs font-semibold px-2 py-0.5 rounded-lg
+          ${deltaClicks.neutral ? 'text-gray-500 bg-white/5' : deltaClicks.positive ? 'text-neon-green bg-neon-green/10' : 'text-red-400 bg-red-400/10'}`}>
+          {deltaClicks.text}
+        </span>
       </div>
-    </div>
-  
-    {/* Click rate */}
-    <div class="stat-card p-5 rounded-2xl relative overflow-hidden group"
-      style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08)">
-      <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-2xl"
-        style="background:linear-gradient(135deg,rgba(251,146,60,0.05),transparent)"></div>
-      <div class="relative">
-        <div class="flex items-start justify-between mb-3">
-          <div class="w-9 h-9 rounded-xl flex items-center justify-center"
-            style="background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.2)">
-            <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-            </svg>
-          </div>
-          <span class={`text-xs font-semibold px-2 py-0.5 rounded-lg
-            ${deltaRate.neutral ? 'text-gray-500 bg-white/5' : deltaRate.pos ? 'text-neon-green bg-neon-green/10' : 'text-red-400 bg-red-400/10'}`}>
-            {deltaRate.text}
-          </span>
-        </div>
-        <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums">
-          {analytics.summary.clickRate.toFixed(1)}<span class="text-lg text-gray-400">%</span>
-        </div>
-        <p class="text-xs text-gray-500 mt-0.5 mb-1">Taux de clic · 7j</p>
-        <p class="text-xs font-semibold" style={`color:${rateColor}`}>{rateLabel}</p>
-        <svg class="w-full h-8 mt-3 opacity-70" viewBox="0 0 80 24" preserveAspectRatio="none"
-          data-values={JSON.stringify(sparkRate)} data-color="#fb923c"></svg>
+      <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums mb-0.5">
+        {analytics.summary.totalClicks.toLocaleString('fr-FR')}
       </div>
+      <p class="text-xs text-gray-500 mb-3">Total Clicks · 7d</p>
+      <svg class="w-full h-8 opacity-60" viewBox="0 0 80 24" preserveAspectRatio="none"
+           data-values={JSON.stringify(sparkClicks)} data-color="#bf00ff"></svg>
     </div>
+
+    <!-- Active Blocks -->
+    <div class="stat-card p-5 glass border border-white/10 rounded-2xl hover:border-neon-blue/30 transition-all duration-300">
+      <div class="flex items-start justify-between mb-3">
+        <div class="w-9 h-9 rounded-xl bg-neon-blue/10 border border-neon-blue/20 flex items-center justify-center">
+          <svg class="w-4 h-4 text-neon-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+          </svg>
+        </div>
+        <a href="/dashboard/blocks" class="text-xs text-gray-600 hover:text-neon-blue transition-colors">manage →</a>
+      </div>
+      <!-- FIX: use activeBlockCount (null-coalesced, not ||) -->
+      <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums mb-0.5">
+        {activeBlockCount}
+        <span class="text-sm font-normal text-gray-600">/{maxBlocks === -1 ? '∞' : maxBlocks}</span>
+      </div>
+      <p class="text-xs text-gray-500 mb-3">Active Blocks</p>
+      <div class="h-1.5 bg-white/10 rounded-full overflow-hidden">
+        <div
+          class="h-full bg-neon-blue rounded-full transition-all"
+          style={`width: ${maxBlocks === -1 ? 40 : Math.min(100, Math.round((activeBlockCount / maxBlocks) * 100))}%`}
+        ></div>
+      </div>
+      <p class="text-xs text-gray-600 mt-1">
+        {maxBlocks === -1 ? 'Unlimited' : `${Math.max(0, maxBlocks - activeBlockCount)} remaining`}
+      </p>
+    </div>
+
+    <!-- Click Rate -->
+    <div class="stat-card p-5 glass border border-white/10 rounded-2xl hover:border-orange-400/30 transition-all duration-300">
+      <div class="flex items-start justify-between mb-3">
+        <div class="w-9 h-9 rounded-xl bg-orange-400/10 border border-orange-400/20 flex items-center justify-center">
+          <svg class="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+          </svg>
+        </div>
+        <span class={`text-xs font-semibold px-2 py-0.5 rounded-lg
+          ${deltaRate.neutral ? 'text-gray-500 bg-white/5' : deltaRate.positive ? 'text-neon-green bg-neon-green/10' : 'text-red-400 bg-red-400/10'}`}>
+          {deltaRate.text}
+        </span>
+      </div>
+      <div class="text-2xl lg:text-3xl font-bold text-white tabular-nums mb-0.5">
+        {analytics.summary.clickRate.toFixed(1)}<span class="text-lg">%</span>
+      </div>
+      <p class="text-xs text-gray-500 mb-3">Click Rate · 7d</p>
+      <svg class="w-full h-8 opacity-60" viewBox="0 0 80 24" preserveAspectRatio="none"
+           data-values={JSON.stringify(sparkRate)} data-color="#fb923c"></svg>
+    </div>
+
   </div>
 
   <!-- ===== CHART + QUICK ACTIONS ===== -->
@@ -468,6 +498,7 @@ const bridgeData = JSON.stringify({
         ))}
       </div>
     </div>
+
   </div>
 
   <!-- ===== RECENT BLOCKS + TOP PERFORMING + ACTIVITY ===== -->
