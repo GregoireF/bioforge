@@ -1,47 +1,41 @@
 ---
-// src/pages/auth/callback.astro
-import { createSupabaseServer } from '@/lib/infra/supabase/server'
-import { UAParser } from 'ua-parser-js'
+import { createSupabaseServer } from '@/lib/supabase/server';
+import { UAParser } from 'ua-parser-js';
 
 const supabase = createSupabaseServer({
   request: Astro.request,
   cookies: Astro.cookies,
-})
+});
 
-const code  = Astro.url.searchParams.get('code')
-const error = Astro.url.searchParams.get('error')
+const code  = Astro.url.searchParams.get('code');
+const error = Astro.url.searchParams.get('error');
 
-if (error) return Astro.redirect('/signin?error=oauth_failed')
+if (error) return Astro.redirect('/signin?error=oauth_failed');
 
-if (!code) return Astro.redirect('/signin?error=no_code')
-
-// ✅ exchangeCodeForSession retourne la session directement
-// On utilise cette session au lieu de rappeler getUser() qui ne voit pas
-// encore les cookies écrits dans la même requête
-const { data: { session }, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-
-if (exchangeError || !session?.user) {
-  console.error('[callback] exchange failed:', exchangeError?.message)
-  return Astro.redirect('/signin?error=oauth_exchange_failed')
+if (code) {
+  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+  if (exchangeError) return Astro.redirect('/signin?error=oauth_exchange_failed');
 }
 
-const user = session.user
+const { data: { user } } = await supabase.auth.getUser();
+
+if (!user) return Astro.redirect('/signin?error=session_not_found');
 
 if (!user.email_confirmed_at) {
-  await supabase.auth.signOut()
-  return Astro.redirect('/signin?error=email_not_verified')
+  await supabase.auth.signOut();
+  return Astro.redirect('/signin?error=email_not_verified');
 }
 
-// ── Upsert session ────────────────────────────────────────────────────────────
+// ==================== UPSERT SESSION ====================
 try {
-  const ua         = new UAParser(Astro.request.headers.get('user-agent') ?? '')
-  const deviceRaw  = ua.getDevice().type ?? 'desktop'
-  const deviceType = ['mobile', 'tablet'].includes(deviceRaw) ? deviceRaw : 'desktop'
+  const ua         = new UAParser(Astro.request.headers.get('user-agent') ?? '');
+  const deviceRaw  = ua.getDevice().type ?? 'desktop';
+  const deviceType = ['mobile', 'tablet'].includes(deviceRaw) ? deviceRaw : 'desktop';
 
   const ip =
     Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    Astro.request.headers.get('cf-connecting-ip') ??
-    null
+    Astro.request.headers.get('cf-connecting-ip') ??   // Cloudflare
+    null;
 
   await supabase.from('user_sessions').insert({
     user_id:     user.id,
@@ -50,25 +44,27 @@ try {
     device_type: deviceType,
     ip,
     last_seen:   new Date().toISOString(),
-  })
+  });
 } catch (err) {
-  console.error('[callback] session upsert failed:', err)
+  // Non-bloquant : on laisse le login continuer même si l'upsert échoue
+  console.error('[callback] session upsert failed:', err);
 }
 
-// ── First login → onboarding ──────────────────────────────────────────────────
+// ── Detect first login → onboarding ─────────────────────────────────────────
+// Vérifier si le profil a déjà complété l'onboarding
 try {
   const { data: profile } = await supabase
     .from('profiles')
     .select('onboarding_completed_at')
     .eq('id', user.id)
-    .maybeSingle()
-
+    .maybeSingle();
+ 
   if (!profile?.onboarding_completed_at) {
-    return Astro.redirect('/dashboard/onboarding')
+    return Astro.redirect('/dashboard/onboarding');
   }
 } catch {
-  // En cas d'erreur, continuer vers le dashboard
+  // En cas d'erreur, continuer vers le dashboard normalement
 }
 
-return Astro.redirect('/dashboard')
+return Astro.redirect('/dashboard');
 ---
