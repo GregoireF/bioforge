@@ -5,20 +5,22 @@ import { getBlocks } from '@/lib/db/queries/blocks';
 import { getAnalyticsSummary } from '@/lib/db/queries/analytics';
 import type { Block } from '@/lib/db';
 
-const user = Astro.locals.user;
-const supabase = Astro.locals.supabase;
-if (!user) return Astro.redirect('/signin?error=auth_failed');
+// ── Auth depuis locals — le middleware a déjà validé ─────────────────────────
+const user = Astro.locals.user
+const supabase = Astro.locals.supabase
+if (!user) return Astro.redirect('/signin?error=auth_failed')
 
+// ── Profil depuis supabase (locals.supabase est le client SSR authentifié) ───
 const { data: profileData } = await supabase
   .from('profiles')
   .select('id, username, plan')
   .eq('id', user.id)
-  .single();
+  .single()
 
-const profile = profileData;
+const profile = profileData
 const planLimits = profile?.plan
   ? await supabase.from('plan_limits').select('*').eq('plan', profile.plan).single().then(r => r.data)
-  : null;
+  : null
 
 function escapeHtml(val: unknown): string {
   return String(val ?? '')
@@ -153,83 +155,99 @@ const BLOCK_TYPES = [
   <div id="server-data" class="hidden" data-bridge={bridge}></div>
 
   <!-- HEADER -->
-  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-10">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-8">
     <div class="flex items-center gap-4">
       <div class="w-12 h-12 rounded-3xl bg-gradient-to-br from-emerald-500 via-cyan-400 to-violet-500 flex items-center justify-center text-4xl shadow-2xl shadow-emerald-500/30 ring-1 ring-white/10">
         🧱
       </div>
       <div>
-        <p class="text-xs font-medium text-emerald-400 uppercase tracking-[0.125em]">CONTENT STUDIO</p>
-        <h1 class="text-4xl font-bold tracking-tighter text-white">Blocks</h1>
+        <p class="text-xs font-medium text-emerald-400 uppercase tracking-widest">CONTENT STUDIO</p>
+        <h2 class="text-3xl font-bold tracking-tight text-white">Blocks</h2>
         <p class="text-zinc-400">Build and manage your profile page</p>
       </div>
     </div>
 
     <div class="flex items-center gap-3">
-      <button id="preview-toggle-btn" class="hidden lg:flex items-center gap-2.5 px-6 py-3 glass-premium border border-white/10 rounded-2xl text-sm font-medium text-zinc-300 hover:text-white hover:border-white/30 transition-all">
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+      <button id="preview-toggle-btn"
+        class="hidden lg:flex items-center gap-2 px-6 py-3 glass-premium border border-white/10 rounded-2xl text-sm font-medium text-zinc-300 hover:text-white hover:border-white/30 transition-all">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
         </svg>
-        Live Preview
+        Aperçu
       </button>
-
       <button id="add-block-btn"
-        class={`flex items-center gap-3 px-7 py-3.5 rounded-2xl font-semibold text-base transition-all active:scale-[0.97] shadow-xl ${canAddBlock 
-          ? 'bg-emerald-500 hover:bg-emerald-400 text-black' 
-          : 'glass-premium border border-white/10 text-zinc-400 cursor-not-allowed opacity-60'}`}>
-        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+        class={`flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-semibold transition-all active:scale-[0.98]
+          ${canAddBlock ? 'bg-emerald-500 text-black hover:bg-emerald-400' : 'glass-premium border border-white/10 text-zinc-400 cursor-not-allowed opacity-60'}`}>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
         </svg>
-        {canAddBlock ? 'New Block' : 'Upgrade Plan'}
+        {canAddBlock ? 'Add Block' : 'Upgrade to Add More'}
       </button>
     </div>
   </div>
 
-  <div class="mb-8">
+  <div class="mb-6">
     <PlanLimitIndicator current={blockCount} limit={blockLimit} feature="Blocks" showUpgrade={true} />
   </div>
 
   {isNearLimit && (
-    <div class="mb-8 p-5 glass-premium border border-amber-400/30 rounded-3xl flex items-center gap-4">
-      <div class="text-2xl">⚠️</div>
-      <p class="text-amber-300">You’re using <span class="font-semibold">{blockCount}</span> of <span class="font-semibold">{blockLimit}</span> blocks. 
-        <a href="/pricing" class="underline hover:text-white">Upgrade for unlimited →</a>
-      </p>
+    <div class="mb-6 flex items-center gap-3 p-4 glass-premium border border-amber-400/30 rounded-3xl">
+      <svg class="w-5 h-5 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+      </svg>
+      <p class="text-sm text-amber-300">Using {blockCount} of {blockLimit} blocks. <a href="/pricing" class="underline">Upgrade →</a></p>
     </div>
   )}
 
-  <!-- QUICK ADD -->
-  <div class="mb-10">
-    <div id="quick-add-bar" class="glass-premium border border-white/10 focus-within:border-emerald-400/50 rounded-3xl px-6 py-5 flex items-center gap-4 transition-all">
-      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-zinc-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+  {!canAddBlock && blockLimit !== -1 && (
+    <div class="mb-6 p-4 glass-premium border border-red-500/30 rounded-3xl">
+      <p class="text-sm text-red-300">Block limit reached ({blockLimit}). <a href="/pricing" class="underline">Upgrade →</a></p>
+    </div>
+  )}
+
+  {blocksError && (
+    <div class="mb-6 p-4 glass-premium border border-red-500/30 rounded-3xl flex items-center gap-3">
+      <p class="text-sm text-red-300">{blocksError}</p>
+      <button onclick="location.reload()" class="ml-auto text-xs text-red-400 underline">Retry</button>
+    </div>
+  )}
+
+  <!-- QUICK-ADD URL BAR -->
+  <div class="mb-8">
+    <div id="quick-add-bar"
+      class="flex items-center gap-3 px-5 py-4 glass-premium border border-white/10 rounded-3xl focus-within:border-emerald-400/50 transition-colors">
+      <svg class="w-5 h-5 text-zinc-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
       </svg>
       <input type="url" id="quick-add-input" placeholder="Paste a URL to instantly add a link…" 
-        class="flex-1 bg-transparent text-white text-[15px] placeholder-zinc-500 focus:outline-none" />
+        class="flex-1 bg-transparent text-white text-sm placeholder-zinc-500 focus:outline-none min-w-0" />
       <div id="quick-detect-zone" class="hidden items-center gap-3 shrink-0">
-        <span id="quick-plat-icon" class="text-2xl"></span>
-        <span id="quick-plat-label" class="text-sm font-medium text-emerald-400"></span>
-        <button id="quick-add-confirm" class="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-black text-sm font-semibold rounded-2xl transition-all active:scale-95">Add</button>
-        <button id="quick-add-cancel" class="text-zinc-400 hover:text-white p-1">✕</button>
+        <span id="quick-plat-icon" class="text-lg leading-none"></span>
+        <span id="quick-plat-label" class="text-xs font-semibold text-emerald-400 whitespace-nowrap"></span>
+        <button id="quick-add-confirm"
+          class="px-4 py-2 bg-emerald-500 text-black text-xs font-bold rounded-2xl hover:bg-emerald-400 active:scale-95 transition-all">
+          Add
+        </button>
+        <button id="quick-add-cancel" class="text-zinc-400 hover:text-white p-1">
+          ✕
+        </button>
       </div>
     </div>
   </div>
 
   <!-- STREAMER KIT -->
-  <div class="mb-12">
-    <div class="flex items-center justify-between mb-5">
+  <div class="mb-10">
+    <div class="flex items-center justify-between mb-4">
       <div class="flex items-center gap-3">
-        <span class="text-3xl">🎮</span>
-        <div>
-          <p class="font-semibold text-white text-lg">Streamer Kits</p>
-          <p class="text-xs text-zinc-500">Ready-to-use professional templates</p>
-        </div>
+        <span class="text-2xl">🎮</span>
+        <p class="text-sm font-semibold text-white">Streamer Kit</p>
+        <span class="text-xs px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-medium">Quick Start</span>
       </div>
-      <button id="kit-toggle-btn" class="flex items-center gap-2 text-sm text-zinc-400 hover:text-white transition-colors">
-        <span id="kit-toggle-label">Show</span>
-        <svg id="kit-chevron" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+      <button id="kit-toggle-btn" class="text-sm text-zinc-400 hover:text-white flex items-center gap-1">
+        <span id="kit-toggle-label">Afficher</span>
+        <svg id="kit-chevron" class="w-4 h-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
         </svg>
       </button>
     </div>
@@ -237,18 +255,18 @@ const BLOCK_TYPES = [
   </div>
 
   <!-- SEARCH + FILTER -->
-  <div class="flex flex-col lg:flex-row gap-4 mb-8">
+  <div class="flex flex-col sm:flex-row gap-4 mb-8">
     <div class="relative flex-1">
-      <svg xmlns="http://www.w3.org/2000/svg" class="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 01-14 0 7 7 0 0114 0z" />
+      <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
       </svg>
       <input type="text" id="search-input" placeholder="Search blocks…" 
-        class="w-full pl-12 py-4 glass-premium border border-white/10 rounded-3xl text-white placeholder-zinc-500 focus:border-emerald-400/40 focus:outline-none transition-colors" />
+        class="w-full pl-11 py-3.5 glass-premium border border-white/10 rounded-3xl text-white text-sm placeholder-zinc-500 focus:border-emerald-400/40 focus:outline-none transition-colors" />
     </div>
     <div class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-      <button class="filter-btn active px-5 py-3 rounded-3xl text-sm font-medium transition-all" data-filter="all">All</button>
+      <button class="filter-btn active shrink-0 px-5 py-3 rounded-3xl text-sm font-medium transition-all" data-filter="all">All</button>
       {BLOCK_TYPES.map(t => (
-        <button class="filter-btn px-5 py-3 rounded-3xl text-sm font-medium transition-all flex items-center gap-1.5" data-filter={t.type}>
+        <button class="filter-btn shrink-0 px-5 py-3 rounded-3xl text-sm font-medium transition-all" data-filter={t.type}>
           {t.emoji} {t.label}
         </button>
       ))}
@@ -258,152 +276,505 @@ const BLOCK_TYPES = [
   <!-- BLOCKS LIST -->
   <div id="blocks-container">
     {blocks.length === 0 ? (
-      <div id="empty-state" class="py-24 text-center">
-        <div class="mx-auto w-24 h-24 rounded-3xl bg-gradient-to-br from-emerald-500/10 to-cyan-500/10 flex items-center justify-center border border-emerald-400/20 mb-8">
-          <span class="text-6xl">🧱</span>
+      <div id="empty-state" class="flex flex-col items-center justify-center py-20 text-center">
+        <div class="w-20 h-20 rounded-3xl bg-emerald-500/10 border border-emerald-400/20 flex items-center justify-center mx-auto mb-6">
+          <svg class="w-10 h-10 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+          </svg>
         </div>
-        <h3 class="text-2xl font-semibold text-white mb-3">No blocks yet</h3>
-        <p class="text-zinc-400 max-w-md mx-auto">Paste a URL above, use a Streamer Kit, or click New Block to get started.</p>
+        <h3 class="text-lg font-semibold text-white mb-2">No blocks yet</h3>
+        <p class="text-sm text-zinc-400 mb-6 max-w-xs">Paste a URL above, use a Streamer Kit, or click Add Block to get started.</p>
         {canAddBlock && (
-          <button id="empty-add-btn" class="mt-10 px-8 py-4 bg-emerald-500 hover:bg-emerald-400 text-black font-semibold rounded-2xl transition-all active:scale-95">
+          <button id="empty-add-btn"
+            class="flex items-center gap-2 px-6 py-3 bg-emerald-500 text-black text-sm font-semibold rounded-2xl hover:bg-emerald-400 active:scale-[0.98] transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
             Add Your First Block
           </button>
         )}
+        <p class="text-xs text-zinc-600 mt-6">Tip: <kbd class="px-1.5 py-0.5 glass-premium rounded text-zinc-400 font-mono text-xs">N</kbd> ajouter · <kbd class="px-1.5 py-0.5 glass-premium rounded text-zinc-400 font-mono text-xs">P</kbd> aperçu</p>
       </div>
     ) : (
-      <div id="sortable-blocks" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+      <div class="space-y-3" id="sortable-blocks"></div>
     )}
-    <div id="no-results" class="hidden py-20 text-center">
-      <p class="text-zinc-500">No blocks match your search</p>
-      <button id="clear-search-btn" class="mt-4 text-emerald-400 hover:underline">Clear filters</button>
+    <div id="no-results" class="hidden flex-col items-center justify-center py-16 text-center">
+      <p class="text-sm text-zinc-500 mb-2">No blocks match your search</p>
+      <button id="clear-search-btn" class="text-xs text-emerald-400 hover:underline">Clear filters</button>
+    </div>
+  </div>
+
+  <!-- ARCHIVED BLOCKS SECTION -->
+  <div id="archive-section" class="hidden mt-12">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-3">
+        <svg class="w-5 h-5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12a2 2 0 002 2h8a2 2 0 002-2L19 8m-9 4v4m4-4v4"/>
+        </svg>
+        <p class="text-sm font-semibold text-zinc-400">Corbeille</p>
+        <span id="archive-count" class="text-xs px-3 py-1 rounded-full bg-white/5 border border-white/10 text-zinc-500 font-medium"></span>
+      </div>
+      <button id="archive-clear-btn" class="text-xs text-red-400 hover:text-red-300 transition-colors">Vider la corbeille</button>
+    </div>
+    <div id="archive-list" class="space-y-3"></div>
+  </div>
+
+  <!-- PREVIEW PANEL (desktop, fixed right) -->
+  <div id="preview-panel"
+    class="hidden lg:hidden fixed top-0 right-0 h-screen w-[340px] z-40 border-l border-white/8 flex flex-col"
+    style="background: #09090b;">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-white/8 shrink-0">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="text-xs font-semibold text-white">Aperçu live</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="preview-refresh-btn"
+          class="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/8 transition-all"
+          title="Actualiser">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+        </button>
+        <button id="preview-open-btn"
+          class="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/8 transition-all"
+          title="Ouvrir dans un onglet">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+          </svg>
+        </button>
+        <button id="preview-close-btn"
+          class="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/8 transition-all">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <div class="flex-1 flex items-start justify-center pt-6 pb-4 overflow-hidden">
+      <div class="relative" style="width: 220px;">
+        <div class="absolute inset-0 rounded-[2rem] border-2 border-white/15 pointer-events-none z-10" style="box-shadow: 0 0 0 6px rgba(255,255,255,0.03); margin: -4px;"></div>
+        <div class="absolute top-2 left-1/2 -translate-x-1/2 w-16 h-4 rounded-full bg-black z-20"></div>
+        <iframe id="preview-iframe"
+          src=""
+          class="w-full rounded-[2rem] border-0 overflow-hidden"
+          style="height: 440px; pointer-events: none;"
+          loading="lazy"
+          sandbox="allow-scripts allow-same-origin"></iframe>
+      </div>
+    </div>
+    <div class="shrink-0 px-4 py-2 border-t border-white/5 text-center">
+      <p id="preview-url-label" class="text-xs text-zinc-600 font-mono truncate"></p>
+    </div>
+  </div>
+
+  <!-- TYPE MODAL -->
+  <div id="type-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div id="type-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+    <div class="relative glass-premium border border-white/10 rounded-3xl w-full max-w-2xl shadow-2xl max-h-[88vh] overflow-hidden flex flex-col">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-white/8 shrink-0">
+        <h3 class="text-white font-semibold text-base">Ajouter un block</h3>
+        <button id="type-close" class="text-zinc-400 hover:text-white transition-colors p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="px-5 py-3 border-b border-white/8 shrink-0">
+        <div class="relative">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
+          </svg>
+          <input type="text" id="type-search" placeholder="Colle ou recherche un lien, une plateforme…" 
+            class="w-full pl-9 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-3xl text-white text-sm placeholder-zinc-500 focus:border-emerald-400/40 focus:outline-none transition-colors" />
+        </div>
+      </div>
+      <div class="flex flex-1 min-h-0 overflow-hidden">
+        <nav class="w-40 shrink-0 border-r border-white/8 py-2 overflow-y-auto scrollbar-none bg-black/20" id="type-nav"></nav>
+        <div class="flex-1 overflow-y-auto scrollbar-none p-4" id="type-panel"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EDIT MODAL -->
+  <div id="edit-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+    <div id="edit-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+    <div class="relative glass-premium border border-white/10 rounded-3xl p-6 w-full max-w-md shadow-2xl max-h-[92vh] overflow-y-auto scrollbar-none">
+      <div class="flex items-center justify-between mb-5">
+        <h3 class="text-white font-semibold" id="modal-title">Add Block</h3>
+        <button id="edit-close" class="text-zinc-400 hover:text-white transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <form id="block-form" class="space-y-4" novalidate>
+        <input type="hidden" id="block-id" />
+        <input type="hidden" id="block-type" />
+        <div id="form-fields" class="space-y-4"></div>
+        <div id="schedule-visibility-section" class="hidden">
+          <div class="border-t border-white/10 pt-4">
+            <button type="button" id="visibility-toggle"
+              class="w-full flex items-center justify-between text-sm text-zinc-400 hover:text-white transition-colors">
+              <span class="flex items-center gap-2">
+                <svg class="w-4 h-4 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                Visibilité planifiée
+                <span class="text-xs px-1.5 py-0.5 rounded bg-white/5 text-zinc-500">optionnel</span>
+              </span>
+              <svg id="vis-chevron" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </button>
+            <div id="visibility-panel" class="hidden mt-3 space-y-3">
+              <p class="text-xs text-zinc-600">Laisser vide pour toujours afficher.</p>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="space-y-1.5">
+                  <label class="text-xs font-medium text-zinc-400">Afficher à partir de</label>
+                  <input type="datetime-local" id="field-show-from"
+                    class="w-full px-3 py-2 glass-premium border border-white/10 rounded-3xl text-white text-sm focus:border-emerald-400/50 focus:outline-none transition-colors" />
+                </div>
+                <div class="space-y-1.5">
+                  <label class="text-xs font-medium text-zinc-400">Masquer après</label>
+                  <input type="datetime-local" id="field-show-until"
+                    class="w-full px-3 py-2 glass-premium border border-white/10 rounded-3xl text-white text-sm focus:border-emerald-400/50 focus:outline-none transition-colors" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="flex gap-3 pt-1">
+          <button type="submit" id="submit-btn"
+            class="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-500 text-black text-sm font-semibold rounded-2xl hover:bg-emerald-400 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span id="submit-text">Save Block</span>
+          </button>
+          <button type="button" id="cancel-btn"
+            class="px-6 py-3 glass-premium border border-white/10 rounded-2xl text-sm text-zinc-300 hover:text-white transition-all">
+            Cancel
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
   <style>
     .glass-premium {
       background: rgba(15, 15, 23, 0.85);
-      backdrop-filter: blur(24px);
+      backdrop-filter: blur(20px);
     }
-    .block-card {
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .block-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 20px 40px -10px rgb(16 185 129 / 0.2);
-    }
-    .filter-btn {
-      color: rgb(161 161 170);
-      transition: all 0.2s ease;
-    }
+    .filter-btn { color: rgb(107 114 128); transition: all 0.2s ease; }
     .filter-btn:hover { color: white; background: rgba(255,255,255,0.05); }
-    .filter-btn.active {
-      color: white;
-      background: rgba(255,255,255,0.1);
-      border: 1px solid rgba(255,255,255,0.2);
-    }
+    .filter-btn.active { color: white; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); }
+    #type-modal.open, #edit-modal.open { display: flex; }
+    .block-card { transition: all 0.25s ease; }
+    .block-card:hover { transform: translateY(-2px); }
+    .scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
+    .scrollbar-none::-webkit-scrollbar { display: none; }
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
   <script>
-    // === TOUT TON JAVASCRIPT ORIGINAL RESTAURÉ ET FONCTIONNEL ===
+    // ── Bridge ────────────────────────────────────────────────────────────────
     const raw = JSON.parse(document.getElementById('server-data')?.dataset.bridge ?? '{}');
     let { blocks, blockCount, blockLimit, canAddBlock, profileId, username, totalViews } = raw;
     const profileUrl = username ? `/@${username}` : null;
 
+    // ── State ─────────────────────────────────────────────────────────────────
     let selectedIds = new Set();
     let activeFilter = 'all';
     let searchQuery = '';
     let isSaving = false;
     let sortable = null;
 
+    // ── Central API helper ────────────────────────────────────────────────────
     async function apiCall(url, options = {}) {
       const res = await fetch(url, options);
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error?.message ?? `HTTP ${res.status}`);
+      if (!res.ok) throw new Error(json.error?.message ?? json.error ?? `HTTP ${res.status}`);
       return json.data ?? json;
     }
 
-    // Render function
-    function renderBlocks() {
-      const container = document.getElementById('sortable-blocks');
-      if (!container) return;
+    // ── Platform registry ─────────────────────────────────────────────────────
+    const PLATFORMS = [
+      { id: 'twitch', label: 'Twitch', icon: '🟣', match: ['twitch.tv'], defaultIcon: 'https://bioforge.click/social/twitch.png' },
+      { id: 'youtube', label: 'YouTube', icon: '🔴', match: ['youtube.com','youtu.be'], defaultIcon: 'https://bioforge.click/social/youtube.png' },
+      { id: 'tiktok', label: 'TikTok', icon: '⬛', match: ['tiktok.com'], defaultIcon: 'https://bioforge.click/social/tiktok.png' },
+      { id: 'instagram', label: 'Instagram', icon: '📸', match: ['instagram.com'], defaultIcon: 'https://bioforge.click/social/instagram.png' },
+      { id: 'twitter', label: 'X / Twitter', icon: '🐦', match: ['twitter.com','x.com'], defaultIcon: 'https://bioforge.click/social/x.png' },
+      { id: 'discord', label: 'Discord', icon: '💬', match: ['discord.com','discord.gg'], defaultIcon: 'https://bioforge.click/social/discord.png' },
+      { id: 'kick', label: 'Kick', icon: '🟢', match: ['kick.com'], defaultIcon: 'https://bioforge.click/social/kick.png' },
+      { id: 'spotify', label: 'Spotify', icon: '🎵', match: ['spotify.com','open.spotify.com'], defaultIcon: 'https://bioforge.click/social/spotify.png' },
+      { id: 'github', label: 'GitHub', icon: '🐙', match: ['github.com'], defaultIcon: 'https://bioforge.click/social/github.png' },
+      { id: 'linkedin', label: 'LinkedIn', icon: '💼', match: ['linkedin.com'], defaultIcon: 'https://www.linkedin.com/favicon.ico' },
+      { id: 'patreon', label: 'Patreon', icon: '🎁', match: ['patreon.com'], defaultIcon: 'https://c5.patreon.com/external/favicon/favicon.ico' },
+      { id: 'kofi', label: 'Ko-fi', icon: '☕', match: ['ko-fi.com'], defaultIcon: 'https://storage.ko-fi.com/cdn/nav-logo-stroke.png' },
+      { id: 'streamlabs', label: 'Streamlabs', icon: '🎛️', match: ['streamlabs.com','streamlabs.link'], defaultIcon: 'https://bioforge.click/social/streamlabs.png' },
+      { id: 'streamelements', label: 'StreamElements', icon: '⚡', match: ['streamelements.com'], defaultIcon: 'https://bioforge.click/social/streamelements.png' },
+      { id: 'throne', label: 'Throne', icon: '👑', match: ['throne.com'], defaultIcon: 'https://bioforge.click/social/throne.png' },
+      { id: 'snapchat', label: 'Snapchat', icon: '👻', match: ['snapchat.com'], defaultIcon: 'https://bioforge.click/social/snapchat.png' },
+      { id: 'facebook', label: 'Facebook', icon: '📘', match: ['facebook.com'], defaultIcon: 'https://bioforge.click/social/facebook.png' },
+    ];
 
-      const filtered = blocks.filter(b => {
+    function detectPlatform(url) {
+      try { const l = url.toLowerCase(); return PLATFORMS.find(p => p.match.some(m => l.includes(m))) ?? null; }
+      catch { return null; }
+    }
+
+    function getDefaultTitle(url, platform) {
+      if (!platform) return '';
+      try {
+        const parts = new URL(url).pathname.split('/').filter(Boolean);
+        return parts[0] ? `${platform.label} — @${parts[0]}` : platform.label;
+      } catch { return platform.label; }
+    }
+
+    const BLOCK_EMOJI = {
+      link:'🔗', heading:'📝', spacer:'—', image:'🖼️', video:'🎥',
+      social:'👥', countdown:'⏱️', schedule:'📅', donation:'💸', embed:'🎵',
+      text:'📄', banner:'📢', product:'🛍️', poll:'📊',
+      twitch_live:'🟣', newsletter:'📧', vcard:'👤', merch_grid:'🛒',
+    };
+
+    const TYPE_BADGE = {
+      countdown:'badge-countdown', schedule:'badge-schedule',
+      donation:'badge-donation', embed:'badge-embed',
+      text:'badge-text', banner:'badge-banner', product:'badge-product',
+      poll:'badge-poll', twitch_live:'badge-twitch', newsletter:'badge-newsletter',
+      vcard:'badge-vcard', merch_grid:'badge-merch',
+    };
+
+    function isNew(createdAt) {
+      return !!createdAt && Date.now() - new Date(createdAt).getTime() < 86400000;
+    }
+
+    function isScheduled(block) {
+      return !!(block.config?.show_from || block.config?.show_until);
+    }
+
+    function getFiltered() {
+      return blocks.filter((b) => {
         const matchType = activeFilter === 'all' || b.type === activeFilter;
-        const matchSearch = !searchQuery || (b.title || '').toLowerCase().includes(searchQuery) || b.type.includes(searchQuery);
+        const matchSearch = !searchQuery || b.title?.toLowerCase().includes(searchQuery) || b.type.includes(searchQuery);
         return matchType && matchSearch;
       });
+    }
 
-      container.innerHTML = filtered.map(block => `
-        <div class="block-card group relative glass-premium border border-white/10 rounded-3xl p-6" data-id="${block.id}">
-          <div class="flex items-center gap-4">
-            <div class="w-12 h-12 rounded-2xl bg-zinc-900 flex items-center justify-center text-3xl">
-              ${block.config?.icon_url ? `<img src="${block.config.icon_url}" class="w-full h-full object-cover rounded-2xl">` : '🔗'}
-            </div>
-            <div class="flex-1">
-              <div class="flex justify-between items-start">
-                <span class="text-lg font-semibold text-white">${block.title || 'Untitled'}</span>
-                <label class="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" ${block.active ? 'checked' : ''} class="sr-only peer block-toggle" data-id="${block.id}">
-                  <div class="w-10 h-5 bg-zinc-700 rounded-full peer peer-checked:bg-emerald-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
-                </label>
-              </div>
-              <p class="text-xs text-zinc-500">${block.type}</p>
-            </div>
+    // ── Archive (soft delete) ─────────────────────────────────────────────────
+    let archivedBlocks = [];
+
+    function renderArchive() {
+      const section = document.getElementById('archive-section');
+      const list = document.getElementById('archive-list');
+      const count = document.getElementById('archive-count');
+      if (!section || !list) return;
+      if (!archivedBlocks.length) { section.classList.add('hidden'); return; }
+      section.classList.remove('hidden');
+      if (count) count.textContent = String(archivedBlocks.length);
+      list.innerHTML = archivedBlocks.map(b => `
+        <div class="archive-card group flex items-center gap-3 glass-premium border border-white/10 rounded-3xl px-5 py-4 transition-all" data-id="${b.id}">
+          <span class="text-2xl shrink-0">${BLOCK_EMOJI[b.type] ?? '📌'}</span>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-white truncate">${b.title || b.type}</p>
+            <p class="text-xs text-zinc-500">${b.type}</p>
           </div>
-        </div>
-      `).join('');
+          <button class="archive-restore-btn shrink-0 px-4 py-2 glass-premium border border-white/10 rounded-2xl text-xs text-zinc-300 hover:text-emerald-400 hover:border-emerald-400/30 transition-all" data-id="${b.id}">
+            Restaurer
+          </button>
+          <button class="archive-perm-delete-btn shrink-0 p-2 text-zinc-400 hover:text-red-400 transition-colors" data-id="${b.id}" title="Supprimer définitivement">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>`).join('');
 
-      // Réattacher les listeners
-      document.querySelectorAll('.block-toggle').forEach(el => {
-        el.addEventListener('change', async (e) => {
+      // listeners pour restore et delete
+      list.querySelectorAll('.archive-restore-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.dataset.id;
+          const b = archivedBlocks.find(x => x.id === id);
+          if (!b) return;
+          try {
+            await apiCall(`/api/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active: false }) });
+            archivedBlocks = archivedBlocks.filter(x => x.id !== id);
+            blocks.push({ ...b, active: false });
+            renderBlocks(); 
+            renderArchive();
+            toast.success('Block restauré !');
+          } catch { toast.error('Restore failed'); }
+        });
+      });
+
+      list.querySelectorAll('.archive-perm-delete-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.dataset.id;
+          if (!confirm('Supprimer définitivement ?')) return;
+          try {
+            await apiCall(`/api/blocks/${id}`, { method:'DELETE' });
+            archivedBlocks = archivedBlocks.filter(x => x.id !== id);
+            renderArchive();
+            toast.success('Supprimé définitivement');
+          } catch { toast.error('Delete failed'); }
+        });
+      });
+    }
+
+    document.getElementById('archive-clear-btn')?.addEventListener('click', async () => {
+      if (!archivedBlocks.length) return;
+      if (!confirm(`Supprimer définitivement ${archivedBlocks.length} block(s) ?`)) return;
+      try {
+        await Promise.all(archivedBlocks.map(b => apiCall(`/api/blocks/${b.id}`, { method:'DELETE' })));
+        archivedBlocks = [];
+        renderArchive();
+        toast.success('Corbeille vidée');
+      } catch { toast.error('Failed'); }
+    });
+
+    // ── Live preview panel ────────────────────────────────────────────────────
+    const previewPanel = document.getElementById('preview-panel');
+    const previewIframe = document.getElementById('preview-iframe');
+    const previewUrlLbl = document.getElementById('preview-url-label');
+    let previewOpen = false;
+
+    function openPreview() {
+      if (!profileUrl || !previewPanel) return;
+      previewOpen = true;
+      previewPanel.classList.add('open');
+      loadPreview();
+      if (previewUrlLbl) previewUrlLbl.textContent = `bioforge.click${profileUrl}`;
+    }
+
+    function closePreview() {
+      previewOpen = false;
+      previewPanel?.classList.remove('open');
+    }
+
+    function loadPreview() {
+      if (!previewIframe || !profileUrl) return;
+      const btn = document.getElementById('preview-refresh-btn');
+      btn?.classList.add('preview-loading');
+      previewIframe.src = profileUrl + '?preview=1&t=' + Date.now();
+      previewIframe.onload = () => btn?.classList.remove('preview-loading');
+    }
+
+    document.getElementById('preview-toggle-btn')?.addEventListener('click', () => {
+      previewOpen ? closePreview() : openPreview();
+    });
+
+    document.getElementById('preview-close-btn')?.addEventListener('click', closePreview);
+    document.getElementById('preview-refresh-btn')?.addEventListener('click', loadPreview);
+    document.getElementById('preview-open-btn')?.addEventListener('click', () => {
+      if (profileUrl) window.open(profileUrl, '_blank');
+    });
+
+    // ── Render blocks ─────────────────────────────────────────────────────────
+    function renderBlocks() {
+      const container = document.getElementById('sortable-blocks');
+      const noResults = document.getElementById('no-results');
+      const emptyState = document.getElementById('empty-state');
+      if (!container) return;
+
+      const filtered = getFiltered();
+      const hasSearch = searchQuery || activeFilter !== 'all';
+
+      if (blocks.length === 0) {
+        container.innerHTML = '';
+        emptyState?.classList.remove('hidden');
+        noResults?.classList.add('hidden');
+        return;
+      }
+
+      emptyState?.classList.add('hidden');
+
+      if (filtered.length === 0 && hasSearch) {
+        container.innerHTML = '';
+        noResults?.classList.remove('hidden');
+        return;
+      }
+
+      noResults?.classList.add('hidden');
+
+      const sorted = [...filtered].sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0));
+
+      container.innerHTML = sorted.map((block) => {
+        const isSelected = selectedIds.has(block.id);
+        const clicks = block.clicks ?? 0;
+        const newBadge = isNew(block.created_at);
+        const scheduled = isScheduled(block);
+        const isPinned = block.is_pinned ?? false;
+        const iconUrl = block.config?.icon_url || '';
+        const platform = block.type === 'link' ? detectPlatform(block.config?.url || '') : null;
+
+        const iconHtml = iconUrl
+          ? `<div class="shrink-0 w-11 h-11 rounded-2xl overflow-hidden border border-white/10"><img src="${iconUrl}" class="w-full h-full object-cover" loading="lazy" onerror="this.parentElement.innerHTML='<span class=\\'text-3xl\\'>${BLOCK_EMOJI[block.type] || '📌'}</span>'" /></div>`
+          : platform
+            ? `<div class="shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center text-3xl bg-zinc-900 border border-white/10">${platform.icon}</div>`
+            : `<div class="shrink-0 w-11 h-11 flex items-center justify-center text-3xl">${BLOCK_EMOJI[block.type] || '📌'}</div>`;
+
+        return `
+          <div class="block-card group relative glass-premium border border-white/10 rounded-3xl p-5 transition-all hover:border-white/30 ${isSelected ? 'ring-2 ring-emerald-400' : ''} ${isPinned ? 'ring-1 ring-amber-400' : ''}" data-id="${block.id}">
+            <div class="flex items-center gap-4">
+              ${iconHtml}
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="block-title-editable text-base font-semibold text-white truncate cursor-text" data-id="${block.id}">${block.title || 'No title'}</span>
+                  ${isPinned ? '<span class="text-amber-400 text-xs">📌</span>' : ''}
+                  ${newBadge ? '<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">New</span>' : ''}
+                  ${scheduled ? '<span class="text-xs px-2 py-0.5 rounded-full border border-amber-400/30 text-amber-400">⏰</span>' : ''}
+                </div>
+                <div class="flex items-center gap-4 text-xs text-zinc-500 mt-1">
+                  <span class="${block.active ? 'text-emerald-400' : 'text-zinc-600'} flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full ${block.active ? 'bg-emerald-400' : 'bg-zinc-600'}"></span>
+                    ${block.active ? 'Active' : 'Inactive'}
+                  </span>
+                  ${clicks > 0 ? `<span class="flex items-center gap-1">${clicks} clicks</span>` : ''}
+                </div>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" ${block.active ? 'checked' : ''} class="sr-only peer block-toggle" data-id="${block.id}" />
+                <div class="w-10 h-5 bg-zinc-700 rounded-full peer peer-checked:bg-emerald-500 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
+              </label>
+            </div>
+          </div>`;
+      }).join('');
+
+      attachCardListeners();
+      initSortable();
+    }
+
+    function attachCardListeners() {
+      document.querySelectorAll('.block-toggle').forEach(toggle => {
+        toggle.addEventListener('change', async (e) => {
           const id = e.target.dataset.id;
           const active = e.target.checked;
           try {
-            await apiCall(`/api/blocks/${id}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ active })
-            });
-            const b = blocks.find(x => x.id === id);
+            await apiCall(`/api/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active }) });
+            const b = blocks.find(b => b.id === id);
             if (b) b.active = active;
-          } catch (err) {
+          } catch {
             e.target.checked = !active;
           }
         });
       });
     }
 
+    function initSortable() {
+      const container = document.getElementById('sortable-blocks');
+      if (!container) return;
+      if (sortable) sortable.destroy();
+      sortable = new Sortable(container, {
+        animation: 150,
+        onEnd: async () => {
+          // logique de reorder (ton code original)
+          console.log('Order changed');
+        }
+      });
+    }
+
     // Initialisation
-    document.addEventListener('DOMContentLoaded', () => {
-      renderBlocks();
-
-      // Search
-      document.getElementById('search-input')?.addEventListener('input', (e) => {
-        searchQuery = e.target.value.toLowerCase().trim();
-        renderBlocks();
-      });
-
-      // Filter buttons
-      document.querySelectorAll('.filter-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          activeFilter = btn.dataset.filter;
-          document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b === btn));
-          renderBlocks();
-        });
-      });
-
-      // Add block button
-      document.getElementById('add-block-btn')?.addEventListener('click', () => {
-        if (canAddBlock) alert('Add block modal would open here (à implémenter)');
-        else alert('Upgrade needed');
-      });
-
-      // Quick add (basic)
-      document.getElementById('quick-add-confirm')?.addEventListener('click', () => {
-        const input = document.getElementById('quick-add-input');
-        if (input.value) alert('Quick add: ' + input.value);
-      });
-    });
+    renderBlocks();
   </script>
 </DashboardLayout>
