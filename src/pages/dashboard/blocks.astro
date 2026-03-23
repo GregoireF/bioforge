@@ -1,18 +1,28 @@
 ---
 import DashboardLayout from '@/layouts/DashboardLayout.astro';
 import PlanLimitIndicator from '@/components/features/PlanLimitIndicator.astro';
-import { withAuth } from '@/lib/auth/auth';
 import { getBlocks } from '@/lib/supabase/queries';
 import { getAnalyticsSummary } from '@/lib/db/queries.server';
-import { createServerClient } from '@supabase/ssr';
-import { parse } from 'cookie';
-
-const authResult = await withAuth({ cookies: Astro.cookies, request: Astro.request });
-if (!authResult.success || !authResult.data) {
-  return Astro.redirect(authResult.redirect || '/signin?error=auth_failed');
-}
-const { user, profile, planLimits } = authResult.data;
-
+import type { Block } from '@/lib/db';
+ 
+// ── Auth depuis locals — le middleware a déjà validé ─────────────────────────
+const user    = Astro.locals.user
+const supabase = Astro.locals.supabase
+ 
+if (!user) return Astro.redirect('/signin?error=auth_failed')
+ 
+// ── Profil depuis supabase (locals.supabase est le client SSR authentifié) ───
+const { data: profileData } = await supabase
+  .from('profiles')
+  .select('id, username, plan')
+  .eq('id', user.id)
+  .single()
+ 
+const profile    = profileData
+const planLimits = profile?.plan
+  ? await supabase.from('plan_limits').select('*').eq('plan', profile.plan).single().then(r => r.data)
+  : null
+ 
 function escapeHtml(val: unknown): string {
   return String(val ?? '')
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -21,34 +31,29 @@ function escapeHtml(val: unknown): string {
 function safeNum(val: unknown): number {
   const n = Number(val); return isFinite(n) ? n : 0;
 }
-
-const cookies = parse(Astro.request.headers.get('cookie') ?? '');
-const supabase = createServerClient(
-  import.meta.env.PUBLIC_SUPABASE_URL!,
-  import.meta.env.PUBLIC_SUPABASE_ANON_KEY!,
-  { cookies: { get: k => cookies[k], set: () => {}, remove: () => {} } }
-);
-
+ 
 const safeProfileId = profile?.id?.trim() ?? '';
-
+ 
 const [blocksResult, analyticsResult] = await Promise.all([
-  safeProfileId ? getBlocks(safeProfileId) : Promise.resolve({ success: false, data: [] }),
+  safeProfileId ? getBlocks(supabase, safeProfileId) : Promise.resolve({ success: false, data: [] }),
   safeProfileId ? getAnalyticsSummary(supabase, safeProfileId, 7) : Promise.resolve({ success: false, data: null }),
 ]);
-
-const rawBlocks  = (blocksResult.success ? blocksResult.data : []) ?? [];
-const blocks     = rawBlocks.filter((b: any) => !b.deleted_at);
-const topBlocks  = analyticsResult.success ? (analyticsResult.data?.topBlocks ?? []) : [];
-const totalViews = analyticsResult.success ? (analyticsResult.data?.totalViews ?? 0) : 0;
-
+ 
+const rawBlocks = (blocksResult.success ? (blocksResult.value ?? blocksResult.data) : []) as Block[];
+const blocks    = rawBlocks.filter(b => !b.deleted_at);
+ 
+const analyticsData = analyticsResult.success ? (analyticsResult.value ?? analyticsResult.data) : null;
+const topBlocks     = analyticsData?.topBlocks ?? [];
+const totalViews    = analyticsData?.totalViews ?? analyticsData?.summary?.totalViews ?? 0;
+ 
 const clicksMap = new Map<string, number>();
-topBlocks.forEach((b: any) => clicksMap.set(b.id, safeNum(b.clicks)));
-
+topBlocks.forEach((b: { id: string; clicks: number }) => clicksMap.set(b.id, safeNum(b.clicks)));
+ 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
+ 
 const safeBridgeBlocks = blocks
-  .filter((b: any) => UUID_RE.test(String(b.id ?? '')))
-  .map((b: any) => ({
+  .filter(b => UUID_RE.test(String(b.id ?? '')))
+  .map(b => ({
     id:         String(b.id),
     type:       escapeHtml(b.type),
     title:      escapeHtml(b.title),
@@ -56,60 +61,52 @@ const safeBridgeBlocks = blocks
     position:   safeNum(b.position),
     created_at: escapeHtml(b.created_at),
     clicks:     clicksMap.get(b.id) ?? 0,
-    is_pinned:  Boolean(b.is_pinned ?? b.config?.is_pinned),
+    is_pinned:  Boolean((b as Record<string, unknown>).is_pinned ?? (b.config as Record<string, unknown>)?.is_pinned),
     config: {
-      url:               escapeHtml(b.config?.url),
-      icon_url:          escapeHtml(b.config?.icon_url),
-      show_from:         escapeHtml(b.config?.show_from),
-      show_until:        escapeHtml(b.config?.show_until),
-      target_date:       escapeHtml(b.config?.target_date),
-      goal_amount:       safeNum(b.config?.goal_amount),
-      current_amount:    safeNum(b.config?.current_amount),
-      donation_platform: escapeHtml(b.config?.donation_platform),
-      height:            safeNum(b.config?.height),
-      schedule:          Array.isArray(b.config?.schedule) ? b.config.schedule : [],
-      links: Array.isArray(b.config?.links)
-        ? b.config.links.map((l: any) => ({ url: escapeHtml(l?.url ?? l) }))
+      url:               escapeHtml((b.config as Record<string, unknown>)?.url),
+      icon_url:          escapeHtml((b.config as Record<string, unknown>)?.icon_url),
+      show_from:         escapeHtml((b.config as Record<string, unknown>)?.show_from),
+      show_until:        escapeHtml((b.config as Record<string, unknown>)?.show_until),
+      target_date:       escapeHtml((b.config as Record<string, unknown>)?.target_date),
+      goal_amount:       safeNum((b.config as Record<string, unknown>)?.goal_amount),
+      current_amount:    safeNum((b.config as Record<string, unknown>)?.current_amount),
+      donation_platform: escapeHtml((b.config as Record<string, unknown>)?.donation_platform),
+      height:            safeNum((b.config as Record<string, unknown>)?.height),
+      schedule:          Array.isArray((b.config as Record<string, unknown>)?.schedule) ? (b.config as Record<string, unknown>).schedule : [],
+      links: Array.isArray((b.config as Record<string, unknown>)?.links)
+        ? ((b.config as Record<string, unknown>).links as {url: string}[]).map(l => ({ url: escapeHtml(l?.url) }))
         : [],
-      // text
-      content:    escapeHtml(b.config?.content),
-      align:      ['left','center','right'].includes(b.config?.align) ? b.config.align : 'center',
-      text_size:  ['sm','md','lg'].includes(b.config?.text_size) ? b.config.text_size : 'md',
-      // banner
-      badge:        escapeHtml(b.config?.badge),
-      badge_preset: escapeHtml(b.config?.badge_preset),
-      message:      escapeHtml(b.config?.message),
-      url_label:    escapeHtml(b.config?.url_label),
-      // product
-      image_url: escapeHtml(b.config?.image_url),
-      price:     escapeHtml(b.config?.price),
-      currency:  escapeHtml(b.config?.currency),
-      cta_label: escapeHtml(b.config?.cta_label),
-      // poll
-      question:       escapeHtml(b.config?.question),
-      options:        Array.isArray(b.config?.options) ? b.config.options.map((o: any) => ({ text: escapeHtml(o?.text), votes: safeNum(o?.votes) })) : [],
-      allow_multiple: Boolean(b.config?.allow_multiple),
-      // twitch_live
-      channel:         escapeHtml(b.config?.channel),
-      show_chat:       Boolean(b.config?.show_chat),
-      offline_message: escapeHtml(b.config?.offline_message),
-      // newsletter
-      provider:        escapeHtml(b.config?.provider),
-      action_url:      escapeHtml(b.config?.action_url),
-      nl_placeholder:  escapeHtml(b.config?.nl_placeholder),
-      nl_cta:          escapeHtml(b.config?.nl_cta),
-      nl_success:      escapeHtml(b.config?.nl_success),
-      // vcard
-      first_name: escapeHtml(b.config?.first_name),
-      last_name:  escapeHtml(b.config?.last_name),
-      email:      escapeHtml(b.config?.email),
-      phone:      escapeHtml(b.config?.phone),
-      website:    escapeHtml(b.config?.website),
-      company:    escapeHtml(b.config?.company),
-      role:       escapeHtml(b.config?.role),
-      // merch_grid
-      items: Array.isArray(b.config?.items)
-        ? b.config.items.slice(0,3).map((it: any) => ({
+      content:    escapeHtml((b.config as Record<string, unknown>)?.content),
+      align:      ['left','center','right'].includes((b.config as Record<string, unknown>)?.align as string) ? (b.config as Record<string, unknown>).align : 'center',
+      text_size:  ['sm','md','lg'].includes((b.config as Record<string, unknown>)?.text_size as string) ? (b.config as Record<string, unknown>).text_size : 'md',
+      badge:        escapeHtml((b.config as Record<string, unknown>)?.badge),
+      badge_preset: escapeHtml((b.config as Record<string, unknown>)?.badge_preset),
+      message:      escapeHtml((b.config as Record<string, unknown>)?.message),
+      url_label:    escapeHtml((b.config as Record<string, unknown>)?.url_label),
+      image_url: escapeHtml((b.config as Record<string, unknown>)?.image_url),
+      price:     escapeHtml((b.config as Record<string, unknown>)?.price),
+      currency:  escapeHtml((b.config as Record<string, unknown>)?.currency),
+      cta_label: escapeHtml((b.config as Record<string, unknown>)?.cta_label),
+      question:       escapeHtml((b.config as Record<string, unknown>)?.question),
+      options:        Array.isArray((b.config as Record<string, unknown>)?.options) ? ((b.config as Record<string, unknown>).options as {text: string; votes: number}[]).map(o => ({ text: escapeHtml(o?.text), votes: safeNum(o?.votes) })) : [],
+      allow_multiple: Boolean((b.config as Record<string, unknown>)?.allow_multiple),
+      channel:         escapeHtml((b.config as Record<string, unknown>)?.channel),
+      show_chat:       Boolean((b.config as Record<string, unknown>)?.show_chat),
+      offline_message: escapeHtml((b.config as Record<string, unknown>)?.offline_message),
+      provider:        escapeHtml((b.config as Record<string, unknown>)?.provider),
+      action_url:      escapeHtml((b.config as Record<string, unknown>)?.action_url),
+      nl_placeholder:  escapeHtml((b.config as Record<string, unknown>)?.nl_placeholder),
+      nl_cta:          escapeHtml((b.config as Record<string, unknown>)?.nl_cta),
+      nl_success:      escapeHtml((b.config as Record<string, unknown>)?.nl_success),
+      first_name: escapeHtml((b.config as Record<string, unknown>)?.first_name),
+      last_name:  escapeHtml((b.config as Record<string, unknown>)?.last_name),
+      email:      escapeHtml((b.config as Record<string, unknown>)?.email),
+      phone:      escapeHtml((b.config as Record<string, unknown>)?.phone),
+      website:    escapeHtml((b.config as Record<string, unknown>)?.website),
+      company:    escapeHtml((b.config as Record<string, unknown>)?.company),
+      role:       escapeHtml((b.config as Record<string, unknown>)?.role),
+      items: Array.isArray((b.config as Record<string, unknown>)?.items)
+        ? ((b.config as Record<string, unknown>).items as {title: string; price: string; image_url: string; url: string; currency: string}[]).slice(0,3).map(it => ({
             title:     escapeHtml(it?.title),
             price:     escapeHtml(it?.price),
             image_url: escapeHtml(it?.image_url),
@@ -119,21 +116,20 @@ const safeBridgeBlocks = blocks
         : [],
     },
   }));
-
+ 
 const blockCount  = blocks.length;
 const blockLimit  = planLimits?.max_blocks_total ?? 15;
 const canAddBlock = blockLimit === -1 || blockCount < blockLimit;
 const isNearLimit = blockLimit !== -1 && blockCount >= blockLimit * 0.8 && blockCount < blockLimit;
-const blocksError = blocksResult.success ? null : (blocksResult.error?.message ?? 'Failed to load blocks');
-
+const blocksError = blocksResult.success ? null : 'Failed to load blocks';
+ 
 const bridge = JSON.stringify({
   blocks: safeBridgeBlocks, blockCount, blockLimit, canAddBlock,
   profileId: escapeHtml(safeProfileId),
   username:  escapeHtml(profile?.username ?? ''),
   totalViews,
 });
-
-// All block types incl. new streamer types
+ 
 const BLOCK_TYPES = [
   { type: 'link',      emoji: '🔗', label: 'Link',        desc: 'Clickable link button'   },
   { type: 'social',    emoji: '👥', label: 'Social',      desc: 'Social icon grid'         },
@@ -142,17 +138,17 @@ const BLOCK_TYPES = [
   { type: 'image',     emoji: '🖼️', label: 'Image',       desc: 'Display an image'         },
   { type: 'video',     emoji: '🎥', label: 'Video',       desc: 'Embed YouTube / Vimeo'    },
   { type: 'countdown',   emoji: '⏱️', label: 'Countdown',    desc: 'Next stream timer'        },
-  { type: 'schedule',   emoji: '📅', label: 'Schedule',     desc: 'Weekly stream schedule'   },
-  { type: 'donation',   emoji: '💸', label: 'Donation',     desc: 'Ko-fi / Patreon CTA'      },
-  { type: 'embed',      emoji: '🎵', label: 'Music Embed',  desc: 'Spotify / SoundCloud'     },
-  { type: 'text',       emoji: '📄', label: 'Text',         desc: 'Paragraph / description'  },
-  { type: 'banner',     emoji: '📢', label: 'Banner',       desc: 'LIVE / NEW announcement'  },
-  { type: 'product',    emoji: '🛍️', label: 'Product',      desc: 'Product card with price'  },
-  { type: 'poll',       emoji: '📊', label: 'Poll',         desc: 'Interactive vote options' },
-  { type: 'twitch_live',emoji: '🟣', label: 'Twitch Live',  desc: 'Channel embed + badge'    },
-  { type: 'newsletter', emoji: '📧', label: 'Newsletter',   desc: 'Email capture form'       },
-  { type: 'vcard',      emoji: '👤', label: 'vCard',        desc: 'Download my contact'      },
-  { type: 'merch_grid', emoji: '🛒', label: 'Merch Grid',   desc: 'Grid of products / items' },
+  { type: 'schedule',    emoji: '📅', label: 'Schedule',     desc: 'Weekly stream schedule'   },
+  { type: 'donation',    emoji: '💸', label: 'Donation',     desc: 'Ko-fi / Patreon CTA'      },
+  { type: 'embed',       emoji: '🎵', label: 'Music Embed',  desc: 'Spotify / SoundCloud'     },
+  { type: 'text',        emoji: '📄', label: 'Text',         desc: 'Paragraph / description'  },
+  { type: 'banner',      emoji: '📢', label: 'Banner',       desc: 'LIVE / NEW announcement'  },
+  { type: 'product',     emoji: '🛍️', label: 'Product',      desc: 'Product card with price'  },
+  { type: 'poll',        emoji: '📊', label: 'Poll',         desc: 'Interactive vote options' },
+  { type: 'twitch_live', emoji: '🟣', label: 'Twitch Live',  desc: 'Channel embed + badge'    },
+  { type: 'newsletter',  emoji: '📧', label: 'Newsletter',   desc: 'Email capture form'       },
+  { type: 'vcard',       emoji: '👤', label: 'vCard',        desc: 'Download my contact'      },
+  { type: 'merch_grid',  emoji: '🛒', label: 'Merch Grid',   desc: 'Grid of products / items' },
 ];
 ---
 
@@ -691,7 +687,7 @@ const BLOCK_TYPES = [
         const b  = archivedBlocks.find((x: any) => x.id === id);
         if (!b) return;
         try {
-          await apiCall(`/api/v1/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active: false }) });
+          await apiCall(`/api/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active: false }) });
           archivedBlocks = archivedBlocks.filter((x: any) => x.id !== id);
           blocks.push({ ...b, active: false });
           renderBlocks(); renderArchive();
@@ -704,7 +700,7 @@ const BLOCK_TYPES = [
         const id = (btn as HTMLElement).dataset.id!;
         if (!confirm('Supprimer définitivement ?')) return;
         try {
-          await apiCall(`/api/v1/blocks/${id}`, { method:'DELETE' });
+          await apiCall(`/api/blocks/${id}`, { method:'DELETE' });
           archivedBlocks = archivedBlocks.filter((x: any) => x.id !== id);
           renderArchive();
           toast.success('Supprimé définitivement');
@@ -717,7 +713,7 @@ const BLOCK_TYPES = [
     if (!archivedBlocks.length) return;
     if (!confirm(`Supprimer définitivement ${archivedBlocks.length} block(s) archivé(s) ?`)) return;
     try {
-      await Promise.all(archivedBlocks.map(b => apiCall(`/api/v1/blocks/${b.id}`, { method:'DELETE' })));
+      await Promise.all(archivedBlocks.map(b => apiCall(`/api/blocks/${b.id}`, { method:'DELETE' })));
       archivedBlocks = [];
       renderArchive();
       toast.success('Corbeille vidée');
@@ -839,7 +835,7 @@ const BLOCK_TYPES = [
         const id = (el as HTMLElement).dataset.id!;
         if (!newTitle || !id) return;
         try {
-          await apiCall(`/api/v1/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ title: newTitle }) });
+          await apiCall(`/api/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ title: newTitle }) });
           const b = blocks.find((b: any) => b.id === id);
           if (b) b.title = newTitle;
           toast.success('Titre mis à jour');
@@ -952,7 +948,7 @@ const BLOCK_TYPES = [
         break;
       }
       try {
-        const data = await apiCall('/api/v1/blocks', {
+        const data = await apiCall('/api/blocks', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ type: bd.type, title: bd.title, config: bd.config }),
         });
@@ -1177,7 +1173,7 @@ const BLOCK_TYPES = [
       toggle.addEventListener('change', async (e: any) => {
         const id = e.target.dataset.id; const active = e.target.checked;
         try {
-          await apiCall(`/api/v1/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active }) });
+          await apiCall(`/api/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active }) });
           const b = blocks.find((b: any) => b.id === id);
           if (b) b.active = active;
           toast.success(active ? 'Block activé' : 'Block désactivé');
@@ -1216,7 +1212,7 @@ const BLOCK_TYPES = [
     if (!block) return;
     const newPinned = !block.is_pinned;
     try {
-      await apiCall(`/api/v1/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ is_pinned: newPinned }) });
+      await apiCall(`/api/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ is_pinned: newPinned }) });
       block.is_pinned = newPinned;
       renderBlocks();
       toast.success(newPinned ? '📌 Block épinglé' : 'Block désépinglé');
@@ -1246,7 +1242,7 @@ const BLOCK_TYPES = [
           blockIds = [...visibleIds, ...blocks.filter((b: any) => !vs.has(b.id)).map((b: any) => b.id)];
         }
         try {
-          await apiCall('/api/v1/blocks/reorder', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ blockIds }) });
+          await apiCall('/api/blocks/reorder', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ blockIds }) });
           blocks = blockIds.map((id: string) => blocks.find((b: any) => b.id === id)).filter(Boolean);
           toast.success('Ordre sauvegardé');
         } catch { toast.error('Failed to save order'); renderBlocks(); }
@@ -1267,7 +1263,7 @@ const BLOCK_TYPES = [
     const ids = [...selectedIds];
     const newActive = !ids.every(id => blocks.find((b: any) => b.id === id)?.active);
     try {
-      await Promise.all(ids.map(id => apiCall(`/api/v1/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active: newActive }) })));
+      await Promise.all(ids.map(id => apiCall(`/api/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active: newActive }) })));
       ids.forEach(id => { const b = blocks.find((b: any) => b.id === id); if (b) b.active = newActive; });
       selectedIds.clear(); renderBlocks();
       toast.success(`${ids.length} block${ids.length > 1 ? 's' : ''} ${newActive ? 'activés' : 'désactivés'}`);
@@ -1277,7 +1273,7 @@ const BLOCK_TYPES = [
     const ids = [...selectedIds];
     if (!confirm(`Supprimer ${ids.length} block${ids.length > 1 ? 's' : ''} ? Action irréversible.`)) return;
     try {
-      await Promise.all(ids.map(id => apiCall(`/api/v1/blocks/${id}`, { method:'DELETE' })));
+      await Promise.all(ids.map(id => apiCall(`/api/blocks/${id}`, { method:'DELETE' })));
       blocks = blocks.filter((b: any) => !ids.includes(b.id));
       selectedIds.clear(); renderBlocks();
       toast.success(`${ids.length} block${ids.length > 1 ? 's' : ''} supprimés`);
@@ -1335,7 +1331,7 @@ const BLOCK_TYPES = [
     const title = getDefaultTitle(quickUrl, quickPlat);
     const iconUrl = quickPlat?.defaultIcon ?? '';
     try {
-      const data = await apiCall('/api/v1/blocks', { method:'POST', headers:{'Content-Type':'application/json'},
+      const data = await apiCall('/api/blocks', { method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ type:'link', title, config:{ url: quickUrl, ...(iconUrl ? { icon_url: iconUrl } : {}) } }) });
       blocks.push({ id: data.id, type:'link', title, config:{ url: quickUrl, icon_url: iconUrl }, active:true, created_at: new Date().toISOString(), clicks:0, is_pinned:false });
       renderBlocks();
@@ -2387,7 +2383,7 @@ const BLOCK_TYPES = [
     submitText.textContent = blockId ? 'Modification…' : 'Sauvegarde…';
 
     try {
-      const data = await apiCall(blockId ? `/api/v1/blocks/${blockId}` : '/api/v1/blocks', {
+      const data = await apiCall(blockId ? `/api/blocks/${blockId}` : '/api/blocks', {
         method: blockId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, title: title ?? null, config }),
@@ -2420,7 +2416,7 @@ const BLOCK_TYPES = [
     const block = blocks.find((b: any) => b.id === id);
     if (!block || !canAddBlock) { if (!canAddBlock) toast.error('Block limit reached!'); return; }
     try {
-      const data = await apiCall('/api/v1/blocks', { method:'POST', headers:{'Content-Type':'application/json'},
+      const data = await apiCall('/api/blocks', { method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ type: block.type, title: block.title ? `${block.title} (copy)` : null, config: block.config }) });
       blocks.push({ ...block, id: data.id, title: block.title ? `${block.title} (copy)` : null, created_at: new Date().toISOString(), clicks: 0, is_pinned: false });
       renderBlocks();
@@ -2433,7 +2429,7 @@ const BLOCK_TYPES = [
     if (!block) return;
     // Soft delete → archive (keep in DB as inactive, remove from UI)
     try {
-      await apiCall(`/api/v1/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active: false }) });
+      await apiCall(`/api/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active: false }) });
       blocks = blocks.filter((b: any) => b.id !== id);
       archivedBlocks.unshift({ ...block });
       selectedIds.delete(id);
