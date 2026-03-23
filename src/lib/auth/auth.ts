@@ -1,10 +1,10 @@
 import { createSupabaseServer } from '@/lib/infra/supabase/server';
 import { getProfile, getProfileWithPlanLimits } from '@/lib/supabase/queries';
+import { ok, err }                 from '@/lib/core/result'
+import type { Result }             from '@/lib/core/result'
+import type { Profile, PlanLimit } from '@/lib/db'
 import type { User, Session } from '@supabase/supabase-js';
-import type { Profile } from '@/lib/infra/supabase/database.types';
 import type { AstroCookies } from 'astro';
-
-
 
 export interface AuthData {
   user: User | null;
@@ -20,23 +20,6 @@ export interface AuthResult {
   statusCode?: number;
   redirect?: string;
 }
-
-// Fonction de base : récupère session via client SSR
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 export async function withAuth(
   context: { cookies: AstroCookies; request: Request }
