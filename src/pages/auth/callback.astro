@@ -1,5 +1,5 @@
 ---
-import { createSupabaseServer } from '@/lib/supabase/server';
+import { createSupabaseServer } from '@/lib/infra/supabase/server';
 import { UAParser } from 'ua-parser-js';
 
 const supabase = createSupabaseServer({
@@ -26,6 +26,7 @@ if (!user.email_confirmed_at) {
   return Astro.redirect('/signin?error=email_not_verified');
 }
 
+// ==================== UPSERT SESSION ====================
 try {
   const ua         = new UAParser(Astro.request.headers.get('user-agent') ?? '');
   const deviceRaw  = ua.getDevice().type ?? 'desktop';
@@ -33,7 +34,7 @@ try {
 
   const ip =
     Astro.request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    Astro.request.headers.get('cf-connecting-ip') ??
+    Astro.request.headers.get('cf-connecting-ip') ??   // Cloudflare
     null;
 
   await supabase.from('user_sessions').insert({
@@ -45,21 +46,24 @@ try {
     last_seen:   new Date().toISOString(),
   });
 } catch (err) {
+  // Non-bloquant : on laisse le login continuer même si l'upsert échoue
   console.error('[callback] session upsert failed:', err);
 }
 
+// ── Detect first login → onboarding ─────────────────────────────────────────
+// Vérifier si le profil a déjà complété l'onboarding
 try {
   const { data: profile } = await supabase
     .from('profiles')
     .select('onboarding_completed_at')
     .eq('id', user.id)
     .maybeSingle();
-
+ 
   if (!profile?.onboarding_completed_at) {
     return Astro.redirect('/dashboard/onboarding');
   }
 } catch {
-  // continuer vers le dashboard
+  // En cas d'erreur, continuer vers le dashboard normalement
 }
 
 return Astro.redirect('/dashboard');
