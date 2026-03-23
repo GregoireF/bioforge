@@ -48,7 +48,9 @@ export function wrapApiHandler<TReq = unknown, TRes = unknown>(
         )
       }
 
-      const { user, profile, planLimits } = auth.value
+      // ✅ Supporte les deux formats : ok() → .value | { success, data } → .data
+      const authData = (auth as any).value ?? (auth as any).data
+      const { user, profile, planLimits } = authData
       const supabase = createSupabaseServer(context)
 
       const isMutating = MUTATING.has(request.method)
@@ -88,12 +90,7 @@ export function wrapApiHandler<TReq = unknown, TRes = unknown>(
 
         if (
           options?.requireBody &&
-          (
-            body == null ||
-            typeof body !== 'object' ||
-            Array.isArray(body) ||
-            !body || Object.keys(body).length === 0
-          )
+          (body == null || typeof body !== 'object' || Array.isArray(body) || !body || Object.keys(body).length === 0)
         ) {
           throw new AppError({
             message: 'Request body is required',
@@ -104,23 +101,10 @@ export function wrapApiHandler<TReq = unknown, TRes = unknown>(
       }
 
       // ── Handler
-      const result = await handler({
-        context,
-        user,
-        supabase,
-        profile,
-        planLimits,
-        body,
-      })
+      const result = await handler({ context, user, supabase, profile, planLimits, body })
 
       logger.info(
-        {
-          requestId,
-          method: request.method,
-          url: request.url,
-          ms: Date.now() - start,
-          userId: user.id,
-        },
+        { requestId, method: request.method, url: request.url, ms: Date.now() - start, userId: user.id },
         '[API] success'
       )
 
@@ -130,25 +114,12 @@ export function wrapApiHandler<TReq = unknown, TRes = unknown>(
       const appError = toAppError(err)
 
       logger.error(
-        {
-          requestId,
-          method: context.request.method,
-          url: context.request.url,
-          ms: Date.now() - start,
-          code: appError.code,
-        },
+        { requestId, method: context.request.method, url: context.request.url, ms: Date.now() - start, code: appError.code },
         appError.message
       )
 
       return json(
-        {
-          success: false,
-          error: {
-            code: appError.code,
-            message: appError.message,
-            meta: appError.meta,
-          },
-        },
+        { success: false, error: { code: appError.code, message: appError.message, meta: appError.meta } },
         appError.statusCode || 500
       )
     }
