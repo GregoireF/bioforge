@@ -675,7 +675,7 @@ const bridgeData = JSON.stringify({
         <div class="absolute left-4 top-2 bottom-2 w-px" style="background:rgba(255,255,255,0.07)"></div>
         <div class="space-y-4 pl-9">
           {notifs.slice(0, 6).map((n: any) => {
-            const ICON_BG: Record<${JSON.stringify(value)}> = {
+            const ICON_BG: Record<string, string> = {
               welcome:         'rgba(0,255,157,0.15)',
               roadmap_shipped: 'rgba(0,255,157,0.15)',
               visit_milestone: 'rgba(56,189,248,0.15)',
@@ -774,6 +774,7 @@ const bridgeData = JSON.stringify({
       style="background:#00ff9d;color:#000">Passer à Pro →</a>
     <button id="paywall-close" class="text-sm text-gray-500 hover:text-gray-300 transition-colors">Plus tard</button>
   </div>
+</div>
 
 </DashboardLayout>
 
@@ -787,74 +788,69 @@ const bridgeData = JSON.stringify({
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
- 
 <script>
   const bridge = document.getElementById('server-data');
-  const { chartLabels, chartViews, chartClicks, sparkViews, sparkClicks, sparkRate, isPaid, profileUrl, todayViews } =
+  const { chartLabels, chartViews, chartClicks, isPaid } =
     JSON.parse(bridge?.dataset.bridge ?? '{}');
- 
-  // ── Sparklines ────────────────────────────────────────────────────────────────
+
+  // ==================== SPARKLINES ====================
   function drawSparkline(svgEl, values, color) {
     if (!svgEl || !values?.length) return;
     const W = 80, H = 24, pad = 2;
-    const max = Math.max(...values, 1), min = Math.min(...values, 0);
+    const max = Math.max(...values, 1);
+    const min = Math.min(...values, 0);
     const range = max - min || 1;
     const pts = values.map((v, i) => {
-      const x = pad + (i / Math.max(values.length - 1, 1)) * (W - pad * 2);
+      const x = pad + (i / (values.length - 1)) * (W - pad * 2);
       const y = H - pad - ((v - min) / range) * (H - pad * 2);
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     });
-    const gid = 'g' + color.replace(/[^a-z0-9]/gi, '');
-    const area = `${pts[0].split(',')[0]},${H} ${pts.join(' ')} ${pts[pts.length-1].split(',')[0]},${H}`;
+    const first = pts[0], last = pts[pts.length - 1];
+    const area  = `${first.split(',')[0]},${H} ${pts.join(' ')} ${last.split(',')[0]},${H}`;
+    const gid   = color.replace('#', 'sg');
     svgEl.innerHTML = `
       <defs>
         <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="${color}" stop-opacity="0.35"/>
+          <stop offset="0%" stop-color="${color}" stop-opacity="0.3"/>
           <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
         </linearGradient>
       </defs>
       <polygon points="${area}" fill="url(#${gid})"/>
       <polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="${pts[pts.length-1].split(',')[0]}" cy="${pts[pts.length-1].split(',')[1]}" r="2" fill="${color}"/>
     `;
   }
+
   requestAnimationFrame(() => {
     document.querySelectorAll('svg[data-values]').forEach(svg => {
       drawSparkline(svg, JSON.parse(svg.dataset.values ?? '[]'), svg.dataset.color ?? '#fff');
     });
   });
- 
-  // ── Today badge ───────────────────────────────────────────────────────────────
-  const badge = document.getElementById('today-badge');
-  if (badge && todayViews !== undefined) {
-    badge.classList.remove('hidden');
-    badge.classList.add('inline-flex');
-  }
- 
-  // ── Chart ─────────────────────────────────────────────────────────────────────
+
+  // ==================== CHART ====================
   let chartInstance = null;
-  let currentDs = 'both';
- 
-  function buildChart(labels, views, clicks, ds) {
+
+  function buildChart(labels, views, clicks) {
     const ctx = document.getElementById('growth-chart');
     if (!ctx || typeof Chart === 'undefined') return;
     chartInstance?.destroy();
-    const datasets = [];
-    if (ds === 'both' || ds === 'views')  datasets.push({ label: 'Vues',  data: views,  borderColor: '#00ff9d', backgroundColor: 'rgba(0,255,157,0.07)', tension: 0.4, fill: true, borderWidth: 2, pointRadius: 2, pointHoverRadius: 5, pointBackgroundColor: '#00ff9d' });
-    if (ds === 'both' || ds === 'clicks') datasets.push({ label: 'Clics', data: clicks, borderColor: '#bf00ff', backgroundColor: 'rgba(191,0,255,0.07)', tension: 0.4, fill: true, borderWidth: 2, pointRadius: 2, pointHoverRadius: 5, pointBackgroundColor: '#bf00ff' });
     chartInstance = new Chart(ctx, {
       type: 'line',
-      data: { labels, datasets },
+      data: {
+        labels,
+        datasets: [
+          { label: 'Views',  data: views,  borderColor: '#00ff9d', backgroundColor: 'rgba(0,255,157,0.08)',  tension: 0.4, fill: true, borderWidth: 2, pointRadius: 3, pointHoverRadius: 6, pointBackgroundColor: '#00ff9d' },
+          { label: 'Clicks', data: clicks, borderColor: '#bf00ff', backgroundColor: 'rgba(191,0,255,0.08)', tension: 0.4, fill: true, borderWidth: 2, pointRadius: 3, pointHoverRadius: 6, pointBackgroundColor: '#bf00ff' },
+        ]
+      },
       options: {
         responsive: true, maintainAspectRatio: false,
         interaction: { mode: 'index', intersect: false },
         plugins: {
-          legend: { labels: { color: '#6b7280', font: { size: 11 }, boxWidth: 8, usePointStyle: true } },
+          legend: { labels: { color: '#6b7280', font: { size: 11 }, boxWidth: 10, usePointStyle: true } },
           tooltip: {
-            backgroundColor: '#0d1014', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+            backgroundColor: '#111', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
             titleColor: '#fff', bodyColor: '#9ca3af', padding: 10,
-            callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y.toLocaleString('fr-FR')}` }
+            callbacks: { label: (c) => ` ${c.dataset.label}: ${c.parsed.y.toLocaleString('fr-FR')}` }
           }
         },
         scales: {
@@ -864,29 +860,27 @@ const bridgeData = JSON.stringify({
       }
     });
   }
- 
+
+  // FIX: wait for Chart.js CDN to finish loading before calling buildChart
   function initChart() {
-    if (!document.getElementById('growth-chart') || !chartLabels?.length) return;
-    if (typeof Chart === 'undefined') { setTimeout(initChart, 100); return; }
-    const obs = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting) { buildChart(chartLabels, chartViews, chartClicks, currentDs); obs.disconnect(); }
+    const chartCanvas = document.getElementById('growth-chart');
+    if (!chartCanvas || !chartLabels?.length) return;
+    if (typeof Chart === 'undefined') {
+      // CDN not ready yet — retry after a tick
+      setTimeout(initChart, 100);
+      return;
+    }
+    const obs = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) { buildChart(chartLabels, chartViews, chartClicks); obs.disconnect(); }
     }, { threshold: 0.1 });
-    obs.observe(document.getElementById('growth-chart'));
+    obs.observe(chartCanvas);
   }
+
+  // Try immediately, then also on window load as fallback
   initChart();
   window.addEventListener('load', initChart, { once: true });
- 
-  // Dataset toggle
-  document.querySelectorAll('.ds-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.ds-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentDs = btn.dataset.ds;
-      if (chartInstance) buildChart(chartInstance.data.labels, chartViews, chartClicks, currentDs);
-    });
-  });
- 
-  // Period selector
+
+  // ==================== PERIOD TABS ====================
   document.querySelectorAll('.period-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const days = parseInt(btn.dataset.days);
@@ -894,76 +888,34 @@ const bridgeData = JSON.stringify({
       if (!free && !isPaid) { document.getElementById('paywall-modal')?.classList.add('open'); return; }
       document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      if (days === 7) { buildChart(chartLabels, chartViews, chartClicks, currentDs); return; }
+      if (days === 7) { buildChart(chartLabels, chartViews, chartClicks); return; }
       fetch(`/api/analytics/summary?days=${days}`)
-        .then(r => r.ok ? r.json() : Promise.reject())
-        .then(d => {
-          const labels = (d.profileStats ?? []).map(s => new Date(s.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }));
-          const views  = (d.profileStats ?? []).map(s => s.views ?? 0);
+        .then(r => r.ok ? r.json() : Promise.reject(r.status))
+        .then(data => {
+          const labels = (data.profileStats ?? []).map(s => new Date(s.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }));
+          const views  = (data.profileStats ?? []).map(s => s.views ?? 0);
           const cmap   = new Map();
-          (d.blockStats ?? []).forEach(bs => cmap.set(bs.date, (cmap.get(bs.date) ?? 0) + (bs.clicks ?? 0)));
-          buildChart(labels, views, (d.profileStats ?? []).map(s => cmap.get(s.date) ?? 0), currentDs);
-        }).catch(() => {});
+          (data.blockStats ?? []).forEach(bs => cmap.set(bs.date, (cmap.get(bs.date) ?? 0) + (bs.clicks ?? 0)));
+          buildChart(labels, views, (data.profileStats ?? []).map(s => cmap.get(s.date) ?? 0));
+        })
+        .catch(() => {});
     });
   });
   document.querySelector('.period-btn[data-days="7"]')?.classList.add('active');
- 
-  // ── Paywall ───────────────────────────────────────────────────────────────────
+
+  // ==================== PAYWALL ====================
   const modal = document.getElementById('paywall-modal');
   document.getElementById('paywall-backdrop')?.addEventListener('click', () => modal?.classList.remove('open'));
   document.getElementById('paywall-close')?.addEventListener('click',    () => modal?.classList.remove('open'));
   document.addEventListener('keydown', e => { if (e.key === 'Escape') modal?.classList.remove('open'); });
- 
-  // ── Copy URL ──────────────────────────────────────────────────────────────────
-  function copyUrl(btn) {
-    const url = btn?.dataset?.url;
-    if (!url) return;
-    navigator.clipboard.writeText(url).then(() => {
-      const label = btn.querySelector('#copy-label, span');
-      const icon  = btn.querySelector('#copy-icon, svg');
-      if (label) label.textContent = 'Copié !';
-      if (icon)  icon.style.color = '#00ff9d';
-      btn.style.borderColor = 'rgba(0,255,157,0.4)';
-      btn.style.color = '#00ff9d';
-      setTimeout(() => {
-        if (label) label.textContent = 'Copier';
-        if (icon)  icon.style.color = '';
-        btn.style.borderColor = '';
-        btn.style.color = '';
-      }, 2000);
-    });
-  }
-  document.getElementById('copy-url-btn')?.addEventListener('click', function() { copyUrl(this); });
-  document.getElementById('share-copy')?.addEventListener('click', function() { copyUrl(this); });
- 
-  // ── QR Code (mini canvas — sans lib externe) ──────────────────────────────────
-  // Version simplifiée: juste afficher l'URL en QR via API publique si disponible
-  // ou un placeholder stylé
-  (function() {
-    const canvas = document.getElementById('qr-canvas');
-    if (!canvas || !profileUrl) return;
-    const ctx2 = canvas.getContext('2d');
-    if (!ctx2) return;
-    // Placeholder graphique tant qu'on n'a pas de lib QR
-    ctx2.fillStyle = '#0a0a0a';
-    ctx2.fillRect(0, 0, 52, 52);
-    // Grid décorative
-    ctx2.fillStyle = '#00ff9d';
-    const cells = 7;
-    const cell  = 52 / cells;
-    // Pattern QR simplifié (finder patterns)
-    [[0,0],[0,4],[4,0]].forEach(([r,c]) => {
-      for (let y = r; y < r+3; y++) for (let x = c; x < c+3; x++) {
-        if (y === r || y === r+2 || x === c || x === c+2)
-          ctx2.fillRect(x*cell+1, y*cell+1, cell-2, cell-2);
-      }
-    });
-    // Data cells random seed from URL
-    let seed = [...(profileUrl)].reduce((a,c) => a + c.charCodeAt(0), 0);
-    for (let y = 0; y < cells; y++) for (let x = 0; x < cells; x++) {
-      seed = (seed * 1664525 + 1013904223) & 0xffffffff;
-      if ((seed >>> 0) % 3 === 0 && !(x < 3 && y < 3) && !(x > 3 && y < 3) && !(x < 3 && y > 3))
-        ctx2.fillRect(x*cell+1, y*cell+1, cell-2, cell-2);
-    }
-  })();
+
+  // ==================== ONBOARDING ====================
+  const ONBOARDING_KEY  = 'onboarding_dismissed_v1';
+  const onboardingCard  = document.getElementById('onboarding-card');
+  if (localStorage.getItem(ONBOARDING_KEY) === '1') onboardingCard?.remove();
+  document.getElementById('dismiss-onboarding')?.addEventListener('click', () => {
+    onboardingCard?.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
+    setTimeout(() => onboardingCard?.remove(), 300);
+    localStorage.setItem(ONBOARDING_KEY, '1');
+  });
 </script>
