@@ -1,5 +1,7 @@
 // src/lib/auth/auth.ts
+// Format de retour : Result<AuthData, AuthError> — auth.value (pas auth.data)
 import { createSupabaseServer }    from '@/lib/infra/supabase/server'
+import { getProfile, getProfileWithPlanLimits } from '@/lib/supabase/queries'
 import { ok, err }                 from '@/lib/core/result'
 import type { Result }             from '@/lib/core/result'
 import type { Profile, PlanLimit } from '@/lib/db'
@@ -40,52 +42,36 @@ export async function withAuth(
 
   const supabase = createSupabaseServer({ cookies: context.cookies, request: context.request })
 
-  // 1. Session locale — pas d'appel réseau
+  // 1. Session locale (ton code original qui fonctionnait)
   const { data: { session }, error: sessionError } = await supabase.auth.getSession()
   if (sessionError || !session?.user)
     return authErr(sessionError?.message ?? 'No active session', 401)
 
-  // 2. Validation JWT côté serveur
-  let user: User
-  try {
-    const { data: { user: u }, error } = await withTimeout(
-      supabase.auth.getUser(), 5000, 'getUser'
-    )
-    if (error || !u) return authErr(error?.message ?? 'Token validation failed', 401)
-    user = u
-  } catch (e) {
-    return authErr(e instanceof Error ? e.message : 'Auth timeout', 503)
-  }
+  const user = session.user
 
-  // 3. Profil
-  let profile: Profile
-  try {
-    const { data, error } = await withTimeout(
-      supabase.from('profiles').select('*')
-        .eq('id', user.id).eq('is_active', true).is('deleted_at', null).single(),
-      5000, 'getProfile'
-    )
-    if (error || !data) return authErr(error?.message ?? 'Profile not found', 404)
-    profile = data
-  } catch (e) {
-    return authErr(e instanceof Error ? e.message : 'Database timeout', 503)
-  }
+  // 2. Validation stricte (ton code original)
+  const { data: { user: validatedUser }, error: userError } = await supabase.auth.getUser()
+  if (userError || !validatedUser)
+    return authErr(userError?.message ?? 'Invalid user', 401)
 
-  // 4. Plan limits — non bloquant
+  // 3. Profil (via tes queries existantes qui fonctionnent)
+  const profileResult = await getProfile(validatedUser.id)
+  if (!profileResult.success || !profileResult.data)
+    return authErr(profileResult.message ?? 'Profile not found', 404)
+
+  const profile = profileResult.data as unknown as Profile
+
+  // 4. Plan limits (non bloquant)
   let planLimits: PlanLimit | null = null
   try {
-    const { data } = await withTimeout(
-      supabase.from('plan_limits').select('*').eq('plan', profile.plan).single(),
-      3000, 'getPlanLimits'
-    )
-    planLimits = data ?? null
+    const limitsResult = await getProfileWithPlanLimits(validatedUser.id)
+    if (limitsResult.success) planLimits = limitsResult.data as unknown as PlanLimit
   } catch (e) {
     console.warn('[withAuth] planLimits failed:', e instanceof Error ? e.message : String(e))
   }
 
-  // ✅ Retourne ok() — format Result<AuthData, AuthError>
-  // wrapApiHandler lit auth.value (pas auth.data)
-  return ok({ user, session, profile, planLimits })
+  // ✅ ok() — compatible avec wrapApiHandler qui lit auth.value
+  return ok({ user: validatedUser, session, profile, planLimits })
 }
 
 export type AuthOnlyResult = Result<{ user: User; session: Session }, AuthError>
@@ -99,13 +85,8 @@ export async function withAuthOnly(
   if (sessionError || !session?.user)
     return authErr(sessionError?.message ?? 'No session', 401)
 
-  try {
-    const { data: { user }, error } = await withTimeout(
-      supabase.auth.getUser(), 5000, 'getUser'
-    )
-    if (error || !user) return authErr(error?.message ?? 'Invalid token', 401)
-    return ok({ user, session })
-  } catch (e) {
-    return authErr(e instanceof Error ? e.message : 'Timeout', 503)
-  }
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) return authErr(userError?.message ?? 'Invalid token', 401)
+
+  return ok({ user, session })
 }
