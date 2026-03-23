@@ -691,7 +691,7 @@ const BLOCK_TYPES = [
         const b  = archivedBlocks.find((x: any) => x.id === id);
         if (!b) return;
         try {
-          await apiCall(`/api/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active: false }) });
+          await apiCall(`/api/v1/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active: false }) });
           archivedBlocks = archivedBlocks.filter((x: any) => x.id !== id);
           blocks.push({ ...b, active: false });
           renderBlocks(); renderArchive();
@@ -704,7 +704,7 @@ const BLOCK_TYPES = [
         const id = (btn as HTMLElement).dataset.id!;
         if (!confirm('Supprimer définitivement ?')) return;
         try {
-          await apiCall(`/api/blocks/${id}`, { method:'DELETE' });
+          await apiCall(`/api/v1/blocks/${id}`, { method:'DELETE' });
           archivedBlocks = archivedBlocks.filter((x: any) => x.id !== id);
           renderArchive();
           toast.success('Supprimé définitivement');
@@ -717,7 +717,7 @@ const BLOCK_TYPES = [
     if (!archivedBlocks.length) return;
     if (!confirm(`Supprimer définitivement ${archivedBlocks.length} block(s) archivé(s) ?`)) return;
     try {
-      await Promise.all(archivedBlocks.map(b => apiCall(`/api/blocks/${b.id}`, { method:'DELETE' })));
+      await Promise.all(archivedBlocks.map(b => apiCall(`/api/v1/blocks/${b.id}`, { method:'DELETE' })));
       archivedBlocks = [];
       renderArchive();
       toast.success('Corbeille vidée');
@@ -839,7 +839,7 @@ const BLOCK_TYPES = [
         const id = (el as HTMLElement).dataset.id!;
         if (!newTitle || !id) return;
         try {
-          await apiCall(`/api/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ title: newTitle }) });
+          await apiCall(`/api/v1/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ title: newTitle }) });
           const b = blocks.find((b: any) => b.id === id);
           if (b) b.title = newTitle;
           toast.success('Titre mis à jour');
@@ -952,7 +952,7 @@ const BLOCK_TYPES = [
         break;
       }
       try {
-        const data = await apiCall('/api/blocks', {
+        const data = await apiCall('/api/v1/blocks', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ type: bd.type, title: bd.title, config: bd.config }),
         });
@@ -1177,7 +1177,7 @@ const BLOCK_TYPES = [
       toggle.addEventListener('change', async (e: any) => {
         const id = e.target.dataset.id; const active = e.target.checked;
         try {
-          await apiCall(`/api/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active }) });
+          await apiCall(`/api/v1/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active }) });
           const b = blocks.find((b: any) => b.id === id);
           if (b) b.active = active;
           toast.success(active ? 'Block activé' : 'Block désactivé');
@@ -1216,7 +1216,7 @@ const BLOCK_TYPES = [
     if (!block) return;
     const newPinned = !block.is_pinned;
     try {
-      await apiCall(`/api/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ is_pinned: newPinned }) });
+      await apiCall(`/api/v1/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ is_pinned: newPinned }) });
       block.is_pinned = newPinned;
       renderBlocks();
       toast.success(newPinned ? '📌 Block épinglé' : 'Block désépinglé');
@@ -1246,7 +1246,7 @@ const BLOCK_TYPES = [
           blockIds = [...visibleIds, ...blocks.filter((b: any) => !vs.has(b.id)).map((b: any) => b.id)];
         }
         try {
-          await apiCall('/api/blocks/reorder', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ blockIds }) });
+          await apiCall('/api/v1/blocks/reorder', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ blockIds }) });
           blocks = blockIds.map((id: string) => blocks.find((b: any) => b.id === id)).filter(Boolean);
           toast.success('Ordre sauvegardé');
         } catch { toast.error('Failed to save order'); renderBlocks(); }
@@ -1267,7 +1267,7 @@ const BLOCK_TYPES = [
     const ids = [...selectedIds];
     const newActive = !ids.every(id => blocks.find((b: any) => b.id === id)?.active);
     try {
-      await Promise.all(ids.map(id => apiCall(`/api/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active: newActive }) })));
+      await Promise.all(ids.map(id => apiCall(`/api/v1/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active: newActive }) })));
       ids.forEach(id => { const b = blocks.find((b: any) => b.id === id); if (b) b.active = newActive; });
       selectedIds.clear(); renderBlocks();
       toast.success(`${ids.length} block${ids.length > 1 ? 's' : ''} ${newActive ? 'activés' : 'désactivés'}`);
@@ -1277,7 +1277,7 @@ const BLOCK_TYPES = [
     const ids = [...selectedIds];
     if (!confirm(`Supprimer ${ids.length} block${ids.length > 1 ? 's' : ''} ? Action irréversible.`)) return;
     try {
-      await Promise.all(ids.map(id => apiCall(`/api/blocks/${id}`, { method:'DELETE' })));
+      await Promise.all(ids.map(id => apiCall(`/api/v1/blocks/${id}`, { method:'DELETE' })));
       blocks = blocks.filter((b: any) => !ids.includes(b.id));
       selectedIds.clear(); renderBlocks();
       toast.success(`${ids.length} block${ids.length > 1 ? 's' : ''} supprimés`);
@@ -1335,7 +1335,7 @@ const BLOCK_TYPES = [
     const title = getDefaultTitle(quickUrl, quickPlat);
     const iconUrl = quickPlat?.defaultIcon ?? '';
     try {
-      const data = await apiCall('/api/blocks', { method:'POST', headers:{'Content-Type':'application/json'},
+      const data = await apiCall('/api/v1/blocks', { method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ type:'link', title, config:{ url: quickUrl, ...(iconUrl ? { icon_url: iconUrl } : {}) } }) });
       blocks.push({ id: data.id, type:'link', title, config:{ url: quickUrl, icon_url: iconUrl }, active:true, created_at: new Date().toISOString(), clicks:0, is_pinned:false });
       renderBlocks();
@@ -2387,7 +2387,7 @@ const BLOCK_TYPES = [
     submitText.textContent = blockId ? 'Modification…' : 'Sauvegarde…';
 
     try {
-      const data = await apiCall(blockId ? `/api/blocks/${blockId}` : '/api/blocks', {
+      const data = await apiCall(blockId ? `/api/v1/blocks/${blockId}` : '/api/v1/blocks', {
         method: blockId ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, title: title ?? null, config }),
@@ -2420,7 +2420,7 @@ const BLOCK_TYPES = [
     const block = blocks.find((b: any) => b.id === id);
     if (!block || !canAddBlock) { if (!canAddBlock) toast.error('Block limit reached!'); return; }
     try {
-      const data = await apiCall('/api/blocks', { method:'POST', headers:{'Content-Type':'application/json'},
+      const data = await apiCall('/api/v1/blocks', { method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ type: block.type, title: block.title ? `${block.title} (copy)` : null, config: block.config }) });
       blocks.push({ ...block, id: data.id, title: block.title ? `${block.title} (copy)` : null, created_at: new Date().toISOString(), clicks: 0, is_pinned: false });
       renderBlocks();
@@ -2433,7 +2433,7 @@ const BLOCK_TYPES = [
     if (!block) return;
     // Soft delete → archive (keep in DB as inactive, remove from UI)
     try {
-      await apiCall(`/api/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active: false }) });
+      await apiCall(`/api/v1/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active: false }) });
       blocks = blocks.filter((b: any) => b.id !== id);
       archivedBlocks.unshift({ ...block });
       selectedIds.delete(id);
