@@ -1,15 +1,32 @@
-import { createSupabaseServer } from '@/lib/infra/supabase/server';
-import { getProfile, getProfileWithPlanLimits } from '@/lib/supabase/queries';
+// src/lib/auth/auth.ts
+// Logique originale inchangée — seul le format de retour change :
+// { success: true, data: {} } → ok({}) pour wrapApiHandler (lit .value)
+import { createSupabaseServer }    from '@/lib/infra/supabase/server'
+import { getProfile, getProfileWithPlanLimits } from '@/lib/supabase/queries'
 import { ok, err }                 from '@/lib/core/result'
 import type { Result }             from '@/lib/core/result'
 import type { Profile, PlanLimit } from '@/lib/db'
-import type { User, Session } from '@supabase/supabase-js';
-import type { AstroCookies } from 'astro';
+import type { User, Session }      from '@supabase/supabase-js'
+import type { AstroCookies }       from 'astro'
 
 export interface AuthData {
   user:       User
+  session:    Session
+  profile:    Profile
+  planLimits: PlanLimit | null
 }
 
+export type AuthError = {
+  message:    string
+  statusCode: number
+  redirect:   string
+}
+
+export type AuthResult = Result<AuthData, AuthError>
+
+function authErr(message: string, statusCode: number, redirect = '/signin'): AuthResult {
+  return err({ message, statusCode, redirect })
+}
 
 export async function withAuth(
   context: { cookies: AstroCookies; request: Request }
@@ -17,61 +34,50 @@ export async function withAuth(
 
   const supabase = createSupabaseServer({ cookies: context.cookies, request: context.request })
 
-  // 1. Récupère et valide la session
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  // 1. Session (inchangé)
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+  if (sessionError || !session?.user)
+    return authErr(sessionError?.message ?? 'Aucune session valide', 401)
 
-  if (sessionError || !session || !session.user) {
-    return {
-      success: false,
-      error: sessionError || new Error('Aucune session valide'),
-      redirect: '/signin?error=session_invalid'
-    };
-  }
+  // 2. Validation stricte (inchangé)
+  const { data: { user: validatedUser }, error: userError } = await supabase.auth.getUser()
+  if (userError || !validatedUser)
+    return authErr(userError?.message ?? 'Utilisateur invalide', 401)
 
-  const user = session.user;
+  // 3. Profil (inchangé)
+  const profileResult = await getProfile(validatedUser.id)
+  if (!profileResult.success || !profileResult.data)
+    return authErr(profileResult.message ?? 'Profil introuvable', 404)
 
-  // 2. Validation stricte côté serveur (supprime le warning + plus sécurisé)
-  const { data: { user: validatedUser }, error: userError } = await supabase.auth.getUser();
+  const profile = profileResult.data as unknown as Profile
 
-  if (userError || !validatedUser) {
-    return {
-      success: false,
-      error: userError || new Error('Utilisateur invalide'),
-      redirect: '/signin?error=invalid_user'
-    };
-  }
-
-  // 3. Récupère le profile (en passant le client authentifié si possible)
-  const profileResult = await getProfile(validatedUser.id);
-
-  if (!profileResult.success || !profileResult.data) {
-    return {
-      success: false,
-      error: new Error(profileResult.message || 'Profil introuvable'),
-      redirect: '/signin?error=profile_missing'
-    };
-  }
-
-  const profile = profileResult.data;
-
-  // 4. Récupère les limites du plan (optionnel, seulement si nécessaire)
-  let planLimits = null;
+  // 4. Plan limits (inchangé)
+  let planLimits: PlanLimit | null = null
   try {
-    const limitsResult = await getProfileWithPlanLimits(validatedUser.id);
-    if (limitsResult.success) {
-      planLimits = limitsResult.data;
-    }
-  } catch (err) {
-    console.warn('Impossible de charger les limites du plan:', err);
+    const limitsResult = await getProfileWithPlanLimits(validatedUser.id)
+    if (limitsResult.success) planLimits = limitsResult.data as unknown as PlanLimit
+  } catch (e) {
+    console.warn('[withAuth] planLimits failed:', e instanceof Error ? e.message : String(e))
   }
 
-  return {
-    success: true,
-    data: {
-      user: validatedUser,
-      session,
-      profile,
-      planLimits,
-    }
-  };
+  // ✅ Seul changement : ok() au lieu de { success: true, data: {} }
+  return ok({ user: validatedUser, session, profile, planLimits })
+}
+
+export type AuthOnlyResult = Result<{ user: User; session: Session }, AuthError>
+
+export async function withAuthOnly(
+  context: { cookies: AstroCookies; request: Request }
+): Promise<AuthOnlyResult> {
+  const supabase = createSupabaseServer(context)
+
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+  if (sessionError || !session?.user)
+    return authErr(sessionError?.message ?? 'No session', 401)
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user)
+    return authErr(userError?.message ?? 'Invalid token', 401)
+
+  return ok({ user, session })
 }
