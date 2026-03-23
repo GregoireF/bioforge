@@ -1,7 +1,7 @@
-import { createSupabaseServer } from '@/lib/supabase/server';
+import { createSupabaseServer } from '@/lib/infra/supabase/server';
 import { getProfile, getProfileWithPlanLimits } from '@/lib/supabase/queries';
 import type { User, Session } from '@supabase/supabase-js';
-import type { Profile } from '@/lib/supabase/database.types';
+import type { Profile } from '@/lib/infra/supabase/database.types';
 import type { AstroCookies } from 'astro';
 
 
