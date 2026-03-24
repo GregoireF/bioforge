@@ -290,219 +290,254 @@ const BLOCK_TYPES = [
     </div>
   </div>
 
-  <!-- ===== BLOCKS LIST ===== -->
-  <div id="blocks-container">
-    {blocks.length === 0 ? (
-      <div id="empty-state" class="flex flex-col items-center justify-center py-20 text-center">
-        <div class="w-20 h-20 rounded-2xl bg-neon-green/10 border border-neon-green/20 flex items-center justify-center mx-auto mb-5">
-          <svg class="w-9 h-9 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
-          </svg>
-        </div>
-        <h3 class="text-lg font-semibold text-white mb-2">No blocks yet</h3>
-        <p class="text-sm text-gray-400 mb-6 max-w-xs">Paste a URL above, use a Streamer Kit template, or click Add Block to get started.</p>
-        {canAddBlock && (
-          <button id="empty-add-btn"
-            class="flex items-center gap-2 px-6 py-3 bg-neon-green text-black text-sm font-semibold rounded-xl hover:bg-neon-green/90 active:scale-[0.98] transition-all">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-            </svg>
-            Add Your First Block
-          </button>
-        )}
-        <p class="text-xs text-gray-600 mt-4">Tip: <kbd class="px-1.5 py-0.5 glass rounded text-gray-400 font-mono text-xs">N</kbd> ajouter · <kbd class="px-1.5 py-0.5 glass rounded text-gray-400 font-mono text-xs">P</kbd> aperçu</p>
-      </div>
-    ) : (
-      <div class="space-y-2" id="sortable-blocks"></div>
-    )}
-    <div id="no-results" class="hidden flex-col items-center justify-center py-16 text-center">
-      <p class="text-sm text-gray-500 mb-2">No blocks match your search</p>
-      <button id="clear-search-btn" class="text-xs text-neon-green hover:underline">Clear filters</button>
-    </div>
-  </div>
-
-    <div id="no-results" class="hidden flex-col items-center justify-center py-16 text-center">
-      <p class="text-sm text-gray-500 mb-2">No blocks match your search</p>
-      <button id="clear-search-btn" class="text-xs text-neon-green hover:underline">Clear filters</button>
-    </div>
-  </div>
-
-  <!-- ===== ARCHIVED BLOCKS SECTION ===== -->
-  <div id="archive-section" class="hidden mt-8">
-    <div class="flex items-center justify-between mb-3">
-      <div class="flex items-center gap-2">
-        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12a2 2 0 002 2h8a2 2 0 002-2L19 8m-9 4v4m4-4v4"/>
-        </svg>
-        <p class="text-sm font-semibold text-gray-400">Corbeille</p>
-        <span id="archive-count" class="text-xs px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-500 font-medium"></span>
-      </div>
-      <button id="archive-clear-btn" class="text-xs text-red-400 hover:text-red-300 transition-colors">Vider la corbeille</button>
-    </div>
-    <div id="archive-list" class="space-y-2"></div>
-  </div>
-
-  <!-- ===== PREVIEW PANEL (desktop, fixed right) ===== -->
-  <div id="preview-panel"
-    class="hidden lg:hidden fixed top-0 right-0 h-screen w-[340px] z-40 border-l border-white/8 flex flex-col"
-    style="background: #09090b;">
-    <div class="flex items-center justify-between px-4 py-3 border-b border-white/8 shrink-0">
-      <div class="flex items-center gap-2">
-        <span class="w-2 h-2 rounded-full bg-neon-green animate-pulse"></span>
-        <span class="text-xs font-semibold text-white">Aperçu live</span>
-      </div>
-      <div class="flex items-center gap-2">
-        <button id="preview-refresh-btn"
-          class="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all"
-          title="Actualiser">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-          </svg>
-        </button>
-        <button id="preview-open-btn"
-          class="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all"
-          title="Ouvrir dans un onglet">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
-          </svg>
-        </button>
-        <button id="preview-close-btn"
-          class="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
-        </button>
-      </div>
-    </div>
-    <!-- Phone frame -->
-    <div class="flex-1 flex items-start justify-center pt-6 pb-4 overflow-hidden">
-      <div class="relative" style="width: 220px;">
-        <!-- Phone outline -->
-        <div class="absolute inset-0 rounded-[2rem] border-2 border-white/15 pointer-events-none z-10"
-          style="box-shadow: 0 0 0 6px rgba(255,255,255,0.03); margin: -4px;"></div>
-        <!-- Notch -->
-        <div class="absolute top-2 left-1/2 -translate-x-1/2 w-16 h-4 rounded-full bg-black z-20"></div>
-        <iframe id="preview-iframe"
-          src=""
-          class="w-full rounded-[2rem] border-0 overflow-hidden"
-          style="height: 440px; pointer-events: none;"
-          loading="lazy"
-          sandbox="allow-scripts allow-same-origin"></iframe>
-      </div>
-    </div>
-    <div class="shrink-0 px-4 py-2 border-t border-white/5 text-center">
-      <p id="preview-url-label" class="text-xs text-gray-600 font-mono truncate"></p>
-    </div>
-  </div>
-  <div id="type-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
-    <div id="type-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
-    <div class="relative glass border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[88vh] overflow-hidden flex flex-col">
-
-      <!-- Modal header -->
-      <div class="flex items-center justify-between px-5 py-4 border-b border-white/8 shrink-0">
-        <h3 class="text-white font-semibold text-base">Ajouter un block</h3>
-        <button id="type-close" class="text-gray-500 hover:text-white transition-colors p-1">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Search bar -->
-      <div class="px-5 py-3 border-b border-white/8 shrink-0">
-        <div class="relative">
-          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
-          </svg>
-          <input type="text" id="type-search" placeholder="Colle ou recherche un lien, une plateforme…"
-            class="w-full pl-9 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/40 focus:outline-none transition-colors" />
-        </div>
-      </div>
-
-      <!-- Body: sidebar + content -->
-      <div class="flex flex-1 min-h-0 overflow-hidden">
-        <!-- Left sidebar -->
-        <nav class="w-40 shrink-0 border-r border-white/8 py-2 overflow-y-auto scrollbar-none bg-black/20">
-          <!-- populated by JS -->
-          <div id="type-nav"></div>
-        </nav>
-
-        <!-- Right panel -->
-        <div class="flex-1 overflow-y-auto scrollbar-none p-4" id="type-panel">
-          <!-- populated by JS -->
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===== EDIT MODAL ===== -->
-  <div id="edit-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
-    <div id="edit-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
-    <div class="relative glass border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl max-h-[92vh] overflow-y-auto scrollbar-none">
-      <div class="flex items-center justify-between mb-5">
-        <h3 class="text-white font-semibold" id="modal-title">Add Block</h3>
-        <button id="edit-close" class="text-gray-500 hover:text-white transition-colors">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
-        </button>
-      </div>
-      <form id="block-form" class="space-y-4" novalidate>
-        <input type="hidden" id="block-id" />
-        <input type="hidden" id="block-type" />
-        <div id="form-fields" class="space-y-4"></div>
-
-        <!-- Scheduled visibility (all types except spacer) -->
-        <div id="schedule-visibility-section" class="hidden">
-          <div class="border-t border-white/10 pt-4">
-            <button type="button" id="visibility-toggle"
-              class="w-full flex items-center justify-between text-sm text-gray-400 hover:text-white transition-colors">
-              <span class="flex items-center gap-2">
-                <svg class="w-4 h-4 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+  <div id="blocks-main-layout">
+    <div id="blocks-content">
+      <!-- ===== BLOCKS LIST ===== -->
+      <div id="blocks-container">
+        {blocks.length === 0 ? (
+          <div id="empty-state" class="flex flex-col items-center justify-center py-20 text-center">
+            <div class="w-20 h-20 rounded-2xl bg-neon-green/10 border border-neon-green/20 flex items-center justify-center mx-auto mb-5">
+              <svg class="w-9 h-9 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+              </svg>
+            </div>
+            <h3 class="text-lg font-semibold text-white mb-2">No blocks yet</h3>
+            <p class="text-sm text-gray-400 mb-6 max-w-xs">Paste a URL above, use a Streamer Kit template, or click Add Block to get started.</p>
+            {canAddBlock && (
+              <button id="empty-add-btn"
+                class="flex items-center gap-2 px-6 py-3 bg-neon-green text-black text-sm font-semibold rounded-xl hover:bg-neon-green/90 active:scale-[0.98] transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>
-                Visibilité planifiée
-                <span class="text-xs px-1.5 py-0.5 rounded bg-white/5 text-gray-500">optionnel</span>
-              </span>
-              <svg id="vis-chevron" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                Add Your First Block
+              </button>
+            )}
+            <p class="text-xs text-gray-600 mt-4">Tip: <kbd class="px-1.5 py-0.5 glass rounded text-gray-400 font-mono text-xs">N</kbd> ajouter · <kbd class="px-1.5 py-0.5 glass rounded text-gray-400 font-mono text-xs">P</kbd> aperçu</p>
+          </div>
+        ) : (
+          <div class="space-y-2" id="sortable-blocks"></div>
+        )}
+        <div id="no-results" class="hidden flex-col items-center justify-center py-16 text-center">
+          <p class="text-sm text-gray-500 mb-2">No blocks match your search</p>
+          <button id="clear-search-btn" class="text-xs text-neon-green hover:underline">Clear filters</button>
+        </div>
+      </div>
+
+        <div id="no-results" class="hidden flex-col items-center justify-center py-16 text-center">
+          <p class="text-sm text-gray-500 mb-2">No blocks match your search</p>
+          <button id="clear-search-btn" class="text-xs text-neon-green hover:underline">Clear filters</button>
+        </div>
+      </div>
+
+      <!-- ===== ARCHIVED BLOCKS SECTION ===== -->
+      <div id="archive-section" class="hidden mt-8">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12a2 2 0 002 2h8a2 2 0 002-2L19 8m-9 4v4m4-4v4"/>
+            </svg>
+            <p class="text-sm font-semibold text-gray-400">Corbeille</p>
+            <span id="archive-count" class="text-xs px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-500 font-medium"></span>
+          </div>
+          <button id="archive-clear-btn" class="text-xs text-red-400 hover:text-red-300 transition-colors">Vider la corbeille</button>
+        </div>
+        <div id="archive-list" class="space-y-2"></div>
+      </div>
+
+      <!-- ===== PREVIEW PANEL (desktop, fixed right) ===== -->
+      <div id="preview-panel"
+        class="hidden lg:hidden fixed top-0 right-0 h-screen w-[340px] z-40 border-l border-white/8 flex flex-col"
+        style="background: #09090b;">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-white/8 shrink-0">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-neon-green animate-pulse"></span>
+            <span class="text-xs font-semibold text-white">Aperçu live</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="preview-refresh-btn"
+              class="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all"
+              title="Actualiser">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
               </svg>
             </button>
-            <div id="visibility-panel" class="hidden mt-3 space-y-3">
-              <p class="text-xs text-gray-600">Laisser vide pour toujours afficher.</p>
-              <div class="grid grid-cols-2 gap-3">
-                <div class="space-y-1.5">
-                  <label class="text-xs font-medium text-gray-400">Afficher à partir de</label>
-                  <input type="datetime-local" id="field-show-from"
-                    class="w-full px-3 py-2 glass border border-white/10 rounded-xl text-white text-sm focus:border-neon-green/50 focus:outline-none transition-colors" />
-                </div>
-                <div class="space-y-1.5">
-                  <label class="text-xs font-medium text-gray-400">Masquer après</label>
-                  <input type="datetime-local" id="field-show-until"
-                    class="w-full px-3 py-2 glass border border-white/10 rounded-xl text-white text-sm focus:border-neon-green/50 focus:outline-none transition-colors" />
-                </div>
-              </div>
+            <button id="preview-open-btn"
+              class="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all"
+              title="Ouvrir dans un onglet">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+              </svg>
+            </button>
+            <button id="preview-close-btn"
+              class="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <!-- Phone frame -->
+        <div class="flex-1 flex items-start justify-center pt-6 pb-4 overflow-hidden">
+          <div class="relative" style="width: 220px;">
+            <!-- Phone outline -->
+            <div class="absolute inset-0 rounded-[2rem] border-2 border-white/15 pointer-events-none z-10"
+              style="box-shadow: 0 0 0 6px rgba(255,255,255,0.03); margin: -4px;"></div>
+            <!-- Notch -->
+            <div class="absolute top-2 left-1/2 -translate-x-1/2 w-16 h-4 rounded-full bg-black z-20"></div>
+            <iframe id="preview-iframe"
+              src=""
+              class="w-full rounded-[2rem] border-0 overflow-hidden"
+              style="height: 440px; pointer-events: none;"
+              loading="lazy"
+              sandbox="allow-scripts allow-same-origin"></iframe>
+          </div>
+        </div>
+        <div class="shrink-0 px-4 py-2 border-t border-white/5 text-center">
+          <p id="preview-url-label" class="text-xs text-gray-600 font-mono truncate"></p>
+        </div>
+      </div>
+      <div id="type-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div id="type-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+        <div class="relative glass border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[88vh] overflow-hidden flex flex-col">
+
+          <!-- Modal header -->
+          <div class="flex items-center justify-between px-5 py-4 border-b border-white/8 shrink-0">
+            <h3 class="text-white font-semibold text-base">Ajouter un block</h3>
+            <button id="type-close" class="text-gray-500 hover:text-white transition-colors p-1">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Search bar -->
+          <div class="px-5 py-3 border-b border-white/8 shrink-0">
+            <div class="relative">
+              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
+              </svg>
+              <input type="text" id="type-search" placeholder="Colle ou recherche un lien, une plateforme…"
+                class="w-full pl-9 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/40 focus:outline-none transition-colors" />
+            </div>
+          </div>
+
+          <!-- Body: sidebar + content -->
+          <div class="flex flex-1 min-h-0 overflow-hidden">
+            <!-- Left sidebar -->
+            <nav class="w-40 shrink-0 border-r border-white/8 py-2 overflow-y-auto scrollbar-none bg-black/20">
+              <!-- populated by JS -->
+              <div id="type-nav"></div>
+            </nav>
+
+            <!-- Right panel -->
+            <div class="flex-1 overflow-y-auto scrollbar-none p-4" id="type-panel">
+              <!-- populated by JS -->
             </div>
           </div>
         </div>
+      </div>
 
-        <div class="flex gap-3 pt-1">
-          <button type="submit" id="submit-btn"
-            class="flex-1 flex items-center justify-center gap-2 py-2.5 bg-neon-green text-black text-sm font-semibold rounded-xl hover:bg-neon-green/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+      <!-- ===== EDIT MODAL ===== -->
+      <div id="edit-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
+        <div id="edit-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+        <div class="relative glass border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl max-h-[92vh] overflow-y-auto scrollbar-none">
+          <div class="flex items-center justify-between mb-5">
+            <h3 class="text-white font-semibold" id="modal-title">Add Block</h3>
+            <button id="edit-close" class="text-gray-500 hover:text-white transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+          <form id="block-form" class="space-y-4" novalidate>
+            <input type="hidden" id="block-id" />
+            <input type="hidden" id="block-type" />
+            <div id="form-fields" class="space-y-4"></div>
+
+            <!-- Scheduled visibility (all types except spacer) -->
+            <div id="schedule-visibility-section" class="hidden">
+              <div class="border-t border-white/10 pt-4">
+                <button type="button" id="visibility-toggle"
+                  class="w-full flex items-center justify-between text-sm text-gray-400 hover:text-white transition-colors">
+                  <span class="flex items-center gap-2">
+                    <svg class="w-4 h-4 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    Visibilité planifiée
+                    <span class="text-xs px-1.5 py-0.5 rounded bg-white/5 text-gray-500">optionnel</span>
+                  </span>
+                  <svg id="vis-chevron" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                </button>
+                <div id="visibility-panel" class="hidden mt-3 space-y-3">
+                  <p class="text-xs text-gray-600">Laisser vide pour toujours afficher.</p>
+                  <div class="grid grid-cols-2 gap-3">
+                    <div class="space-y-1.5">
+                      <label class="text-xs font-medium text-gray-400">Afficher à partir de</label>
+                      <input type="datetime-local" id="field-show-from"
+                        class="w-full px-3 py-2 glass border border-white/10 rounded-xl text-white text-sm focus:border-neon-green/50 focus:outline-none transition-colors" />
+                    </div>
+                    <div class="space-y-1.5">
+                      <label class="text-xs font-medium text-gray-400">Masquer après</label>
+                      <input type="datetime-local" id="field-show-until"
+                        class="w-full px-3 py-2 glass border border-white/10 rounded-xl text-white text-sm focus:border-neon-green/50 focus:outline-none transition-colors" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex gap-3 pt-1">
+              <button type="submit" id="submit-btn"
+                class="flex-1 flex items-center justify-center gap-2 py-2.5 bg-neon-green text-black text-sm font-semibold rounded-xl hover:bg-neon-green/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                <span id="submit-text">Save Block</span>
+              </button>
+              <button type="button" id="cancel-btn"
+                class="px-5 py-2.5 glass border border-white/10 rounded-xl text-sm text-gray-300 hover:text-white transition-all">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div id="preview-panel-inline" style="display:none">
+    <div class="glass border border-white/10 rounded-2xl overflow-hidden">
+      <div class="flex items-center justify-between px-3 py-2.5 border-b border-white/8">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-neon-green animate-pulse"></span>
+          <span class="text-xs font-semibold text-white">Aperçu live</span>
+        </div>
+        <div class="flex items-center gap-1">
+          <button id="preview-refresh-btn" class="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all" title="Actualiser">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
             </svg>
-            <span id="submit-text">Save Block</span>
           </button>
-          <button type="button" id="cancel-btn"
-            class="px-5 py-2.5 glass border border-white/10 rounded-xl text-sm text-gray-300 hover:text-white transition-all">
-            Cancel
+          <button id="preview-open-btn" class="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all" title="Ouvrir">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+            </svg>
           </button>
         </div>
-      </form>
+      </div>
+      <div class="relative" style="padding:12px">
+        <div class="relative" style="width:100%;padding-bottom:200%;">
+          <div class="absolute inset-0 rounded-2xl border border-white/10 overflow-hidden">
+            <iframe id="preview-iframe" src="" class="w-full h-full border-0"
+              sandbox="allow-scripts allow-same-origin" loading="lazy"></iframe>
+          </div>
+        </div>
+      </div>
+      <div class="px-3 py-2 border-t border-white/5 text-center">
+        <p id="preview-url-label" class="text-xs text-gray-600 font-mono truncate"></p>
+      </div>
     </div>
   </div>
-
 </DashboardLayout>
 
 <style>
@@ -560,6 +595,59 @@ const BLOCK_TYPES = [
   #og-loading { transition: opacity 0.2s; }
   /* Keyboard shortcut hint */
   kbd { font-family: monospace; }
+  /* ── Block cards compactes ── */
+  .bc { position:relative; display:flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid rgba(255,255,255,0.08); border-radius:14px; background:rgba(255,255,255,0.03); transition:border-color .15s,background .15s; min-height:52px; }
+  .bc:hover { border-color:rgba(255,255,255,0.14); background:rgba(255,255,255,0.05); }
+  .bc--selected { border-color:rgba(0,255,157,0.35) !important; background:rgba(0,255,157,0.03); }
+  .bc--pinned { border-color:rgba(251,191,36,0.3) !important; }
+  .bc.sortable-ghost { opacity:0.4; }
+  .bc.sortable-drag  { box-shadow:0 16px 40px rgba(0,0,0,0.5); transform:rotate(0.8deg); }
+  .bc-pintab { position:absolute; top:-1px; left:12px; width:2px; height:6px; background:rgb(251,191,36); border-radius:0 0 2px 2px; }
+  .bc-check { opacity:0; transition:opacity .15s; }
+  .bc-check--vis, .bc:hover .bc-check { opacity:1; }
+  .bc-check input { width:14px; height:14px; accent-color:#00ff9d; cursor:pointer; }
+  .bc-drag { color:rgba(255,255,255,0.2); cursor:grab; flex-shrink:0; }
+  .bc-drag:hover { color:rgba(255,255,255,0.5); }
+  .bc-icon { width:30px; height:30px; border-radius:50%; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0; overflow:hidden; }
+  .bc-icon img { width:100%; height:100%; object-fit:cover; }
+  .bc-body { flex:1; min-width:0; }
+  .bc-row1 { display:flex; align-items:center; gap:5px; flex-wrap:nowrap; overflow:hidden; }
+  .bc-badge { font-size:10px; padding:1.5px 6px; border-radius:99px; border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.45); background:rgba(255,255,255,0.05); flex-shrink:0; text-transform:lowercase; }
+  .bc-title { font-size:13px; font-weight:500; color:rgba(255,255,255,0.9); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:default; }
+  .bc-notitle { font-size:13px; color:rgba(255,255,255,0.3); font-style:italic; }
+  .bc-pin,.bc-sched { font-size:11px; flex-shrink:0; }
+  .bc-new { font-size:10px; padding:1.5px 5px; border-radius:99px; background:rgba(0,255,157,0.12); color:#00ff9d; border:1px solid rgba(0,255,157,0.25); flex-shrink:0; }
+  .bc-sub { font-size:11px; color:rgba(255,255,255,0.3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
+  .bc-clicks { font-size:11px; color:rgba(255,255,255,0.3); white-space:nowrap; flex-shrink:0; }
+  .bc-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+  .bc-dot--on  { background:#22c55e; }
+  .bc-dot--off { background:rgba(255,255,255,0.2); }
+  .bc-toggle-wrap { flex-shrink:0; cursor:pointer; }
+  .bc-copy,.bc-menu { opacity:0; padding:4px; color:rgba(255,255,255,0.3); transition:opacity .15s,color .15s; flex-shrink:0; }
+  .bc:hover .bc-copy, .bc:hover .bc-menu { opacity:1; }
+  .bc-copy:hover,.bc-menu:hover { color:rgba(255,255,255,0.8); }
+  /* Badge colors — remplacent les anciennes .badge-* */
+  .badge-countdown { background:rgba(251,191,36,0.1); color:rgb(200,150,20); border-color:rgba(251,191,36,0.25); }
+  .badge-schedule  { background:rgba(99,179,237,0.1); color:rgb(80,150,200); border-color:rgba(99,179,237,0.25); }
+  .badge-donation  { background:rgba(248,113,113,0.1); color:rgb(200,80,80); border-color:rgba(248,113,113,0.25); }
+  .badge-embed     { background:rgba(167,139,250,0.1); color:rgb(140,110,220); border-color:rgba(167,139,250,0.25); }
+  .badge-text      { background:rgba(148,163,184,0.08); color:rgb(120,130,145); border-color:rgba(148,163,184,0.2); }
+  .badge-banner    { background:rgba(251,113,133,0.1); color:rgb(200,80,100); border-color:rgba(251,113,133,0.25); }
+  .badge-product   { background:rgba(52,211,153,0.1); color:rgb(30,160,110); border-color:rgba(52,211,153,0.25); }
+  .badge-poll      { background:rgba(56,189,248,0.1); color:rgb(30,150,210); border-color:rgba(56,189,248,0.25); }
+  .badge-twitch    { background:rgba(145,70,255,0.12); color:rgb(160,100,255); border-color:rgba(145,70,255,0.3); }
+  .badge-newsletter{ background:rgba(251,191,36,0.08); color:rgb(180,140,10); border-color:rgba(251,191,36,0.2); }
+  .badge-vcard     { background:rgba(99,179,237,0.08); color:rgb(70,140,200); border-color:rgba(99,179,237,0.2); }
+  .badge-merch     { background:rgba(248,113,113,0.08); color:rgb(180,70,70); border-color:rgba(248,113,113,0.2); }
+  /* Preview intégré ≥1280px */
+  @media (min-width: 1280px) {
+    #blocks-main-layout { display:flex; gap:24px; align-items:flex-start; }
+    #blocks-content     { flex:1; min-width:0; }
+    #preview-panel-inline { display:flex !important; flex-direction:column; width:260px; flex-shrink:0; position:sticky; top:80px; }
+  }
+  @media (max-width: 1279px) {
+    #preview-panel-inline { display:none !important; }
+  }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
@@ -974,15 +1062,15 @@ const BLOCK_TYPES = [
   });
 
   // ── Render blocks ─────────────────────────────────────────────────────────
-  function renderBlocks() {
+    function renderBlocks() {
     const container  = document.getElementById('sortable-blocks');
     const noResults  = document.getElementById('no-results');
     const emptyState = document.getElementById('empty-state');
     if (!container) return;
-
+ 
     const filtered  = getFiltered();
     const hasSearch = searchQuery || activeFilter !== 'all';
-
+ 
     if (blocks.length === 0) {
       container.innerHTML = '';
       emptyState?.classList.remove('hidden');
@@ -990,17 +1078,16 @@ const BLOCK_TYPES = [
       return;
     }
     emptyState?.classList.add('hidden');
-
+ 
     if (filtered.length === 0 && hasSearch) {
       container.innerHTML = '';
       noResults?.classList.remove('hidden');
       return;
     }
     noResults?.classList.add('hidden');
-
-    // Pinned first
+ 
     const sorted = [...filtered].sort((a: any, b: any) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0));
-
+ 
     container.innerHTML = sorted.map((block: any) => {
       const isSelected = selectedIds.has(block.id);
       const clicks     = block.clicks ?? 0;
@@ -1010,152 +1097,144 @@ const BLOCK_TYPES = [
       const iconUrl    = block.config?.icon_url || '';
       const platform   = block.type === 'link' ? detectPlatform(block.config?.url || '') : null;
       const typeBadge  = TYPE_BADGE[block.type] ?? '';
-      const ctr        = (totalViews > 0 && clicks > 0) ? ((clicks / totalViews) * 100).toFixed(1) : null;
-
+ 
+      // ── Icône compacte ──────────────────────────────────────────────────────
       const iconHtml = iconUrl
-        ? `<div class="shrink-0 w-9 h-9 rounded-full overflow-hidden border border-white/10 bg-white/5">
-             <img src="${iconUrl}" class="w-full h-full object-cover" loading="lazy"
-               onerror="this.parentElement.innerHTML='<span class=\\'flex items-center justify-center w-full h-full text-base\\'>${BLOCK_EMOJI[block.type] ?? '📌'}</span>'" />
-           </div>`
+        ? `<div class="bc-icon"><img src="${iconUrl}" loading="lazy"
+             onerror="this.parentElement.innerHTML='<span>${BLOCK_EMOJI[block.type] ?? '📌'}</span>'" /></div>`
         : platform
-          ? `<div class="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-lg bg-white/5 border border-white/10">${platform.icon}</div>`
-          : `<div class="shrink-0 w-9 h-9 flex items-center justify-center text-xl">${BLOCK_EMOJI[block.type] ?? '📌'}</div>`;
-
-      // Block-type-specific extra info
-      let extraHtml = '';
-      if (block.type === 'donation' && block.config?.goal_amount > 0) {
+          ? `<div class="bc-icon"><span>${platform.icon}</span></div>`
+          : `<div class="bc-icon"><span>${BLOCK_EMOJI[block.type] ?? '📌'}</span></div>`;
+ 
+      // ── Info contextuelle compacte ──────────────────────────────────────────
+      let subInfo = '';
+      if (block.type === 'link' && block.config?.url) {
+        try { subInfo = new URL(block.config.url).hostname.replace('www.', ''); } catch { subInfo = block.config.url; }
+      } else if (block.type === 'donation' && block.config?.goal_amount > 0) {
         const pct = Math.min(100, Math.round((block.config.current_amount / block.config.goal_amount) * 100));
-        extraHtml = `
-          <div class="mt-2 pl-7">
-            <div class="flex items-center justify-between text-xs text-gray-500 mb-1.5">
-              <span>${block.config.current_amount ?? 0} / ${block.config.goal_amount} €</span>
-              <span class="font-semibold text-neon-green">${pct}%</span>
-            </div>
-            <div class="h-1.5 w-full rounded-full bg-white/5">
-              <div class="progress-bar h-full" style="width:${pct}%"></div>
-            </div>
-          </div>`;
+        subInfo = `${block.config.current_amount ?? 0} / ${block.config.goal_amount} € · ${pct}%`;
       } else if (block.type === 'countdown' && block.config?.target_date) {
-        const diff  = new Date(block.config.target_date).getTime() - Date.now();
-        const text  = diff > 0
-          ? `dans ${Math.floor(diff/86400000)}j ${Math.floor((diff%86400000)/3600000)}h`
-          : 'Terminé';
-        extraHtml = `<div class="mt-1 pl-7 text-xs ${diff > 0 ? 'text-yellow-400/70' : 'text-gray-500'}">⏱ ${text}</div>`;
+        const diff = new Date(block.config.target_date).getTime() - Date.now();
+        subInfo = diff > 0 ? `dans ${Math.floor(diff/86400000)}j ${Math.floor((diff%86400000)/3600000)}h` : 'Terminé';
       } else if (block.type === 'schedule' && block.config?.schedule?.length) {
-        const days = block.config.schedule.map((s: any) => `${s.day?.slice(0,3)} ${s.time}`).join(' · ');
-        extraHtml = `<div class="mt-1 pl-7 text-xs text-blue-400/70">📅 ${days}</div>`;
-      } else if (block.type === 'embed' && block.config?.url) {
-        const domain = (() => { try { return new URL(block.config.url).hostname.replace('www.',''); } catch { return ''; } })();
-        extraHtml = `<div class="mt-1 pl-7 text-xs text-purple-400/70">🎵 ${domain}</div>`;
-      } else if (block.type === 'text' && block.config?.content) {
-        const snippet = block.config.content.slice(0, 80).replace(/</g,'&lt;');
-        extraHtml = `<div class="mt-1 pl-7 text-xs text-gray-500 italic truncate">"${snippet}${block.config.content.length > 80 ? '…' : ''}"</div>`;
-      } else if (block.type === 'banner') {
-        const badge = block.config?.badge || block.config?.badge_preset || 'LIVE';
-        extraHtml = `<div class="mt-1 pl-7 text-xs text-pink-400/70">📢 Badge: ${badge.toUpperCase()}</div>`;
-      } else if (block.type === 'product' && block.config?.price) {
-        extraHtml = `<div class="mt-1 pl-7 text-xs text-green-400/70">🛍️ ${block.config.price} ${block.config.currency || '€'}</div>`;
+        subInfo = block.config.schedule.slice(0,3).map((s: any) => s.day?.slice(0,3)).join(', ') + (block.config.schedule.length > 3 ? '…' : '');
       } else if (block.type === 'poll' && block.config?.options?.length) {
         const total = block.config.options.reduce((s: number, o: any) => s + (o.votes ?? 0), 0);
-        extraHtml = `<div class="mt-1 pl-7 text-xs text-sky-400/70">📊 ${block.config.options.length} options · ${total} votes</div>`;
+        subInfo = `${block.config.options.length} options · ${total} votes`;
       } else if (block.type === 'twitch_live' && block.config?.channel) {
-        extraHtml = `<div class="mt-1 pl-7 text-xs text-purple-400/70">🟣 twitch.tv/${block.config.channel}</div>`;
-      } else if (block.type === 'newsletter') {
-        const prov = block.config?.provider || 'custom';
-        extraHtml = `<div class="mt-1 pl-7 text-xs text-yellow-400/70">📧 ${prov}</div>`;
-      } else if (block.type === 'vcard') {
-        const name = [block.config?.first_name, block.config?.last_name].filter(Boolean).join(' ');
-        extraHtml = name ? `<div class="mt-1 pl-7 text-xs text-blue-400/70">👤 ${name}</div>` : '';
+        subInfo = `twitch.tv/${block.config.channel}`;
+      } else if (block.type === 'embed' && block.config?.url) {
+        try { subInfo = new URL(block.config.url).hostname.replace('www.',''); } catch { subInfo = 'embed'; }
+      } else if (block.type === 'text' && block.config?.content) {
+        subInfo = block.config.content.slice(0, 45) + (block.config.content.length > 45 ? '…' : '');
+      } else if (block.type === 'social') {
+        subInfo = `${block.config?.links?.length ?? 0} liens`;
+      } else if (block.type === 'product' && block.config?.price) {
+        subInfo = `${block.config.price} ${block.config.currency || '€'}`;
       } else if (block.type === 'merch_grid' && block.config?.items?.length) {
-        extraHtml = `<div class="mt-1 pl-7 text-xs text-red-400/70">🛒 ${block.config.items.length} article${block.config.items.length > 1 ? 's' : ''}</div>`;
+        subInfo = `${block.config.items.length} article${block.config.items.length > 1 ? 's' : ''}`;
+      } else if (block.type === 'newsletter') {
+        subInfo = block.config?.provider || 'custom';
+      } else if (block.type === 'vcard') {
+        subInfo = [block.config?.first_name, block.config?.last_name].filter(Boolean).join(' ');
+      } else if (block.type === 'banner') {
+        subInfo = `${block.config?.badge || block.config?.badge_preset || 'LIVE'} · ${block.config?.message?.slice(0,30) || ''}`;
+      } else if (block.type === 'image' && block.config?.url) {
+        try { subInfo = new URL(block.config.url).hostname.replace('www.',''); } catch { subInfo = 'image'; }
+      } else if (block.type === 'video' && block.config?.url) {
+        try { subInfo = new URL(block.config.url).hostname.replace('www.',''); } catch { subInfo = 'vidéo'; }
       }
-
+ 
+      const clicksStr = clicks > 0
+        ? `<span class="bc-clicks">${clicks >= 1000 ? (clicks/1000).toFixed(1)+'k' : clicks} clics</span>`
+        : '';
+      const pinIcon   = isPinned  ? '<span class="bc-pin" title="Épinglé">📌</span>' : '';
+      const newIcon   = newBadge  ? '<span class="bc-new">New</span>' : '';
+      const schedIcon = scheduled ? '<span class="bc-sched" title="Planifié">⏰</span>' : '';
+ 
       return `
-        <div class="block-card group relative glass border border-white/10 rounded-2xl p-4 transition-all hover:border-white/20
-          ${isSelected ? 'selected' : ''} ${isPinned ? 'pinned-card' : ''}"
+        <div class="bc ${isSelected ? 'bc--selected' : ''} ${isPinned ? 'bc--pinned' : ''}"
           data-id="${block.id}" data-type="${block.type}">
-          ${isPinned ? '<div class="pin-tab"></div>' : ''}
-          <div class="absolute top-4 left-4 z-10 ${selectedIds.size > 0 ? '' : 'opacity-0 group-hover:opacity-100'} transition-opacity">
+          ${isPinned ? '<div class="bc-pintab"></div>' : ''}
+ 
+          <div class="bc-check ${selectedIds.size > 0 ? 'bc-check--vis' : ''}">
             <input type="checkbox" ${isSelected ? 'checked' : ''}
-              class="block-select w-4 h-4 rounded accent-neon-green cursor-pointer" data-id="${block.id}" />
+              class="block-select" data-id="${block.id}" />
           </div>
-          <div class="flex items-center gap-3 pl-7">
-            <div class="drag-handle cursor-grab active:cursor-grabbing text-gray-600 hover:text-gray-400 transition-colors shrink-0 touch-none">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16"/>
-              </svg>
+ 
+          <div class="bc-drag drag-handle touch-none" title="Glisser pour réordonner">
+            <svg width="12" height="16" fill="none" viewBox="0 0 12 16">
+              <circle cx="4" cy="4"  r="1.5" fill="currentColor"/>
+              <circle cx="8" cy="4"  r="1.5" fill="currentColor"/>
+              <circle cx="4" cy="8"  r="1.5" fill="currentColor"/>
+              <circle cx="8" cy="8"  r="1.5" fill="currentColor"/>
+              <circle cx="4" cy="12" r="1.5" fill="currentColor"/>
+              <circle cx="8" cy="12" r="1.5" fill="currentColor"/>
+            </svg>
+          </div>
+ 
+          ${iconHtml}
+ 
+          <div class="bc-body">
+            <div class="bc-row1">
+              <span class="bc-badge ${typeBadge}">${block.type}</span>
+              ${block.title
+                ? `<span class="block-title-editable bc-title" data-id="${block.id}" title="Double-clic pour renommer">${block.title}</span>`
+                : `<span class="bc-notitle">Sans titre</span>`}
+              ${pinIcon}${newIcon}${schedIcon}
             </div>
-            ${iconHtml}
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-1.5 flex-wrap mb-0.5">
-                <span class="text-xs px-2 py-0.5 rounded-full border font-medium capitalize ${typeBadge || 'bg-white/5 border-white/10 text-gray-400'}">${block.type}</span>
-                ${block.title
-                  ? `<span class="block-title-editable text-sm font-semibold text-white truncate max-w-[160px] cursor-default select-none" data-id="${block.id}" title="Double-clic pour renommer">${block.title}</span>`
-                  : `<span class="text-sm text-gray-600 italic">No title</span>`}
-                ${isPinned   ? '<span title="Épinglé" class="text-xs leading-none">📌</span>' : ''}
-                ${newBadge   ? '<span class="text-xs px-1.5 py-0.5 rounded-full bg-neon-green/15 text-neon-green font-medium border border-neon-green/25">New</span>' : ''}
-                ${scheduled  ? '<span class="text-xs px-1.5 py-0.5 rounded-full border badge-scheduled font-medium">⏰ Planifié</span>' : ''}
-                ${platform   ? `<span class="text-xs px-1.5 py-0.5 rounded-full bg-white/5 text-gray-500 border border-white/10">${platform.label}</span>` : ''}
-              </div>
-              <div class="flex items-center gap-3 text-xs">
-                <span class="${block.active ? 'text-neon-green' : 'text-gray-600'} flex items-center gap-1">
-                  <span class="w-1.5 h-1.5 rounded-full ${block.active ? 'bg-neon-green' : 'bg-gray-600'}"></span>
-                  ${block.active ? 'Active' : 'Inactive'}
-                </span>
-                ${clicks > 0 ? `
-                  <span class="flex items-center gap-1 text-blue-400">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/>
-                    </svg>
-                    ${clicks.toLocaleString('fr-FR')} clicks${ctr ? ` <span class="text-gray-500">(${ctr}%)</span>` : ''}
-                  </span>` : ''}
-              </div>
-            </div>
-            ${block.type === 'link' && block.config?.url ? `
-            <button class="block-copy-btn p-1.5 glass rounded-lg border border-white/5 text-gray-600 hover:text-white hover:border-white/20 transition-all shrink-0"
-              data-url="${block.config.url}" title="Copier l'URL">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.1-1.1m-.757-4.9a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
-              </svg>
-            </button>` : ''}
-            <label class="relative inline-flex items-center cursor-pointer shrink-0">
-              <input type="checkbox" ${block.active ? 'checked' : ''}
-                class="sr-only peer block-toggle" data-id="${block.id}" />
-              <div class="w-10 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-neon-green transition-colors"></div>
-            </label>
-            <div class="relative shrink-0">
-              <button class="block-menu-btn opacity-0 group-hover:opacity-100 transition-opacity p-2 glass rounded-lg border border-white/5 text-gray-500 hover:text-white hover:border-white/20 transition-all"
-                data-id="${block.id}" aria-label="Options">
-                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+            ${subInfo ? `<div class="bc-sub">${subInfo}</div>` : ''}
+          </div>
+ 
+          ${clicksStr}
+ 
+          <span class="bc-dot ${block.active ? 'bc-dot--on' : 'bc-dot--off'}"
+            title="${block.active ? 'Actif' : 'Inactif'}"></span>
+ 
+          <label class="bc-toggle-wrap" title="${block.active ? 'Désactiver' : 'Activer'}">
+            <input type="checkbox" ${block.active ? 'checked' : ''}
+              class="sr-only peer block-toggle" data-id="${block.id}" />
+            <div class="w-9 h-5 bg-gray-700 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-neon-green transition-colors relative"></div>
+          </label>
+ 
+          ${block.type === 'link' && block.config?.url
+            ? `<button class="block-copy-btn bc-copy" data-url="${block.config.url}" title="Copier l'URL">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.1-1.1m-.757-4.9a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
                 </svg>
+              </button>`
+            : '<span style="width:22px"></span>'}
+ 
+          <div class="relative shrink-0">
+            <button class="block-menu-btn bc-menu" data-id="${block.id}" aria-label="Options">
+              <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+              </svg>
+            </button>
+            <div class="block-menu-dropdown hidden absolute right-0 top-full mt-1 w-44 rounded-xl shadow-2xl z-30 py-1 border border-white/10 overflow-hidden"
+              data-id="${block.id}">
+              <button class="block-edit-btn w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors text-left" data-id="${block.id}">
+                <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                Modifier
               </button>
-              <div class="block-menu-dropdown hidden absolute right-0 top-full mt-1 w-44 rounded-xl shadow-2xl z-30 py-1 border border-white/10 overflow-hidden"
-                data-id="${block.id}">
-                <button class="block-edit-btn w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors text-left" data-id="${block.id}">
-                  <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                  Edit
-                </button>
-                <button class="block-pin-btn w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors text-left" data-id="${block.id}" data-pinned="${isPinned}">
-                  <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
-                  ${isPinned ? 'Désépingler' : 'Épingler en haut'}
-                </button>
-                <button class="block-duplicate-btn w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors text-left" data-id="${block.id}">
-                  <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                  Duplicate
-                </button>
-                <div class="my-1 border-t border-white/10"></div>
-                <button class="block-delete-btn w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-400 hover:bg-red-500/5 transition-colors text-left" data-id="${block.id}">
-                  <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                  Delete
-                </button>
-              </div>
+              <button class="block-pin-btn w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors text-left" data-id="${block.id}" data-pinned="${isPinned}">
+                <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+                ${isPinned ? 'Désépingler' : 'Épingler en haut'}
+              </button>
+              <button class="block-duplicate-btn w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors text-left" data-id="${block.id}">
+                <svg class="w-4 h-4 text-gray-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                Dupliquer
+              </button>
+              <div class="my-1 border-t border-white/10"></div>
+              <button class="block-delete-btn w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-red-400 hover:bg-red-500/5 transition-colors text-left" data-id="${block.id}">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                Supprimer
+              </button>
             </div>
           </div>
-          ${extraHtml}
         </div>`;
     }).join('');
-
+ 
     attachCardListeners();
     attachInlineEdit();
     attachCopyBtns();
@@ -1226,7 +1305,7 @@ const BLOCK_TYPES = [
     if (!(window as any).Sortable) { setTimeout(initSortable, 30); return; }
     sortable?.destroy();
     sortable = new (window as any).Sortable(container, {
-      animation: 200, handle: '.drag-handle',
+      animation: 200, handle: '.bc-drag',  // ← .drag-handle → .bc-drag
       ghostClass: 'sortable-ghost', dragClass: 'sortable-drag',
       onEnd: async () => {
         const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -1242,7 +1321,7 @@ const BLOCK_TYPES = [
           blockIds = [...visibleIds, ...blocks.filter((b: any) => !vs.has(b.id)).map((b: any) => b.id)];
         }
         try {
-          await apiCall('/api/blocks/reorder', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ blockIds }) });
+          await apiCall('/api/v1/blocks/reorder', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ blockIds }) });
           blocks = blockIds.map((id: string) => blocks.find((b: any) => b.id === id)).filter(Boolean);
           toast.success('Ordre sauvegardé');
         } catch { toast.error('Failed to save order'); renderBlocks(); }
@@ -1484,6 +1563,20 @@ const BLOCK_TYPES = [
         data-cat="${cat.id}" style="width: calc(100% - 8px);">
         ${cat.label}
       </button>`).join('');
+
+    // Bouton "Suggérer une feature" en bas de la nav
+    const navEl = document.getElementById('type-nav')!;
+    const suggest = document.createElement('div');
+    suggest.style.cssText = 'padding:4px 4px 0;margin-top:6px;border-top:1px solid rgba(255,255,255,0.08);';
+    suggest.innerHTML = `
+      <a href="/dashboard/roadmap"
+        class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-gray-500 hover:text-neon-green hover:bg-white/5 transition-all w-full">
+        <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+        </svg>
+        Suggérer une feature
+      </a>`;
+    navEl.appendChild(suggest);
     nav.querySelectorAll('.type-nav-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         activeCatId = (btn as HTMLElement).dataset.cat!;
