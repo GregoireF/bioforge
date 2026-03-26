@@ -11,7 +11,6 @@ const supabase = Astro.locals.supabase
  
 if (!user) return Astro.redirect('/signin?error=auth_failed')
  
-// ── Profil depuis supabase (locals.supabase est le client SSR authentifié) ───
 const { data: profileData } = await supabase
   .from('profiles')
   .select('id, username, plan')
@@ -151,7 +150,6 @@ const BLOCK_TYPES = [
   { type: 'merch_grid',  emoji: '🛒', label: 'Merch Grid',   desc: 'Grid of products / items' },
 ];
 ---
-
 <DashboardLayout title="Blocks">
 
   <div id="server-data" class="hidden" data-bridge={bridge}></div>
@@ -290,59 +288,96 @@ const BLOCK_TYPES = [
     </div>
   </div>
 
-  <!-- ===== BLOCKS LIST ===== -->
-  <div id="blocks-container">
-    {blocks.length === 0 ? (
-      <div id="empty-state" class="flex flex-col items-center justify-center py-20 text-center">
-        <div class="w-20 h-20 rounded-2xl bg-neon-green/10 border border-neon-green/20 flex items-center justify-center mx-auto mb-5">
-          <svg class="w-9 h-9 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
-          </svg>
-        </div>
-        <h3 class="text-lg font-semibold text-white mb-2">No blocks yet</h3>
-        <p class="text-sm text-gray-400 mb-6 max-w-xs">Paste a URL above, use a Streamer Kit template, or click Add Block to get started.</p>
-        {canAddBlock && (
-          <button id="empty-add-btn"
-            class="flex items-center gap-2 px-6 py-3 bg-neon-green text-black text-sm font-semibold rounded-xl hover:bg-neon-green/90 active:scale-[0.98] transition-all">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-            </svg>
-            Add Your First Block
-          </button>
+  <!-- ===== LAYOUT PRINCIPAL : liste + aperçu sticky ===== -->
+  <div class="flex gap-6 items-start" id="blocks-main-layout">
+
+    <div class="flex-1 min-w-0" id="blocks-content-col">
+
+      <!-- ===== BLOCKS LIST ===== -->
+      <div id="blocks-container">
+        {blocks.length === 0 ? (
+          <div id="empty-state" class="flex flex-col items-center justify-center py-20 text-center">
+            <div class="w-20 h-20 rounded-2xl bg-neon-green/10 border border-neon-green/20 flex items-center justify-center mx-auto mb-5">
+              <svg class="w-9 h-9 text-neon-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+              </svg>
+            </div>
+            <h3 class="text-lg font-semibold text-white mb-2">No blocks yet</h3>
+            <p class="text-sm text-gray-400 mb-6 max-w-xs">Paste a URL above, use a Streamer Kit template, or click Add Block to get started.</p>
+            {canAddBlock && (
+              <button id="empty-add-btn"
+                class="flex items-center gap-2 px-6 py-3 bg-neon-green text-black text-sm font-semibold rounded-xl hover:bg-neon-green/90 active:scale-[0.98] transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Add Your First Block
+              </button>
+            )}
+            <p class="text-xs text-gray-600 mt-4">Tip: <kbd class="px-1.5 py-0.5 glass rounded text-gray-400 font-mono text-xs">N</kbd> ajouter · <kbd class="px-1.5 py-0.5 glass rounded text-gray-400 font-mono text-xs">P</kbd> aperçu</p>
+          </div>
+        ) : (
+          <div class="space-y-2" id="sortable-blocks"></div>
         )}
-        <p class="text-xs text-gray-600 mt-4">Tip: <kbd class="px-1.5 py-0.5 glass rounded text-gray-400 font-mono text-xs">N</kbd> ajouter · <kbd class="px-1.5 py-0.5 glass rounded text-gray-400 font-mono text-xs">P</kbd> aperçu</p>
+        <div id="no-results" class="hidden flex-col items-center justify-center py-16 text-center">
+          <p class="text-sm text-gray-500 mb-2">No blocks match your search</p>
+          <button id="clear-search-btn" class="text-xs text-neon-green hover:underline">Clear filters</button>
+        </div>
       </div>
-    ) : (
-      <div class="space-y-2" id="sortable-blocks"></div>
-    )}
-    <div id="no-results" class="hidden flex-col items-center justify-center py-16 text-center">
-      <p class="text-sm text-gray-500 mb-2">No blocks match your search</p>
-      <button id="clear-search-btn" class="text-xs text-neon-green hover:underline">Clear filters</button>
-    </div>
-  </div>
 
-    <div id="no-results" class="hidden flex-col items-center justify-center py-16 text-center">
-      <p class="text-sm text-gray-500 mb-2">No blocks match your search</p>
-      <button id="clear-search-btn" class="text-xs text-neon-green hover:underline">Clear filters</button>
-    </div>
-  </div>
-
-  <!-- ===== ARCHIVED BLOCKS SECTION ===== -->
-  <div id="archive-section" class="hidden mt-8">
-    <div class="flex items-center justify-between mb-3">
-      <div class="flex items-center gap-2">
-        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12a2 2 0 002 2h8a2 2 0 002-2L19 8m-9 4v4m4-4v4"/>
-        </svg>
-        <p class="text-sm font-semibold text-gray-400">Corbeille</p>
-        <span id="archive-count" class="text-xs px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-500 font-medium"></span>
+      <!-- ===== ARCHIVED BLOCKS SECTION ===== -->
+      <div id="archive-section" class="hidden mt-8">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8l1 12a2 2 0 002 2h8a2 2 0 002-2L19 8m-9 4v4m4-4v4"/>
+            </svg>
+            <p class="text-sm font-semibold text-gray-400">Corbeille</p>
+            <span id="archive-count" class="text-xs px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-gray-500 font-medium"></span>
+          </div>
+          <button id="archive-clear-btn" class="text-xs text-red-400 hover:text-red-300 transition-colors">Vider la corbeille</button>
+        </div>
+        <div id="archive-list" class="space-y-2"></div>
       </div>
-      <button id="archive-clear-btn" class="text-xs text-red-400 hover:text-red-300 transition-colors">Vider la corbeille</button>
-    </div>
-    <div id="archive-list" class="space-y-2"></div>
-  </div>
 
-  <!-- ===== PREVIEW PANEL (desktop, fixed right) ===== -->
+    </div><!-- /blocks-content-col -->
+
+    <!-- ===== APERÇU INLINE sticky (≥1280px) — AMÉLIORATION #1 ===== -->
+    <div id="preview-panel-inline"
+      class="w-[240px] flex-shrink-0 sticky top-20 hidden xl:block">
+      <div class="glass border border-white/10 rounded-2xl overflow-hidden">
+        <div class="flex items-center justify-between px-3 py-2.5 border-b border-white/8">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-neon-green animate-pulse"></span>
+            <span class="text-xs font-semibold text-white">Aperçu live</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <button id="inline-preview-refresh" class="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all" title="Actualiser">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            </button>
+            <button id="inline-preview-open" class="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all" title="Ouvrir dans un onglet">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="p-2">
+          <div class="relative" style="padding-bottom: 177%;">
+            <iframe id="inline-preview-iframe"
+              src=""
+              class="absolute inset-0 w-full h-full rounded-xl border-0"
+              style="pointer-events:none;"
+              loading="lazy"
+              sandbox="allow-scripts allow-same-origin"></iframe>
+          </div>
+        </div>
+        <div class="px-3 py-2 border-t border-white/5">
+          <p id="inline-preview-url" class="text-xs text-gray-600 font-mono truncate text-center"></p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /blocks-main-layout -->
+
+  <!-- ===== PREVIEW PANEL (desktop, fixed right — bouton Aperçu) ===== -->
   <div id="preview-panel"
     class="hidden lg:hidden fixed top-0 right-0 h-screen w-[340px] z-40 border-l border-white/8 flex flex-col"
     style="background: #09090b;">
@@ -352,53 +387,39 @@ const BLOCK_TYPES = [
         <span class="text-xs font-semibold text-white">Aperçu live</span>
       </div>
       <div class="flex items-center gap-2">
-        <button id="preview-refresh-btn"
-          class="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all"
-          title="Actualiser">
+        <button id="preview-refresh-btn" class="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all" title="Actualiser">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
           </svg>
         </button>
-        <button id="preview-open-btn"
-          class="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all"
-          title="Ouvrir dans un onglet">
+        <button id="preview-open-btn" class="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all" title="Ouvrir dans un onglet">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
           </svg>
         </button>
-        <button id="preview-close-btn"
-          class="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all">
+        <button id="preview-close-btn" class="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-all">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
           </svg>
         </button>
       </div>
     </div>
-    <!-- Phone frame -->
     <div class="flex-1 flex items-start justify-center pt-6 pb-4 overflow-hidden">
       <div class="relative" style="width: 220px;">
-        <!-- Phone outline -->
-        <div class="absolute inset-0 rounded-[2rem] border-2 border-white/15 pointer-events-none z-10"
-          style="box-shadow: 0 0 0 6px rgba(255,255,255,0.03); margin: -4px;"></div>
-        <!-- Notch -->
+        <div class="absolute inset-0 rounded-[2rem] border-2 border-white/15 pointer-events-none z-10" style="box-shadow: 0 0 0 6px rgba(255,255,255,0.03); margin: -4px;"></div>
         <div class="absolute top-2 left-1/2 -translate-x-1/2 w-16 h-4 rounded-full bg-black z-20"></div>
-        <iframe id="preview-iframe"
-          src=""
-          class="w-full rounded-[2rem] border-0 overflow-hidden"
-          style="height: 440px; pointer-events: none;"
-          loading="lazy"
-          sandbox="allow-scripts allow-same-origin"></iframe>
+        <iframe id="preview-iframe" src="" class="w-full rounded-[2rem] border-0 overflow-hidden" style="height: 440px; pointer-events: none;" loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe>
       </div>
     </div>
     <div class="shrink-0 px-4 py-2 border-t border-white/5 text-center">
       <p id="preview-url-label" class="text-xs text-gray-600 font-mono truncate"></p>
     </div>
   </div>
+
+  <!-- ===== TYPE MODAL ===== -->
   <div id="type-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
     <div id="type-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
     <div class="relative glass border border-white/10 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[88vh] overflow-hidden flex flex-col">
-
-      <!-- Modal header -->
       <div class="flex items-center justify-between px-5 py-4 border-b border-white/8 shrink-0">
         <h3 class="text-white font-semibold text-base">Ajouter un block</h3>
         <button id="type-close" class="text-gray-500 hover:text-white transition-colors p-1">
@@ -407,8 +428,6 @@ const BLOCK_TYPES = [
           </svg>
         </button>
       </div>
-
-      <!-- Search bar -->
       <div class="px-5 py-3 border-b border-white/8 shrink-0">
         <div class="relative">
           <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -418,19 +437,22 @@ const BLOCK_TYPES = [
             class="w-full pl-9 pr-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/40 focus:outline-none transition-colors" />
         </div>
       </div>
-
-      <!-- Body: sidebar + content -->
       <div class="flex flex-1 min-h-0 overflow-hidden">
-        <!-- Left sidebar -->
-        <nav class="w-40 shrink-0 border-r border-white/8 py-2 overflow-y-auto scrollbar-none bg-black/20">
-          <!-- populated by JS -->
-          <div id="type-nav"></div>
+        <!-- Left sidebar — AMÉLIORATION #2 : bouton Suggérer en bas -->
+        <nav class="w-40 shrink-0 border-r border-white/8 py-2 overflow-y-auto scrollbar-none bg-black/20 flex flex-col">
+          <div id="type-nav" class="flex-1"></div>
+          <!-- Bouton Suggérer une feature -->
+          <div class="px-1 py-2 border-t border-white/8 mt-2 shrink-0">
+            <a href="/dashboard/roadmap"
+              class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-gray-500 hover:text-neon-green hover:bg-white/5 transition-all w-full">
+              <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+              </svg>
+              Suggérer une feature
+            </a>
+          </div>
         </nav>
-
-        <!-- Right panel -->
-        <div class="flex-1 overflow-y-auto scrollbar-none p-4" id="type-panel">
-          <!-- populated by JS -->
-        </div>
+        <div class="flex-1 overflow-y-auto scrollbar-none p-4" id="type-panel"></div>
       </div>
     </div>
   </div>
@@ -451,8 +473,6 @@ const BLOCK_TYPES = [
         <input type="hidden" id="block-id" />
         <input type="hidden" id="block-type" />
         <div id="form-fields" class="space-y-4"></div>
-
-        <!-- Scheduled visibility (all types except spacer) -->
         <div id="schedule-visibility-section" class="hidden">
           <div class="border-t border-white/10 pt-4">
             <button type="button" id="visibility-toggle"
@@ -485,7 +505,6 @@ const BLOCK_TYPES = [
             </div>
           </div>
         </div>
-
         <div class="flex gap-3 pt-1">
           <button type="submit" id="submit-btn"
             class="flex-1 flex items-center justify-center gap-2 py-2.5 bg-neon-green text-black text-sm font-semibold rounded-xl hover:bg-neon-green/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none">
@@ -518,7 +537,6 @@ const BLOCK_TYPES = [
   .block-menu-dropdown { backdrop-filter: blur(16px); background: rgba(12,12,18,0.96); }
   .scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
   .scrollbar-none::-webkit-scrollbar { display: none; }
-  /* New type badges */
   .badge-countdown   { background: rgba(251,191,36,0.12);  color: rgb(251,191,36);  border-color: rgba(251,191,36,0.3); }
   .badge-schedule    { background: rgba(99,179,237,0.12);  color: rgb(99,179,237);  border-color: rgba(99,179,237,0.3); }
   .badge-donation    { background: rgba(248,113,113,0.12); color: rgb(248,113,113); border-color: rgba(248,113,113,0.3); }
@@ -532,34 +550,26 @@ const BLOCK_TYPES = [
   .badge-vcard       { background: rgba(99,179,237,0.10);  color: rgb(99,179,237);  border-color: rgba(99,179,237,0.25); }
   .badge-merch       { background: rgba(248,113,113,0.10); color: rgb(248,113,113); border-color: rgba(248,113,113,0.25); }
   .badge-scheduled   { background: rgba(251,191,36,0.08);  color: rgba(251,191,36,0.8); border-color: rgba(251,191,36,0.2); }
-  /* Progress bar */
   .progress-bar { background: linear-gradient(90deg, #00ff9d, #00e88a); border-radius: 99px; }
-  /* Pin tab */
   .pin-tab { position: absolute; top: -1px; left: 14px; width: 2px; height: 8px; background: rgb(251,191,36); border-radius: 0 0 2px 2px; }
-  /* Kit card */
   .kit-card { transition: transform 0.15s ease, border-color 0.15s ease; }
   .kit-card:hover { transform: translateY(-2px); }
-  /* Preview panel slide in */
   #preview-panel.open { display: flex !important; }
   .with-preview { padding-right: 340px; }
-  /* Preview refresh spin */
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   .preview-loading svg { animation: spin 0.8s linear infinite; }
-  /* Inline edit */
   .block-title-editable[contenteditable="true"] {
     outline: none; border-bottom: 1px solid rgba(0,255,157,0.5);
     padding-bottom: 1px; cursor: text; min-width: 40px;
   }
-  /* Copy quick btn */
   .block-copy-btn { opacity: 0; transition: opacity 0.15s; }
   .block-card:hover .block-copy-btn { opacity: 1; }
-  /* Archive card */
   .archive-card { opacity: 0.6; }
   .archive-card:hover { opacity: 1; }
-  /* OG fetch loader */
   #og-loading { transition: opacity 0.2s; }
-  /* Keyboard shortcut hint */
   kbd { font-family: monospace; }
+  /* Aperçu inline — refresh spin */
+  #inline-preview-refresh.spinning svg { animation: spin 0.8s linear infinite; }
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
@@ -650,8 +660,6 @@ const BLOCK_TYPES = [
     });
   }
 
-  const BLOCK_EMOJI2 = BLOCK_EMOJI; // alias kept for archive section below
-
   // ── Archive (soft delete) ─────────────────────────────────────────────────
   let archivedBlocks: any[] = [];
 
@@ -720,7 +728,7 @@ const BLOCK_TYPES = [
     } catch { toast.error('Failed'); }
   });
 
-  // ── Live preview panel ────────────────────────────────────────────────────
+  // ── Live preview panel (bouton Aperçu) ────────────────────────────────────
   const previewPanel   = document.getElementById('preview-panel');
   const previewIframe  = document.getElementById('preview-iframe') as HTMLIFrameElement | null;
   const previewUrlLbl  = document.getElementById('preview-url-label');
@@ -748,9 +756,11 @@ const BLOCK_TYPES = [
     previewIframe.onload = () => btn?.classList.remove('preview-loading');
   }
   function schedulePreviewRefresh() {
-    if (!previewOpen) return;
     if (previewDebounce) clearTimeout(previewDebounce);
-    previewDebounce = setTimeout(loadPreview, 1200);
+    previewDebounce = setTimeout(() => {
+      if (previewOpen) loadPreview();
+      loadInlinePreview();
+    }, 1200);
   }
 
   document.getElementById('preview-toggle-btn')?.addEventListener('click', () => {
@@ -761,6 +771,27 @@ const BLOCK_TYPES = [
   document.getElementById('preview-open-btn')?.addEventListener('click', () => {
     if (profileUrl) window.open(profileUrl, '_blank');
   });
+
+  // ── Aperçu inline ─────────────────────────────────────────────────────────
+  const inlineIframe = document.getElementById('inline-preview-iframe') as HTMLIFrameElement | null;
+  const inlineUrl    = document.getElementById('inline-preview-url');
+
+  function loadInlinePreview() {
+    if (!inlineIframe || !profileUrl) return;
+    const btn = document.getElementById('inline-preview-refresh');
+    btn?.classList.add('spinning');
+    inlineIframe.src = profileUrl + '?preview=1&t=' + Date.now();
+    inlineIframe.onload = () => btn?.classList.remove('spinning');
+    if (inlineUrl) inlineUrl.textContent = `bioforge.click${profileUrl}`;
+  }
+
+  document.getElementById('inline-preview-refresh')?.addEventListener('click', loadInlinePreview);
+  document.getElementById('inline-preview-open')?.addEventListener('click', () => {
+    if (profileUrl) window.open(profileUrl, '_blank');
+  });
+
+  // Charger au démarrage si le panel est visible
+  if (profileUrl) setTimeout(loadInlinePreview, 600);
 
   // ── OG auto-fetch (via microlink.io free tier) ────────────────────────────
   let ogFetchController: AbortController | null = null;
@@ -787,7 +818,6 @@ const BLOCK_TYPES = [
     if (el) el.style.opacity = show ? '1' : '0';
   }
 
-  // Attach OG fetch when URL field changes in edit modal
   function attachOgFetch() {
     const urlField   = document.getElementById('field-url')      as HTMLInputElement | null;
     const titleField = document.getElementById('field-title')    as HTMLInputElement | null;
@@ -913,7 +943,7 @@ const BLOCK_TYPES = [
     if (!grid) return;
     grid.innerHTML = STREAMER_KITS.map(kit => `
       <button class="kit-card group text-left glass border border-white/10 rounded-2xl p-4 hover:border-white/20 w-full"
-        style="" data-kit="${kit.id}">
+        data-kit="${kit.id}">
         <div class="flex items-start justify-between mb-3">
           <div class="text-2xl leading-none">${kit.label.split(' ')[0]}</div>
           <span class="text-xs px-2 py-0.5 rounded-full border font-medium"
@@ -960,7 +990,6 @@ const BLOCK_TYPES = [
     toast.success(`${added} blocks ajoutés depuis le kit ${kit.label} !`);
   }
 
-  // Kit toggle
   let kitVisible = false;
   document.getElementById('kit-toggle-btn')?.addEventListener('click', () => {
     kitVisible = !kitVisible;
@@ -973,7 +1002,7 @@ const BLOCK_TYPES = [
     if (kitVisible) renderStreamerKit();
   });
 
-  // ── Render blocks ─────────────────────────────────────────────────────────
+  // ── Render blocks — VERSION ORIGINALE EXACTE ──────────────────────────────
   function renderBlocks() {
     const container  = document.getElementById('sortable-blocks');
     const noResults  = document.getElementById('no-results');
@@ -1014,8 +1043,7 @@ const BLOCK_TYPES = [
 
       const iconHtml = iconUrl
         ? `<div class="shrink-0 w-9 h-9 rounded-full overflow-hidden border border-white/10 bg-white/5">
-             <img src="${iconUrl}" class="w-full h-full object-cover" loading="lazy"
-               onerror="this.parentElement.innerHTML='<span class=\\'flex items-center justify-center w-full h-full text-base\\'>${BLOCK_EMOJI[block.type] ?? '📌'}</span>'" />
+             <img src="${iconUrl}" class="w-full h-full object-cover" loading="lazy" />
            </div>`
         : platform
           ? `<div class="shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-lg bg-white/5 border border-white/10">${platform.icon}</div>`
@@ -1206,7 +1234,6 @@ const BLOCK_TYPES = [
       btn.addEventListener('click', () => handleDeleteBlock((btn as HTMLElement).dataset.id!)));
   }
 
-  // ── Pin ───────────────────────────────────────────────────────────────────
   async function handlePinBlock(id: string) {
     const block = blocks.find((b: any) => b.id === id);
     if (!block) return;
@@ -1219,7 +1246,6 @@ const BLOCK_TYPES = [
     } catch { toast.error('Failed to update pin'); }
   }
 
-  // ── Sortable ──────────────────────────────────────────────────────────────
   function initSortable() {
     const container = document.getElementById('sortable-blocks');
     if (!container) return;
@@ -1312,7 +1338,6 @@ const BLOCK_TYPES = [
       platLabelEl.textContent = quickPlat?.label ?? 'Link détecté';
       detectZone.classList.remove('hidden'); detectZone.classList.add('flex');
     } else if (val.length > 1) {
-      // Non-URL text → open type modal with search pre-filled
       quickInput.value = '';
       detectZone.classList.add('hidden'); detectZone.classList.remove('flex');
       openTypeModal();
@@ -1400,9 +1425,9 @@ const BLOCK_TYPES = [
         { kind: 'platform', id: 'facebook' },
         { kind: 'platform', id: 'snapchat' },
         { kind: 'platform', id: 'linkedin' },
-        { kind: 'block', type: 'social',   emoji: '👥', label: 'Icônes sociales', desc: 'Grille d\'icônes de tous tes réseaux' },
-        { kind: 'block', type: 'vcard',    emoji: '👤', label: 'vCard',           desc: 'Télécharger mes coordonnées' },
-        { kind: 'block', type: 'newsletter', emoji: '📧', label: 'Newsletter',   desc: 'Capture email' },
+        { kind: 'block', type: 'social',     emoji: '👥', label: 'Icônes sociales', desc: 'Grille d\'icônes de tous tes réseaux' },
+        { kind: 'block', type: 'vcard',      emoji: '👤', label: 'vCard',           desc: 'Télécharger mes coordonnées' },
+        { kind: 'block', type: 'newsletter', emoji: '📧', label: 'Newsletter',      desc: 'Capture email' },
       ],
     },
     {
@@ -1477,7 +1502,6 @@ const BLOCK_TYPES = [
     const nav   = document.getElementById('type-nav')!;
     const panel = document.getElementById('type-panel')!;
 
-    // Sidebar nav
     nav.innerHTML = TYPE_CATEGORIES.map(cat => `
       <button class="type-nav-btn w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium transition-all text-left rounded-lg mx-1 my-0.5
         ${cat.id === activeCatId ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white hover:bg-white/5'}"
@@ -1494,11 +1518,9 @@ const BLOCK_TYPES = [
       });
     });
 
-    // Panel content
     const cat = TYPE_CATEGORIES.find(c => c.id === activeCatId)!;
     let items = cat.items;
 
-    // Search filter
     if (typeSearch) {
       const q = typeSearch.toLowerCase();
       items = TYPE_CATEGORIES.flatMap(c => c.items).filter(item => {
@@ -1508,7 +1530,6 @@ const BLOCK_TYPES = [
         }
         return (item as any).label?.toLowerCase().includes(q) || (item as any).type?.includes(q);
       });
-      // Deduplicate
       const seen = new Set<string>();
       items = items.filter(item => {
         const key = item.kind === 'platform' ? `plat:${item.id}` : `block:${(item as any).type}`;
@@ -1522,8 +1543,7 @@ const BLOCK_TYPES = [
       return;
     }
 
-    // Group into platforms vs blocks
-    const platforms = items.filter(i => i.kind === 'platform');
+    const platforms  = items.filter(i => i.kind === 'platform');
     const blockItems = items.filter(i => i.kind === 'block');
 
     let html = '';
@@ -1569,7 +1589,6 @@ const BLOCK_TYPES = [
 
     panel.innerHTML = html;
 
-    // Attach listeners
     panel.querySelectorAll('.type-plat-row').forEach(btn => {
       btn.addEventListener('click', () => {
         const plat = PLATFORMS.find(p => p.id === (btn as HTMLElement).dataset.pid)!;
@@ -1594,7 +1613,6 @@ const BLOCK_TYPES = [
     setTimeout(() => (document.getElementById('type-search') as HTMLInputElement)?.focus(), 80);
   }
 
-  // Type search handler
   document.getElementById('type-search')?.addEventListener('input', (e: any) => {
     typeSearch  = e.target.value.trim();
     if (typeSearch) activeCatId = 'all';
@@ -1608,7 +1626,6 @@ const BLOCK_TYPES = [
   const IC = 'w-full px-4 py-3 glass border border-white/10 rounded-xl text-white text-sm placeholder-gray-600 focus:border-neon-green/50 focus:outline-none focus:ring-1 focus:ring-neon-green/20 transition-colors';
   const DAYS_FR = ['Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi','Dimanche'];
 
-  // Normalise old format {day,time} → new format {day,slots:[]}
   function normalizeSchedule(raw: any[]): {day: string; slots: string[]}[] {
     return raw.map((s: any) => ({
       day:   s.day,
@@ -1918,18 +1935,15 @@ const BLOCK_TYPES = [
         <div class="space-y-3" id="merch-items-list">
           ${(block?.config?.items?.length ? block.config.items : [{},{},{}]).slice(0,3).map((it: any, i: number) => `
             <div class="merch-item rounded-xl overflow-hidden border border-white/10 bg-white/3" data-i="${i}">
-              <!-- Header article -->
               <div class="flex items-center justify-between px-3 py-2 bg-white/5 border-b border-white/8">
                 <span class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Article ${i+1}</span>
                 <span class="text-xs text-gray-600">Optionnel si vide</span>
               </div>
               <div class="p-3 space-y-2">
-                <!-- Nom + URL côte à côte -->
                 <div class="grid grid-cols-1 gap-2">
                   <input type="text" class="merch-title ${IC}" value="${it.title || ''}" placeholder="Nom du produit" maxlength="80" />
                   <input type="url" class="merch-url ${IC}" value="${it.url || ''}" placeholder="https://throne.com/..." />
                 </div>
-                <!-- Image URL avec preview -->
                 <div class="flex items-center gap-2">
                   <div class="shrink-0 w-12 h-12 rounded-lg overflow-hidden border border-white/15 bg-white/5 flex items-center justify-center" id="merch-img-preview-${i}">
                     ${it.image_url
@@ -1939,7 +1953,6 @@ const BLOCK_TYPES = [
                   </div>
                   <input type="url" class="merch-img ${IC} flex-1" value="${it.image_url || ''}" placeholder="URL image (optionnel)" data-preview-id="merch-img-preview-${i}" />
                 </div>
-                <!-- Prix avec symbole visuel -->
                 <div class="flex gap-2 items-stretch">
                   <div class="relative flex-1">
                     <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-neon-green pointer-events-none select-none merch-currency-symbol">${it.currency === 'USD' ? '$' : it.currency === 'GBP' ? '£' : '€'}</span>
@@ -1958,7 +1971,6 @@ const BLOCK_TYPES = [
     const fields = document.getElementById('form-fields')!;
     fields.innerHTML = fieldHtml[type] ?? `<div class="py-4 text-center text-sm text-gray-500">Type "${type}" non supporté.</div>`;
 
-    // Visibility section visibility
     document.getElementById('schedule-visibility-section')!.classList.toggle('hidden', type === 'spacer');
     const showFrom  = document.getElementById('field-show-from')  as HTMLInputElement | null;
     const showUntil = document.getElementById('field-show-until') as HTMLInputElement | null;
@@ -1969,86 +1981,57 @@ const BLOCK_TYPES = [
     if (type === 'link') setTimeout(attachOgFetch, 50);
     setTimeout(() => (fields.querySelector('input:not([type="checkbox"]):not([type="time"]):not([type="hidden"]), textarea') as HTMLElement|null)?.focus(), 100);
 
-    // Donation platform pills
     if (type === 'donation') {
       document.querySelectorAll('.don-plat-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = (btn as HTMLElement).dataset.plat!;
           (document.getElementById('field-donation-platform') as HTMLInputElement).value = id;
           document.querySelectorAll('.don-plat-btn').forEach(b => {
-            b.classList.toggle('border-neon-green/50', b === btn);
-            b.classList.toggle('bg-neon-green/5', b === btn);
-            b.classList.toggle('text-white', b === btn);
-            b.classList.toggle('border-white/10', b !== btn);
-            b.classList.toggle('text-gray-400', b !== btn);
+            b.classList.toggle('border-neon-green/50', b === btn); b.classList.toggle('bg-neon-green/5', b === btn);
+            b.classList.toggle('text-white', b === btn); b.classList.toggle('border-white/10', b !== btn); b.classList.toggle('text-gray-400', b !== btn);
           });
         });
       });
     }
 
-    // Schedule day checkboxes + multi-slot management
     if (type === 'schedule') {
       function refreshSlotRemoveBtns(day: string) {
         const container = document.getElementById(`sch-slots-${day.toLowerCase()}`);
         if (!container) return;
         const rows = container.querySelectorAll('.sch-slot-row');
-        rows.forEach(row => {
-          const rmBtn = row.querySelector('.rm-slot') as HTMLElement | null;
-          if (rmBtn) rmBtn.style.display = rows.length > 1 ? '' : 'none';
-        });
+        rows.forEach(row => { const rmBtn = row.querySelector('.rm-slot') as HTMLElement | null; if (rmBtn) rmBtn.style.display = rows.length > 1 ? '' : 'none'; });
       }
-
       document.querySelectorAll('.sch-day-cb').forEach((cb: any) => {
         cb.addEventListener('change', () => {
-          const day       = cb.dataset.day as string;
+          const day = cb.dataset.day as string;
           const container = document.getElementById(`sch-slots-${day.toLowerCase()}`);
-          const addBtn    = container?.querySelector('.add-slot') as HTMLElement | null;
+          const addBtn = container?.querySelector('.add-slot') as HTMLElement | null;
           if (!container) return;
-          const active = cb.checked;
-          container.classList.toggle('opacity-30',        !active);
-          container.classList.toggle('pointer-events-none', !active);
-          if (addBtn) addBtn.classList.toggle('hidden', !active);
+          container.classList.toggle('opacity-30', !cb.checked); container.classList.toggle('pointer-events-none', !cb.checked);
+          if (addBtn) addBtn.classList.toggle('hidden', !cb.checked);
         });
       });
-
       document.querySelectorAll('.add-slot').forEach(btn => {
         btn.addEventListener('click', () => {
-          const day       = (btn as HTMLElement).dataset.day!;
+          const day = (btn as HTMLElement).dataset.day!;
           const container = document.getElementById(`sch-slots-${day.toLowerCase()}`);
           if (!container) return;
-          const addBtnEl  = container.querySelector('.add-slot');
-          const row       = document.createElement('div');
-          row.className   = 'sch-slot-row flex items-center gap-2';
-          row.dataset.day = day;
-          row.innerHTML   = `
-            <input type="time" class="sch-time-input px-3 py-1.5 glass border border-white/10 rounded-lg text-white text-sm focus:border-neon-green/40 focus:outline-none transition-colors w-28"
-              data-day="${day}" value="20:00" />
-            <button type="button" class="rm-slot text-gray-600 hover:text-red-400 transition-colors shrink-0" data-day="${day}">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>`;
-          row.querySelector('.rm-slot')?.addEventListener('click', () => {
-            row.remove();
-            refreshSlotRemoveBtns(day);
-          });
+          const addBtnEl = container.querySelector('.add-slot');
+          const row = document.createElement('div');
+          row.className = 'sch-slot-row flex items-center gap-2'; row.dataset.day = day;
+          row.innerHTML = `<input type="time" class="sch-time-input px-3 py-1.5 glass border border-white/10 rounded-lg text-white text-sm focus:border-neon-green/40 focus:outline-none transition-colors w-28" data-day="${day}" value="20:00" /><button type="button" class="rm-slot text-gray-600 hover:text-red-400 transition-colors shrink-0" data-day="${day}"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>`;
+          row.querySelector('.rm-slot')?.addEventListener('click', () => { row.remove(); refreshSlotRemoveBtns(day); });
           container.insertBefore(row, addBtnEl);
           refreshSlotRemoveBtns(day);
           (row.querySelector('input') as HTMLElement)?.focus();
         });
       });
-
       document.querySelectorAll('.rm-slot').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const day = (btn as HTMLElement).dataset.day!;
-          btn.closest('.sch-slot-row')?.remove();
-          refreshSlotRemoveBtns(day);
-        });
+        btn.addEventListener('click', () => { const day = (btn as HTMLElement).dataset.day!; btn.closest('.sch-slot-row')?.remove(); refreshSlotRemoveBtns(day); });
       });
-
-      // Init remove button visibility
       DAYS_FR.forEach((day: string) => refreshSlotRemoveBtns(day));
     }
 
-    // Visibility accordion
     document.getElementById('visibility-toggle')?.addEventListener('click', () => {
       const panel = document.getElementById('visibility-panel');
       panel?.classList.toggle('hidden');
@@ -2056,14 +2039,13 @@ const BLOCK_TYPES = [
       if (ch) ch.style.transform = panel?.classList.contains('hidden') ? '' : 'rotate(180deg)';
     });
 
-    // Icon live preview
     const iconInput = document.getElementById('field-icon-url') as HTMLInputElement | null;
     const iconWrap  = document.getElementById('icon-preview-wrap');
     if (iconInput && iconWrap) {
       const empty = `<svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`;
       iconInput.addEventListener('input', () => {
         const u = iconInput.value.trim();
-        iconWrap.innerHTML = u ? `<img src="${u}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='${empty.replace(/'/g,"\\'")}'"/>` : empty;
+        iconWrap.innerHTML = u ? `<img src="${u}" class="w-full h-full object-cover" />` : empty;
       });
       const urlField = document.getElementById('field-url') as HTMLInputElement | null;
       urlField?.addEventListener('blur', () => {
@@ -2073,21 +2055,17 @@ const BLOCK_TYPES = [
       });
     }
 
-    // MerchGrid: image preview live + currency symbol update
     if (type === 'merch_grid') {
       const CURRENCY_SYMBOLS = { EUR: '€', USD: '$', GBP: '£' };
-      const emptyImgSvg = '<svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>';
       document.querySelectorAll('.merch-img').forEach(inp => {
-        const input     = inp;
+        const input     = inp as HTMLInputElement;
         const previewId = input.dataset.previewId;
         if (!previewId) return;
         const preview = document.getElementById(previewId);
         if (!preview) return;
         input.addEventListener('input', () => {
           const u = input.value.trim();
-          preview.innerHTML = u
-            ? `<img src="${u}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML=this.dataset.empty" data-empty="${emptyImgSvg.replace(/"/g, '&quot;')}" />`
-            : emptyImgSvg;
+          preview.innerHTML = u ? `<img src="${u}" class="w-full h-full object-cover" />` : `<svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>`;
         });
       });
       document.querySelectorAll('.merch-currency').forEach(sel => {
@@ -2099,7 +2077,6 @@ const BLOCK_TYPES = [
       });
     }
 
-    // Banner preset pills
     if (type === 'banner') {
       const badgeInput  = document.getElementById('field-banner-badge')  as HTMLInputElement | null;
       const presetInput = document.getElementById('field-banner-preset') as HTMLInputElement | null;
@@ -2109,34 +2086,26 @@ const BLOCK_TYPES = [
           if (badgeInput)  badgeInput.value  = p;
           if (presetInput) presetInput.value = p;
           document.querySelectorAll('.banner-preset-btn').forEach(b => {
-            b.classList.toggle('border-neon-green/50', b === btn);
-            b.classList.toggle('bg-neon-green/10',    b === btn);
-            b.classList.toggle('text-white',           b === btn);
-            b.classList.toggle('border-white/15',      b !== btn);
-            b.classList.toggle('text-gray-500',        b !== btn);
+            b.classList.toggle('border-neon-green/50', b === btn); b.classList.toggle('bg-neon-green/10', b === btn);
+            b.classList.toggle('text-white', b === btn); b.classList.toggle('border-white/15', b !== btn); b.classList.toggle('text-gray-500', b !== btn);
           });
         });
       });
     }
 
-    // Newsletter provider pills
     if (type === 'newsletter') {
       document.querySelectorAll('.nl-plat-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const p = (btn as HTMLElement).dataset.prov!;
           (document.getElementById('field-nl-provider') as HTMLInputElement).value = p;
           document.querySelectorAll('.nl-plat-btn').forEach(b => {
-            b.classList.toggle('border-neon-green/50', b === btn);
-            b.classList.toggle('bg-neon-green/5',      b === btn);
-            b.classList.toggle('text-white',            b === btn);
-            b.classList.toggle('border-white/10',       b !== btn);
-            b.classList.toggle('text-gray-400',         b !== btn);
+            b.classList.toggle('border-neon-green/50', b === btn); b.classList.toggle('bg-neon-green/5', b === btn);
+            b.classList.toggle('text-white', b === btn); b.classList.toggle('border-white/10', b !== btn); b.classList.toggle('text-gray-400', b !== btn);
           });
         });
       });
     }
 
-    // Poll options: add / remove
     if (type === 'poll') {
       function updatePollRemoveBtns() {
         const rows = document.querySelectorAll('.poll-option-row');
@@ -2167,10 +2136,8 @@ const BLOCK_TYPES = [
         document.querySelectorAll('.rm-poll-option').forEach(btn => {
           btn.addEventListener('click', () => {
             btn.closest('.poll-option-row')?.remove();
-            // Renumber
             document.querySelectorAll('.poll-option-row').forEach((row, i) => {
-              const sp = row.querySelector('span') as HTMLElement;
-              if (sp) sp.textContent = `${i+1}.`;
+              const sp = row.querySelector('span') as HTMLElement; if (sp) sp.textContent = `${i+1}.`;
             });
             updatePollRemoveBtns();
           });
@@ -2253,8 +2220,7 @@ const BLOCK_TYPES = [
           if (!cb.checked) return;
           const day   = cb.dataset.day as string;
           const times = Array.from(document.querySelectorAll(`.sch-time-input[data-day="${day}"]`))
-            .map(el => (el as HTMLInputElement).value)
-            .filter(Boolean);
+            .map(el => (el as HTMLInputElement).value).filter(Boolean);
           scheduleMap.set(day, times.length ? times : ['20:00']);
         });
         if (!scheduleMap.size) { toast.error('Coche au moins un jour'); return; }
@@ -2427,7 +2393,6 @@ const BLOCK_TYPES = [
   async function handleDeleteBlock(id: string) {
     const block = blocks.find((b: any) => b.id === id);
     if (!block) return;
-    // Soft delete → archive (keep in DB as inactive, remove from UI)
     try {
       await apiCall(`/api/blocks/${id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ active: false }) });
       blocks = blocks.filter((b: any) => b.id !== id);
